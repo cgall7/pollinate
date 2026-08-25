@@ -1,0 +1,161 @@
+{
+  "owner": "Fizz, wave-3 triage (Lumen ruling, UX Design 2026-08-25: ratchet baseline, not a blocking sweep — shrink-wrap likely renders these fixed-value keys identically today, misplaced by convention rather than confirmed visibly broken)",
+  "entries": [
+    {
+      "file": "src/components/BackButton.js",
+      "styleKey": "button",
+      "key": "width",
+      "line": 30
+    },
+    {
+      "file": "src/components/HiveCard.js",
+      "styleKey": "card",
+      "key": "width",
+      "line": 49
+    },
+    {
+      "file": "src/components/StartHiveDoorCard.js",
+      "styleKey": "card",
+      "key": "width",
+      "line": 27
+    },
+    {
+      "file": "src/navigation/AccountDoor.js",
+      "styleKey": "door",
+      "key": "width",
+      "line": 54
+    },
+    {
+      "file": "src/screens/ComposeNote.js",
+      "styleKey": "recipientChip",
+      "key": "width",
+      "line": 156
+    },
+    {
+      "file": "src/screens/CoreRitual.js",
+      "styleKey": "demoDataLink",
+      "key": "alignSelf",
+      "line": 277
+    },
+    {
+      "file": "src/screens/CoreRitual.js",
+      "styleKey": "demoDataLink",
+      "key": "marginTop",
+      "line": 278
+    },
+    {
+      "file": "src/screens/CreateHive.js",
+      "styleKey": "cadenceCard",
+      "key": "marginBottom",
+      "line": 383
+    },
+    {
+      "file": "src/screens/EveningMirror.js",
+      "styleKey": "closeButton",
+      "key": "marginTop",
+      "line": 120
+    },
+    {
+      "file": "src/screens/HoneycombTab.js",
+      "styleKey": "gateSignInLink",
+      "key": "alignSelf",
+      "line": 780
+    },
+    {
+      "file": "src/screens/HoneycombTab.js",
+      "styleKey": "gateSignInLink",
+      "key": "marginTop",
+      "line": 781
+    },
+    {
+      "file": "src/screens/MemoryLane.js",
+      "styleKey": "closeButton",
+      "key": "width",
+      "line": 236
+    },
+    {
+      "file": "src/screens/MonthlyRecap.js",
+      "styleKey": "titleRow",
+      "key": "marginBottom",
+      "line": 472
+    },
+    {
+      "file": "src/screens/NotesInbox.js",
+      "styleKey": "row",
+      "key": "marginBottom",
+      "line": 224
+    },
+    {
+      "file": "src/screens/Onboarding.js",
+      "styleKey": "signInLink",
+      "key": "alignSelf",
+      "line": 1041
+    },
+    {
+      "file": "src/screens/Onboarding.js",
+      "styleKey": "signInLink",
+      "key": "marginTop",
+      "line": 1042
+    },
+    {
+      "file": "src/screens/Onboarding.js",
+      "styleKey": "declineLink",
+      "key": "alignSelf",
+      "line": 1090
+    },
+    {
+      "file": "src/screens/Onboarding.js",
+      "styleKey": "declineLink",
+      "key": "marginTop",
+      "line": 1091
+    },
+    {
+      "file": "src/screens/Onboarding.js",
+      "styleKey": "skipDemoLink",
+      "key": "alignSelf",
+      "line": 1099
+    },
+    {
+      "file": "src/screens/Onboarding.js",
+      "styleKey": "skipDemoLink",
+      "key": "marginTop",
+      "line": 1100
+    },
+    {
+      "file": "src/screens/PackageOpen.js",
+      "styleKey": "closeButton",
+      "key": "width",
+      "line": 247
+    },
+    {
+      "file": "src/screens/PlantSeed.js",
+      "styleKey": "recipientChip",
+      "key": "width",
+      "line": 333
+    },
+    {
+      "file": "src/screens/ReceivedPackages.js",
+      "styleKey": "row",
+      "key": "marginBottom",
+      "line": 159
+    },
+    {
+      "file": "src/screens/SealHive.js",
+      "styleKey": "backLink",
+      "key": "marginTop",
+      "line": 254
+    },
+    {
+      "file": "src/screens/SeedsInbox.js",
+      "styleKey": "row",
+      "key": "marginBottom",
+      "line": 382
+    },
+    {
+      "file": "src/screens/SendHive.js",
+      "styleKey": "backLink",
+      "key": "marginTop",
+      "line": 216
+    }
+  ]
+}

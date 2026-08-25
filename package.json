@@ -44,7 +44,8 @@
     "preflight:prod-schema": "node scripts/prod-schema-check.mjs",
     "check:absolute-fill": "node scripts/check-absolute-fill.mjs",
     "check:svg-stop-alpha": "node scripts/check-svg-stop-alpha.mjs",
-    "check:pressable-layout": "node scripts/check-pressable-layout.mjs"
+    "check:pressable-layout": "node scripts/check-pressable-layout.mjs",
+    "ratchet:update": "node scripts/ratchet-update.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dancing-script": "^0.4.2",

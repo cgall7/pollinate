@@ -9,16 +9,14 @@
 //
 //   npm run check:pressable-layout
 //
-// CreateHive.js:146's cover-theme picker is the caught instance:
-// `styles.themeCard` carries `width: '48%'` on `style`, so every swatch
-// renders at its content's natural width (measured on device: 81.67pt where
-// the 354pt grid's 48% is 169.9pt) and every label clips. The component's
-// own doc comment (PressableScale.js:11-16, Pixel, R43 gate, 2026-08-11)
-// names this exact defect and ships the fix (`containerStyle`) undefined by
-// default — "zero change for every existing consumer" is the tell: the
-// remedy was built, documented, and adopted nowhere. Lumen: "the second
-// documented-hazard-never-swept uncovered today, and this one's
-// documentation lives inside the component that bites."
+// CreateHive.js's cover-theme picker was the caught instance (fixed on
+// `wave2@7d73dbf`, no longer live): `styles.themeCard` carried
+// `width: '48%'` on `style`, so every swatch rendered at its content's
+// natural width instead of the 354pt grid's 48%. The component's own doc
+// comment (PressableScale.js:11-16, Pixel, R43 gate, 2026-08-11) names this
+// exact defect and shipped the fix (`containerStyle`) undefined by default —
+// "zero change for every existing consumer" is the tell: the remedy was
+// built, documented, and adopted nowhere.
 //
 // WHAT IT ASSERTS. For every `<PressableScale>` JSX element (matched by the
 // local binding of `import { PressableScale } from '.../PressableScale'`),
@@ -40,10 +38,34 @@
 // those govern the box's own children or don't depend on which node in the
 // pair receives them; only the keys a *parent* resolves against the box
 // itself are in scope, per Lumen's routing.
+//
+// THE RATCHET (Lumen, 2026-08-25, after the wave2 device re-pass). First
+// sweep on `wave2`'s pre-fix base: 25 hits. Fizz's `7d73dbf` fixed the two
+// provably-circular percentage sites (CreateHive, PrimaryButton) as part of
+// the ruled blocking work; the honest live count on top of that fix is 23 —
+// fixed-value keys that shrink-wrap likely renders identically today
+// whether on `style` or `containerStyle` (misplaced by convention, not
+// confirmed visibly broken). Lumen's ruling: ratchet baseline, not a
+// blocking sweep — 20 files of churn plus a full device sweep isn't worth
+// holding wave2 for. Same R16 discipline as check-safe-area/
+// check-spring-adoption (GUIDES/HEX_TAP_SPEC_LUXURY_PASS.md, "R15/R16/R17
+// Build Review"): stable identity (`file:styleKey:bannedKey`, not line —
+// R16a), monotone updates only via `npm run ratchet:update` (R16b), a named
+// owner asserted by the suite itself, not just printed (R16/R17).
+//
+// scripts/lib/ratchet.mjs and scripts/lib/ratchet-keys.mjs are copied
+// verbatim from `sage/luxury-gates-v2@19062c3` (the already-reviewed R16/R17
+// mechanism) rather than re-derived — that branch hasn't merged to `main`/
+// `wave2` yet, so this is the first ratcheted gate to land on this lineage.
+// When `luxury-gates-v2` merges, `ratchet-keys.mjs` and `ratchet-update.mjs`
+// will need reconciling with that branch's safe-area/spring-adoption
+// entries — noted here so it isn't a surprise.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile, readdir } from 'node:fs/promises';
 import { parse } from '@babel/parser';
+import { loadBaseline, diffAgainstBaseline, ownerIsNamed } from './lib/ratchet.mjs';
+import { pressableLayoutKeyOf } from './lib/ratchet-keys.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ENTRY = path.join(ROOT, 'App.js');
@@ -61,6 +83,12 @@ const BANNED_KEYS = new Set([
   'marginHorizontal',
   'marginVertical',
 ]);
+
+// `--dump-json` (ratchet-update.mjs) wants only the final JSON on stdout —
+// same convention as check-safe-area.mjs.
+const DUMP_JSON = process.argv.includes('--dump-json');
+const realLog = console.log;
+if (DUMP_JSON) console.log = () => {};
 
 let pass = 0;
 const failures = [];
@@ -106,13 +134,17 @@ const propKeyName = (prop) => {
   return null; // computed key — not statically resolvable, out of scope
 };
 
-// Resolve `expr` to the set of ObjectExpression nodes it could evaluate to,
+// Resolve `expr` to the set of { obj, styleKey } it could evaluate to,
 // same-file only, bounded depth. Mirrors check-svg-stop-alpha's tracing.
+// `styleKey` is the StyleSheet.create property name when resolved via
+// `styles.x` (R16a's stable identity); `null` for an inline object literal
+// or a local binding not traced to a named key — those fall back to
+// line-sensitivity, same as check-spring-adoption's ungeneralizable case.
 const resolveStyleObjects = (expr, ctx, depth = 0) => {
   if (!expr || depth > 4) return [];
   switch (expr.type) {
     case 'ObjectExpression':
-      return [expr];
+      return [{ obj: expr, styleKey: null }];
     case 'ArrayExpression':
       return expr.elements.flatMap((el) => resolveStyleObjects(el, ctx, depth + 1));
     case 'LogicalExpression': // `cond && styles.x`
@@ -133,7 +165,10 @@ const resolveStyleObjects = (expr, ctx, depth = 0) => {
       if (!sheet) return [];
       const entry = sheet.properties.find((p) => propKeyName(p) === expr.property.name);
       if (!entry || entry.type !== 'ObjectProperty') return [];
-      return resolveStyleObjects(entry.value, ctx, depth + 1);
+      return resolveStyleObjects(entry.value, ctx, depth + 1).map((r) => ({
+        obj: r.obj,
+        styleKey: r.styleKey ?? expr.property.name,
+      }));
     }
     default:
       return []; // CallExpression (e.g. StyleSheet.flatten), spreads, etc. — unresolved, judged innocent
@@ -142,6 +177,7 @@ const resolveStyleObjects = (expr, ctx, depth = 0) => {
 
 let filesChecked = 0;
 let elementsChecked = 0;
+const violations = [];
 
 for (const file of files) {
   const src = await readFile(file, 'utf8');
@@ -209,13 +245,13 @@ for (const file of files) {
     const styleExpr =
       styleAttr.value && styleAttr.value.type === 'JSXExpressionContainer' ? styleAttr.value.expression : null;
 
-    const objects = resolveStyleObjects(styleExpr, ctx);
+    const resolved = resolveStyleObjects(styleExpr, ctx);
     const hits = [];
-    for (const obj of objects) {
+    for (const { obj, styleKey } of resolved) {
       for (const prop of obj.properties) {
         const keyName = propKeyName(prop);
         if (keyName && BANNED_KEYS.has(keyName)) {
-          hits.push({ key: keyName, line: prop.loc.start.line });
+          hits.push({ key: keyName, line: prop.loc.start.line, styleKey: styleKey ?? `<inline>@${line}` });
         }
       }
     }
@@ -223,13 +259,7 @@ for (const file of files) {
     if (hits.length === 0) {
       ok(`${rel(file)}:${line} <PressableScale> style has no layout-positioning keys`);
     } else {
-      const detail = hits.map((h) => `${h.key} (line ${h.line})`).join(', ');
-      bad(
-        `${rel(file)}:${line} <PressableScale> style carries layout-positioning keys`,
-        `${detail} — style only reaches the inner Animated.View, so these ` +
-          `resolve against a Pressable that shrinks to its content instead of ` +
-          `the parent grid; move to containerStyle`,
-      );
+      for (const h of hits) violations.push({ file: rel(file), styleKey: h.styleKey, key: h.key, line: h.line });
     }
   }
 }
@@ -244,6 +274,48 @@ if (elementsChecked === 0) {
 } else {
   ok(`checked ${elementsChecked} <PressableScale> element(s)`);
 }
+
+// De-dupe by (file, styleKey, key): two JSX call sites can reference the
+// same StyleSheet.create entry (MemoryLane.js's closeButton, PackageOpen.js's
+// closeButton — each rendered from two places), and the defect lives in the
+// shared style object, not per call site — one ratchet row, not two
+// colliding ones. First occurrence (lowest line) wins.
+const seenViolationKeys = new Set();
+const dedupedViolations = [];
+for (const v of violations) {
+  const k = `${v.file}:${v.styleKey}:${v.key}`;
+  if (seenViolationKeys.has(k)) continue;
+  seenViolationKeys.add(k);
+  dedupedViolations.push(v);
+}
+violations.length = 0;
+violations.push(...dedupedViolations);
+violations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+
+// `--dump-json` (ratchet-update.mjs) — print the live violations and exit,
+// skip the ratchet diff/assertions below. Kept separate so a baseline can
+// only ever be regenerated as an explicit, visible step.
+if (DUMP_JSON) {
+  realLog(JSON.stringify({ layoutKeys: violations }));
+  process.exit(0);
+}
+
+console.log(`\n--- PressableScale style carrying a layout-positioning key (${violations.length}) ---`);
+for (const v of violations) console.log(`  ${v.file}:${v.line}  styles.${v.styleKey}.${v.key}`);
+
+const baseline = loadBaseline(path.join(ROOT, 'scripts', 'baselines', 'pressable-layout.json'));
+const diff = diffAgainstBaseline(violations, baseline.entries, pressableLayoutKeyOf);
+console.log(
+  `\n${diff.stillOpen} already in the baseline (owner: ${baseline.owner}) — ${diff.added.length} new, ${diff.stale.length} baseline rows no longer reproduced`,
+);
+for (const v of diff.added) console.log(`  NEW, not in baseline: ${pressableLayoutKeyOf(v)}  styles.${v.styleKey}.${v.key}`);
+for (const v of diff.stale) console.log(`  STALE baseline row, run \`npm run ratchet:update\` to retire it: ${pressableLayoutKeyOf(v)}`);
+if (diff.added.length === 0) ok('no PressableScale layout key beyond the checked-in ratchet baseline');
+else bad('no PressableScale layout key beyond the checked-in ratchet baseline', diff.added.map(pressableLayoutKeyOf).join(', '));
+if (diff.stale.length === 0) ok('every ratchet-baselined layout-key entry still reproduces (or has been retired via ratchet:update)');
+else bad('every ratchet-baselined layout-key entry still reproduces (or has been retired via ratchet:update)', diff.stale.map(pressableLayoutKeyOf).join(', '));
+if (ownerIsNamed(baseline.owner)) ok('pressable-layout.json owner names an actual owner, not "unassigned"');
+else bad('pressable-layout.json owner names an actual owner, not "unassigned"', JSON.stringify(baseline.owner));
 
 console.log(`\ncheck-pressable-layout: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
