@@ -46,10 +46,15 @@ const NoteRow = ({ note, direction, onPress }) => {
 // route — one screen already holds the list, so a second navigation hop
 // just to show four fields would be more chrome than content.
 const NoteDetail = ({ note, direction, onClose }) => {
+  const insets = useSafeAreaInsets();
   const person = direction === 'received' ? note.sender : note.recipient;
   return (
     <View style={styles.detailOverlay}>
-      <PressableScale onPress={onClose} style={styles.detailClose} haptic={null}>
+      <PressableScale
+        onPress={onClose}
+        style={[styles.detailClose, { top: insets.top + CHROME_TOP_GAP }]}
+        haptic={null}
+      >
         <Ionicons name="close" size={24} color={theme.colors.inkSoft} />
       </PressableScale>
       <View style={styles.detailCard}>
@@ -258,7 +263,6 @@ const styles = StyleSheet.create({
   },
   detailClose: {
     position: 'absolute',
-    top: 64,
     right: 24,
   },
   detailCard: {

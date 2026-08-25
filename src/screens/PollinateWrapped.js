@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Pressable, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,6 +12,7 @@ import { EntryStore } from '../services/EntryStore';
 import { dominantTheme } from '../utils/themeTagger';
 import { startOfYear, endOfYear, longestStreak } from '../utils/dateRanges';
 import { DURATIONS, SPRINGS, useReducedMotion } from '../constants/motion';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 const DISMISS_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -96,6 +98,7 @@ const buildSlidesFromEntries = (entries, year) => {
 };
 
 export const PollinateWrapped = ({ onComplete }) => {
+  const insets = useSafeAreaInsets();
   // The read is a Supabase call behind an auth check (P0-2), so it can throw
   // — signed out, offline, a hiccup. `readState` tracks how it ended;
   // `slides` only ever holds a real or demo deck, never a stand-in for
@@ -169,7 +172,7 @@ export const PollinateWrapped = ({ onComplete }) => {
           hitSlop={DISMISS_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel="Close"
-          style={styles.unknownDismiss}
+          style={[styles.unknownDismiss, { top: insets.top + CHROME_TOP_GAP }]}
         >
           <Ionicons name="chevron-down" size={26} color={theme.colors.ink} />
         </TouchableOpacity>
@@ -209,7 +212,7 @@ export const PollinateWrapped = ({ onComplete }) => {
 
   return (
     <Pressable style={styles.container} onPress={nextSlide}>
-      <View style={styles.progressContainer}>
+      <View style={[styles.progressContainer, { top: insets.top + CHROME_TOP_GAP }]}>
         {slides.map((_, i) => (
           <ProgressSegment key={i} filled={i <= currentSlide} />
         ))}
@@ -285,13 +288,11 @@ const styles = StyleSheet.create({
   // this screen has no ScreenHeader to hang a left slot on.
   unknownDismiss: {
     position: 'absolute',
-    top: 60,
     left: 20,
   },
   progressContainer: {
     flexDirection: 'row',
     position: 'absolute',
-    top: 60,
     left: 20,
     right: 20,
     height: 4,

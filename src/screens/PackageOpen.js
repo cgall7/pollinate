@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +10,7 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 import {
   STUB_GRAMMAR,
   buildRevealSequence,
@@ -43,6 +45,7 @@ import {
 // ending is a plain close for this pass — flagged to Sage/Colin as an open
 // item rather than shipped as UI with nothing behind it.
 export const PackageOpenScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { hiveId } = route.params;
   const reduced = useReducedMotion();
 
@@ -153,7 +156,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       <View style={[styles.container, styles.centered, { backgroundColor: cover.base }]}>
         <PressableScale
           onPress={() => navigation.goBack()}
-          style={styles.closeButton}
+          style={[styles.closeButton, { top: insets.top + CHROME_TOP_GAP }]}
           accessibilityLabel="Close"
         >
           <Ionicons name="close" size={22} color={cover.textColor} />
@@ -170,7 +173,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     <View style={[styles.container, { backgroundColor: cover.base }]}>
       <PressableScale
         onPress={() => navigation.goBack()}
-        style={styles.closeButton}
+        style={[styles.closeButton, { top: insets.top + CHROME_TOP_GAP }]}
         accessibilityLabel="Close package"
       >
         <Ionicons name="close" size={22} color={cover.textColor} />
@@ -241,7 +244,6 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 60,
     right: 24,
     zIndex: 1,
     width: 40,

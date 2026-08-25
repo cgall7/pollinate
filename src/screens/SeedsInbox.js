@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../constants/theme';
@@ -9,6 +10,7 @@ import { PressableScale } from '../components/PressableScale';
 import { Avatar } from '../components/Avatar';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // 8.4 — the surface that makes a planted seed exist.
 //
@@ -88,6 +90,7 @@ const SeedRow = ({ seed, direction, onPress }) => {
 };
 
 const SeedDetail = ({ seed, direction, onClose }) => {
+  const insets = useSafeAreaInsets();
   const person = direction === DIRECTIONS.RECEIVED ? seed.sender : seed.recipient;
   const { view } = resolveSeedView(seed);
   const sealed = view === SEED_VIEWS.SEALED;
@@ -95,7 +98,11 @@ const SeedDetail = ({ seed, direction, onClose }) => {
 
   return (
     <View style={styles.detailOverlay}>
-      <PressableScale onPress={onClose} style={styles.detailClose} haptic={null}>
+      <PressableScale
+        onPress={onClose}
+        style={[styles.detailClose, { top: insets.top + CHROME_TOP_GAP }]}
+        haptic={null}
+      >
         <Ionicons name="close" size={24} color={theme.colors.inkSoft} />
       </PressableScale>
       <View style={styles.detailCard}>
@@ -464,7 +471,6 @@ const styles = StyleSheet.create({
   },
   detailClose: {
     position: 'absolute',
-    top: 24,
     right: 24,
   },
   detailCard: {

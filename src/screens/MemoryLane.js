@@ -164,7 +164,11 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
   if (error) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: cover.base }]}>
-        <PressableScale onPress={() => navigation.goBack()} style={styles.closeButton} accessibilityLabel="Close">
+        <PressableScale
+          onPress={() => navigation.goBack()}
+          style={[styles.closeButton, { top: insets.top + CHROME_TOP_GAP }]}
+          accessibilityLabel="Close"
+        >
           <Ionicons name="close" size={22} color={cover.textColor} />
         </PressableScale>
         <Text style={styles.emptyTitle}>We couldn't reach this hive.</Text>
@@ -179,7 +183,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
     <View style={[styles.container, { backgroundColor: cover.base }]}>
       <PressableScale
         onPress={() => navigation.goBack()}
-        style={styles.closeButton}
+        style={[styles.closeButton, { top: insets.top + CHROME_TOP_GAP }]}
         accessibilityLabel="Close memory lane"
       >
         <Ionicons name="close" size={22} color={cover.textColor} />
@@ -233,7 +237,6 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 60,
     right: 24,
     zIndex: 1,
     width: 40,

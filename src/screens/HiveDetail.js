@@ -88,7 +88,10 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   if (error || !hive) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <PressableScale onPress={() => navigation.goBack()} style={styles.backButtonFloating}>
+        <PressableScale
+          onPress={() => navigation.goBack()}
+          style={[styles.backButtonFloating, { top: insets.top + CHROME_TOP_GAP }]}
+        >
           <Ionicons name="chevron-back" size={22} color={theme.colors.ink} />
         </PressableScale>
         <Text style={styles.emptyTitle}>We couldn't reach this hive.</Text>
@@ -237,7 +240,6 @@ const styles = StyleSheet.create({
   },
   backButtonFloating: {
     position: 'absolute',
-    top: 60,
     left: 24,
     width: 40,
     height: 40,
