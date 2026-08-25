@@ -2,7 +2,7 @@
 // component that draws it so a gate can import the numbers. Every figure here
 // is a property of that specific drawing, so it is re-derived, never retyped.
 //
-// **THE MASTER OF RECORD IS `GUIDES/assets/final-mascot-2026-08-25-espresso.png`.**
+// **THE MASTER OF RECORD IS `design/final-mascot-2026-08-25-espresso.png`.**
 // The line this replaces named `final-mascot-2026-08-12.png` and said to re-run
 // the export if the render ever changes. That was true about the GEOMETRY —
 // every figure below reproduces from either file — and false about the PIXELS,
@@ -16,9 +16,13 @@
 // APPLIED BELOW IT. The 08-25 master carries the espresso decision, so the
 // chain is honest again and this comment is safe to follow.
 //
-// Pipeline, in order, both scripts banked at `GUIDES/assets/pipeline/`:
+// Pipeline, in order, in `design/pipeline/` — see `design/README.md`:
 //   build_layers.py  master -> wing_full/body_full   (R82's split)
 //   cut.py           -> assets/mascot-{wing,body}.png + the hero LOD
+//
+// `build_layers.py` defaults to the espresso master and REFUSES the 08-12 one
+// by inspecting its irises, not by its name — a rename only moves a trap. It
+// is a guard rather than a comment because a comment is what failed here.
 //
 // Acceptance for the repair was a ROUND TRIP, not a colour match (Lumen's bar,
 // 2026-08-25): the repaired master back through the chain must reproduce what
