@@ -383,6 +383,145 @@ check(
   []
 );
 
+console.log('\n── D2. hive prompt ladders inherit the spark contract, and the selector is pure (ENG-44/45/45.4) ──');
+
+// hivePrompts.js is the Project 16 prompt engine (spec §16.2-16.3). Its
+// ladders start empty — COPY-1 (Lumen) has not landed yet — so most of
+// this section is vacuously true today. That is correct: the point is
+// CI catches a contract violation the moment copy lands, not that this
+// gate has something to fail on right now.
+const hivePromptsAst = await ast('src/constants/hivePrompts.js');
+const hivePrompts = await import(path.join(ROOT, 'src/constants/hivePrompts.js'));
+const {
+  HIVE_PROMPT_LADDERS,
+  RELATIONSHIP_TO_REGISTER,
+  registerForRelationship,
+  selectHivePrompt,
+} = hivePrompts;
+
+const EXPECTED_HIVE_BUCKETS = {
+  child: ['0-1', '1-3', '3-7', '7-12', '12-18', '18+'],
+  partner: ['0-1y', '1-3y', '3-10y', '10y+'],
+  parent: ['new', 'established'],
+  friend: ['new', 'established'],
+};
+check(
+  'walker control: all 4 prompt registers exist (spec §16.2)',
+  Object.keys(HIVE_PROMPT_LADDERS).sort(),
+  Object.keys(EXPECTED_HIVE_BUCKETS).sort()
+);
+for (const [register, buckets] of Object.entries(EXPECTED_HIVE_BUCKETS)) {
+  check(
+    `${register} ladder has exactly its spec §16.3 age buckets`,
+    Object.keys(HIVE_PROMPT_LADDERS[register] ?? {}),
+    buckets
+  );
+}
+check(
+  'every DB relationship value (spec §16.1: 7 values) maps to one of the 4 registers',
+  Object.entries(RELATIONSHIP_TO_REGISTER).filter(([, register]) => !EXPECTED_HIVE_BUCKETS[register]),
+  []
+);
+check(
+  'sibling/mentor/other fall back to friend (spec §16.2)',
+  ['sibling', 'mentor', 'other'].map((r) => registerForRelationship(r)),
+  ['friend', 'friend', 'friend']
+);
+
+// THE COMPOSITION CONTRACT, inherited verbatim from prompts.js (spec §16.2):
+// same three rules, enumerated across every register and bucket at once —
+// a duplicate spark in child/0-1 and friend/new is just as visible to a
+// user who owns both hives as a duplicate inside one deck.
+const allHiveSparks = Object.values(HIVE_PROMPT_LADDERS)
+  .flatMap((ladder) => Object.values(ladder).flat())
+  .flatMap((p) => p.sparks ?? []);
+check(
+  'no hive spark starts with a capital (composed mid-sentence, after "I am grateful for")',
+  allHiveSparks.filter((s) => /^[A-Z]/.test(s)),
+  []
+);
+check(
+  'no hive spark starts with a preposition (composed as the OBJECT of "for")',
+  allHiveSparks.filter((s) => /^(in|on|at|with|by|for|from|to|of)\b/i.test(s)),
+  []
+);
+const hiveSparkCounts = new Map();
+for (const s of allHiveSparks) hiveSparkCounts.set(s, (hiveSparkCounts.get(s) ?? 0) + 1);
+check(
+  'no hive spark string repeats across any register/bucket',
+  [...hiveSparkCounts].filter(([, n]) => n > 1).map(([s]) => s),
+  []
+);
+check(
+  'every hive prompt that exists carries at least one spark',
+  Object.values(HIVE_PROMPT_LADDERS)
+    .flatMap((ladder) => Object.values(ladder).flat())
+    .filter((p) => !p.sparks?.length)
+    .map((p) => p.question),
+  []
+);
+
+// Spec §16.3: "No AsyncStorage state, no server round-trip". Walked over
+// the AST rather than grepped raw text — this file's own comments name
+// AsyncStorage in prose (to state the invariant), which a text regex
+// would mistake for a violation.
+let touchesAsyncStorageOrNetwork = false;
+walk(hivePromptsAst.program, (node) => {
+  if (node.type === 'ImportDeclaration' && /AsyncStorage/.test(node.source?.value ?? '')) {
+    touchesAsyncStorageOrNetwork = true;
+  }
+  if (node.type !== 'CallExpression') return;
+  const callee = node.callee;
+  if (callee?.type === 'Identifier' && callee.name === 'fetch') touchesAsyncStorageOrNetwork = true;
+  if (callee?.type === 'MemberExpression' && callee.object?.type === 'Identifier') {
+    if (['AsyncStorage', 'supabase'].includes(callee.object.name)) touchesAsyncStorageOrNetwork = true;
+  }
+});
+check(
+  'selector source touches neither AsyncStorage nor a network call (spec §16.3)',
+  touchesAsyncStorageOrNetwork,
+  false
+);
+
+// The formula itself (spec §16.3), exercised against a throwaway 3-entry
+// fixture monkey-patched into friend/new — this has to hold before COPY-1
+// lands too, since ENG-45.2 builds against the selector, not the copy.
+const fixtureLadder = [
+  { question: 'a', sparks: ['x'] },
+  { question: 'b', sparks: ['y'] },
+  { question: 'c', sparks: ['z'] },
+];
+const originalFriendNew = HIVE_PROMPT_LADDERS.friend.new;
+HIVE_PROMPT_LADDERS.friend.new = fixtureLadder;
+const sameDayPicks = [0, 1, 2, 3, 4, 5, 6].map((hiveAgeDays) =>
+  selectHivePrompt({ hiveId: 'fixture-hive', relationship: 'friend', hiveAgeDays, cadenceDays: 7 })
+);
+check(
+  'the selector holds steady for a full cadence window, then advances (no jumping, spec §16.3)',
+  new Set(sameDayPicks).size,
+  1
+);
+const nextWindowPick = selectHivePrompt({
+  hiveId: 'fixture-hive',
+  relationship: 'friend',
+  hiveAgeDays: 7,
+  cadenceDays: 7,
+});
+check(
+  'a same-day re-render selects the identical prompt (pure function, no hidden state)',
+  selectHivePrompt({ hiveId: 'fixture-hive', relationship: 'friend', hiveAgeDays: 3, cadenceDays: 7 }),
+  sameDayPicks[3]
+);
+// A +1 step mod a length-3 ladder can never land back on the same index,
+// so this is a guarantee for this fixture, not a probabilistic sample.
+check('crossing into the next cadence window always selects a different prompt', nextWindowPick, fixtureLadder[2]);
+check(
+  'a different hive_id can select a different prompt at the same age (per-hive variety, spec §16.3)',
+  selectHivePrompt({ hiveId: 'other-hive-id', relationship: 'friend', hiveAgeDays: 0, cadenceDays: 7 }) !== null,
+  true
+);
+HIVE_PROMPT_LADDERS.friend.new = originalFriendNew;
+
 console.log('\n── E. the progress map claims the length the flow has ──');
 
 // A progress map is a claim about how much is left. Six cells over a
