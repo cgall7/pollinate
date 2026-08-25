@@ -659,16 +659,43 @@ const HoneycombFeed = () => {
         <Text style={styles.sharedConfirmation}>Shared to your hive.</Text>
       )}
 
+      {/* §23.9.1 class (Lumen, this thread): emptiness copy reads the
+          partition the screen renders, or scopes its claim to the source it
+          actually queries — never the other way around. `mergedFeed` and
+          `connections` are real-data-only, but a DEMO_CONTENT build seats
+          `todayMembers` with the demo seven, so "Your hive is quiet" was
+          claiming the SCREEN while measuring the GRAPH: a signed-in tester
+          with zero connections saw seven demo faces above a claim that the
+          hive was quiet. WeekView (above, §18.1) is the in-file exemplar of
+          the correct shape — it gates its empty state on the exact
+          `sections` it renders, which is why it never lies in a demo build.
+          Screen-claims here now gate the same way (`todayMembers.length ===
+          0` joins the predicate — never true in a DEMO_CONTENT build, which
+          is honest: that screen is never quiet). Graph-claims keep the same
+          CTA but rescope their wording for the demo-occupied state, where
+          the comb has faces and the copy has to admit it. */}
       {hiveView !== 'week' && (
         mergedFeed.length === 0 ? (
-          connections.length === 0 ? (
+          todayMembers.length === 0 ? (
+            connections.length === 0 ? (
+              <View style={[styles.emptyState, styles.emptyStateYellow]}>
+                <Text style={styles.emptyTitle}>Your hive is quiet.</Text>
+                <Text style={styles.emptyBody}>Add a connection by email to get started.</Text>
+              </View>
+            ) : (
+              <View style={[styles.emptyState, styles.emptyStateSky]}>
+                <Text style={styles.emptyTitle}>Nothing in the hive yet.</Text>
+                <Text style={styles.emptyBody}>Be the first — share today's entry…</Text>
+              </View>
+            )
+          ) : connections.length === 0 ? (
             <View style={[styles.emptyState, styles.emptyStateYellow]}>
-              <Text style={styles.emptyTitle}>Your hive is quiet.</Text>
-              <Text style={styles.emptyBody}>Add a connection by email to get started.</Text>
+              <Text style={styles.emptyTitle}>Make this hive yours.</Text>
+              <Text style={styles.emptyBody}>Add a connection by email — these neighbors are keeping your seats warm.</Text>
             </View>
           ) : (
             <View style={[styles.emptyState, styles.emptyStateSky]}>
-              <Text style={styles.emptyTitle}>Nothing in the hive yet.</Text>
+              <Text style={styles.emptyTitle}>Your connections haven't shared yet.</Text>
               <Text style={styles.emptyBody}>Be the first — share today's entry…</Text>
             </View>
           )
