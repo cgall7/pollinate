@@ -1,13 +1,17 @@
 // The idle-motion instrument's OFF switch — `scripts/measure-bee-idle-motion.mjs`,
 // Sage's gate 4 of the luxury pass, the bar that can say no to the bee.
 //
-// That script records 90s of an untouched Today twice each way and compares
-// the two `.mov` file sizes: `simctl recordVideo` writes frames when pixels
-// change and nothing when they don't, so on an idle screen the file size IS
-// the ambient motion. More than 15% larger with the bee than without and the
-// bee retires. It needs a build where nothing renders the resident bee and
-// everything else on the screen is byte-identical, and it explicitly does not
-// own that hook:
+// REWRITTEN 2026-08-25 (Bee Doctrine thread, UX Design #8d2c9a5d) — the
+// script used to compare two `.mov` FILE SIZES against a 15% threshold.
+// Pixel measured that metric apart: the encoder writes a whole frame the
+// moment any pixel changes, so presence cost 1.01x and 3x the amplitude cost
+// 813x against 811x for 1x — nothing can land between 1.00x and a 1.15% bar.
+// It now captures lossless PNG bursts twice each way and asks two separate
+// questions: a binary TRIPWIRE (does anything move outside the declared
+// Breath region, beyond the ambient control's own noise floor) and a
+// reported, unthresholded AMPLITUDE figure for what happens inside it. It
+// needs a build where nothing renders the resident bee and everything else
+// on the screen is byte-identical, and it explicitly does not own that hook:
 //
 //     "read `process.env.EXPO_PUBLIC_SUPPRESS_BEE === 'true'` at the bee's
 //      mount site and force it unmounted when set"          — its own header
