@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet } from 'react-native';
+import { Animated, Easing, Image, StyleSheet } from 'react-native';
 import {
+  BREATH_BEAT_DEG,
+  BREATH_CYCLE_MS,
   HINGE,
   MASCOT_ASPECT,
   MASCOT_WIDTH_FRACTION,
@@ -60,21 +62,47 @@ const BODY = require('../../assets/mascot-body.png');
 // hero pose needs it: a held bee flicks twice and rests, and a bee that
 // buzzes continuously at 148pt reads like a loading spinner rather than a
 // character. `flutter` is the built-in loop for everything that is in transit.
-export const MascotBee = ({ size = 44, flutter = false, beat: driven, wingStyle }) => {
+// `breath` is the doctrine's State 2 and it is the SAME channel as `flutter`,
+// not a second one. A perched bee and an airborne bee both move exactly one
+// thing — the wing, about its hinge — and they differ in how far and how
+// slowly. Giving Breath its own transform would be two mechanisms for one
+// gesture, and the first time they were both live the wing would carry two
+// drivers on one value (R83's rule, and R46's).
+//
+// So the mode picks the sweep and the rhythm, and nothing else changes:
+//
+//     flutter   18deg   80ms out, 80ms back      airborne
+//     breath     2deg   2100ms out, 2100ms back  perched
+//
+// `flutter` wins if both are passed. That is not a preference: an airborne bee
+// whose host also asked for breath is a host that has not noticed the bee took
+// off, and the wing that reads correctly there is the flying one.
+export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: driven, wingStyle }) => {
   const own = useRef(new Animated.Value(0)).current;
   const beat = driven ?? own;
+  const breathing = breath && !flutter;
+  const animated = flutter || breathing;
 
   useEffect(() => {
-    if (!flutter || driven) return undefined;
+    if (!animated || driven) return undefined;
+    // The doctrine asks Breath for "ease-in-out, symmetric (not a spring — a
+    // measured breath)", and that is what a `timing` with no `easing` already
+    // is: `TimingAnimation.js:77` defaults to `easeInOut()`. So the curve is
+    // STATED here rather than changed — the flutter path keeps whatever the
+    // default is by continuing not to pass one, because writing the default
+    // out longhand on a shipped wingbeat is a behaviour change wearing a
+    // clarification's clothes if the two ever turn out not to be identical.
+    const halfMs = breathing ? BREATH_CYCLE_MS / 2 : WING_BEAT_MS;
+    const curve = breathing ? { easing: Easing.inOut(Easing.ease) } : null;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(own, { toValue: 1, duration: WING_BEAT_MS, useNativeDriver: true }),
-        Animated.timing(own, { toValue: 0, duration: WING_BEAT_MS, useNativeDriver: true }),
+        Animated.timing(own, { toValue: 1, duration: halfMs, ...curve, useNativeDriver: true }),
+        Animated.timing(own, { toValue: 0, duration: halfMs, ...curve, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [flutter, driven, own]);
+  }, [animated, breathing, driven, own]);
 
   const width = size * MASCOT_WIDTH_FRACTION;
   const height = width / MASCOT_ASPECT;
@@ -97,7 +125,11 @@ export const MascotBee = ({ size = 44, flutter = false, beat: driven, wingStyle 
   // interpolate into a `useMemo` — the R89 pattern — silently freezes the wing
   // hinge at whatever `size` was on first commit.** If it ever needs
   // memoising, the offsets have to become nodes in the same change.
-  const beatStyle = flutter || driven
+  // The sweep is the mode's, and it is read here rather than at the top so the
+  // interpolation below is rebuilt on every render along with it — see the
+  // paragraph under this one, which is load-bearing.
+  const sweepDeg = breathing ? BREATH_BEAT_DEG : WING_BEAT_DEG;
+  const beatStyle = animated || driven
     ? {
         transform: [
           { translateX: offsetX },
@@ -105,7 +137,7 @@ export const MascotBee = ({ size = 44, flutter = false, beat: driven, wingStyle 
           {
             rotate: beat.interpolate({
               inputRange: [0, 1],
-              outputRange: [`-${WING_BEAT_DEG / 2}deg`, `${WING_BEAT_DEG / 2}deg`],
+              outputRange: [`-${sweepDeg / 2}deg`, `${sweepDeg / 2}deg`],
             }),
           },
           { translateX: -offsetX },

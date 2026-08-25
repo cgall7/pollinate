@@ -74,6 +74,10 @@ export const usePerchSet = () => {
   const nodes = useRef(new Map()).current;
   const cache = useRef(new Map()).current;
   const [keys, setKeys] = useState([]);
+  // Which anchor the bee LIVES at — Bee Doctrine State 1. It is state, not a
+  // derived read, for the same reason `keys` is: it changes only when
+  // membership does, so a scroll must not touch it.
+  const [homeKey, setHomeKey] = useState(null);
 
   const register = useCallback(
     (key, entry) => {
@@ -90,6 +94,17 @@ export const usePerchSet = () => {
       setKeys((prev) => {
         const next = [...nodes.keys()];
         return prev.length === next.length && prev.every((k, i) => k === next[i]) ? prev : next;
+      });
+      // FIRST declared wins, and the tie is resolved rather than rejected: a
+      // second `home` on one screen is an authoring mistake, and the failure
+      // this must not have is a bee that swaps residence depending on which
+      // card mounted last. Declaration order is the screen's own order, so the
+      // resolution is at least stable and readable. `check-bee-attitude`
+      // section K asserts exactly one per render state, which is where an
+      // authoring mistake should be caught — not at runtime, silently.
+      setHomeKey(() => {
+        for (const [k, e] of nodes) if (e.home) return k;
+        return null;
       });
     },
     [nodes, cache],
@@ -111,7 +126,7 @@ export const usePerchSet = () => {
     [nodes, cache],
   );
 
-  return useMemo(() => ({ keys, read, register }), [keys, read, register]);
+  return useMemo(() => ({ keys, homeKey, read, register }), [keys, homeKey, read, register]);
 };
 
 /**
@@ -131,29 +146,34 @@ export const PerchField = ({ perches, children }) => (
  * @param id  stable within the screen; `chooseAnchor`'s anti-repeat memory is
  *            keyed on it, so an id that changes per render is a bee that has
  *            forgotten where it just was
- * @param on  'left' | 'right' — §32/R122. TodayTab's anchors are full-width
- *            blocks in one 24pt column, so a set that puts them all on the
- *            same side has zero x-extent and the bee never turns around.
- *            Alternate them; `check-bee-attitude` row K4 ("the set is not a
- *            column") measures the result against the declarations below.
- *            J6/J7 derive the one-body-width threshold K4 reuses; they sweep
- *            synthetic sets and read nothing this file declares.
+ * @param on  'left' | 'right' — §32/R122, and R122a decides which. The bee
+ *            rests AT the resolved point with the character centred on it, so
+ *            a side puts half a character (15.03pt at the default size) into
+ *            whatever lies that way. On a full-width left-aligned block,
+ *            'left' is where the glyphs begin and 'right' is the trailing
+ *            gutter. Judge it at the REST position, which is now the anchor
+ *            exactly — the hover that used to displace it by one radius is
+ *            retired.
  * @param at  0..1 along that side, top to bottom
+ * @param home  this is where the bee lives when nothing is happening — Bee
+ *            Doctrine State 1. At most one per screen per render state. A
+ *            screen with no `home` gets no resident bee at all, which is the
+ *            doctrine's own default: "the bee is absent almost everywhere".
  *
  * `collapsable={false}` is load-bearing on Android: a View with no drawing
  * props of its own is eligible to be collapsed out of the native hierarchy,
  * and a collapsed view measures as nothing.
  */
-export const PerchAnchor = ({ id, on = 'left', at = 0.5, children, style }) => {
+export const PerchAnchor = ({ id, on = 'left', at = 0.5, home = false, children, style }) => {
   const perches = useContext(PerchContext);
   const ref = useRef(null);
 
   const setNode = useCallback(
     (node) => {
       ref.current = node;
-      perches?.register(id, node ? { node, on, at } : null);
+      perches?.register(id, node ? { node, on, at, home } : null);
     },
-    [perches, id, on, at],
+    [perches, id, on, at, home],
   );
 
   return (

@@ -326,28 +326,37 @@ walk(flyingBeeAst.program, (n) => {
   }
 });
 
-// §32.2 — `CRUISE_EASING` is deleted with the loop it eased. What replaced it
-// is `BEAT_EASINGS`, the three curves a sequenced beat is flown on, and the
-// row below enumerates that object off the AST rather than naming its members
-// here: a fourth beat curve added later has to be one this gate models, and a
-// hand-written list of three would let it in silently.
-const BEAT_EASINGS = {};
-walk(flyingBeeAst.program, (n) => {
-  if (n.type !== 'VariableDeclarator' || n.id?.name !== 'BEAT_EASINGS') return;
-  (n.init?.properties ?? []).forEach((prop) => {
-    BEAT_EASINGS[prop.key.name] = flyingBeeSource.slice(prop.value.start, prop.value.end);
-  });
-});
+// §32.2 then the Bee Doctrine. `CRUISE_EASING` was deleted with the loop it
+// eased and replaced by `BEAT_EASINGS`, the three curves a sequenced beat was
+// flown on; the doctrine then retired the beats. What is left flying is the
+// ERRAND, whose curves live at the `buildPollinationPlan` call site, and the
+// preset arc.
+//
+// So the easings are enumerated OFF THE CALL SITE now rather than off a named
+// object. That is the stronger place to read them from and always was: the
+// row exists so the turn-window rows below can convert a wall-time window into
+// `t`, and what has to be modelled is the curve the bee is ACTUALLY flown on,
+// not one an object claims. R82's own hole was exactly this — resolving a prop
+// to a default instead of to what the call site passes.
+const ERRAND_EASINGS = {};
+{
+  const visitCall = flyingBeeSource.match(/buildPollinationPlan\(\{[\s\S]*?\}\)/)?.[0] ?? '';
+  for (const [key, prop] of [['approach', 'easeApproach'], ['descent', 'easeDescent']]) {
+    const found = visitCall.match(new RegExp(`${prop}:\\s*([^,\\n]+)`))?.[1]?.trim();
+    if (found) ERRAND_EASINGS[key] = found;
+  }
+}
 
 const EASING_ROWS = [
   ['PRESET_EASING', constants.PRESET_EASING],
-  ...Object.entries(BEAT_EASINGS).map(([k, v]) => [`BEAT_EASINGS.${k}`, v]),
+  ...Object.entries(ERRAND_EASINGS).map(([k, v]) => [`errand ${k}`, v]),
 ];
-if (Object.keys(BEAT_EASINGS).length === 0) {
+if (Object.keys(ERRAND_EASINGS).length !== 2) {
   bad(
-    'the beat easings are readable off the source',
-    'no `BEAT_EASINGS` object in FlyingBee.js. Every sequenced beat is flown on one of these, and a ' +
-      'gate that cannot read them cannot tell you what turn window any of them produces.',
+    'the errand easings are readable off the call site',
+    `read ${Object.keys(ERRAND_EASINGS).length} of 2 (${JSON.stringify(ERRAND_EASINGS)}) from FlyingBee's ` +
+      '`buildPollinationPlan({…})`. The errand is the only flight left, so a gate that cannot read its ' +
+      'two curves cannot tell you what turn window it produces — and cannot-tell is a failure.',
   );
 }
 for (const [name, found] of EASING_ROWS) {
@@ -363,29 +372,18 @@ for (const [name, found] of EASING_ROWS) {
   }
 }
 
-// §32.2 / §28.5 — A SORTIE IS A POLLINATION VISIT WITHOUT THE POLLEN, so it
-// must be flown on the SAME approach and descent curves the tap uses, not on a
-// second pair that reads the same today. Both are handed to the builders from
-// one object; this row is what stops someone "tuning the idle flight" and
-// silently splitting the two beats that §28.5 argues are the same gesture.
-{
-  const visitCall = flyingBeeSource.match(/buildPollinationPlan\(\{[\s\S]*?\}\)/)?.[0] ?? '';
-  const approach = visitCall.match(/easeApproach:\s*([^,\n]+)/)?.[1]?.trim();
-  const descent = visitCall.match(/easeDescent:\s*([^,\n]+)/)?.[1]?.trim();
-  const dartMatches = approach === BEAT_EASINGS.dart || approach === 'BEAT_EASINGS.dart';
-  const settleMatches = descent === BEAT_EASINGS.settle || descent === 'BEAT_EASINGS.settle';
-  if (dartMatches && settleMatches) {
-    ok(`a sortie and a visit are flown on the same two curves (approach ${approach}, descent ${descent})`);
-  } else {
-    bad(
-      'a sortie and a visit are flown on the same two curves',
-      `visit approach ${approach ?? '(unread)'} vs BEAT_EASINGS.dart ${BEAT_EASINGS.dart ?? '(unread)'}; ` +
-        `visit descent ${descent ?? '(unread)'} vs BEAT_EASINGS.settle ${BEAT_EASINGS.settle ?? '(unread)'}. ` +
-        '§28.5 argues the break-off reads as a break-off because it is the same landing gesture at a ' +
-        'different speed — two curves and that argument is about nothing.',
-    );
-  }
-}
+// §28.5 — **the sortie-vs-visit row is RETIRED, and its retirement is the
+// entry rather than a silent deletion.** It asserted that an idle sortie was
+// flown on the same two curves as the tap's visit, because "a sortie is a
+// pollination visit without the pollen" and two curves would have split one
+// gesture into two that merely read alike today. The Bee Doctrine retires the
+// sortie, so the row's subject no longer exists — and a row whose subject is
+// gone must be removed, not left green over nothing (the callee-position
+// failure: an assertion that can no longer fail is not an assertion).
+//
+// What it protected is still protected, one level up: §28.5's contrast is now
+// between the errand and a bee at REST, checked by F6, and the errand's own
+// curves are the ones enumerated above.
 
 // --- enumerate the call sites off disk ------------------------------------
 const jsFiles = async (dir) => {
@@ -1301,6 +1299,14 @@ const targetAxisProp = (axis) =>
 // CALL WHOSE RESULT IS A NUMBER IS ASKING, NOT FLYING. A `buildPollinationPlan(…)`
 // whose result is immediately member-accessed (`.durationMs`) is a
 // measurement; anything else becomes a plan and is held to §28.4.
+//
+// **The Bee Doctrine took the measurement away, and the classifier stays.**
+// The dwell solver was the only measurement call there has ever been, and the
+// doctrine retired the dwell with the idle flight, so the expected count is
+// now ZERO. The machinery is kept rather than simplified out for one reason:
+// a measurement call reappearing is exactly the shape of the idle flight
+// coming back — something asking "how long would that take" is something
+// planning to go. The row fails on it either way, and it fails with a name.
 {
   // Measurement calls, found first so the flight pass can exclude them by
   // POSITION rather than by name. A name-based exemption would be a door: any
@@ -1325,20 +1331,18 @@ const targetAxisProp = (axis) =>
     froms.push({ callee, src: prop ? flyingBeeSource.slice(prop.start, prop.end).replace(/\s+/g, ' ') : '(absent)' });
   });
   const bad0 = froms.filter((f) => !/posRef\.current/.test(f.src));
-  // One flight-producing call site: the pollination visit. The sortie's own
-  // plan is built inside `resolveBeat`, in the sequencer, from a `from` this
-  // component passes it — asserted separately in section K, because the module
-  // is importable and the call site is here. Zero would mean the beat stopped
+  // One flight-producing call site, and under the doctrine it is the only
+  // flight there is: the pollination visit. Zero would mean the errand stopped
   // being built at all.
-  if (froms.length === 1 && bad0.length === 0 && measurements.size === 1) {
-    ok(`the plan-producing call takes waypoint 0 from the live position ref (§28.4 — the break costs no teleport; ${measurements.size} measurement call excluded by use, not by name)`);
+  if (froms.length === 1 && bad0.length === 0 && measurements.size === 0) {
+    ok(`the plan-producing call takes waypoint 0 from the live position ref (§28.4 — the break costs no teleport; ${measurements.size} measurement calls, the dwell solver retired with the idle flight)`);
   } else {
     bad(
       'the plan-producing call takes waypoint 0 from the live position ref (§28.4 — the break costs no teleport)',
       froms.length !== 1
         ? `expected exactly one flight-producing call, found ${froms.length}: ${froms.map((f) => `${f.callee} from: ${f.src}`).join('; ')}`
-        : measurements.size !== 1
-          ? `expected exactly one measurement call (the dwell solver's), found ${measurements.size} — a second one is either a duplicate solve or a flight that lost its plan`
+        : measurements.size !== 0
+          ? `expected no measurement calls — the dwell solver was the only one and the Bee Doctrine retired it — found ${measurements.size}. Something is asking how long a flight would take, which is what a bee about to go somewhere does.`
           : bad0.map((f) => `${f.callee} from: ${f.src}`).join('; '),
     );
   }
@@ -1370,23 +1374,30 @@ const targetAxisProp = (axis) =>
   // name in the comments that explain the deletion, and a grep would report
   // the explanation as the defect. R85, second outing: PROSE ABOUT A VARIABLE
   // IS NOT THE VARIABLE.
-  const advances = [...flyingBeeSource.matchAll(/advance\(/g)].length;
+  // **Re-based by the Bee Doctrine, and the invariant is unchanged.** The
+  // hand-off used to be `advance(` — choose the next beat and fly it. There is
+  // no next beat now: an errand ends by RESTING where it finished, which is
+  // still a hand-off to a state and still not a flight to a named point. So
+  // the name the row counts moves and the sentence it enforces does not.
+  const advances = [...flyingBeeSource.matchAll(/(?<![\w.])rest\(/g)].length;
   const clean = live.size === 0;
-  // Two call sites must advance the machine: the completion callback (any
-  // landing, including a pollination visit) and the abort branch. `start` is
-  // a third, and it is the opening beat rather than a hand-off.
+  // Three call sites: the completion callback (any landing, including a
+  // pollination visit), the abort branch, and `start`'s opening placement.
+  // `start` counted as a non-hand-off under the old machine because it opened
+  // a sequence; under the doctrine it IS the resident state, so all three are
+  // the same verb and the floor is the same three.
   const wired = advances >= 3;
 
   if (clean && wired) {
-    ok(`the cruise has no fixed destination left (§32.2 — 0 of ${banned.length} loop identifiers survive, ${advances} hand-offs to the sequencer)`);
+    ok(`the cruise has no fixed destination left (§32.2 — 0 of ${banned.length} loop identifiers survive, ${advances} hand-offs to rest)`);
   } else {
     bad(
       'the cruise has no fixed destination left (§32.2)',
       `${clean ? '' : `these loop identifiers are still live in FlyingBee: ${[...live].join(', ')}. ` +
         'A fallback lap survives on whichever screen forgets to declare anchors, which is the screen ' +
         'nobody looks at until Colin does. '}` +
-        `${wired ? '' : `only ${advances} \`advance(\` call sites — the landing path and the abort path must both ` +
-          'hand off to the next beat, or a flight ends with the bee parked wherever it stopped'}`,
+        `${wired ? '' : `only ${advances} \`rest(\` call sites — the opening placement, the landing path and the ` +
+          'abort path must all hand off to rest, or a flight ends with the bee mid-air and no state'}`,
     );
   }
 }
@@ -1680,11 +1691,16 @@ const targetAxisProp = (axis) =>
 // against. It does, to 0.06%, because it is the same fractional path resolved
 // against the same box, restated per diagonal.
 //
-// It also pins the OTHER half of the chain, which is new and easy to break in
-// isolation: a sortie is flown at `referenceSpeedPxS x DART_SPEED_RATIO`, and
-// §28.5's contrast is between that and the approach. Raise the dart without
-// re-basing the approach and the break-off stops reading, so both ratios are
-// asserted against the one reference here.
+// **What this row lost when the idle flight retired, stated rather than
+// quietly dropped.** It used to pin BOTH halves of §28.5's contrast: the
+// approach against the dart, `referenceSpeedPxS x DART_SPEED_RATIO`. There is
+// no dart now — the Bee Doctrine retired the idle sortie, and `DART_SPEED_RATIO`
+// went with it — so the contrast has only one side left in code. That does not
+// weaken §28.5's argument, because the thing the approach must be faster than
+// is the pace the bee was already flying, and a resting bee's pace is zero:
+// the contrast is now satisfied by construction rather than by a ratio. What
+// remains checkable, and is checked, is that the approach is a RATIO of a
+// DERIVED reference rather than a typed constant.
 {
   const rows = DEVICES.map((d) => {
     const reference = sequencer.referenceSpeedPxS(d.width, d.height);
@@ -1692,13 +1708,10 @@ const targetAxisProp = (axis) =>
       d,
       reference,
       approach: reference * flight.APPROACH_SPEED_RATIO,
-      dart: reference * sequencer.DART_SPEED_RATIO,
     };
   });
   const offBy = rows.filter(
-    (r) =>
-      Math.abs(r.approach / r.reference - flight.APPROACH_SPEED_RATIO) > 1e-12 ||
-      Math.abs(r.dart / r.reference - sequencer.DART_SPEED_RATIO) > 1e-12,
+    (r) => Math.abs(r.approach / r.reference - flight.APPROACH_SPEED_RATIO) > 1e-12,
   );
   const shipped = rows.find((r) => r.d.width === 393);
   // 0.1 px/s, i.e. the 0.06% the swap was ratified on. A tighter bound would
@@ -1706,18 +1719,22 @@ const targetAxisProp = (axis) =>
   const referenceOk = Math.abs(shipped.reference - 187.59) < 0.15;
   // The contrast §28.5 is actually about: the approach must be faster than the
   // pace he was already flying, or "he broke off" has nothing to read off.
-  const contrasts = flight.APPROACH_SPEED_RATIO > sequencer.DART_SPEED_RATIO;
+  // The bee an errand breaks off from is at rest, so the pace to beat is 0.
+  // Stated as a comparison rather than assumed, because the day something
+  // gives the idle bee a speed again is the day this has to be re-based.
+  const RESTING_SPEED_RATIO = 0;
+  const contrasts = flight.APPROACH_SPEED_RATIO > RESTING_SPEED_RATIO;
   if (offBy.length === 0 && referenceOk && contrasts) {
     ok(
-      `approach = ${flight.APPROACH_SPEED_RATIO}x and dart = ${sequencer.DART_SPEED_RATIO}x the reference speed on all ${rows.length} device boxes ` +
+      `approach = ${flight.APPROACH_SPEED_RATIO}x the reference speed on all ${rows.length} device boxes ` +
         `(reference ${shipped.reference.toFixed(2)} px/s at 393x852 vs the published 187.59, so approach ${shipped.approach.toFixed(2)})`,
     );
   } else {
     bad(
-      `approach and dart are both ratios of the reference speed on all device boxes`,
+      'the approach speed is a ratio of the derived reference on all device boxes',
       `${referenceOk ? '' : `reference at 393x852 is ${shipped.reference.toFixed(2)} px/s, not the published 187.59 — ` +
         'CRUISE_DIAG_PER_S moved and §28.5 did not. '}` +
-        `${contrasts ? '' : `approach ratio ${flight.APPROACH_SPEED_RATIO} is not above dart ratio ${sequencer.DART_SPEED_RATIO}; ` +
+        `${contrasts ? '' : `approach ratio ${flight.APPROACH_SPEED_RATIO} is not above the resting bee's ${RESTING_SPEED_RATIO}; ` +
           'the break-off is specified as a speed contrast and there is no contrast left. '}` +
         `${offBy.length === 0 ? '' : offBy.map((r) => r.d.label).join(', ')}`,
     );
@@ -2979,473 +2996,6 @@ let tickPropName = null;
 }
 
 // =========================================================================
-// J. §32 — the anti-repeat rule preserves a CHOICE, not a destination
-// =========================================================================
-//
-// R121. `flightSequencer.js`'s own comment rejects "a shuffle of the full
-// set, which would guarantee every anchor is visited once per cycle and
-// reintroduce a period equal to the anchor count" — and at `n = depth + 1`
-// the implementation WAS that shuffle, because blocking `n - 1` keys leaves a
-// pool of exactly one. The rule was asserted only by that comment, which is
-// how it stayed true in prose and false in code for a day.
-//
-// So this section asserts it as arithmetic, and it samples the function
-// rather than reading the clamp: R81 — a sequencer is a generator of
-// flights, so the only honest way to gate it is to sweep its seeds. Every
-// row below runs the IMPORTED `chooseAnchor` and looks at what came out.
-// Rewriting the clamp expression to something equivalent leaves every row
-// green, which is the point; rewriting it to something weaker does not.
-//
-// THE BOUNDARY IS DERIVED, NOT LISTED. J4 and J5 do not assert "3 anchors
-// work" — they measure where the behaviour changes and check that against
-// arithmetic. A hardcoded pass-list has the hole it closes (R85(f)): raise
-// `antiRepeatDepth` and a list of cases would keep passing while the
-// invariant moved underneath it.
-//
-// Writing them that way immediately falsified the sentence they were written
-// from. The first draft of H4 asserted the aperiodicity threshold is
-// `depth + 2`, which is the invariant as stated in the module — and it went
-// red at `depth 2: expected 4, observed 3`. That is the clamp working: it
-// gives up DEPTH to keep a CHOICE, so aperiodicity arrives at three anchors
-// for every depth, and `n >= depth + 2` is not the threshold for a choice —
-// it is the threshold above which the requested depth is actually honoured.
-// Two properties, so two rows. The prose that survived the correction is now
-// H5's, and the module's own comment moved with it.
-//
-// WHAT THIS SECTION CANNOT DO, said because a silent gap reads like a clean
-// one. `flightSequencer.js` still has no importer in `src/`, so no host
-// declares an anchor set and there is nothing to check the invariant
-// AGAINST. The row that matters most — "every render state a host declares
-// supplies at least `antiRepeatDepth + 2` anchors" — cannot be written until
-// a host declares one, and it is the row that turns this from a property of
-// the engine into a property of the app. Sage's §4 rule, arriving as a
-// missing row rather than as a mutation: A GATE ASSERTS A PROPERTY OF
-// WHATEVER IT CAN IMPORT, AND THE DEFECT LIVES AT THE CALL SITE IT COULDN'T.
-{
-  const seqSource = await readFile(path.join(ROOT, 'src/components/flightSequencer.js'), 'utf8');
-  const seq = await import(
-    `data:text/javascript;base64,${Buffer.from(seqSource).toString('base64')}`
-  );
-  const { chooseAnchor, makeRng, STUB_GRAMMAR } = seq;
-  // The depth under test comes from the module, so raising `antiRepeatDepth`
-  // moves the boundary J4 asserts instead of leaving it pinned to a literal.
-  const SHIPPED_DEPTH = STUB_GRAMMAR.antiRepeatDepth;
-  const DEPTHS = [...new Set([1, 2, 3, SHIPPED_DEPTH])].sort((a, b) => a - b);
-  const COUNTS = [2, 3, 4, 5, 6];
-  const SEEDS = 256;
-  const STEPS = 60;
-
-  const anchorsOf = (n) =>
-    Array.from({ length: n }, (_, i) => ({ key: String.fromCharCode(65 + i), x: i * 100, y: 0 }));
-
-  // Walk exactly as `nextBeat` will: one `recent` list, appended and trimmed.
-  const walk = (n, depth, seed) => {
-    const anchors = anchorsOf(n);
-    const rng = makeRng(seed);
-    const recent = [];
-    const out = [];
-    for (let i = 0; i < STEPS; i += 1) {
-      const a = chooseAnchor(anchors, recent, rng, depth);
-      if (!a) return null;
-      out.push(a.key);
-      recent.push(a.key);
-      if (recent.length > 8) recent.shift();
-    }
-    return out.join('');
-  };
-
-  // Smallest p for which the post-warmup tail repeats with period p, or null.
-  // Capped at 12: a period longer than the anchor count is not a period a
-  // viewer could see, and every count under test is well below it.
-  const periodOf = (s) => {
-    const tail = s.slice(20);
-    for (let p = 1; p <= 12; p += 1) {
-      let holds = true;
-      for (let i = 0; i + p < tail.length; i += 1) {
-        if (tail[i] !== tail[i + p]) {
-          holds = false;
-          break;
-        }
-      }
-      if (holds) return p;
-    }
-    return null;
-  };
-
-  // Shortest gap between two visits of the same anchor. This is the depth the
-  // run ACTUALLY enforced, read off the output — `minReturn - 1` keys were
-  // blocked, whatever the clamp expression says.
-  const minReturnGap = (s) => {
-    const last = new Map();
-    let min = Infinity;
-    for (let i = 0; i < s.length; i += 1) {
-      if (last.has(s[i])) min = Math.min(min, i - last.get(s[i]));
-      last.set(s[i], i);
-    }
-    return min;
-  };
-
-  const sweep = new Map(); // `${n}:${depth}` -> { periods:Set, tails:Set, selfRepeats, minGap }
-  for (const n of COUNTS) {
-    for (const depth of DEPTHS) {
-      const periods = new Set();
-      const tails = new Set();
-      let selfRepeats = 0;
-      let minGap = Infinity;
-      for (let seed = 1; seed <= SEEDS; seed += 1) {
-        const s = walk(n, depth, seed * 7919);
-        for (let i = 1; i < s.length; i += 1) if (s[i] === s[i - 1]) selfRepeats += 1;
-        periods.add(periodOf(s));
-        tails.add(s.slice(-12));
-        minGap = Math.min(minGap, minReturnGap(s));
-      }
-      sweep.set(`${n}:${depth}`, { periods, tails, selfRepeats, minGap });
-    }
-  }
-  const cases = COUNTS.length * DEPTHS.length * SEEDS;
-
-  // --- J1: no anchor is ever chosen twice in a row -----------------------
-  //
-  // The row the floor of 1 exists for. `Math.min(depth, n - 2)` is 0 at two
-  // anchors and `[..].slice(-0)` returns the WHOLE array, so an unfloored
-  // clamp blocks everything, empties `eligible`, takes the `: anchors`
-  // fallback and picks the incumbent 48.2% of the time — a dart, a descent
-  // and a settle flown to the point the bee is already on.
-  {
-    const NAME = 'J1 §32 chooseAnchor never returns the incumbent, swept';
-    const guilty = [];
-    for (const [key, r] of sweep) if (r.selfRepeats > 0) guilty.push(`${key} (${r.selfRepeats})`);
-    if (guilty.length) {
-      bad(
-        NAME,
-        `n:depth pairs whose sequence repeats an anchor back-to-back — ${guilty.join(', ')}. ` +
-          'A zero-length sortie flies the whole break-off gesture to where the bee already is. ' +
-          'If the clamp was just changed, check the floor: `slice(-0)` returns the whole array.'
-      );
-    } else {
-      ok(`${NAME} — ${cases} sequences x ${STEPS} beats, n ${COUNTS.join('/')} x depth ${DEPTHS.join('/')}, zero back-to-back`);
-    }
-  }
-
-  // --- J2: above the invariant, the sequence is aperiodic ----------------
-  {
-    const NAME = 'J2 §32 no observable period at three anchors or more, any depth';
-    const guilty = [];
-    for (const n of COUNTS) {
-      for (const depth of DEPTHS) {
-        if (n < 3) continue; // two anchors is arithmetic — H3 owns it
-        const { periods } = sweep.get(`${n}:${depth}`);
-        const seen = [...periods].filter((p) => p !== null);
-        if (seen.length) guilty.push(`n=${n} depth=${depth} -> period ${seen.join('/')}`);
-      }
-    }
-    if (guilty.length) {
-      bad(
-        NAME,
-        `the clamp should leave a pool of at least two at every n >= 3, whatever the depth asks for, but the tail repeats: ${guilty.join(', ')}`
-      );
-    } else {
-      const distinct = [...sweep]
-        .filter(([k]) => Number(k.split(':')[0]) >= 3)
-        .reduce((min, [, r]) => Math.min(min, r.tails.size), Infinity);
-      ok(`${NAME} — every (n, depth) with n >= 3 aperiodic over ${SEEDS} seeds; worst case still ${distinct} distinct 12-tails`);
-    }
-  }
-
-  // --- J3: below the invariant, the degeneracy is DECLARED ---------------
-  //
-  // Stated positively, so silence means one thing. Two anchors with no
-  // self-repeat is forced alternation — arithmetic, not a defect, and not
-  // something the engine can repair. Asserting the period IS 2 means a
-  // change that "fixes" it (by reintroducing self-repeats, the only way out)
-  // fails here as well as at H1, instead of quietly looking like progress.
-  {
-    const NAME = 'J3 §32 two anchors alternate, and that is the documented floor';
-    const { periods, tails } = sweep.get(`2:${SHIPPED_DEPTH}`);
-    const seen = [...periods];
-    if (seen.length === 1 && seen[0] === 2 && tails.size === 2) {
-      ok(`${NAME} — n=2 depth=${SHIPPED_DEPTH}: period 2 on all ${SEEDS} seeds, ${tails.size} distinct tails (the two phases). A host declaring two anchors in a render state has declared a screensaver; the answer is on the host.`);
-    } else {
-      bad(
-        NAME,
-        `expected period 2 and exactly 2 distinct tails at two anchors, got periods [${seen.map((p) => (p === null ? 'none' : p)).join(', ')}] and ${tails.size} tails. ` +
-          'Aperiodic here would mean the incumbent became eligible again — see H1.'
-      );
-    }
-  }
-
-  // --- J4: the choice threshold is 3, and it does NOT move with depth ----
-  //
-  // Derived rather than listed: for each depth, find the smallest anchor
-  // count at which periodicity disappears. It is 3 for every depth, and that
-  // independence IS the clamp — the requested depth is the thing that gives
-  // way, never the pool. Raise `antiRepeatDepth` and this row must not move.
-  {
-    const NAME = 'J4 §32 the aperiodicity threshold is 3 and is independent of depth';
-    const guilty = [];
-    const found = [];
-    for (const depth of DEPTHS) {
-      const first = COUNTS.find((n) => [...sweep.get(`${n}:${depth}`).periods].every((p) => p === null));
-      found.push(`depth ${depth} -> ${first ?? 'never'}`);
-      if (first !== 3) {
-        guilty.push(
-          `depth ${depth}: expected 3, observed ${first ?? `no aperiodic count in ${COUNTS.join('/')}`}`
-        );
-      }
-    }
-    if (guilty.length) {
-      bad(
-        NAME,
-        `${guilty.join('; ')}. A threshold that tracks depth means the clamp is honouring the requested depth at the pool's expense — the pre-R121 behaviour.`
-      );
-    } else {
-      ok(`${NAME} — ${found.join(', ')}; depth gives way, the pool does not`);
-    }
-  }
-
-  // --- J5: the requested depth IS honoured wherever it can be ------------
-  //
-  // The other half, and the one the module's invariant is actually about.
-  // The enforced depth is read off the output — the shortest gap between two
-  // visits of the same anchor is `enforced + 1` — and compared against the
-  // clamp's arithmetic. So `n >= antiRepeatDepth + 2` earns its place as the
-  // condition under which a host gets the anti-repeat it asked for, rather
-  // than as a claim about whether the bee has anywhere to go.
-  {
-    const NAME = 'J5 §32 enforced anti-repeat depth = max(1, min(depth, n-2)), measured';
-    const guilty = [];
-    for (const n of COUNTS) {
-      for (const depth of DEPTHS) {
-        const expected = Math.max(1, Math.min(depth, n - 2));
-        const observed = sweep.get(`${n}:${depth}`).minGap - 1;
-        if (observed !== expected) {
-          guilty.push(`n=${n} depth=${depth}: asked ${depth}, arithmetic says ${expected}, observed ${observed}`);
-        }
-      }
-    }
-    if (guilty.length) {
-      bad(NAME, guilty.join('; '));
-    } else {
-      const full = COUNTS.filter((n) => n >= SHIPPED_DEPTH + 2);
-      ok(`${NAME} — ${cases} sequences agree; at the shipped depth ${SHIPPED_DEPTH} the full depth is honoured from ${full[0]} anchors up (n >= antiRepeatDepth + 2), and traded down below that`);
-    }
-  }
-
-  // --- J6: the flip boundary is `facingFor`'s, derived from both modules ---
-  //
-  // R122. `facingFlipRate` exists because the perch contract `{ key, on, at }`
-  // does NOT make a spread out of nothing: every TodayTab anchor is a
-  // full-width block in one padded column, so `on: 'left'` three times
-  // resolves to one x and the bee flies a vertical line. The floor is the
-  // point below which that is MECHANICAL — under one bee-box of x-extent no
-  // pair can clear `facingFor`'s threshold, so the facing cannot change.
-  //
-  // Neither side of this row is typed. The boundary is found by sweeping
-  // `facingFlipRate` until it leaves zero, and the thing it is compared
-  // against is found by sweeping `facingFor` itself. Change the threshold in
-  // `beeAttitude.js` and both move together; change only one and this goes
-  // red, which is the whole reason the comparison is between two sweeps
-  // rather than between a sweep and a literal.
-  {
-    const NAME = 'J6 §32 the anchor-spread floor is facingFor\'s own threshold, both swept';
-    const SIZE = BEE_SIZE; // FlyingBee.js's DEFAULT_SIZE, read off source above
-    let rateBoundary = null;
-    for (let d = 0; d <= SIZE * 3 && rateBoundary === null; d += 1) {
-      const rate = seq.facingFlipRate([{ key: 'a', x: 0, y: 0 }, { key: 'b', x: d, y: 300 }], SIZE);
-      if (rate > 0) rateBoundary = d;
-    }
-    let facingBoundary = null;
-    for (let d = 0; d <= SIZE * 3 && facingBoundary === null; d += 1) {
-      if (facingFor(d, SIZE, -1) === 1) facingBoundary = d;
-    }
-    if (rateBoundary === null || facingBoundary === null) {
-      bad(NAME, `no boundary inside 0..${SIZE * 3}px — rate ${rateBoundary}, facing ${facingBoundary}. ` +
-        'One of the two sweeps never left its starting value, so this row cannot tell.');
-    } else if (rateBoundary !== facingBoundary) {
-      bad(NAME, `facingFlipRate first leaves zero at ${rateBoundary}px, facingFor first flips at ` +
-        `${facingBoundary}px. The floor and the mechanism it is derived from disagree, so a set that ` +
-        'passes the floor can still be one the bee never turns around in.');
-    } else {
-      ok(`${NAME} — both leave zero at ${rateBoundary}px (one ${SIZE}px box); below it every |dx| is ` +
-        'under threshold, so no hop in the set can flip the facing');
-    }
-  }
-
-  // --- J7: and that is true of the flights, not just of the arithmetic ----
-  //
-  // J6 compares two predicates. This one flies the real thing: a column set
-  // and a spread set, through `buildPollinationPlan` and `buildAttitude`.
-  //
-  // THE EVENT IS BETWEEN SORTIES, NOT INSIDE ONE — and the first draft of this
-  // row measured inside one. It summed `buildAttitude`'s `windows`, which is
-  // that module's record of facing changes WITHIN a single flight, and a
-  // sortie travels one way from takeoff to landing, so `windows` is 0 for
-  // every well-formed sortie including the spread ones. The row went red on
-  // its own control within a minute of being written, which is the only
-  // reason it is not green and blind today. A bee turns around when the NEXT
-  // sortie leaves the other way, so the sequence of sorties is the unit.
-  //
-  // The spread half is the control and it is the half that matters: a row
-  // reporting "no turns" for both sets would pass the column half by being
-  // blind rather than by the property holding.
-  {
-    const NAME = 'J7 §32 the observed turn boundary is the predicted one, x-extent swept';
-    const SIZE = BEE_SIZE;
-    const W = 393;
-    const H = 852;
-    const BODY = mascot.MASCOT_WIDTH_FRACTION * SIZE;
-    const dart = EASINGS['Easing.inOut(Easing.ease)'];
-    const settle = EASINGS['Easing.out(Easing.cubic)'];
-    // Fly the real sequencer over the set for 60s and read the facing the
-    // attitude builder actually lands on at each sortie. Chained, because the
-    // question is whether consecutive sorties disagree.
-    const turnsFor = (set) => {
-      const grammar = seq.resolveGrammar({
-        grammar: STUB_GRAMMAR,
-        anchors: set,
-        sortieDurationFor: (hopPx) => flight.buildPollinationPlan({
-          from: { x: 0, y: 0 },
-          target: { x: hopPx, y: 0 },
-          ringStep: Infinity,
-          bodyLengthPx: BODY,
-          width: W,
-          height: H,
-          approachSpeedPxS: seq.referenceSpeedPxS(W, H) * seq.DART_SPEED_RATIO,
-          easeApproach: dart,
-          easeDescent: settle,
-        }).durationMs,
-      });
-      const rng = makeRng(0xB33);
-      const recent = [];
-      let at = { x: set[0].x, y: set[0].y };
-      let facing = null;
-      let turns = 0;
-      let sorties = 0;
-      for (let i = 0; i < 40; i += 1) {
-        const anchor = chooseAnchor(set, recent, rng, grammar.antiRepeatDepth);
-        const plan = flight.buildPollinationPlan({
-          from: at,
-          target: { x: anchor.x, y: anchor.y },
-          ringStep: Infinity,
-          bodyLengthPx: BODY,
-          width: W,
-          height: H,
-          approachSpeedPxS: seq.referenceSpeedPxS(W, H) * seq.DART_SPEED_RATIO,
-          easeApproach: dart,
-          easeDescent: settle,
-        });
-        const att = buildAttitude(plan.path, {
-          width: W,
-          height: H,
-          size: SIZE,
-          closed: false,
-          easing: plan.easing,
-          durationMs: plan.durationMs,
-          // What the sequencer's plans have always carried and nothing read
-          // until R122. Without it every sortie re-seeds from `Math.sign(dx)`
-          // and the threshold is never consulted between plans.
-          heldFacing: facing ?? undefined,
-        });
-        const landed = att.segments[att.segments.length - 1].facing;
-        if (facing !== null && landed !== facing) turns += 1;
-        facing = landed;
-        sorties += 1;
-        at = { x: anchor.x, y: anchor.y };
-        recent.push(anchor.key);
-        if (recent.length > 8) recent.shift();
-      }
-      return { turns, sorties };
-    };
-    // Three full-width cards on a 24pt gutter — Sage's case, and the one a
-    // designer writing anchors in reading order actually produces. The middle
-    // one's x is swept so the OBSERVED boundary is derived, not sampled at two
-    // convenient points: two hand-picked sets would have been green through
-    // the whole 8..43px band where the predicate said 0 and the bee turned 27
-    // times.
-    const setAt = (ext) => [
-      { key: 'badge', x: 24, y: 120 },
-      { key: 'streak', x: 24 + ext, y: 300 },
-      { key: 'quote', x: 24, y: 520 },
-    ];
-    const rows = [];
-    let observedBoundary = null;
-    let predictedBoundary = null;
-    for (let ext = 0; ext <= SIZE * 2; ext += 1) {
-      const set = setAt(ext);
-      const { turns, sorties } = turnsFor(set);
-      const rate = seq.facingFlipRate(set, SIZE);
-      if (turns > 0 && observedBoundary === null) observedBoundary = ext;
-      if (rate > 0 && predictedBoundary === null) predictedBoundary = ext;
-      rows.push({ ext, turns, sorties, rate });
-    }
-    const disagree = rows.filter((r) => (r.turns > 0) !== (r.rate > 0));
-    if (observedBoundary === null || predictedBoundary === null) {
-      bad(NAME, `no boundary inside 0..${SIZE * 2}px of x-extent — turns first appear at ` +
-        `${observedBoundary}, rate first leaves zero at ${predictedBoundary}. One of the two never ` +
-        'changed, so this row cannot tell.');
-    } else if (disagree.length) {
-      const w = disagree[0];
-      bad(NAME, `${disagree.length} of ${rows.length} x-extents disagree with the predicate; first at ` +
-        `extent ${w.ext}px, where facingFlipRate is ${w.rate} and the bee turned around ${w.turns} ` +
-        `times in ${w.sorties} sorties. The floor predicts the flight or it is not a floor.`);
-    } else {
-      const top = rows[rows.length - 1];
-      ok(`${NAME} — swept x-extent 0..${SIZE * 2}px in 1px steps: turns first appear at ` +
-        `${observedBoundary}px and facingFlipRate first leaves zero at ${predictedBoundary}px, ` +
-        `agreeing at all ${rows.length} extents (0 turns below, ${top.turns} in ${top.sorties} ` +
-        'sorties at the top)');
-    }
-  }
-
-  // --- J8: `heldFacing` is READ, not merely carried ----------------------
-  //
-  // J7's sweep is only true because `buildAttitude` now takes `heldFacing`.
-  // Before R122 it did not, and the field was written by three plan builders,
-  // threaded through `resolveBeat`, handed across the component boundary and
-  // consumed by nothing, while `flightSequencer`'s own comment cited "its
-  // `heldFacing` option" as the reason a perched bee keeps the facing he
-  // arrived with. Nothing about a dead field looks dead.
-  //
-  // So this row does not check that the option EXISTS — an unread parameter
-  // exists. It checks that passing the two facings produces two different
-  // answers on a path whose own travel is below the threshold, which is the
-  // only case where holding is distinguishable from re-seeding.
-  {
-    const NAME = 'J8 §32 buildAttitude consumes heldFacing, it does not just accept it';
-    const SIZE = BEE_SIZE;
-    const W = 393;
-    const H = 852;
-    // Below-threshold horizontal travel: the deadband, where the incoming
-    // facing is the only thing that can decide the answer.
-    const sub = SIZE * 0.25;
-    const opts = { width: W, height: H, size: SIZE, closed: false, durationMs: 1000 };
-    const p = [{ x: 0.5, y: 0.2 }, { x: 0.5 + sub / W, y: 0.8 }];
-    const right = buildAttitude(p, { ...opts, heldFacing: 1 }).scaleXOutput;
-    const left = buildAttitude(p, { ...opts, heldFacing: -1 }).scaleXOutput;
-    const bare = buildAttitude(p, opts).scaleXOutput;
-    const carried = seq.buildPerchPlan({
-      at: { x: 200, y: 400 }, width: W, height: H, durationMs: 3000, heldFacing: -1,
-    }).heldFacing;
-    if (carried !== -1) {
-      bad(NAME, `buildPerchPlan dropped heldFacing (carried ${carried}). The consumer below is fine ` +
-        'and the producer is not, so a sequenced bee still snaps.');
-    } else if (right.every((v, i) => v === left[i])) {
-      bad(NAME, `heldFacing +1 and -1 produce the same scaleX (${JSON.stringify(right)}) on ` +
-        `${sub.toFixed(1)}px of travel — below the ${SIZE}px threshold, so the seed is the only ` +
-        'input. The option is accepted and discarded.');
-    } else if (!left.every((v) => v === -1) || !right.every((v) => v === 1)) {
-      bad(NAME, `heldFacing did not hold through sub-threshold travel: +1 gave ` +
-        `${JSON.stringify(right)}, -1 gave ${JSON.stringify(left)}. facingFor's deadband is not ` +
-        'reaching segment 0.');
-    } else {
-      ok(`${NAME} — on ${sub.toFixed(1)}px of travel (under the ${SIZE}px threshold) heldFacing +1 ` +
-        `holds right and -1 holds left; with none passed the base case still reads its own sign ` +
-        `(${JSON.stringify(bare)}), so existing call sites are unchanged`);
-    }
-  }
-}
-
-// =========================================================================
 // K. The declared anchor sets (§32.2)
 // =========================================================================
 //
@@ -3606,222 +3156,125 @@ for (const [file, { anchors, host }] of perchSets) {
   }
 }
 
-// --- K3. the worst render state still clears the floor -------------------
+// --- K3. exactly one residence per host ----------------------------------
 //
-// The floor is two, and it is `chooseAnchor`'s rather than a taste call: below
-// it there is nowhere to go that is not where he already is. Derived from the
-// module, so raising the floor there moves this row.
+// Bee Doctrine State 1. `usePerchSet` resolves `homeKey` by taking the FIRST
+// anchor declared with `home`, which means a second one is silent: the bee
+// simply lives at whichever card mounted first, and nothing anywhere would
+// show it. Runtime cannot reject it without removing the bee from a shipped
+// screen, so the rejection belongs here.
 //
-// The worst state is the one where every conditional anchor is absent, and
-// that is computed from the JSX rather than declared: an anchor inside a
-// ternary or a `&&` is one the user can make disappear.
+// Zero is also a failure, and it is the more interesting one. A host that
+// mounts a cruise `<FlyingBee>` and declares anchors but no `home` renders no
+// bee at all — `sequenceHalted` is true — so the screen keeps its anchors,
+// keeps its mount, and quietly loses its resident. That is a deletion nobody
+// wrote, which is exactly the shape K6 exists for on the other two removals.
 //
-// It is DELIBERATELY CONSERVATIVE and that is worth saying, because the count
-// it prints is not the count any flying state has. On TodayTab the all-absent
-// state is the error arm, which the ruling gives no bee at all — so this row
-// asserts the floor holds even in a state that never flies. Teaching it about
-// suppression would make it agree with K6 about which states matter, and two
-// rows that have to agree are one row with a way to disagree.
+// **Per render state, not per file.** An anchor inside a conditional arm is
+// absent in the states that do not render that arm, so a file whose only
+// `home` is conditional has render states with no residence. That is legal
+// only where the same condition also suppresses the bee — TodayTab's error arm
+// does exactly this (`perches={error ? null : perches}`, K6 row 2), so the row
+// takes the suppression as the discharge rather than re-deriving it.
+for (const [file, { anchors, src }] of perchSets) {
+  const homes = anchors.filter((a) => a.home === true);
+  const conditionalHomes = homes.filter((a) => a.conditional);
+  const suppressed = /perches=\{[^}]*\?[^}]*:\s*perches\}|perches=\{[^}]*&&\s*perches\}/.test(src);
+  const NAME = `${path.basename(file)} declares exactly one home anchor`;
+  if (homes.length !== 1) {
+    bad(
+      NAME,
+      homes.length === 0
+        ? 'no <PerchAnchor home> on a screen that mounts a cruise <FlyingBee>. `homeKey` is null, ' +
+          '`sequenceHalted` is true, and the screen renders no bee at all — the resident is gone ' +
+          'and nothing else changes.'
+        : `${homes.length} anchors marked home (${homes.map((a) => `${a.id}:${a.line}`).join(', ')}). ` +
+          '`usePerchSet` takes the first in declaration order, so the bee lives wherever the tree ' +
+          'happens to mount first — a residence decided by render order is not a residence.',
+    );
+  } else if (conditionalHomes.length === 1 && !suppressed) {
+    bad(
+      NAME,
+      `the one home anchor (${homes[0].id}:${homes[0].line}) is inside a conditional arm, and this ` +
+        'host does not suppress the bee on the other arm — so there is a render state with a mount, ' +
+        'anchors, and nowhere to live.',
+    );
+  } else {
+    ok(
+      `${path.basename(file)} declares exactly one home anchor (${homes[0].id} ${homes[0].on}@${homes[0].at}` +
+        `${conditionalHomes.length ? ', conditional — discharged by the call-site suppression' : ''})`,
+    );
+  }
+}
+
+// --- K4. a residence names its side ---------------------------------------
+//
+// R122a: the bee rests AT the anchor and is drawn centred on it, so a side
+// puts half a character into whatever lies that way. `resolvePerchPoint`
+// defaults to the LEFT edge, and on a full-width left-aligned block the left
+// edge is where the glyphs begin — which is the defect this doctrine pass
+// exists to fix, a streak caption reading "2 ays to 3." under a resting bee.
+//
+// **What this row does NOT assert, and the distinction is the point.** It does
+// not say a home must be `on: 'right'`. That would be a false universal of
+// exactly the kind this project keeps re-learning: 'right' is negative space
+// on a left-aligned full-width block and is CONTENT on a right-aligned icon
+// row (HoneycombTab's `header-actions`, which is why that one is a landing
+// site and not a residence). Whether a given side lands on glyphs is a
+// question about a rendered frame, and a gate that cannot see one must not
+// pretend to answer it.
+//
+// What it can assert is that somebody DECIDED. A defaulted side on a
+// permanent position is the one case where the author demonstrably did not
+// consider it, because the default is the failing side.
 for (const [file, { anchors }] of perchSets) {
-  const always = anchors.filter((a) => !a.conditional);
-  const FLOOR = 2;
-  if (always.length >= FLOOR) {
-    ok(
-      `${path.basename(file)} clears the anchor floor in its worst render state ` +
-        `(${always.length} unconditional of ${anchors.length}; floor ${FLOOR})`,
+  const home = anchors.find((a) => a.home === true);
+  if (!home) continue; // K3 already failed this host; one defect, one row.
+  const NAME = `${path.basename(file)} the home anchor states its side explicitly`;
+  if (home.on === undefined) {
+    bad(
+      NAME,
+      `${home.id}:${home.line} is marked home with no \`on\`, so it takes resolvePerchPoint's ` +
+        "default of 'left'. A resident sits there permanently; the side is the one thing about a " +
+        'residence that has to be a decision.',
     );
   } else {
-    bad(
-      `${path.basename(file)} clears the anchor floor in its worst render state`,
-      `only ${always.length} of ${anchors.length} anchors render unconditionally ` +
-        `(conditional: ${anchors.filter((a) => a.conditional).map((a) => a.id).join(', ')}). ` +
-        'Below two the bee flies a zero-length sortie to the point he is already standing on, ' +
-        'which is worse than the loop this replaced — and the state that does it is a state a user reaches.',
-    );
+    ok(`${path.basename(file)} home anchor ${home.id} states on="${home.on}" explicitly`);
   }
 }
 
-// --- K4. the set is not a column -----------------------------------------
+// --- K5. rest is a position, not an animation -----------------------------
 //
-// SAGE'S FALSIFICATION OF MY OWN CONTRACT, AS A ROW. I argued the collinearity
-// problem dissolved for free once anchors were sides rather than centres; it
-// does not, because TodayTab's anchors are full-width blocks in ONE padded
-// column, so choosing 'left' for all of them puts every anchor on the same x.
-// A CONTRACT WHOSE SAFE USE DEPENDS ON TASTE IS NOT A CONTRACT.
+// The doctrine's claim to Colin is a budget claim: an idle screen with the bee
+// on it should cost what the same screen costs without him. That rests on one
+// mechanism — `buildRestPlan` returns `durationMs: null`, and the driver reads
+// null as "place him and stop" rather than starting a timing.
 //
-// The floor is derived, not chosen: `facingFor` flips the mirror at one bee
-// box of horizontal travel, so a set whose entire x-extent is under `size`
-// contains no hop that can turn the bee around — he flies every sortie of
-// every session facing the same way. That is J6/J7's threshold, reused here
-// against the sets the app ships instead of against a sweep.
-for (const [file, { anchors, paddingH }] of perchSets) {
-  const SIZE = constants.DEFAULT_SIZE;
-  const device = DEVICES.reduce((a, b) => (a.width <= b.width ? a : b));
-  if (paddingH === null) {
-    bad(
-      `${path.basename(file)} anchor set spans at least one bee box in x`,
-      "could not read the content column's paddingHorizontal from the screen's stylesheet — " +
-        'the extent below would be computed against a padding this gate invented.',
-    );
-    continue;
-  }
-  // A full-width anchor's frame in the content column. The badge and the
-  // header actions are narrower than this and sit at its RIGHT edge, so
-  // modelling every anchor as full-width is exact for the left/right x this
-  // row is about, and does not flatter the result.
-  const frame = {
-    x: paddingH.left,
-    y: 0,
-    width: device.width - paddingH.left - paddingH.right,
-    height: 100,
-  };
-  // BOTH the full set and the set a user cannot make disappear. The second is
-  // the one that matters and it is the one a hand-written row would omit: my
-  // first draft checked only the full set, and a mutation that put three of
-  // TodayTab's four anchors in one column stayed GREEN because the fourth —
-  // the conditional badge — still carried the whole extent by itself. An
-  // x-extent that depends on an anchor some render state removes is an extent
-  // that some render state does not have. Same shape as K3's floor: THE
-  // INVARIANT IS ABOUT THE WORST STATE, NOT THE DECLARED SET.
-  const subsets = [
-    { label: 'all', set: anchors },
-    { label: 'unconditional only', set: anchors.filter((a) => !a.conditional) },
-  ];
-  const measure = (set) => {
-    const pts = set.map((a, i) => ({
-      key: a.id,
-      x: sequencer.resolvePerchPoint(frame, a.on, a.at).x,
-      y: i * 100,
-    }));
-    const xs = pts.map((p) => p.x);
-    return {
-      extent: xs.length ? Math.max(...xs) - Math.min(...xs) : 0,
-      sides: new Set(set.map((a) => a.on)),
-      flipRate: sequencer.facingFlipRate(pts, SIZE),
-    };
-  };
-  const results = subsets.map((s) => ({ ...s, ...measure(s.set) }));
-  const failed = results.filter((r) => !(r.extent >= SIZE && r.sides.size === 2 && r.flipRate > 0));
-  if (failed.length === 0) {
-    ok(
-      `${path.basename(file)} anchor set spans at least one bee box in x on the ${device.label} ` +
-        `(${results.map((r) => `${r.label}: ${r.extent.toFixed(0)}pt, flipRate ${r.flipRate.toFixed(3)}`).join('; ')})`,
-    );
+// Both halves are checked, on the two different objects that carry them (the
+// R85(e) shape). The module is SAMPLED, not read: `buildRestPlan` is called
+// and its output inspected, so a rest plan that acquired a duration through
+// any path at all fails here. The call site is READ, because "there is no
+// `Animated.timing` on this branch" is a statement about source.
+//
+// A zero would pass a naive "no duration" check and be wrong: an
+// `Animated.timing` of 0ms still runs, still completes, and still fires the
+// callback that would advance a machine the doctrine says has nowhere to go.
+{
+  const NAME = 'K5 rest is a position — buildRestPlan carries no duration, and the driver starts no timing for it';
+  const plan = sequencer.buildRestPlan({ at: { x: 40, y: 90 }, width: 402, height: 874, heldFacing: -1 });
+  const beeSrc = await readFile(path.join(ROOT, 'src/components/FlyingBee.js'), 'utf8');
+  const branch = /if \(plan && plan\.durationMs === null\) \{\s*\n\s*return \(\) => loopRef\.current\?\.stop\(\);/.test(beeSrc);
+  const problems = [];
+  if (plan.durationMs !== null) problems.push(`buildRestPlan returned durationMs ${plan.durationMs}, not null`);
+  if (plan.path.length !== 2 || plan.path[0].x !== plan.path[1].x || plan.path[0].y !== plan.path[1].y)
+    problems.push('the rest path is not two identical waypoints, so t moving would move the bee');
+  if (plan.flutter !== false) problems.push('the rest plan asks for the airborne wingbeat');
+  if (plan.trail !== false) problems.push('the rest plan asks for a trail, which would pile particles at one point');
+  if (!branch) problems.push('FlyingBee has no `plan.durationMs === null` early return before the timing driver — a null duration reaching Animated.timing is an animation of duration null, not the absence of one');
+  if (problems.length === 0) {
+    ok(`${NAME} (kind '${plan.kind}', durationMs ${plan.durationMs}, two identical waypoints, flutter false, trail false)`);
   } else {
-    bad(
-      `${path.basename(file)} anchor set spans at least one bee box in x`,
-      failed
-        .map(
-          (r) =>
-            `${r.label}: extent ${r.extent.toFixed(1)}pt against a ${SIZE}pt bee box, ` +
-            `sides ${[...r.sides].join('/') || '(none)'}, facingFlipRate ${r.flipRate === null ? 'null' : r.flipRate.toFixed(3)}`,
-        )
-        .join('; ') +
-        '. Every anchor on this screen is a full-width block in one column, so the side is the only ' +
-        'thing giving the set any x-extent — put them all on one side and the bee never turns around. ' +
-        'An "unconditional only" failure means the extent exists but rests on an anchor a render state removes.',
-    );
-  }
-}
-
-// --- K5. a sortie between the declared anchors is flyable ----------------
-//
-// The rows above are about the SET. This one flies it: resolve a real beat
-// between the two extreme anchors, through the same `resolveBeat` the
-// component calls, and check the attitude the bee wears getting there. A set
-// can satisfy every structural rule above and still produce a flight that
-// banks past the readable limit, and that is the failure only a resolved plan
-// can show.
-for (const [file, { anchors, paddingH }] of perchSets) {
-  if (paddingH === null) continue;
-  const SIZE = constants.DEFAULT_SIZE;
-  const device = DEVICES.reduce((a, b) => (a.width <= b.width ? a : b));
-  const frame = {
-    x: paddingH.left,
-    y: 0,
-    width: device.width - paddingH.left - paddingH.right,
-    height: 100,
-  };
-  const pts = anchors.map((a, i) => {
-    const p = sequencer.resolvePerchPoint({ ...frame, y: 80 + i * 140 }, a.on, a.at);
-    return { key: a.id, x: p.x, y: p.y };
-  });
-  const grammar = sequencer.resolveGrammar({
-    grammar: sequencer.STUB_GRAMMAR,
-    anchors: pts,
-    sortieDurationFor: (hop) =>
-      flight.buildPollinationPlan({
-        from: { x: 0, y: 0 },
-        target: { x: hop, y: 0 },
-        ringStep: Infinity,
-        bodyLengthPx: mascot.MASCOT_WIDTH_FRACTION * SIZE,
-        width: device.width,
-        height: device.height,
-        approachSpeedPxS: sequencer.referenceSpeedPxS(device.width, device.height) * sequencer.DART_SPEED_RATIO,
-        easeApproach: (w) => w,
-        easeDescent: (w) => w,
-      }).durationMs,
-  });
-  if (!grammar) {
-    bad(
-      `${path.basename(file)} resolves a dwell for its own anchor set`,
-      'resolveGrammar returned null — fewer than two anchors, or an airborne target outside (0,1). ' +
-        'The host would render no bee at all.',
-    );
-    continue;
-  }
-  // Fly every ordered pair, not a chosen one: R81's rule, and the pair that
-  // banks worst is not the pair anyone would pick by hand.
-  const banks = [];
-  let unflyable = null;
-  for (const from of pts) {
-    for (const to of pts) {
-      if (from === to) continue;
-      const plan = sequencer.resolveBeat({
-        beat: { state: 'sortie', anchor: to },
-        from,
-        width: device.width,
-        height: device.height,
-        bodyLengthPx: mascot.MASCOT_WIDTH_FRACTION * SIZE,
-        grammar,
-        easings: { dart: (w) => w, settle: (w) => w, hover: (w) => w },
-        builders: {
-          buildPollinationPlan: flight.buildPollinationPlan,
-          composeSegmentEasing: flight.composeSegmentEasing,
-        },
-        heldFacing: 1,
-      });
-      if (!plan) {
-        unflyable = `${from.key} -> ${to.key}`;
-        break;
-      }
-      const a = buildAttitude(plan.path, {
-        width: device.width,
-        height: device.height,
-        size: SIZE,
-        closed: false,
-        easing: (w) => w,
-        durationMs: plan.durationMs,
-        heldFacing: 1,
-      });
-      banks.push(...a.rotateOutput.map((d) => Math.abs(d)));
-    }
-  }
-  const worst = banks.length ? Math.max(...banks) : Infinity;
-  const LIMIT = 22;
-  if (!unflyable && worst <= LIMIT + 1e-9) {
-    ok(
-      `${path.basename(file)} every ordered anchor pair resolves a flyable sortie ` +
-        `(${pts.length * (pts.length - 1)} pairs, worst bank ${worst.toFixed(2)}° <= ${LIMIT}°, ` +
-        `solved dwell ${(grammar.perchMs[0] / 1000).toFixed(2)}-${(grammar.perchMs[1] / 1000).toFixed(2)}s)`,
-    );
-  } else {
-    bad(
-      `${path.basename(file)} every ordered anchor pair resolves a flyable sortie`,
-      unflyable
-        ? `resolveBeat returned null for ${unflyable}`
-        : `worst bank ${worst.toFixed(2)}° exceeds the ${LIMIT}° readable limit`,
-    );
+    bad(NAME, problems.join('; '));
   }
 }
 

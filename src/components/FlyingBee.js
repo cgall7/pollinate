@@ -4,22 +4,13 @@ import { MascotBee } from './MascotBee';
 import { buildAttitude } from './beeAttitude';
 import {
   APPROACH_SPEED_RATIO,
+  DESCENT_MS,
   POLLEN_RADIUS_FRACTION,
   buildPollinationPlan,
-  composeSegmentEasing,
   pollenCountFor,
   pollenFlecks,
 } from './pollinationFlight';
-import {
-  DART_SPEED_RATIO,
-  STUB_GRAMMAR,
-  chooseAnchor,
-  makeRng,
-  nextBeat,
-  referenceSpeedPxS,
-  resolveBeat,
-  resolveGrammar,
-} from './flightSequencer';
+import { buildRestPlan, referenceSpeedPxS } from './flightSequencer';
 import { theme } from '../constants/theme';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 import { DURATIONS, MAX_TRAIL_PARTICLES, useReducedMotion } from '../constants/motion';
@@ -30,9 +21,10 @@ import { DURATIONS, MAX_TRAIL_PARTICLES, useReducedMotion } from '../constants/m
 // short trail of `accentBurst` glow particles that drift and fade behind
 // it. §14.1 (R9) makes this default-ON for Today/Honeycomb idle; the only
 // guardrails are: never over active text input (`active={false}` parks it
-// small in a corner, motionless), max one airborne bee per screen (one
-// <FlyingBee> per host), and reduced-motion collapses it to a slow static
-// opacity breathe with zero particles (§12.5 Rule 4 — no exceptions).
+// small in a corner), max one airborne bee per screen (one <FlyingBee> per
+// host), and reduced-motion suppresses the flight entirely (§12.5 Rule 4 — no
+// exceptions; the parked pose it collapses to is now the doctrine's frozen
+// rest rather than Rule 4's opacity pulse, see the render branch).
 //
 // §13.3 — `preset="loginArc"`: the same engine flown as a one-shot instead
 // of a loop. The bee spirals inward from off-edge, tightens to the anchor's
@@ -98,16 +90,8 @@ const DEFAULT_SIZE = 44;
 // leaving is not a new gesture that needs a new number, and the two places a
 // mascot appears and disappears reading at the same pace is the whole of why
 // `DESCENT_MS` was pinned rather than tuned.
-const PRESENCE_FADE_MS = STUB_GRAMMAR.settleMs;
+const PRESENCE_FADE_MS = DESCENT_MS;
 
-// How many anchor keys the anti-repeat memory carries. `chooseAnchor` reads
-// the TAIL of this, so it only has to be at least the largest depth any
-// grammar will ask for; the rest is slack, and slack costs one string.
-const RECENT_MEMORY = 8;
-
-// Stable identity for "no perch set", so a mount without one does not hand a
-// fresh `[]` to a dep array on every render.
-const EMPTY_KEYS = [];
 
 // A track is *position only*. Attitude — which way the bee points and how
 // far it tips — is not a property of a fractional path: it needs the
@@ -125,15 +109,6 @@ const buildTrack = (path) => ({
 // a window in `t`.
 const PRESET_EASING = Easing.out(Easing.cubic);
 
-// The three easings a sequenced beat is flown on, named once. `dart` and
-// `settle` are §28.5's approach and descent verbatim — a sortie IS a
-// pollination visit without the pollen, so it must not be flown on a second
-// pair that could drift from the one the tap uses.
-const BEAT_EASINGS = {
-  dart: Easing.inOut(Easing.ease),
-  settle: Easing.out(Easing.cubic),
-  hover: Easing.inOut(Easing.ease),
-};
 
 const PRESETS = {
   // In from off-right, up over the top, back down across to the lower
@@ -196,7 +171,6 @@ export const FlyingBee = ({
   const planRef = useRef(null);
   planRef.current = plan;
   const t = useRef(new Animated.Value(0)).current;
-  const breathe = useRef(new Animated.Value(0)).current;
   // §32.2 — presence, not opacity-of-the-bee. It fades the whole flight box,
   // trail particles included, so a bee leaving a screen does not leave its own
   // glow hanging in the air behind it. Starts at 0 for a sequenced mount
@@ -204,18 +178,6 @@ export const FlyingBee = ({
   // screen finishes declaring where he can stand, which is the arrival this
   // beat should have had all along.
   const presence = useRef(new Animated.Value(preset ? 1 : 0)).current;
-  // The machine's memory. Refs, not state: nothing renders off them, and a
-  // beat is chosen inside an animation completion callback where a state read
-  // would be one render behind.
-  const recentRef = useRef([]);
-  const rngRef = useRef(null);
-  if (!rngRef.current) {
-    // Per-session seed, per mount — Principle 4. Reproducibility lives in the
-    // gate, which passes its own seed to the same `makeRng`; a shipped bee
-    // that started from the same seed every launch would be the screensaver
-    // with one extra layer of indirection.
-    rngRef.current = makeRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
-  }
   const posRef = useRef({ x: 0, y: 0 });
   const beeOpacityRef = useRef(1);
   const loopRef = useRef(null);
@@ -239,23 +201,28 @@ export const FlyingBee = ({
   const easing = plan ? plan.easing : PRESET_EASING;
   const durationMs = plan ? plan.durationMs : presetDef ? presetDef.duration : 0;
 
-  // §32.2 — is there anywhere to go? Two anchors is the floor and it is
-  // `chooseAnchor`'s, not a taste call: with one anchor the bee flies a
-  // zero-length sortie to the point he is already standing on, which is worse
-  // than the loop this replaces. `resolveGrammar` returns null for the same
-  // set and for the same reason, so the two agree by construction.
+  // Bee Doctrine — is there anywhere to LIVE? One home anchor, and the floor
+  // is one because the bee no longer goes anywhere: the old two-anchor floor
+  // was `chooseAnchor`'s, and it existed so a sortie had a destination that
+  // was not its own origin. With the idle flight retired there is no sortie,
+  // so a screen that declares one residence has declared everything the
+  // resident needs.
   //
   // A preset flight has no anchors and needs none — it is a one-shot arc to a
-  // destination its host named, and it is not sequenced.
-  const anchorKeys = perches?.keys ?? EMPTY_KEYS;
+  // destination its host named, and it is not resident.
+  const homeKey = perches?.homeKey ?? null;
   const sequenced = !presetDef;
-  const canSequence = sequenced && anchorKeys.length >= 2;
+  const canSequence = sequenced && homeKey !== null;
   // Everything that makes a bee visible or animated is off when this is true.
   // Note it is NOT folded into `flightSuppressed`: suppressed means "parked" —
-  // a small static bee that breathes in the corner, which is the right answer
+  // a small still bee in the corner, which is the right answer
   // for Reduce Motion and for a text field taking focus. Halted means "not
   // here at all", which is the ratified answer for the week feed and the error
   // arm. Collapsing the two would have shipped a parked bee onto both.
+  //
+  // **A screen with anchors but no `home` is halted, and that is the doctrine
+  // rather than an oversight.** Anchors that are not home are errand LANDING
+  // sites; declaring one does not make a screen somewhere the bee lives.
   const sequenceHalted = sequenced && !canSequence;
 
   // Attitude is resolved against the measured container, not the path's
@@ -499,131 +466,87 @@ export const FlyingBee = ({
     });
   };
 
-  // --- §32.2, the sequencer's side of the boundary ------------------------
+  // --- §32.2, the resident's side of the boundary --------------------------
   //
-  // Anchors are resolved HERE, at the moment of choosing, and never cached.
+  // The home anchor is resolved HERE, at the moment of use, and never cached.
   // `PerchAnchor.read` calls `measureInWindow` on the element itself, so the
-  // point the bee flies to is where that card is standing right now — after a
-  // scroll, after a keyboard, after a card appeared above it. There is no
+  // point the bee stands on is where that block is standing right now — after
+  // a scroll, after a keyboard, after a card appeared above it. There is no
   // coordinate to go stale because there is no coordinate stored, and that is
   // strictly better than a scroll listener: no throttle, no re-render, and no
   // window in which the two disagree.
   //
+  // **And it is worth MORE under the doctrine than it was under the flight.**
+  // A sortie read its destination once and flew; a resident stands there
+  // indefinitely, so a stale coordinate has no next beat to correct it. The
+  // rest is re-seated whenever the screen re-renders the machine (see the
+  // driver effect's deps), which is the same measure-on-use with a longer
+  // exposure.
+  //
   // The conversion is the one `pollinate` already does and it is done in one
   // place for both: window point, minus this box's own origin, minus the
   // half-box that turns a corner-driven track into a centred character (§28.3).
-  const readAnchors = () => {
-    if (!perches || !layout) return [];
+  const readHome = () => {
+    if (!perches || !layout || homeKey === null) return null;
+    const p = perches.read(homeKey);
+    if (!p) return null;
     const boxOrigin = readOrigin();
-    return anchorKeys
-      .map((key) => {
-        const p = perches.read(key);
-        return p ? { key, x: p.x - boxOrigin.x - size / 2, y: p.y - boxOrigin.y - size / 2 } : null;
-      })
-      .filter(Boolean);
+    return { key: homeKey, x: p.x - boxOrigin.x - size / 2, y: p.y - boxOrigin.y - size / 2 };
   };
 
-  // A sortie's duration for a given hop, computed by the builder that will fly
-  // it. `perchRangeFor` takes this as an argument for exactly one reason: the
-  // dwell is solved to hit an airborne FRACTION, so it has to be solved against
-  // the real plan geometry — staging offset and settle included — rather than
-  // against a second copy of the arithmetic living in the grammar.
-  const sortieDurationFor = (hopPx) =>
-    buildPollinationPlan({
-      from: { x: 0, y: 0 },
-      target: { x: hopPx, y: 0 },
-      ringStep: Infinity,
-      bodyLengthPx,
-      width: layout.width,
-      height: layout.height,
-      approachSpeedPxS: cruiseSpeed * DART_SPEED_RATIO,
-      easeApproach: BEAT_EASINGS.dart,
-      easeDescent: BEAT_EASINGS.settle,
-    }).durationMs;
-
   /**
-   * Advance the machine one beat: choose, resolve, fly.
+   * REST — put the bee down and leave him there.
    *
-   * `finishedState` is the beat that just ended — `nextBeat` branches on it,
-   * and 'perch' is the state that produces a sortie, which is why an ABORT
-   * passes 'perch'. That is not a lie about what happened; it is the sentence
-   * "he has finished being where he was, go somewhere". §28.9's ruling is
-   * unchanged and it is now free: aborting is leaving, and leaving is the only
-   * thing this machine does.
+   * This is the whole of what `advance` used to be. There is no next beat to
+   * choose, no dwell to solve and no anchor to pick, so what is left is the
+   * one thing the old machine did on its way past: build a stationary plan and
+   * hand it to the driver.
    *
-   * The grammar is re-solved per beat rather than once per anchor-set change,
-   * and the reason is the measure-on-use above: the anchors have coordinates
-   * only at the instant they are read, so a dwell solved at mount would be
-   * solved against a layout the user has since scrolled. It is `meanHopPx`
-   * over at most four anchors — twelve `hypot`s once every few seconds.
+   * `at` is optional and the distinction is the doctrine's: rest with no
+   * argument means "stay where you landed" (State 3's ending — the bee settles
+   * near the reveal card and stays there, it does not fly home), and rest
+   * WITH an argument means "go and be at the residence", which only the
+   * opening placement does.
    */
-  const advance = (finishedState) => {
-    const anchors = readAnchors();
-    const grammar = resolveGrammar({ grammar: STUB_GRAMMAR, anchors, sortieDurationFor });
-    // Null grammar means fewer than two anchors, i.e. the screen stopped
-    // declaring anywhere to go mid-flight. Stop; `sequenceHalted` fades him.
-    if (!grammar) {
+  const rest = (at) => {
+    const target = at ?? posRef.current;
+    if (!target) {
       setPlan(null);
       return;
     }
-    const beat = nextBeat({
-      state: finishedState,
-      recent: recentRef.current,
-      anchors,
-      rng: rngRef.current,
-      grammar,
-    });
-    const next = resolveBeat({
-      beat,
-      from: { ...posRef.current },
-      width: layout.width,
-      height: layout.height,
-      bodyLengthPx,
-      grammar,
-      easings: BEAT_EASINGS,
-      builders: { buildPollinationPlan, composeSegmentEasing },
-      // The facing the bee is ACTUALLY wearing as this beat ends, read off the
-      // same attitude the render is drawing with rather than recomputed from
-      // the path — `scaleXOutput` is the mirror channel, ±1, and its last
-      // entry is where the flight left him. Recomputing it here would be a
-      // second copy of `beeAttitude`'s walk, and the seam it exists to close
-      // (a perched bee snapping to face right, because a stationary path's
-      // first segment has `dx === 0`) is exactly the kind that only shows up
-      // when the two copies disagree.
-      heldFacing: attitude?.scaleXOutput?.[attitude.scaleXOutput.length - 1],
-    });
-    if (!next) {
-      setPlan(null);
-      return;
-    }
-    if (next.anchorKey) {
-      recentRef.current = [...recentRef.current, next.anchorKey].slice(-RECENT_MEMORY);
-    }
-    setPlan(next);
+    setPlan(
+      buildRestPlan({
+        at: { x: target.x, y: target.y },
+        width: layout.width,
+        height: layout.height,
+        // The facing the bee is ACTUALLY wearing as the last flight ends, read
+        // off the same attitude the render is drawing with rather than
+        // recomputed from the path — `scaleXOutput` is the mirror channel, ±1,
+        // and its last entry is where the flight left him. Recomputing it here
+        // would be a second copy of `beeAttitude`'s walk, and the seam it
+        // exists to close (a resting bee snapping to face right, because a
+        // stationary path's first segment has `dx === 0`) is exactly the kind
+        // that only shows up when the two copies disagree.
+        heldFacing: attitude?.scaleXOutput?.[attitude.scaleXOutput.length - 1],
+      }),
+    );
   };
 
   /**
-   * Put the bee somewhere before the first beat.
+   * Put the bee at home before anything else happens.
    *
-   * He starts PERCHED on a chosen anchor rather than flying in, and the choice
-   * is not decoration: `posRef` is seeded from the animation and its
-   * initialiser is `{ x: 0, y: 0 }`, so "just start a sortie" begins every
-   * session with a flight out of this container's top-left corner — the exact
-   * artefact R89 found already shipping, arrived at a second way. Seeding the
-   * position from the anchor and opening with a landing beat means the first
-   * thing the screen shows is a bee who was already here.
+   * He starts RESIDENT rather than flying in, and the choice is not
+   * decoration: `posRef`'s initialiser is `{ x: 0, y: 0 }`, so any opening
+   * that moves begins every session out of this container's top-left corner —
+   * the exact artefact R89 found already shipping. Seeding the position from
+   * the anchor means the first thing the screen shows is a bee who was
+   * already here, which is also the doctrine's whole claim about him.
    */
   const start = () => {
-    const anchors = readAnchors();
-    if (anchors.length < 2) return false;
-    const first = chooseAnchor(anchors, [], rngRef.current, STUB_GRAMMAR.antiRepeatDepth);
-    if (!first) return false;
-    posRef.current = { x: first.x, y: first.y };
-    recentRef.current = [first.key];
-    // 'sortie' = "a flight just ended here", which is what being placed on an
-    // anchor is. `nextBeat` answers it with a hover or a perch, never with
-    // another flight, so nothing moves until he has been seen standing still.
-    advance('sortie');
+    const home = readHome();
+    if (!home) return false;
+    posRef.current = { x: home.x, y: home.y };
+    rest(home);
     return true;
   };
 
@@ -641,10 +564,11 @@ export const FlyingBee = ({
   useEffect(() => {
     if (!layout || flightSuppressed || sequenceHalted) return;
     if (!pollinate) {
-      // Abort. It used to be `buildReturnPlan` to `PATH[0]`; it is now just
-      // the next beat, which is a sortie to a different anchor. Same flight,
-      // no fixed destination — §28.4's seam had nothing left to close.
-      if (planRef.current?.kind === 'visit') advance('perch');
+      // Abort. It used to be `buildReturnPlan` to `PATH[0]`, then the next
+      // sortie; under the doctrine an aborted errand ends where it gave up and
+      // the bee simply rests there. §28.9 is unchanged and now costs nothing:
+      // aborting is stopping, and stopping is a position.
+      if (planRef.current?.kind === 'visit') rest();
       return;
     }
     if (pollinate.key === pollinateKeyRef.current) return;
@@ -725,6 +649,15 @@ export const FlyingBee = ({
       return undefined;
     }
     t.setValue(0);
+    // REST — Bee Doctrine State 1. `durationMs: null` is the absence of an
+    // animation, not a zero-length one: `t` is already at 0, the track's two
+    // waypoints are identical, so the bee is AT the rest point and nothing is
+    // driving anything. This is the branch the 15% idle-motion budget is won
+    // in — an idle Today costs zero flight animations, and the only thing
+    // moving on the whole screen is a 2-degree wing on a 4.2s clock.
+    if (plan && plan.durationMs === null) {
+      return () => loopRef.current?.stop();
+    }
     if (plan) {
       loopRef.current = Animated.timing(t, {
         toValue: 1,
@@ -741,11 +674,12 @@ export const FlyingBee = ({
           // be aborted.
           onPollinateEndRef.current?.();
         }
-        // A visit is a landing like any other: he may look around the cell he
-        // just pollinated before leaving it. 'sortie' is the finished state for
-        // every arrival, and the machine does not need to know which kind of
-        // errand brought him.
-        advance(plan.kind === 'visit' ? 'sortie' : plan.kind);
+        // Doctrine State 3's ending, verbatim: "bee settles at a perch near
+        // the reveal card, then transitions to Breath". He does NOT fly home
+        // — flying home with nothing to carry is the idle re-perch §Retire
+        // Outright deletes, and it would be the retired behaviour re-entering
+        // through the one door still open to it.
+        rest();
       });
     } else {
       loopRef.current = Animated.timing(t, {
@@ -822,19 +756,6 @@ export const FlyingBee = ({
     return () => clearInterval(trailTimerRef.current);
   }, [layout, flightSuppressed, sequenceHalted, preset, plan]);
 
-  // Reduced motion (§12.5 Rule 4) / parked (inactive): no flight, no
-  // particles — a small static bee that breathes via opacity only.
-  useEffect(() => {
-    if (!flightSuppressed || presetDef) return undefined;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: DURATIONS.reducedMotionFade * 4, useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: DURATIONS.reducedMotionFade * 4, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [flightSuppressed, preset]);
 
   // A screen that declares nowhere to land has no bee — parked or otherwise.
   // Easy to get backwards: Reduce Motion on the week feed must render NOTHING,
@@ -846,14 +767,24 @@ export const FlyingBee = ({
   // `presence: 0` instead of unmounting, because unmounting is how you get a
   // bee that vanishes on a frame boundary the first time the fade and the
   // render disagree about which of them finishes first.
+  //
+  // **The parked bee no longer pulses, and that is a §12.5 Rule 4 amendment
+  // rather than a tidy-up — flagged, not slipped in.** Rule 4's answer for
+  // Reduce Motion was "a slow static opacity breathe with zero particles". The
+  // doctrine's §State-2 answer is "complete freeze at rest pose", and its
+  // §Retire Outright deletes perch fidget by name; a bee cycling 0.55..1.0
+  // opacity every 2.4s while sitting still is a fidget, and under Reduce
+  // Motion specifically it is motion someone asked the OS to suppress. So:
+  //
+  //   Reduce Motion   frozen. No opacity loop, no wing. `breath={false}`.
+  //   parked, motion  Breath — the same 2-degree wing the resident wears,
+  //                   because a bee parked over a text field is a resident
+  //                   who has been asked to stand aside, not a different bee.
   if (flightSuppressed) {
     if (presetDef || sequenceHalted) return null;
-    const opacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
     return (
       <View style={[styles.parkedAnchor, style]} pointerEvents="none">
-        <Animated.View style={{ opacity }}>
-          <MascotBee size={size} />
-        </Animated.View>
+        <MascotBee size={size} breath={!reduced} />
       </View>
     );
   }
@@ -922,11 +853,18 @@ export const FlyingBee = ({
             },
           ]}
         >
-          {/* §19.5 puts wing motion on the airborne path only, and the beat
-              now says which that is: a perched bee holds his wings, a hovering
-              one does not. `plan.flutter` is the plan builder's, so this stays
-              one source rather than a second reading of `kind`. */}
-          <MascotBee size={size} flutter={plan ? plan.flutter !== false : true} />
+          {/* §19.5 puts the airborne wingbeat on the airborne path only, and
+              the plan says which that is. `plan.flutter` is the plan builder's,
+              so this stays one source rather than a second reading of `kind`.
+              What a resting bee wears instead is `breath` — Bee Doctrine
+              §State-2, a 2-degree sweep on a 4.2s clock against the airborne
+              18 over 0.16s. The two are the same channel inside `MascotBee`
+              and cannot both be live. */}
+          <MascotBee
+            size={size}
+            flutter={plan ? plan.flutter !== false : true}
+            breath={plan?.kind === 'rest'}
+          />
         </Animated.View>
       )}
       </Animated.View>
