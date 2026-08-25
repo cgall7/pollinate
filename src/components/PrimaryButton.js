@@ -37,7 +37,7 @@ export const PrimaryButton = ({
 }) => (
   <PressableScale
     style={[styles.button, style]}
-    containerStyle={containerStyle}
+    containerStyle={[styles.buttonContainer, containerStyle]}
     onPress={onPress}
     disabled={disabled || loading}
     disabledOpacity={loading ? 1 : 0.4}
@@ -56,8 +56,18 @@ export const PrimaryButton = ({
 );
 
 const styles = StyleSheet.create({
-  button: {
+  // `width` lives here, not on `button` below: `button` feeds
+  // PressableScale's `style`, which only reaches the inner transform
+  // layer — one node too deep to make the button a full-width flex item
+  // in a caller's row (PressableScale.js's own R43 note). Landing it there
+  // instead made the width depend on whatever the outer Pressable's
+  // shrink-to-content size happened to resolve to in a given caller's
+  // layout, rather than being reliably full-width everywhere, "the one CTA
+  // shape in the app."
+  buttonContainer: {
     width: '100%',
+  },
+  button: {
     height: 56,
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.ink,

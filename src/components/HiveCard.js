@@ -30,6 +30,7 @@ export const HiveCard = ({ hive, onPress }) => {
       <GradientCard
         style={styles.material}
         contentStyle={[styles.fill, { backgroundColor: cover.base }]}
+        innerStyle={styles.fillInner}
         colors={theme.gradients.sheen}
       >
         <Text style={[styles.name, { color: cover.textColor }]} numberOfLines={2}>
@@ -60,6 +61,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium - 6,
     borderWidth: 1,
     borderColor: theme.colors.surfaceBorderStrong,
+  },
+  fillInner: {
+    flex: 1,
     padding: 10,
     justifyContent: 'space-between',
   },

@@ -135,7 +135,6 @@ export const LoadState = ({
           PrimaryButton is naturally lighter than a screen CTA. */}
       <PrimaryButton
         onPress={onRetry}
-        style={styles.retry}
         containerStyle={styles.retryContainer}
         accessibilityLabel={retryAccessibilityLabel}
       >
@@ -173,9 +172,6 @@ const styles = StyleSheet.create({
   },
   retryContainer: {
     alignSelf: 'stretch',
-  },
-  retry: {
-    width: '100%',
   },
   staleRow: {
     flexDirection: 'row',

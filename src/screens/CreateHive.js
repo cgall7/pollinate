@@ -144,6 +144,7 @@ export const CreateHiveFlow = ({ navigation }) => {
                   key={themeOption.id}
                   onPress={() => setCoverTheme(themeOption.id)}
                   style={[styles.themeCard, selected && styles.themeCardSelected]}
+                  containerStyle={styles.themeCardContainer}
                   accessibilityLabel={`${themeOption.label} cover${selected ? ', selected' : ''}`}
                 >
                   {/* E2/E3 — the cover never touches the page. It's an inset
@@ -156,6 +157,7 @@ export const CreateHiveFlow = ({ navigation }) => {
                   <GradientCard
                     style={styles.themeMaterial}
                     contentStyle={[styles.themeFill, { backgroundColor: themeOption.base }]}
+                    innerStyle={styles.themeFillInner}
                     colors={theme.gradients.sheen}
                   >
                     {selected && <SelectedCheck />}
@@ -306,15 +308,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  themeCard: {
+  // Layout-positioning keys (width, margin) belong on PressableScale's
+  // `containerStyle`, not `style` — `style` only ever reaches the inner
+  // transform layer, one node too deep to participate in `themeGrid`'s
+  // flex-wrap row at all (PressableScale.js's own R43 note). Landing them
+  // on `style` instead left the real flex item (the outer Pressable)
+  // sized by shrink-to-content while its child asked for '48%' of that
+  // same shrinking box — circular, and it silently resolved to the
+  // swatch's own content width instead of the grid math below.
+  themeCardContainer: {
     // 48 + 48 = 96% < 100%: two per row can never overflow regardless of
     // container width, because the slack is distributed by
     // `justifyContent` instead of added by a `gap` on top of a fitted
     // percentage (E4 — the three-across grid silently reflowed to two on
     // narrower devices and always rendered an orphan 4th card either way).
     width: '48%',
-    aspectRatio: 1,
     marginBottom: 12,
+  },
+  themeCard: {
+    aspectRatio: 1,
     borderRadius: theme.borderRadius.medium,
     // E2/E3 — this is the mat, not the cover. `surface` white is the frame
     // every cover material insets into, so cover-vs-ground separation is
@@ -346,6 +358,9 @@ const styles = StyleSheet.create({
     // rather than depending on anyone re-checking ΔE00 by eye forever.
     borderWidth: 1,
     borderColor: theme.colors.surfaceBorderStrong,
+  },
+  themeFillInner: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
     padding: 10,
