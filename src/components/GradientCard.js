@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useSvgId } from '../utils/svgId';
+import { svgStopProps } from '../utils/svgStopProps';
 
 // Corner-to-corner color wash behind a card, so hero content reads as
 // catching light instead of sitting on a flat white rect. Stops come from
@@ -23,14 +24,14 @@ export const GradientCard = ({ colors, style, contentStyle, children }) => {
             and leaves `bbWidth`/`bbHeight` unset. The `<Rect>` below is
             percentage-sized and has nothing to resolve against without
             them. */}
-        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%" pointerEvents="none">
+        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
           <Defs>
             <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
               {colors.map((color, i) => (
                 <Stop
                   key={color + i}
                   offset={`${(i / (colors.length - 1)) * 100}%`}
-                  stopColor={color}
+                  {...svgStopProps(color)}
                 />
               ))}
             </LinearGradient>
