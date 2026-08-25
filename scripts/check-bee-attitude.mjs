@@ -1402,6 +1402,106 @@ const targetAxisProp = (axis) =>
   }
 }
 
+// --- F4b. The trail is a property of the BEAT, so every beat must answer --
+//
+// **This row exists because the errand flew without its honey trail for a
+// week and nothing caught it.** `52c5d5c` moved the trail off the component
+// and onto the plan (`FlyingBee`: `if (plan && !plan.trail) return`). The
+// sortie plan it was written against declared `trail: true`;
+// `buildPollinationPlan` declared nothing — and `undefined` behaves exactly
+// like a considered `false` while looking, in the source, like nothing at
+// all. First seen on a screen 2026-08-25, in the acceptance capture.
+//
+// A MISSING FIELD CANNOT BE GREPPED FOR. Every search for `trail` returned
+// the sites that HAD one, which is why "check the trail is wired" kept coming
+// back green. The only instrument that finds an absence is one that
+// enumerates the population first and asks each member the question.
+//
+// Membership is not a name list, and not an exemption list either. The rule
+// is "every plan the component can RECEIVE must answer the question the
+// component asks of it", so the set is derived from `FlyingBee`'s OWN import
+// list: a builder it does not import cannot hand it a plan. That makes
+// `buildReturnPlan` (retired with the idle flight, banned by name in the row
+// above) out of scope for the right reason rather than by exception — and
+// self-correcting, because the day anyone imports it, it joins the population
+// and reds until it declares.
+{
+  const declaresTrail = [];
+  const silentPlans = [];
+  const outOfScope = [];
+
+  const importedBuilders = new Set();
+  walk(flyingBeeAst.program, (n) => {
+    if (n.type !== 'ImportDeclaration') return;
+    if (!/pollinationFlight|flightSequencer/.test(n.source?.value ?? '')) return;
+    (n.specifiers ?? []).forEach((sp) => {
+      if (sp.imported?.name) importedBuilders.add(sp.imported.name);
+    });
+  });
+
+  for (const mod of [
+    { name: 'pollinationFlight.js', src: flightSource },
+    { name: 'flightSequencer.js', src: sequencerSource },
+  ]) {
+    const ast = parseJs(mod.src);
+    // Owning builder, by POSITION rather than by matching a shape: every
+    // builder in these modules is `export const buildX = (...) => ...`, and
+    // the innermost declarator containing the literal is its owner whether
+    // the body is an expression or a block with a `return`.
+    const owners = [];
+    walk(ast.program, (n) => {
+      if (n.type !== 'VariableDeclarator') return;
+      if (!n.id?.name || !/^(Arrow)?FunctionExpression$/.test(n.init?.type ?? '')) return;
+      owners.push({ name: n.id.name, start: n.start, end: n.end });
+    });
+    walk(ast.program, (n) => {
+      if (n.type !== 'ObjectExpression') return;
+      const keys = n.properties.map((pr) => pr.key?.name).filter(Boolean);
+      // A plan, structurally: it names a state and it names a route. Nothing
+      // else in these modules carries both.
+      if (!keys.includes('kind') || !keys.includes('path')) return;
+      const owner =
+        owners
+          .filter((o) => o.start <= n.start && n.end <= o.end)
+          .sort((a, b) => b.start - a.start)[0]?.name ?? '(anonymous)';
+      const where = `${mod.name}:${owner}`;
+      if (!importedBuilders.has(owner)) {
+        outOfScope.push(where);
+        return;
+      }
+      const prop = n.properties.find((pr) => pr.key?.name === 'trail');
+      const v = prop?.value;
+      // Boolean literal only. `trail: someFlag` is a third answer the
+      // consumer's `!plan.trail` cannot be read against without running it,
+      // and CANNOT TELL is a fail.
+      if (v?.type === 'BooleanLiteral' || (v?.type === 'Literal' && typeof v.value === 'boolean')) {
+        declaresTrail.push(`${where}=${v.value}`);
+      } else {
+        silentPlans.push(prop ? `${where} (not a boolean literal)` : where);
+      }
+    });
+  }
+
+  // Two plans reach the component today: the errand's visit and the
+  // resident's rest. A floor of two, so the row cannot pass by finding
+  // nothing — the failure that started this was an absence.
+  if (silentPlans.length === 0 && declaresTrail.length >= 2) {
+    ok(
+      `every plan FlyingBee can receive declares \`trail\` as a boolean (${declaresTrail.join(', ')}; ` +
+        `${outOfScope.length} builder(s) out of scope because FlyingBee does not import them: ${outOfScope.join(', ') || 'none'})`
+    );
+  } else {
+    bad(
+      'every plan FlyingBee can receive declares `trail` as a boolean',
+      silentPlans.length
+        ? `these plans leave \`trail\` undefined, which the consumer reads as "no trail" and a reader reads as "not decided yet": ${silentPlans.join(', ')}. ` +
+          'This is the shape of the defect that flew the errand trail-less for a week.'
+        : `expected at least 2 plans in scope, found ${declaresTrail.length} (${declaresTrail.join(', ') || 'none'}) — ` +
+          'the population went empty, so the row was asserting nothing.'
+    );
+  }
+}
+
 // --- F5. §28.7 row 5 — the approach is distance/speed, with no clamp -----
 //
 // THE ROW THIS GATE EXISTS FOR, and it is R81's lesson applied one beat

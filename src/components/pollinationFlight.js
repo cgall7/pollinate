@@ -259,6 +259,17 @@ export const buildPollinationPlan = ({
     descentMs: DESCENT_MS,
     split,
     landing: target,
+    // §28 has always specified a honey trail on the approach, and it stopped
+    // rendering the day 52c5d5c made the trail a property of the BEAT
+    // (`FlyingBee`'s `if (plan && !plan.trail) return`). That commit gave the
+    // sortie plan `trail: true` and left this builder alone, so from then on
+    // the ONE plan that flies over open ground was the one plan that declared
+    // nothing — `undefined`, which reads as "no trail" and looks exactly like
+    // a deliberate `false`. It was invisible for as long as it was, because a
+    // missing field cannot be grepped for; §28 was never on a screen between
+    // that commit and the acceptance capture. First observed 2026-08-25 in the
+    // errand clip: not one particle behind him across the whole approach.
+    trail: true,
   };
 };
 
