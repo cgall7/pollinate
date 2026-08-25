@@ -2,11 +2,12 @@
 
 **Status:** Adopted as the governing V2 spec by Colin, 2026-08-25 (#CEO action
 items, event `d99dd08d…`); amended by Colin's Amendment 2026-08-25 (event
-`ad945232…`, this file's bytes) — §6 closed, nothing left waiting on Colin.
+`ad945232…`) — §6 closed, nothing left waiting on Colin.
 Amended 2026-08-26 (navigation ruling, event `4e4d6d3d…`): §5.2(b) honeyed-mark
 correction; tab bar 4 → 3 per `POLLINATE_V2_NAVIGATION.md` and the 2026-08-26
 amendment in `Pollinate_The_Ruling.md`.
 **Date:** 2026-08-24 (adopted 2026-08-25, amended 2026-08-25 and 2026-08-26)
+**Amendments:** §16.5 rewritten 2026-08-25 (Lumen) — filing moved from RPC/move to copy semantics after Pixel's read-path finding; see the section's amendment block. This changes the file's content hash relative to Colin's Amendment 2026-08-25 bytes; commit `384d35e` preserves those verbatim.
 **Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
@@ -139,29 +140,65 @@ entire payload of the artifact, so the field is *offered*, never *required*.
 
 ### 16.5 File a journal entry into a hive
 
-New RPC — not a bare client UPDATE, because three guards have to hold in one
-transaction:
+> **AMENDED 2026-08-25 (Lumen; thread `bf50e584…`, UX Design).** The RPC/move
+> design this section originally specified is retired. Pixel's read-path
+> finding (event `8f543fef…`): a move sets `entries.hive_id`, and every
+> personal-journal read filters `hive_id is null`, so filing deleted the entry
+> from Today, the streak, Recap, Wrapped, the share path, first-entry date,
+> and the nudge re-arm — seven call sites, plus `entries_one_journal_per_day`
+> (`where hive_id is null`) freeing the day for a second entry. Fizz's routing
+> (event `3da67b75…`) replaces the mechanism below.
 
-```sql
-create function public.file_entry_into_hive(p_entry_id uuid, p_hive_id uuid)
-returns void language plpgsql security definer set search_path = public, pg_temp
-```
+**Ruling — filing is a quotation.** The personal-journal row is never touched:
+not moved, not flagged, nothing. Filing inserts a **new hive-scoped copy** of
+the entry's text through the existing client insert path
+(`HiveStore.addHiveEntry()`, on `fizz/luxury-wave2`); the seven read sites are
+a non-event by construction, and the hive keeps frozen text for the keepsake.
+No new RPC, no migration. This *extends* the share-is-a-quotation close
+(design-system §28.9, workspace `GUIDES/GRATITUDE_DESIGN_SYSTEM_V1.md`: *"a
+share is a quotation, and a quotation doesn't change when the source does"* —
+itself a back-reference; the primary ruling was never encoded as a section
+body) from `shares` to hive filing. It is a **new extension recorded here**,
+not a citation of an existing hive ruling.
 
-Guards:
-1. Caller owns both the entry and the hive.
-2. Entry currently has `hive_id is null` (**journal → hive only, one direction**).
-   Reverse and hive→hive moves are out of scope: they'd have to reason about the
-   `entries_one_journal_per_day` unique index, which is `where hive_id is null`
-   on purpose (`20260815000001`).
-3. Entry is not `shared` (an entry already on the feed cannot become private hive
-   content), and the target hive's **current volume is not sealed** (§3) — sealed
-   entries are immutable per `20260815000006`.
+What replaces the original three guards:
+1. **Ownership and sealed-ness ride the insert RLS** — `entries_insert_own`
+   (`20260815000005`) enforces hive ownership and `sealed_at is null` at the
+   database. A sealed refusal surfaces as SQLSTATE 42501 and must get its own
+   copy line, never connection-failure copy (per `HiveStore.js`'s own caller
+   contract).
+2. **The direction guard evaporates** — there is no move to reverse. The
+   journal row's `hive_id` never leaves `null`, so `entries_one_journal_per_day`
+   is satisfied by construction.
+3. **The `shared` block is retired (ruled Lumen 2026-08-25).** Its rationale
+   was written for a *move* — the entry would leave the journal while staying
+   publicly shared. With copy semantics nothing leaves the journal or the feed,
+   and exposure only narrows (feed → one hive). The surface promise
+   (`CreateHive`: *"You'll be the only one who sees this hive unless you choose
+   to send it later"*) is about the **container**, not the provenance of its
+   contents. Blocking would exclude exactly the entries most worth keeping —
+   the ones good enough to have been shared. The **not-sealed half of the old
+   guard 3 survives** via item 1.
 
-Apply the house revoke pattern (`20260813000005`): `revoke all ... from public`
-**and** from `anon`, both lines.
+Ratified behaviors (same thread):
+- **Multi-hive filing is intended.** Each filing is an independent insert; an
+  entry about a partner and a kid belongs in both hives.
+- **Same-hive re-filing is a client-surface duty.** The database will not
+  dedupe hive rows (deliberate, per `20260815000001`'s note), and a duplicate
+  ships in the PDF and the reveal — so rows already holding the entry render
+  `FILED` (same register as `SEALED`), non-tappable. Requires one scoped read
+  (my `entries` rows where `entry_date` = key and `hive_id` is not null,
+  selecting `hive_id`), taken **on expand** so a filing from another device is
+  caught.
+- **Implementation note:** the client's `entry.date` is a `'YYYY-MM-DD'`
+  string; it must not reach a bare `new Date(string)` parse (UTC-midnight →
+  the copy files dated *yesterday* west of UTC). Split-parse at the call site.
 
 UX: in `TodayTab`, a saved entry gets a "File this to…" affordance listing the
-user's hives. This is the bridge from the solo on-ramp to the hero feature.
+user's hives, expanding **in place within the entry card** (there is no `Modal`
+in `src/`; in-place expansion is the shipped archetype — see workspace
+`GUIDES/POLLINATE_V2_DES16_FILE_TO_HIVE.md`). This is the bridge from the solo
+on-ramp to the hero feature.
 
 ---
 
