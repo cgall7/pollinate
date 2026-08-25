@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,6 +13,7 @@ import { PressableScale } from '../components/PressableScale';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
 import { Avatar } from '../components/Avatar';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // 8.2 Plant a seed: a gratitude note addressed to one person that stays sealed
 // until a date they choose to wait for. Same chrome as ComposeNote (TO chips
@@ -63,6 +65,7 @@ const COPY = {
 };
 
 export const PlantSeed = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [connections, setConnections] = useState([]);
   // How the last read ENDED — one of LOADING / READY / UNKNOWN. Not what the
   // section renders: `resolveListView` derives that from this plus the rows in
@@ -176,7 +179,7 @@ export const PlantSeed = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <ScreenHeader
           eyebrow="SEED"
           title="Plant a seed"
@@ -300,7 +303,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 64,
   },
   sectionLabel: {
     ...theme.type.label,

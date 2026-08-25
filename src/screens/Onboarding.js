@@ -11,6 +11,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { PressableScale } from '../components/PressableScale';
@@ -29,6 +30,7 @@ import { PendingOnboardingWrites } from '../services/pendingOnboardingWrites';
 import { getDailyPrompt } from '../constants/prompts';
 import { tagEntry } from '../utils/themeTagger';
 import { useAuth } from '../contexts/AuthContext';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 import {
   requestPermissionAndEnable,
   reconcile as reconcileDailyNudge,
@@ -73,6 +75,7 @@ const STEP_ACCOUNT = 4;
 
 // --- Shared shell: wash background + honeycomb journey map + animated step transitions ---
 const StepShell = ({ step, stage, wash, onBack, showMap = true, children }) => {
+  const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
 
@@ -86,7 +89,7 @@ const StepShell = ({ step, stage, wash, onBack, showMap = true, children }) => {
   }, [step]);
 
   return (
-    <View style={[styles.container, { backgroundColor: wash }]}>
+    <View style={[styles.container, { backgroundColor: wash, paddingTop: insets.top + CHROME_TOP_GAP }]}>
       <View style={styles.topBar}>
         {onBack ? (
           <TouchableOpacity onPress={onBack} hitSlop={HIT_SLOP}>
@@ -884,7 +887,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: theme.spacing.lg,
   },

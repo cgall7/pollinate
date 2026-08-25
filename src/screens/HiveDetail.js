@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, FlatList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
@@ -8,6 +9,7 @@ import { HoneycombStore } from '../services/HoneycombStore';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 const longDate = (isoDate) => {
   // entry_date is a plain 'YYYY-MM-DD' — parsing it as local midnight
@@ -27,6 +29,7 @@ const longDate = (isoDate) => {
 // (not in 8b.3's literal scope — "Author can add entries ... Entry list
 // view with chronological ordering").
 export const HiveDetailScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { hiveId } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -99,7 +102,7 @@ export const HiveDetailScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.banner, { backgroundColor: cover.base }]}>
+      <View style={[styles.banner, { backgroundColor: cover.base, paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <PressableScale onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={22} color={cover.textColor} />
         </PressableScale>
@@ -220,7 +223,6 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   banner: {
-    paddingTop: 60,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },

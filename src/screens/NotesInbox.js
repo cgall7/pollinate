@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../constants/theme';
@@ -7,6 +8,7 @@ import { NotesStore } from '../services/NotesStore';
 import { PressableScale } from '../components/PressableScale';
 import { Avatar } from '../components/Avatar';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // 26pt glyph + 12pt slop each side = a 50pt target, over the 44pt floor.
 const DISMISS_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -66,6 +68,7 @@ const NoteDetail = ({ note, direction, onClose }) => {
 // as the two lists (7.4's send confirmation lands here via refresh, not a
 // push — 7.5 needs push infra this repo doesn't have yet).
 export const NotesInbox = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('received');
   const [received, setReceived] = useState([]);
   const [sent, setSent] = useState([]);
@@ -104,7 +107,7 @@ export const NotesInbox = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <ScreenHeader
           eyebrow="GRATITUDE NOTES"
           title="Notes"
@@ -168,7 +171,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 64,
   },
   tabRow: {
     flexDirection: 'row',

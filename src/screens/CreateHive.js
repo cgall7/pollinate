@@ -8,11 +8,13 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
 import { tagEntry } from '../utils/themeTagger';
 import { HIVE_COVER_THEMES, REVIEW_CADENCE_OPTIONS } from '../constants/hiveThemes';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
 
@@ -24,6 +26,7 @@ import { PressableScale } from '../components/PressableScale';
 const STEPS = ['who', 'cover', 'cadence', 'entry'];
 
 export const CreateHiveFlow = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [stepIndex, setStepIndex] = useState(0);
   const [subjectName, setSubjectName] = useState('');
   const [coverTheme, setCoverTheme] = useState(HIVE_COVER_THEMES[0].id);
@@ -66,7 +69,7 @@ export const CreateHiveFlow = ({ navigation }) => {
       style={[styles.container, step !== 'who' && styles.containerCream]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <PressableScale onPress={goBack} style={styles.backButton} accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={22} color={theme.colors.ink} />
         </PressableScale>
@@ -202,7 +205,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
-    paddingTop: 60,
     paddingHorizontal: 24,
   },
   backButton: {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../constants/theme';
@@ -9,6 +10,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
 import { Avatar } from '../components/Avatar';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // 7.1/7.4 (no-tip variant): text-only note to one connection. Tip (7.3) and
 // image attachment (7.7) aren't built — see the notes migration's header
@@ -16,6 +18,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 // Honeycomb tab uses, so "who can I note?" never drifts from "who's in my
 // hive?".
 export const ComposeNote = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [connections, setConnections] = useState([]);
   const [loadingConnections, setLoadingConnections] = useState(true);
   const [recipientId, setRecipientId] = useState(null);
@@ -61,7 +64,7 @@ export const ComposeNote = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <ScreenHeader
           eyebrow="GRATITUDE NOTE"
           title="Send a note"
@@ -129,7 +132,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 64,
   },
   sectionLabel: {
     ...theme.type.label,

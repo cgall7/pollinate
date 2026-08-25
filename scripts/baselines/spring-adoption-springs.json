@@ -3,7 +3,7 @@
   "entries": [
     {
       "file": "src/screens/Onboarding.js",
-      "line": 84,
+      "line": 87,
       "friction": 9,
       "tension": 60,
       "severity": "MISS (duplicates declared)",

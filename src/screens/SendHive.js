@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, ActivityIndicator, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +10,7 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // §6 Screen 2 (Review Before Sending) + Screen 3 (Sent Confirmation), per
 // Lumen's ruling: §6 Screen 1's friend selector is dead against today's
@@ -21,6 +23,7 @@ const longDate = (isoDate) => {
 };
 
 export const SendHiveScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { hiveId, subjectName, coverTheme } = route.params;
   const reduced = useReducedMotion();
   const cover = hiveCoverTheme(coverTheme);
@@ -116,7 +119,7 @@ export const SendHiveScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.banner, { backgroundColor: cover.base }]}>
+      <View style={[styles.banner, { backgroundColor: cover.base, paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <PressableScale onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={22} color={cover.textColor} />
         </PressableScale>
@@ -164,7 +167,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   banner: {
-    paddingTop: 60,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },

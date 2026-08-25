@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
 import { tagEntry } from '../utils/themeTagger';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // 8b.3 — compose a new entry into an existing hive (Design Language §3's
 // Compose Entry Screen). Date is always today, read-only, matching the spec
 // and EntryStore's own `saveEntry(new Date(), ...)` convention.
 export const ComposeHiveEntryScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { hiveId, subjectName } = route.params;
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -42,7 +45,7 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <PressableScale onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={22} color={theme.colors.ink} />
         </PressableScale>
@@ -81,7 +84,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
-    paddingTop: 60,
     paddingHorizontal: 24,
   },
   backButton: {

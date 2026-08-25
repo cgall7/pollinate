@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import * as Notifications from 'expo-notifications';
@@ -179,156 +180,158 @@ export default function App() {
   }
 
   return (
-    <ErrorBoundary onReset={() => setResetKey((k) => k + 1)}>
-      <AuthProvider key={resetKey}>
-        <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
-          <Stack.Navigator
-            initialRouteName={initialRoute}
-            screenOptions={{
-              headerShown: false,
-              cardStyle: { backgroundColor: theme.colors.background }
-            }}
-          >
-            <Stack.Screen name="Onboarding">
-              {(props) => (
-                <OnboardingFlow
-                  {...props}
-                  startAt={props.route.params?.startAt}
-                  onDone={() => props.navigation.replace('Main')}
-                  splashHidden={splashHidden}
-                />
-              )}
-            </Stack.Screen>
+    <SafeAreaProvider>
+      <ErrorBoundary onReset={() => setResetKey((k) => k + 1)}>
+        <AuthProvider key={resetKey}>
+          <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
+            <Stack.Navigator
+              initialRouteName={initialRoute}
+              screenOptions={{
+                headerShown: false,
+                cardStyle: { backgroundColor: theme.colors.background }
+              }}
+            >
+              <Stack.Screen name="Onboarding">
+                {(props) => (
+                  <OnboardingFlow
+                    {...props}
+                    startAt={props.route.params?.startAt}
+                    onDone={() => props.navigation.replace('Main')}
+                    splashHidden={splashHidden}
+                  />
+                )}
+              </Stack.Screen>
 
-            <Stack.Screen name="Lock">
-              {(props) => (
-                <LockScreen
-                  {...props}
-                  onOpen={() => props.navigation.navigate('Input')}
-                />
-              )}
-            </Stack.Screen>
+              <Stack.Screen name="Lock">
+                {(props) => (
+                  <LockScreen
+                    {...props}
+                    onOpen={() => props.navigation.navigate('Input')}
+                  />
+                )}
+              </Stack.Screen>
 
-            <Stack.Screen name="Input">
-              {(props) => (
-                <InputScreen
-                  {...props}
-                  onUnlock={async (text) => {
-                    // InputScreen stopped saving itself when the pre-auth
-                    // onboarding paths started buffering its text instead
-                    // (P0-2 fix, thread 19e90cf8). This is the one caller with
-                    // a real session already — it owns the write now.
-                    await EntryStore.saveEntry(new Date(), text, tagEntry(text));
-                    props.navigation.replace('Main');
-                    // §4.1's save-side re-arm, and it sits AFTER the
-                    // navigation on purpose (Sage, 250bc4e9). This promise is
-                    // the honey unlock's own: CoreRitual holds the unlocking
-                    // overlay for the whole life of `onUnlock`, resetting
-                    // only on the error path because success is expected to
-                    // navigate away. Put the re-arm above `replace` and a
-                    // Supabase select, a scheduled-notification enumeration,
-                    // up to seven cancels, two AsyncStorage reads and up to
-                    // six SERIAL `scheduleNotificationAsync` calls all land
-                    // inside that animation. Below it, the screen is already
-                    // gone and the work is invisible.
-                    //
-                    // Still awaited rather than floated, so the ordering is
-                    // legible and a future throw is not silently orphaned.
-                    // It cannot reject today — the whole body after the
-                    // sentinel guard is one try/catch (see above) — which is
-                    // what makes running it past `replace` safe: CoreRitual's
-                    // `.catch` would otherwise alert and animate a screen
-                    // that has already unmounted.
-                    await rearmDailyNudge();
-                  }}
-                />
-              )}
-            </Stack.Screen>
+              <Stack.Screen name="Input">
+                {(props) => (
+                  <InputScreen
+                    {...props}
+                    onUnlock={async (text) => {
+                      // InputScreen stopped saving itself when the pre-auth
+                      // onboarding paths started buffering its text instead
+                      // (P0-2 fix, thread 19e90cf8). This is the one caller with
+                      // a real session already — it owns the write now.
+                      await EntryStore.saveEntry(new Date(), text, tagEntry(text));
+                      props.navigation.replace('Main');
+                      // §4.1's save-side re-arm, and it sits AFTER the
+                      // navigation on purpose (Sage, 250bc4e9). This promise is
+                      // the honey unlock's own: CoreRitual holds the unlocking
+                      // overlay for the whole life of `onUnlock`, resetting
+                      // only on the error path because success is expected to
+                      // navigate away. Put the re-arm above `replace` and a
+                      // Supabase select, a scheduled-notification enumeration,
+                      // up to seven cancels, two AsyncStorage reads and up to
+                      // six SERIAL `scheduleNotificationAsync` calls all land
+                      // inside that animation. Below it, the screen is already
+                      // gone and the work is invisible.
+                      //
+                      // Still awaited rather than floated, so the ordering is
+                      // legible and a future throw is not silently orphaned.
+                      // It cannot reject today — the whole body after the
+                      // sentinel guard is one try/catch (see above) — which is
+                      // what makes running it past `replace` safe: CoreRitual's
+                      // `.catch` would otherwise alert and animate a screen
+                      // that has already unmounted.
+                      await rearmDailyNudge();
+                    }}
+                  />
+                )}
+              </Stack.Screen>
 
-            <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="Main" component={MainTabs} />
 
-            {/* Private Hives (8b.2/8b.3, hero — PLANS/Pollinate_Delivery_Slices.md
-                Project 8b). Pushed from Today's hive shelf via getParent(),
-                same as Lock/Input above: a flow you go deeper into, not a
-                utility sheet, so no `presentation: 'modal'`. */}
-            <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
-            <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
-            <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
-            {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
-                found: the 8b.2-8b.7 arc was live at the data layer with no
-                button anywhere to trigger it). Design Language §5-6, condensed
-                per Lumen's ruling same thread. Both plain pushes, same
-                reasoning as their HiveDetail siblings. */}
-            <Stack.Screen name="SealHive" component={SealHiveScreen} />
-            <Stack.Screen name="SendHive" component={SendHiveScreen} />
-            {/* 8b.4 Trip Down Memory Lane — the author's bloom moment, first of
-                the reveal engine's two mount points (`revealSequencer.js`
-                header). Pushed from HiveDetail, not modal, for the same
-                reason as its siblings above: this is a place you go, not a
-                sheet over the place you were. */}
-            <Stack.Screen name="MemoryLane" component={MemoryLaneScreen} />
+              {/* Private Hives (8b.2/8b.3, hero — PLANS/Pollinate_Delivery_Slices.md
+                  Project 8b). Pushed from Today's hive shelf via getParent(),
+                  same as Lock/Input above: a flow you go deeper into, not a
+                  utility sheet, so no `presentation: 'modal'`. */}
+              <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
+              <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
+              <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
+              {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
+                  found: the 8b.2-8b.7 arc was live at the data layer with no
+                  button anywhere to trigger it). Design Language §5-6, condensed
+                  per Lumen's ruling same thread. Both plain pushes, same
+                  reasoning as their HiveDetail siblings. */}
+              <Stack.Screen name="SealHive" component={SealHiveScreen} />
+              <Stack.Screen name="SendHive" component={SendHiveScreen} />
+              {/* 8b.4 Trip Down Memory Lane — the author's bloom moment, first of
+                  the reveal engine's two mount points (`revealSequencer.js`
+                  header). Pushed from HiveDetail, not modal, for the same
+                  reason as its siblings above: this is a place you go, not a
+                  sheet over the place you were. */}
+              <Stack.Screen name="MemoryLane" component={MemoryLaneScreen} />
 
-            {/* 8b.6 — the reveal engine's second mount point (revealSequencer.js's
-                own header names both by number). PackageOpen is a plain push, not
-                modal, same reasoning as MemoryLane above: a place you go, not a
-                sheet over the place you were. ReceivedPackages IS a modal — it's
-                an inbox opened from chrome, same category as Notes/Seeds below,
-                not a flow you go deeper into. */}
-            <Stack.Screen name="ReceivedPackages" component={ReceivedPackagesScreen} options={{ presentation: 'modal' }} />
-            <Stack.Screen name="PackageOpen" component={PackageOpenScreen} />
+              {/* 8b.6 — the reveal engine's second mount point (revealSequencer.js's
+                  own header names both by number). PackageOpen is a plain push, not
+                  modal, same reasoning as MemoryLane above: a place you go, not a
+                  sheet over the place you were. ReceivedPackages IS a modal — it's
+                  an inbox opened from chrome, same category as Notes/Seeds below,
+                  not a flow you go deeper into. */}
+              <Stack.Screen name="ReceivedPackages" component={ReceivedPackagesScreen} options={{ presentation: 'modal' }} />
+              <Stack.Screen name="PackageOpen" component={PackageOpenScreen} />
 
-            <Stack.Screen name="Legal" component={LegalScreen} options={{ presentation: 'modal' }} />
+              <Stack.Screen name="Legal" component={LegalScreen} options={{ presentation: 'modal' }} />
 
-            {/* Opened by the account door beside the tab capsule (MainTabs
-                Option C). A modal, not a tab: it's the app's only route to
-                sign-out and the legal documents, and it's opened about twice
-                a year. */}
-            <Stack.Screen name="Account" component={AccountScreen} options={{ presentation: 'modal' }} />
+              {/* Opened by the account door beside the tab capsule (MainTabs
+                  Option C). A modal, not a tab: it's the app's only route to
+                  sign-out and the legal documents, and it's opened about twice
+                  a year. */}
+              <Stack.Screen name="Account" component={AccountScreen} options={{ presentation: 'modal' }} />
 
-            {/* Project 7 (Gratitude Notes, no-tip variant). Both modal: Notes
-                opens from the Honeycomb tab's header, Compose opens from
-                Notes' header, neither is a tab of its own yet — that's a
-                design placement call, not an engineering one. */}
-            <Stack.Screen name="Notes" component={NotesInbox} options={{ presentation: 'modal' }} />
-            <Stack.Screen name="ComposeNote" component={ComposeNote} options={{ presentation: 'modal' }} />
+              {/* Project 7 (Gratitude Notes, no-tip variant). Both modal: Notes
+                  opens from the Honeycomb tab's header, Compose opens from
+                  Notes' header, neither is a tab of its own yet — that's a
+                  design placement call, not an engineering one. */}
+              <Stack.Screen name="Notes" component={NotesInbox} options={{ presentation: 'modal' }} />
+              <Stack.Screen name="ComposeNote" component={ComposeNote} options={{ presentation: 'modal' }} />
 
-            {/* Project 8 (Seeds). 8.2 plants, 8.4 lists — a planted seed is no
-                longer invisible. 8.8's reveal choreography is still @Pixel's:
-                the sealed -> bloomed transition happens on SeedsInbox today
-                (§22.2's refetch), it just does not yet have a beat. Modal for
-                the same reason Compose is: where Seeds finally lives in the IA
-                is Project 10's call. */}
-            <Stack.Screen name="PlantSeed" component={PlantSeed} options={{ presentation: 'modal' }} />
-            <Stack.Screen name="Seeds" component={SeedsInbox} options={{ presentation: 'modal' }} />
+              {/* Project 8 (Seeds). 8.2 plants, 8.4 lists — a planted seed is no
+                  longer invisible. 8.8's reveal choreography is still @Pixel's:
+                  the sealed -> bloomed transition happens on SeedsInbox today
+                  (§22.2's refetch), it just does not yet have a beat. Modal for
+                  the same reason Compose is: where Seeds finally lives in the IA
+                  is Project 10's call. */}
+              <Stack.Screen name="PlantSeed" component={PlantSeed} options={{ presentation: 'modal' }} />
+              <Stack.Screen name="Seeds" component={SeedsInbox} options={{ presentation: 'modal' }} />
 
-            {/* Project 10: Wrapped is no longer a tab (Colin's ruling — it
-                lives in the Garden). It has to be registered somewhere or the
-                screen ships unreachable, and a root-stack modal is the same
-                treatment Notes/Seeds/Compose get for the same reason.
+              {/* Project 10: Wrapped is no longer a tab (Colin's ruling — it
+                  lives in the Garden). It has to be registered somewhere or the
+                  screen ships unreachable, and a root-stack modal is the same
+                  treatment Notes/Seeds/Compose get for the same reason.
 
-                `onComplete` is what makes it a screen rather than a trap: with
-                the prop undefined, `PollinateWrapped.js:147` sends the last
-                slide back to slide 0 forever — survivable when a tab bar sat
-                underneath it, not now that a modal covers the bar. Tapping past
-                the last beat returns you to the Garden. */}
-            <Stack.Screen name="Wrapped" options={{ presentation: 'modal' }}>
-              {(props) => (
-                <PollinateWrapped {...props} onComplete={() => props.navigation.goBack()} />
-              )}
-            </Stack.Screen>
+                  `onComplete` is what makes it a screen rather than a trap: with
+                  the prop undefined, `PollinateWrapped.js:147` sends the last
+                  slide back to slide 0 forever — survivable when a tab bar sat
+                  underneath it, not now that a modal covers the bar. Tapping past
+                  the last beat returns you to the Garden. */}
+              <Stack.Screen name="Wrapped" options={{ presentation: 'modal' }}>
+                {(props) => (
+                  <PollinateWrapped {...props} onComplete={() => props.navigation.goBack()} />
+                )}
+              </Stack.Screen>
 
-            <Stack.Screen name="Evening">
-              {(props) => (
-                <EveningMirror
-                  {...props}
-                  gratitudeText="I am grateful for this beautiful day."
-                  onClose={() => props.navigation.navigate('Main')}
-                />
-              )}
-            </Stack.Screen>
-          </Stack.Navigator>
-        </NavigationContainer>
-      </AuthProvider>
-    </ErrorBoundary>
+              <Stack.Screen name="Evening">
+                {(props) => (
+                  <EveningMirror
+                    {...props}
+                    gratitudeText="I am grateful for this beautiful day."
+                    onClose={() => props.navigation.navigate('Main')}
+                  />
+                )}
+              </Stack.Screen>
+            </Stack.Navigator>
+          </NavigationContainer>
+        </AuthProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }

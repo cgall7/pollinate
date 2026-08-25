@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { theme } from '../constants/theme';
@@ -19,6 +20,7 @@ import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor'
 import { demoHiveShares } from '../constants/demoHive';
 import { DEMO_CONTENT } from '../constants/demoMode';
 import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 import { isBlooming } from '../utils/hiveState';
 
 // Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
@@ -223,6 +225,7 @@ const RequestRow = ({ request, onRespond, onBlock }) => {
 
 const HoneycombFeed = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState([]);
   // 8b.7 — a separate list from `feed`: hive_send_events is its own table
@@ -470,7 +473,7 @@ const HoneycombFeed = () => {
       <PerchField perches={perches}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + CHROME_TOP_GAP }]}
         // §28.9 — new wiring, not a prop flip: this ScrollView had no
         // `onScroll` and no `scrollEventThrottle` at all. A flight's aim point
         // is fixed in window space while the comb is not, and the longest
@@ -746,7 +749,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 60,
     paddingBottom: TAB_CLEARANCE,
   },
   loadingContainer: {

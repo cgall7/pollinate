@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +18,7 @@ import {
   dwellProgress,
   arrivalMs,
 } from '../components/revealSequencer';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // 8b.4 Trip Down Memory Lane — the author's own bloom moment
 // (`docs/strategy/Pollinate_Delivery_Slices.md` §8b.4, Colin's Slice 1
@@ -54,6 +56,7 @@ const formatRevealDate = (atMs) => {
 const RAIL_TICK_MS = 50;
 
 export const MemoryLaneScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { hiveId, subjectName, coverTheme } = route.params;
   const cover = hiveCoverTheme(coverTheme);
   const reduced = useReducedMotion();
@@ -189,7 +192,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
           accessibilityRole="button"
           accessibilityLabel="Tap to continue to the next memory"
         >
-          <View style={styles.entryFrame} pointerEvents="box-none">
+          <View style={[styles.entryFrame, { paddingTop: insets.top + CHROME_TOP_GAP }]} pointerEvents="box-none">
             <Animated.Text style={[styles.date, { color: cover.textColor, opacity: dateOpacity }]}>
               {formatRevealDate(step.at)}
             </Animated.Text>
@@ -247,7 +250,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 100,
     paddingBottom: 48,
   },
   date: {

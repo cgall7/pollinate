@@ -8,11 +8,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Polygon } from 'react-native-svg';
 import { theme } from '../constants/theme';
 import { hexPoints, HEX_ASPECT } from '../utils/combGeometry';
 import { MonthlyRecap } from './MonthlyRecap';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 import { EntryStore } from '../services/EntryStore';
 import { dominantTheme } from '../utils/themeTagger';
 import { recentMonths, currentStreak, longestStreak } from '../utils/dateRanges';
@@ -145,6 +147,7 @@ const WrappedCard = () => {
 };
 
 export const RecapTab = () => {
+  const insets = useSafeAreaInsets();
   // §23.1 — the screen tracks how the last read ENDED, and never picks the view
   // at the call site. `resolveListView` turns (readState x rows-in-hand) into
   // the state to render, which is what keeps a failed read from being able to
@@ -234,7 +237,7 @@ export const RecapTab = () => {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + CHROME_TOP_GAP }]}>
       {/* "Garden", not "Recap": Project 10 made this the Garden tab, and a
           tab labelled one thing opening a screen titled another is the kind
           of mismatch nobody files a bug for and everybody trips on. The
@@ -357,7 +360,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 72,
     paddingBottom: TAB_CLEARANCE,
   },
   rail: {

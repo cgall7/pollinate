@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator, Animated, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,6 +12,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { KeepsakeBee } from '../components/KeepsakeBee';
 import { CelebrationRays } from '../components/CelebrationRays';
 import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 // §5 Screen 3 (Preview Package) + Screen 4 (Seal Complete), condensed per
 // Lumen's ruling (thread b57ad406, 2026-08-19): §5 Screen 1's entry
@@ -27,6 +29,7 @@ const longDate = (isoDate) => {
 };
 
 export const SealHiveScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { hiveId, subjectName, coverTheme } = route.params;
   const reduced = useReducedMotion();
   const cover = hiveCoverTheme(coverTheme);
@@ -132,7 +135,7 @@ export const SealHiveScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.banner, { backgroundColor: cover.base }]}>
+      <View style={[styles.banner, { backgroundColor: cover.base, paddingTop: insets.top + CHROME_TOP_GAP }]}>
         <PressableScale onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={22} color={cover.textColor} />
         </PressableScale>
@@ -187,7 +190,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   banner: {
-    paddingTop: 60,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },

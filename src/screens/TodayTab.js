@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../constants/theme';
 import { EntryStore } from '../services/EntryStore';
@@ -14,6 +15,7 @@ import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { currentStreak, nextMilestone } from '../utils/dateRanges';
 import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
+import { CHROME_TOP_GAP } from '../navigation/safeAreaLayout';
 
 const greeting = (date) => {
   const hour = date.getHours();
@@ -35,6 +37,7 @@ const streakCaption = (streak) => {
 };
 
 export const TodayTab = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [entry, setEntry] = useState(null);
@@ -150,7 +153,7 @@ export const TodayTab = ({ navigation }) => {
       <FlyingBee active perches={error ? null : perches} />
 
       <PerchField perches={perches}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + CHROME_TOP_GAP }]} showsVerticalScrollIndicator={false}>
         <ScreenHeader
           eyebrow={longDate(now)}
           title={greeting(now)}
@@ -278,7 +281,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 72,
     paddingBottom: TAB_CLEARANCE,
   },
   whisper: {
