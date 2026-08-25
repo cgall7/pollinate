@@ -167,6 +167,16 @@ What replaces the original three guards:
    database. A sealed refusal surfaces as SQLSTATE 42501 and must get its own
    copy line, never connection-failure copy (per `HiveStore.js`'s own caller
    contract).
+   **Premise expiry (§17):** this enforcement reads `private_hives.sealed_at` —
+   the column §17.1 rules read-only history. The moment ENG-46 stops writing
+   it, `h.sealed_at is null` is permanently true for new hives and this
+   refusal — with every sealed-content policy reading the same column
+   (`20260815000005`, `20260815000006`, `send_hive` `20260819000001`,
+   `seal_hive` `20260819000003`) — fails open silently. The re-point (or a
+   derived mirror) must ride the **same migration** that moves the seal's
+   writer to `hive_volumes.sealed_at`. Enumeration: Pixel, workspace
+   `GUIDES/POLLINATE_V2_DES16_FILE_TO_HIVE.md` §7a, 2026-08-25. ENG-46's
+   "comment as read-only history" row is **not sufficient** as written.
 2. **The direction guard evaporates** — there is no move to reverse. The
    journal row's `hive_id` never leaves `null`, so `entries_one_journal_per_day`
    is satisfied by construction.
