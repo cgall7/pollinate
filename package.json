@@ -46,6 +46,7 @@
     "check:hex-tap-geometry": "node scripts/check-hex-tap-geometry.mjs",
     "check:token-literals": "node scripts/check-token-literals.mjs",
     "check:safe-area": "node scripts/check-safe-area.mjs",
+    "check:chrome-top": "node scripts/check-chrome-top.mjs",
     "check:spring-adoption": "node scripts/check-spring-adoption.mjs",
     "check:cover-legibility": "node scripts/check-cover-legibility.mjs",
     "ratchet:update": "node scripts/ratchet-update.mjs"

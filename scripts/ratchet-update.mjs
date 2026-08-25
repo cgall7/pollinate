@@ -35,7 +35,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { computeMonotoneUpdate } from './lib/ratchet.mjs';
-import { paddingKeyOf, deprecatedImportKeyOf, springKeyOf, durationKeyOf } from './lib/ratchet-keys.mjs';
+import { paddingKeyOf, deprecatedImportKeyOf, springKeyOf, durationKeyOf, chromeTopKeyOf } from './lib/ratchet-keys.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINES_DIR = path.join(ROOT, 'scripts', 'baselines');
@@ -92,6 +92,9 @@ updateBaseline('safe-area-deprecated-import.json', safeArea.deprecatedSafeAreaVi
 const springAdoption = dumpGate('check-spring-adoption.mjs');
 updateBaseline('spring-adoption-springs.json', springAdoption.springs, springKeyOf);
 updateBaseline('spring-adoption-durations.json', springAdoption.durations, durationKeyOf);
+
+const chromeTop = dumpGate('check-chrome-top.mjs');
+updateBaseline('chrome-top.json', chromeTop.chromeTop, chromeTopKeyOf);
 
 if (blocked) {
   console.log('\nOne or more baselines were left untouched — resolve the new violation(s) above or name them with --accept-new.');

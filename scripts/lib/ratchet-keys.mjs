@@ -14,6 +14,13 @@
 // `ratchet:update`, nothing to habituate past.
 export const paddingKeyOf = (v) => `${v.file}:${v.styleKey}`;
 
+// check-chrome-top.mjs (Lumen, 2026-08-25, thread 6596d9c2 follow-up): same
+// R16a reasoning as paddingKeyOf — `styleKey` is a StyleSheet.create
+// property name, unique per file by construction, so keying on it survives
+// a cosmetic line shift with no diff at all. Measured: 7 live entries, 7
+// distinct.
+export const chromeTopKeyOf = (v) => `${v.file}:${v.styleKey}`;
+
 // One entry per file already (a screen either imports the deprecated API
 // or it doesn't) — no line-sensitivity to begin with.
 export const deprecatedImportKeyOf = (v) => v.file;

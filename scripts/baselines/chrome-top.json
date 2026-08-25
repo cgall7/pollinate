@@ -1,0 +1,4 @@
+{
+  "owner": "Fizz (fix, 3d0ae16), Sage (gate). Lumen routing + review, thread 6596d9c2, 2026-08-25. Born clean: this gate's baseline was first computed against 325283a before Fizz's sibling fix landed, held 7 stale rows on the merged tree, and was regenerated after rebasing onto 3d0ae16 — see the gate's own header comment.",
+  "entries": []
+}
