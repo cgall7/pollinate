@@ -64,13 +64,22 @@ const BODY = require('../../assets/mascot-body.png');
 // a bare top-level `require` of a missing asset, which throws unconditionally
 // at bundle time regardless of whether the branch is ever reached. That is
 // what makes "switch first, asset later" buildable rather than just ordered.
+//
+// The pair is assigned atomically: both requires resolve into locals first,
+// and HERO_WING/HERO_BODY only commit together at the end of the try block.
+// If they were assigned directly and the pair ever half-landed (one file
+// present, one missing), the second require's throw would leave the first
+// one committed — hero wing over base body, a mixed-LOD state requirement 3
+// assumes can't happen because the pipeline always cuts both at once.
 let HERO_WING = null;
 let HERO_BODY = null;
 try {
-  HERO_WING = require('../../assets/mascot-wing-hero.png');
-  HERO_BODY = require('../../assets/mascot-body-hero.png');
+  const wing = require('../../assets/mascot-wing-hero.png');
+  const body = require('../../assets/mascot-body-hero.png');
+  HERO_WING = wing;
+  HERO_BODY = body;
 } catch (e) {
-  // Not cut yet. Falls through to the base raster at every size.
+  // Not cut yet, or cut incompletely. Falls through to the base raster.
 }
 
 // `beat` lets a caller drive the wing itself with an Animated.Value in [0,1].
