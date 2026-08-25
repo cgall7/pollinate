@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
@@ -22,6 +22,7 @@ export const FileToHive = ({ entry, hives }) => {
   const [open, setOpen] = useState(false);
   const [filedIds, setFiledIds] = useState(() => new Set());
   const [filedLoading, setFiledLoading] = useState(false);
+  const [filedError, setFiledError] = useState(false);
   const [raceSealedIds, setRaceSealedIds] = useState(() => new Set());
   const [failure, setFailure] = useState(null);
 
@@ -32,17 +33,20 @@ export const FileToHive = ({ entry, hives }) => {
     if (!open) return;
     let cancelled = false;
     setFiledLoading(true);
+    setFiledError(false);
     HiveStore.getFiledHiveIds(entry.date)
       .then((ids) => {
         if (cancelled) return;
         setFiledIds(ids);
       })
       .catch((err) => {
+        if (cancelled) return;
         // No copy slot for this failure (§1a(b) doesn't rule one) — rows
-        // simply stay untagged and untappable below, which is the same
-        // "unresolved, so no press" state the in-flight window already
-        // has to handle.
+        // stay untagged and untappable below via `filedError`, since an
+        // unresolved read can't make the positive claim that a row is
+        // safe to file into.
         console.warn('FileToHive: failed to read filed set', err);
+        setFiledError(true);
       })
       .finally(() => {
         if (!cancelled) setFiledLoading(false);
@@ -74,13 +78,18 @@ export const FileToHive = ({ entry, hives }) => {
       // §5 — on failure the expansion stays open and gains a line above the
       // rows, so the reopen here overrides the optimistic close above.
       setOpen(true);
+      let message;
       if (err?.code === '42501') {
         // §1a(c) — a sealed race: refused at the database, not dropped.
         setRaceSealedIds((prev) => new Set(prev).add(hive.id));
-        setFailure(`${hive.subjectName}'s hive was sealed. Nothing more can go in.`);
+        message = `${hive.subjectName}'s hive was sealed. Nothing more can go in.`;
       } else {
-        setFailure("We couldn't file it. Try again.");
+        message = "We couldn't file it. Try again.";
       }
+      setFailure(message);
+      // accessibilityLiveRegion is Android-only; without this an iOS
+      // VoiceOver user gets no signal that the filing failed at all.
+      AccessibilityInfo.announceForAccessibility(message);
     }
   };
 
@@ -89,11 +98,19 @@ export const FileToHive = ({ entry, hives }) => {
   if (filedHives.length === 1) collapsedLabel = `Filed to ${filedHives[0].subjectName}'s hive.`;
   else if (filedHives.length > 1) collapsedLabel = `Filed to ${filedHives.length} hives.`;
 
+  const rowsDisabled = filedLoading || filedError;
   const rows = hives.length > 5 ? (
-    <ScrollableRows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} filedLoading={filedLoading} onCommit={commitTo} />
+    <ScrollableRows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} disabled={rowsDisabled} onCommit={commitTo} />
   ) : (
-    <Rows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} filedLoading={filedLoading} onCommit={commitTo} />
+    <Rows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} disabled={rowsDisabled} onCommit={commitTo} />
   );
+
+  // The announced label tracks the visible one — a sighted user sees
+  // "Filed to 2 hives." replace the default prompt, so VoiceOver must hear
+  // the same change rather than a sentence that never varies.
+  const affordanceLabel = collapsedLabel === 'File this to…'
+    ? "File today's entry into one of your hives"
+    : collapsedLabel;
 
   return (
     <View style={styles.container}>
@@ -101,7 +118,7 @@ export const FileToHive = ({ entry, hives }) => {
       <PressableScale
         style={styles.affordanceRow}
         onPress={toggle}
-        accessibilityLabel="File today's entry into one of your hives"
+        accessibilityLabel={affordanceLabel}
         accessibilityState={{ expanded: open }}
       >
         <Text style={styles.affordanceText}>{collapsedLabel}</Text>
@@ -121,7 +138,7 @@ export const FileToHive = ({ entry, hives }) => {
 
 const ROW_HEIGHT = 52;
 
-const Rows = ({ hives, filedIds, raceSealedIds, filedLoading, onCommit }) => (
+const Rows = ({ hives, filedIds, raceSealedIds, disabled, onCommit }) => (
   <View style={styles.rowList}>
     {hives.map((hive, index) => (
       <StaggeredItem key={hive.id} index={index} count={hives.length}>
@@ -129,7 +146,7 @@ const Rows = ({ hives, filedIds, raceSealedIds, filedLoading, onCommit }) => (
           hive={hive}
           filed={filedIds.has(hive.id)}
           sealed={!!hive.sealedAt || raceSealedIds.has(hive.id)}
-          disabled={filedLoading}
+          disabled={disabled}
           onPress={onCommit}
         />
       </StaggeredItem>
@@ -140,9 +157,9 @@ const Rows = ({ hives, filedIds, raceSealedIds, filedLoading, onCommit }) => (
 // §5 — beyond five hives the list scrolls at a fixed height rather than
 // growing the card past the viewport. Nested inside the screen's own
 // vertical ScrollView, same as the horizontal hive shelf already is.
-const ScrollableRows = ({ hives, filedIds, raceSealedIds, filedLoading, onCommit }) => (
+const ScrollableRows = ({ hives, filedIds, raceSealedIds, disabled, onCommit }) => (
   <ScrollView style={styles.scrollRows} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-    <Rows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} filedLoading={filedLoading} onCommit={onCommit} />
+    <Rows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} disabled={disabled} onCommit={onCommit} />
   </ScrollView>
 );
 
@@ -160,7 +177,7 @@ const HiveRow = ({ hive, filed, sealed, disabled, onPress }) => {
         colors={theme.gradients.sheen}
       />
       <View style={styles.rowText}>
-        <Text style={styles.rowName}>{hive.subjectName}</Text>
+        <Text style={styles.rowName} numberOfLines={2}>{hive.subjectName}</Text>
         <Text style={styles.rowCount}>{memoryLabel}</Text>
       </View>
       {tag && <Text style={styles.rowTag}>{tag}</Text>}
