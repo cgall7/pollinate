@@ -70,6 +70,7 @@ import { fileURLToPath } from 'node:url';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { parse } from '@babel/parser';
+import { deriveClearanceBins } from './lib/mascot-clearance.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE_PATH = path.join(ROOT, 'src/components/beeAttitude.js');
@@ -1498,6 +1499,248 @@ const targetAxisProp = (axis) =>
           'This is the shape of the defect that flew the errand trail-less for a week.'
         : `expected at least 2 plans in scope, found ${declaresTrail.length} (${declaresTrail.join(', ') || 'none'}) — ` +
           'the population went empty, so the row was asserting nothing.'
+    );
+  }
+}
+
+// --- F4b2. The clearance table still IS the drawing -----------------------
+//
+// `MASCOT_CLEARANCE` is measured off `assets/mascot-{body,wing}.png`, and a
+// measured constant's failure mode is that the thing it measured moves. This
+// row re-derives it here, from the shipped bytes, through the SAME module
+// `scripts/derive-mascot-clearance.mjs` runs — a re-derivation tool and a gate
+// that disagree would be two answers wearing one name.
+//
+// It closes a gap that was named out loud before it was closed: when the table
+// landed, the arithmetic on top of it was checkable and the measurement under
+// it was not. `mascot.js`'s older figures still have that shape — they cite a
+// script in `.scratch` — so this is the first of them that cannot silently
+// drift from the render, and the pattern the others should follow.
+{
+  const derived = deriveClearanceBins({
+    mascotSource,
+    bodyPng: await readFile(path.join(ROOT, 'assets/mascot-body.png')),
+    wingPng: await readFile(path.join(ROOT, 'assets/mascot-wing.png')),
+  });
+  const shipped = mascot.MASCOT_CLEARANCE;
+  const drift = [];
+  if (shipped.length !== derived.bins.length) {
+    drift.push(`length ${shipped.length} vs ${derived.bins.length}`);
+  } else {
+    shipped.forEach((v, i) => {
+      if (Math.abs(v - derived.bins[i]) > 1e-9) drift.push(`bin ${i} (${i * derived.binDeg}deg) ${v} vs ${derived.bins[i]}`);
+    });
+  }
+  // 360 / binDeg is the only legal length, and it is checked rather than
+  // assumed: a table that does not tile the circle leaves angles that read a
+  // neighbour's clearance, which fails silently and in the unsafe direction.
+  const tiles = shipped.length * mascot.CLEARANCE_BIN_DEG === 360;
+  if (drift.length === 0 && tiles) {
+    ok(
+      `MASCOT_CLEARANCE re-derives from the shipped mascot assets (${shipped.length} bins of ${derived.binDeg}deg tiling the circle, ` +
+        `reach ${Math.min(...shipped).toFixed(4)}..${Math.max(...shipped).toFixed(4)} of the character width)`
+    );
+  } else {
+    bad(
+      'MASCOT_CLEARANCE re-derives from the shipped mascot assets',
+      [
+        drift.length ? `${drift.length} bin(s) drifted from the render — the assets are the source: ${drift.slice(0, 4).join('; ')}. Re-run scripts/derive-mascot-clearance.mjs and paste.` : '',
+        tiles ? '' : `${shipped.length} bins of ${mascot.CLEARANCE_BIN_DEG}deg do not tile 360 — some angles read a neighbour's clearance, or none.`,
+      ].filter(Boolean).join(' | ')
+    );
+  }
+}
+
+// --- F4c. The puff clears the drawing, and stays on the face --------------
+//
+// §28.3, ruled 2026-08-25 after the beat was first put on a screen. The burst
+// used ONE radius off the lattice step, so the ×0.72 alternation was doing two
+// jobs — variety AND clearance — and the short flecks were, by arithmetic, the
+// ones that failed: measured on device, the 48-degree fleck never left him.
+//
+// **The invariant is stated on the currency a viewer has, not on position.**
+// The first form of this rule bound each fleck's TERMINAL position, which is
+// the frame its opacity reaches zero — satisfiable by a fleck nobody ever sees
+// outside him. What ships: every fleck is clear of the DRAWN silhouette while
+// at least half its seed opacity remains.
+//
+// That instant is exactly u = 0.5 and the row does not have to evaluate a
+// bezier to know it. Opacity runs `Animated.timing`'s default easing,
+// `Easing.inOut(Easing.ease)` (`TimingAnimation.js:77`), and `inOut(f)(0.5)`
+// is `1 - f(1)/2`; `f(1) = 1` is what makes `f` an easing, so the half-opacity
+// instant is 0.5 for ANY inOut curve. The two curves that DO matter are named
+// and evaluated: drift is `Easing.out(Easing.cubic)` (0.875 at u = 0.5) and
+// the dot's own radius shrinks on the same default inOut (0.65 of 3pt).
+//
+// R81's rule, one beat over: SAMPLE THE FUNCTION, NOT THE FLIGHT. The live
+// beat emits six flecks at one size; this sweeps every size the bee is drawn
+// at and every count the pool can produce, because the failure was a property
+// of the fan's arithmetic and not of one call.
+{
+  const DRIFT_AT_HALF = 1 - (1 - 0.5) ** 3;      // Easing.out(cubic) at u = 0.5
+  // The dot is a FIXED 6pt at every bee size (`TRAIL_DOT_SIZE`), so its radius
+  // at the half-opacity instant is a constant number of points while the
+  // clearance and the gap both scale with the character. That asymmetry is
+  // real and it decides the domain of this row: the arithmetic holds above a
+  // break-even size and cannot below it, so the row derives that size, reports
+  // it, and sweeps from the smallest size the burst can actually occur at.
+  const dotSize = Number(flyingBeeSource.match(/const TRAIL_DOT_SIZE = ([\d.]+);/)?.[1]);
+  const DOT_R_AT_HALF = (dotSize / 2) * (1 - 0.7 * 0.5);
+  const defaultSize = Number(flyingBeeSource.match(/const DEFAULT_SIZE = ([\d.]+);/)?.[1]);
+  // Every mount that can burst, and what size it draws at. `size` is a prop
+  // with a default, so a mount that passes `pollinate` and does NOT pass
+  // `size` bursts at `DEFAULT_SIZE`; one that passes both would widen this
+  // row's domain, which is why the domain is read rather than assumed.
+  const bursting = [...(await readdir(path.join(ROOT, 'src/screens')))]
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => ({ f, src: '' }));
+  for (const m of bursting) m.src = await readFile(path.join(ROOT, 'src/screens', m.f), 'utf8');
+  const overrides = [];
+  for (const { f, src } of bursting) {
+    for (const tag of src.matchAll(/<FlyingBee\b([\s\S]*?)\/>/g)) {
+      if (!/\bpollinate[\s=]/.test(tag[1])) continue;
+      const sizeProp = tag[1].match(/\bsize\s*=\s*\{([^}]*)\}/);
+      if (sizeProp) overrides.push(`${f}: size={${sizeProp[1].trim()}}`);
+    }
+  }
+  const SIZES = [defaultSize, 48, 60, 88, 132];
+  const COUNTS = [1, 2, 3, 4, 5, 6, 8, 11];
+  const bins = mascot.MASCOT_CLEARANCE;
+  const binDeg = mascot.CLEARANCE_BIN_DEG;
+
+  // Break-even: the smallest size at which every fleck still clears. Reported
+  // rather than asserted — the assertion is about the sizes that ship, and the
+  // number is what tells a later reader how much room the beat has.
+  const clearsAt = (size) => {
+    const widthPx = mascot.MASCOT_WIDTH_FRACTION * size;
+    const clearanceFor = flight.clearanceLookup(bins, binDeg, widthPx);
+    return flight.pollenFlecks(11, clearanceFor, flight.POLLEN_GAP_FRACTION * widthPx).every((f) => {
+      const r = Math.hypot(f.dx, f.dy);
+      return r * DRIFT_AT_HALF - DOT_R_AT_HALF >= clearanceFor(Math.atan2(f.dy, f.dx));
+    });
+  };
+  let lo = 1;
+  let hi = 400;
+  for (let k = 0; k < 60; k += 1) {
+    const mid = (lo + hi) / 2;
+    if (clearsAt(mid)) hi = mid;
+    else lo = mid;
+  }
+  const breakEven = hi;
+
+  const buried = [];
+  const offFace = [];
+  let sampled = 0;
+  let tightestFloor = Infinity;
+  let tightestCeiling = Infinity;
+  for (const size of SIZES) {
+    const widthPx = mascot.MASCOT_WIDTH_FRACTION * size;
+    const clearanceFor = flight.clearanceLookup(bins, binDeg, widthPx);
+    // The bee is drawn at the comb's own cell size at the live call site, so
+    // the apothem the burst must stay inside is this size's own.
+    const apothem = lattice.ringStepFor(size) / 2;
+    for (const count of COUNTS) {
+      for (const fleck of flight.pollenFlecks(count, clearanceFor, flight.POLLEN_GAP_FRACTION * widthPx)) {
+        sampled += 1;
+        const r = Math.hypot(fleck.dx, fleck.dy);
+        const reach = clearanceFor(Math.atan2(fleck.dy, fleck.dx));
+        const nearEdgeAtHalf = r * DRIFT_AT_HALF - DOT_R_AT_HALF;
+        const floorMargin = nearEdgeAtHalf - reach;
+        const ceilingMargin = apothem - r;
+        tightestFloor = Math.min(tightestFloor, floorMargin);
+        tightestCeiling = Math.min(tightestCeiling, ceilingMargin);
+        if (floorMargin < 0) buried.push(`size ${size} count ${count} @${((Math.atan2(fleck.dy, fleck.dx) * 180) / Math.PI).toFixed(0)}deg: near edge ${nearEdgeAtHalf.toFixed(3)} vs reach ${reach.toFixed(3)}`);
+        if (ceilingMargin < 0) offFace.push(`size ${size} count ${count}: r ${r.toFixed(3)} vs apothem ${apothem.toFixed(3)}`);
+      }
+    }
+  }
+  // The row asserts the REALIZED product per fleck, never the provenance of
+  // the constants it came from: a constant can be re-derived, re-named or
+  // re-based and this still answers the only question the design asked.
+  if (buried.length === 0 && offFace.length === 0 && sampled > 0 && overrides.length === 0 && Number.isFinite(defaultSize)) {
+    ok(
+      `every pollen fleck clears the drawn silhouette while half its opacity remains, and none leaves the face ` +
+        `(§28.3 — ${sampled} flecks over ${SIZES.length} sizes x ${COUNTS.length} counts; tightest clearance ${tightestFloor.toFixed(3)}pt, tightest apothem margin ${tightestCeiling.toFixed(3)}pt; ` +
+        `the fixed ${dotSize}pt particle puts the break-even at size ${breakEven.toFixed(1)} and the beat runs at ${defaultSize})`
+    );
+  } else {
+    bad(
+      'every pollen fleck clears the drawn silhouette while half its opacity remains, and none leaves the face (§28.3)',
+      [
+        buried.length ? `${buried.length} fleck(s) still inside the drawing at half opacity — this is the defect the ruling was written about: ${buried.slice(0, 4).join('; ')}` : '',
+        offFace.length ? `${offFace.length} fleck(s) land off the face they were meant to decorate: ${offFace.slice(0, 4).join('; ')}` : '',
+        overrides.length ? `a bursting mount overrides \`size\`, so this row's swept domain is no longer the domain the beat runs in — break-even is size ${breakEven.toFixed(1)}: ${overrides.join('; ')}` : '',
+        Number.isFinite(defaultSize) ? '' : 'DEFAULT_SIZE could not be read, so the sweep had no floor',
+        sampled === 0 ? 'nothing was sampled, so the row asserted nothing' : '',
+      ].filter(Boolean).join(' | ')
+    );
+  }
+}
+
+// --- F4d. The seam this gate cannot cross, asserted by source --------------
+//
+// `clearanceLookup` and `pollenFlecks` live in an import-free module so the
+// row above can SAMPLE them. `FlyingBee` cannot be loaded here — it is JSX —
+// so the one thing left unchecked is whether the call site feeds them the
+// real table. A gate asserts a property of whatever it can import, and the
+// bug lives at the call site it couldn't; this row is that call site, checked
+// the only way available, and it says so rather than looking like the row
+// above.
+{
+  const call = flyingBeeSource.match(/pollenFlecks\(([\s\S]{0,260}?)\)\.forEach/);
+  const args = call ? call[1].replace(/\s+/g, ' ').trim() : '(no pollenFlecks call)';
+  const feedsTable = /clearanceLookup\(\s*MASCOT_CLEARANCE\s*,\s*CLEARANCE_BIN_DEG\s*,/.test(args);
+  const feedsGap = /POLLEN_GAP_FRACTION\s*\*/.test(args);
+  // The width both terms are scaled by must be the SAME expression, or the
+  // clearance and the gap are measured against two different bees.
+  const widths = [...args.matchAll(/(?:CLEARANCE_BIN_DEG,\s*|POLLEN_GAP_FRACTION\s*\*\s*)([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
+  const oneWidth = widths.length === 2 && widths[0] === widths[1];
+  if (feedsTable && feedsGap && oneWidth) {
+    ok(`FlyingBee feeds the burst the real clearance table and the gap, both scaled by the same width (\`${widths[0]}\`)`);
+  } else {
+    bad(
+      'FlyingBee feeds the burst the real clearance table and the gap, both scaled by the same width',
+      `read: ${args}. ` +
+        `${feedsTable ? '' : 'The clearance is not `clearanceLookup(MASCOT_CLEARANCE, CLEARANCE_BIN_DEG, ...)`, so the sampled row above is asserting a fan the app does not emit. '}` +
+        `${feedsGap ? '' : 'The gap is not derived from POLLEN_GAP_FRACTION. '}` +
+        `${oneWidth ? '' : `The two terms are scaled by ${widths.length === 2 ? `different widths (${widths.join(' vs ')})` : 'widths this row could not read'} — clearance and gap must measure the same bee.`}`
+    );
+  }
+}
+
+// --- F4e. The particle is centred on the point it is placed at -------------
+//
+// `styles.trailDot` was a 6pt absolute box with no `left`/`top`, so
+// `translate(pos)` put its TOP-LEFT on the emission point and its centre half
+// a diameter down and right of it. `burstPollen` computes the character's
+// centre carefully and this quietly took it back off — 3pt of bias against
+// clearances the ruling measures in single points, and the same bias on every
+// trail drop. It is asserted rather than commented because the defect is the
+// ABSENCE of two properties, which no reader notices and no grep finds.
+{
+  const decl = flyingBeeSource.match(/trailDot:\s*\{([\s\S]*?)\}/);
+  const body = decl ? decl[1] : '';
+  const read = (k) => {
+    const m = body.match(new RegExp(`${k}:\\s*([^,]+),`));
+    if (!m) return null;
+    try {
+      // eslint-disable-next-line no-new-func
+      return Function(`"use strict"; const TRAIL_DOT_SIZE = ${flyingBeeSource.match(/const TRAIL_DOT_SIZE = ([\d.]+);/)?.[1] ?? NaN}; return (${m[1]});`)();
+    } catch {
+      return null;
+    }
+  };
+  const w = read('width');
+  const h = read('height');
+  const l = read('left');
+  const t = read('top');
+  const centred = w !== null && h !== null && l !== null && t !== null && Math.abs(l + w / 2) < 1e-9 && Math.abs(t + h / 2) < 1e-9;
+  if (centred) {
+    ok(`the pollen/trail particle is centred on the point it is placed at (${w}pt box, left/top ${l}/${t})`);
+  } else {
+    bad(
+      'the pollen/trail particle is centred on the point it is placed at',
+      `read width ${w}, height ${h}, left ${l}, top ${t}. An absolute child with no insets sits at the container origin, so the dot's CENTRE lands half a diameter down and right of every point the code places it at — silently, on the burst and on every trail drop.`
     );
   }
 }

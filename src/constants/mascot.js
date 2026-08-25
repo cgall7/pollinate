@@ -78,3 +78,46 @@ export const BREATH_BEAT_DEG = 2;
 // in one file is exactly how a 4.2s breath ships at 8.4s. The names carry it:
 // `_CYCLE_MS` is a cycle, `_BEAT_MS` is a beat.
 export const BREATH_CYCLE_MS = 4200;
+
+// --- The drawn silhouette, by direction (§28.3, Lumen 2026-08-25) ----------
+//
+// **How far the character reaches from its own centre, as a fraction of its
+// drawn WIDTH, binned by direction.** The pollen burst is seeded off this, and
+// it exists because the burst was previously sized against the character's
+// BOUNDING BOX — one number, 0.5 of the width — while the drawing's own reach
+// runs 0.4416 to 0.6480 depending on where you look. The legs and the antennae
+// stick a long way out past a body that does not fill its box, so a single
+// radius either buries the flecks that fire into a leg or throws the ones
+// firing into a gap much too far. Measured on device: at the old constant the
+// 48-degree fleck never left him at all.
+//
+// Every figure is produced by `scripts/derive-mascot-clearance.mjs` from the
+// shipped `assets/mascot-{body,wing}.png`; `--check` re-derives and fails on
+// drift, so unlike this file's older constants the assets and the numbers
+// cannot silently disagree. Re-run it if the render is ever re-exported.
+//
+// Conventions the derivation states and this table inherits:
+//   * angle 0 is +x, angles increase toward +y (screen down), degrees;
+//   * the reach is in units of the character's WIDTH, so it scales with
+//     `size` and carries no device or cell dimension;
+//   * the wing is swept through `WING_BEAT_DEG` about `HINGE` before the
+//     union, because the burst fires on the frame he lands and the airborne
+//     beat is still the pose;
+//   * BOTH facings are unioned — he mirrors on `scaleX` (R81), so a clearance
+//     that only holds for one facing is a burst that only works landing one
+//     way.
+//
+// Bins rather than a curve, and the bin holds the MAXIMUM over its own span
+// including both edges: a lookup is then an upper bound for every angle inside
+// the bin and needs no interpolation. That is not a shortcut — interpolating
+// this profile would UNDER-state the spikes, and under-stating is the
+// direction that puts a fleck inside a leg.
+export const CLEARANCE_BIN_DEG = 10;
+export const MASCOT_CLEARANCE = [
+  0.4968, 0.496, 0.4416, 0.6248, 0.644, 0.648,
+  0.4752, 0.4488, 0.4488, 0.4488, 0.4488, 0.4752,
+  0.648, 0.644, 0.6248, 0.4416, 0.496, 0.4968,
+  0.496, 0.4712, 0.5712, 0.5728, 0.5664, 0.4784,
+  0.4536, 0.5264, 0.5208, 0.5208, 0.5264, 0.4536,
+  0.4784, 0.5664, 0.5728, 0.5712, 0.4712, 0.496,
+];

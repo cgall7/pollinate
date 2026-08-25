@@ -5,14 +5,15 @@ import { buildAttitude } from './beeAttitude';
 import {
   APPROACH_SPEED_RATIO,
   DESCENT_MS,
-  POLLEN_RADIUS_FRACTION,
+  POLLEN_GAP_FRACTION,
   buildPollinationPlan,
+  clearanceLookup,
   pollenCountFor,
   pollenFlecks,
 } from './pollinationFlight';
 import { buildRestPlan, referenceSpeedPxS } from './flightSequencer';
 import { theme } from '../constants/theme';
-import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
+import { CLEARANCE_BIN_DEG, MASCOT_CLEARANCE, MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 import { DURATIONS, MAX_TRAIL_PARTICLES, useReducedMotion } from '../constants/motion';
 
 // Sunbeam §12.2 — the marquee motion. Distinct from BeeTransition (a scarce
@@ -81,6 +82,13 @@ import { DURATIONS, MAX_TRAIL_PARTICLES, useReducedMotion } from '../constants/m
 // path that flies the mascot at an attitude it can't be read at, or on a
 // call site the table doesn't know about.
 const TRAIL_INTERVAL_MS = 160;
+
+// The particle's drawn size. Named because three things depend on it agreeing:
+// the style below centres on it, and §28.3's gap is solved against the radius
+// the dot has SHRUNK to at the half-opacity instant.
+const TRAIL_DOT_SIZE = 6;
+
+
 const DEFAULT_SIZE = 44;
 
 // How long the bee takes to leave, and to arrive, when a screen state stops
@@ -440,12 +448,20 @@ export const FlyingBee = ({
     trailIntervalMs: TRAIL_INTERVAL_MS,
   });
 
-  const burstPollen = (landingCorner, ringStep) => {
+  const burstPollen = (landingCorner) => {
     // The flecks leave the CHARACTER, not its box: `landingCorner` is the
     // top-left the track drives (§28.3), so put the burst's origin back at the
-    // centre the same `size / 2` took it off.
+    // centre the same `size / 2` took it off. That sentence has been in this
+    // comment since the beat was written and this is the first version of the
+    // burst for which it is true end to end — the flecks now start from the
+    // character's own reach in their own direction, and the dot is centred on
+    // the point it is placed at.
     const origin = { x: landingCorner.x + size / 2, y: landingCorner.y + size / 2 };
-    pollenFlecks(pollenCount, ringStep * POLLEN_RADIUS_FRACTION).forEach((fleck) => {
+    pollenFlecks(
+      pollenCount,
+      clearanceLookup(MASCOT_CLEARANCE, CLEARANCE_BIN_DEG, bodyLengthPx),
+      POLLEN_GAP_FRACTION * bodyLengthPx
+    ).forEach((fleck) => {
       const slot = takeSlot();
       slot.pos.x.setValue(origin.x);
       slot.pos.y.setValue(origin.y);
@@ -604,7 +620,6 @@ export const FlyingBee = ({
         easeApproach: Easing.inOut(Easing.ease),
         easeDescent: Easing.out(Easing.cubic),
       }),
-      ringStep: pollinate.ringStep,
     });
   }, [pollinate, layout, flightSuppressed, sequenceHalted]);
 
@@ -668,7 +683,7 @@ export const FlyingBee = ({
       loopRef.current.start(({ finished }) => {
         if (!finished) return;
         if (plan.kind === 'visit') {
-          burstPollen(plan.landing, plan.ringStep);
+          burstPollen(plan.landing);
           // The abort window closes the instant he lands; tell the host so it
           // stops publishing scroll positions for a flight that can no longer
           // be aborted.
@@ -882,9 +897,19 @@ const styles = StyleSheet.create({
   },
   trailDot: {
     position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    // §28.3 — `left`/`top` centre the dot on the point it is PLACED at.
+    // Without them an absolute child with no insets sits at the container
+    // origin, so `translate(pos)` put the dot's TOP-LEFT on the emission
+    // point and its centre half a diameter down and right of it. `burstPollen`
+    // carefully returns the origin to the character's centre and this quietly
+    // took it off again — 3pt of bias against clearances measured in single
+    // points. It biased every trail drop the same way, which is why one style
+    // fix corrects both.
+    left: -TRAIL_DOT_SIZE / 2,
+    top: -TRAIL_DOT_SIZE / 2,
+    width: TRAIL_DOT_SIZE,
+    height: TRAIL_DOT_SIZE,
+    borderRadius: TRAIL_DOT_SIZE / 2,
     backgroundColor: theme.colors.accentBurst,
   },
   parkedAnchor: {

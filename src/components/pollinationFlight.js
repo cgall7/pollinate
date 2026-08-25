@@ -80,12 +80,52 @@ export const STAGING_SAFETY = 0.9;
 export const stagingOffsetFor = ({ bodyLengthPx, ringStep }) =>
   Math.min(bodyLengthPx, (STAGING_SAFETY * ringStep) / 2);
 
-// §28.3 — pollen scatter radius, as a fraction of the lattice step. This one
-// stays on the comb: the burst is a property of the FACE it lands on, not of
-// the bee that dropped it. A quarter of a step is 19.05pt at cellSize 44,
-// comfortably inside the cell's own half-width across flats (38.105pt), so it
-// reads as landing ON the face rather than around it.
-export const POLLEN_RADIUS_FRACTION = 0.25;
+// §28.3 — how far past HIM the pollen lands, as a fraction of the character's
+// drawn WIDTH (Lumen 2026-08-25).
+//
+// **This used to be a fraction of the lattice step, and that is the bug.** One
+// radius for all six flecks made the ×0.72 alternation below do two jobs at
+// once — variety AND clearance — so the short flecks were, by arithmetic, the
+// ones that failed. Measured off the shipped build: the 48-degree fleck never
+// left the bee at all, and the 160-degree one cleared him by 0.54pt, less than
+// its own radius. The rest of the burst happened underneath him.
+//
+// Each fleck now starts from ITS OWN direction's clearance (`MASCOT_CLEARANCE`,
+// derived from the assets' alpha) and this gap is what it adds on top, so
+// every fleck clears the drawing by construction at every angle and the
+// alternation is free to be variety again.
+//
+// **Solved on the visible-clear currency, not on terminal position.** The
+// earlier form of this rule bound the fleck's TERMINAL position, which is the
+// frame its opacity reaches zero — satisfiable by a fleck no one ever sees
+// outside him. The bound that binds: every fleck is clear of the drawing while
+// at least HALF its seed opacity remains.
+//
+// That instant is exactly u = 0.5, and for a reason worth writing down rather
+// than measuring: opacity runs `Animated.timing`'s default easing, which is
+// `Easing.inOut(Easing.ease)` (`TimingAnimation.js:77`), and `inOut(f)(0.5)`
+// is `1 - f(1)/2` — one half for ANY easing, since `f(1) = 1` is what makes it
+// an easing. So the half-opacity instant does not depend on which curve
+// opacity uses, only on it being an `inOut`.
+//
+// At u = 0.5 the drift (`Easing.out(Easing.cubic)`) has covered 0.875 of the
+// distance and the dot has shrunk to 0.65 of its 3pt radius, so a fleck at
+// radius r has its near edge at 0.875r - 1.95pt. Requiring that to clear the
+// direction's own reach c:
+//
+//     gap * mult >= c / 7 + 2.2286pt        (at size 44)
+//
+// The binding fleck is the ×0.72 one firing into a leg: c = 19.363pt gives a
+// floor of 6.9371pt, 0.2307 of the character width. 0.26 ships — 12.7% of
+// headroom, because a constant set AT its floor breaches it the moment
+// anything it is derived from moves.
+//
+// The ceiling is unchanged and is still the comb's: the far edge of the burst
+// must stay inside the cell's own apothem, so it reads as landing ON the face
+// rather than around it. At 0.26 the widest fleck lands 27.18pt out against an
+// apothem of 38.105pt — 29% of headroom, where the old single-radius shapes
+// left 12%. `check-bee-attitude` asserts the realized product per fleck.
+export const POLLEN_GAP_FRACTION = 0.26;
 
 const TAU = Math.PI * 2;
 
@@ -129,15 +169,43 @@ export const pollenCountFor = ({ poolSize, trailFadeMs, trailIntervalMs, slack =
 
 // Where the flecks go. Deterministic — no RNG, so a frame grab is
 // reproducible and the gate can assert the fan rather than a distribution.
-// Fanned across the lower half-plane (pollen falls), radii alternating so the
+// Fanned across the lower half-plane (pollen falls), gaps alternating so the
 // burst reads as a puff rather than a rosette.
-export const pollenFlecks = (count, radius) => {
+//
+// `clearanceFor(angleRadians) -> px` is how far the drawn character reaches in
+// that direction. It arrives as an ARGUMENT rather than an import for the
+// reason stated at the top of this file: the moment this module grows an
+// import, `check-bee-attitude` can no longer load it and has to pattern-match
+// the source instead of sampling the function. It also makes the fan testable
+// against a silhouette the gate chooses, which is how the ceiling row sweeps
+// shapes this drawing does not have.
+//
+// **The alternation is on the GAP, never on the radius.** Alternating the
+// radius made the short flecks the ones that failed to clear him; alternating
+// the gap keeps the burst irregular while every fleck starts from its own
+// direction's clearance, so no fleck can be born inside the drawing whatever
+// the angles are.
+// The clearance accessor itself, so the ONE implementation is in a module the
+// gate can load. It takes the table rather than importing it: `mascot.js` is
+// importable, but this file's whole contract is that it imports nothing (see
+// the header), and a lookup that lives in `FlyingBee` would be a lookup no
+// gate can sample — the exact seam where "the gate asserts what it can import
+// and the bug lives at the call site it couldn't" opens up.
+//
+// `bins[i]` is the character's reach over `[i * binDeg, (i+1) * binDeg]`, as a
+// fraction of its drawn width; angles wrap, so no caller has to normalise.
+export const clearanceLookup = (bins, binDeg, characterWidthPx) => (angleRadians) => {
+  const deg = ((((angleRadians * 180) / Math.PI) % 360) + 360) % 360;
+  return bins[Math.floor(deg / binDeg)] * characterWidthPx;
+};
+
+export const pollenFlecks = (count, clearanceFor, gapPx) => {
   if (count <= 0) return [];
   const from = TAU * (20 / 360);
   const to = TAU * (160 / 360);
   return Array.from({ length: count }).map((_, i) => {
     const a = count === 1 ? (from + to) / 2 : from + ((to - from) * i) / (count - 1);
-    const r = radius * (i % 2 === 0 ? 1 : 0.72);
+    const r = clearanceFor(a) + gapPx * (i % 2 === 0 ? 1 : 0.72);
     return { dx: Math.cos(a) * r, dy: Math.sin(a) * r };
   });
 };
