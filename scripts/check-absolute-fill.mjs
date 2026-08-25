@@ -39,6 +39,24 @@
 // negative; none exist in `src/` today. Comments, strings, and any other
 // module's own `.absoluteFillObject` property (this repo has none) are out
 // of scope by construction — this gate reads AST nodes, not text.
+//
+// THE BELT (added after Lumen's review, 2026-08-25). The member-expression
+// walk above enumerates one node shape — `MemberExpression` — and the role
+// "reads this property off StyleSheet" spans more than one: an
+// `OptionalMemberExpression` (`StyleSheet?.absoluteFillObject`), a computed
+// access (`StyleSheet['absoluteFillObject']`, which the non-computed walk
+// skips by design), and a destructure (`const { absoluteFillObject } =
+// StyleSheet`) followed by a bare `Identifier` at every use site are all the
+// same silent no-op under a different node type — demonstrated live against
+// this gate, which stayed 63/0 on the destructured form. Rather than
+// enumerate every shape that can carry the property, assert the thing they
+// all share: zero AST nodes anywhere in the file — any type, any position —
+// whose `name` or string `value` is literally `absoluteFillObject`. That
+// string has no legal occurrence in this codebase: the export does not
+// exist in RN 0.86.2, and R43's hazard notes live in comments, which the
+// AST never sees. This subsumes the member-expression walk; it is kept
+// alongside it only because its failure message can name the exact
+// `StyleSheet.` shape, which the belt's generic message does not.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile, readdir } from 'node:fs/promises';
@@ -58,6 +76,7 @@ const bad = (label, detail) => {
   console.log(`  FAIL ${label} — ${detail}`);
 };
 const rel = (p) => path.relative(ROOT, p);
+const BELT_TARGET = 'absoluteFillObject';
 
 const jsFiles = async (dir) => {
   const out = [];
@@ -97,6 +116,27 @@ for (const file of files) {
     continue;
   }
   filesChecked += 1;
+
+  // Belt: every node in the file, any type, checked for a `name` or string
+  // `value` equal to the banned token — independent of whether this file
+  // imports StyleSheet, so it does not share the member-walk's scope limits.
+  const beltHits = [];
+  walk(ast.program, (node) => {
+    if (node.name === BELT_TARGET || node.value === BELT_TARGET) {
+      beltHits.push(node.loc?.start?.line ?? '?');
+    }
+  });
+  if (beltHits.length === 0) {
+    ok(`${rel(file)} has no 'absoluteFillObject' token anywhere in its AST`);
+  } else {
+    bad(
+      `${rel(file)} contains an 'absoluteFillObject' AST node`,
+      `line(s) ${[...new Set(beltHits)].join(', ')} — this token has zero legal ` +
+        `occurrences in this codebase; any appearance (member access, optional ` +
+        `access, computed access, destructure, alias) is the same silent no-op ` +
+        `under a different shape`,
+    );
+  }
 
   // Local binding(s) this file gives to react-native's `StyleSheet` export.
   // A rename (`StyleSheet as SS`) is legal JS and none exist today, but the
