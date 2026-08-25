@@ -67,4 +67,6 @@ export const SENTINELS = {
     args: { p_hive_id: '00000000-0000-0000-0000-000000000000' },
     expect: '42501',
   },
+  '20260824000001_private_hives_relationship': { kind: 'column', table: 'private_hives', column: 'relationship' },
+  '20260824000002_entries_reflection': { kind: 'column', table: 'entries', column: 'reflection' },
 };
