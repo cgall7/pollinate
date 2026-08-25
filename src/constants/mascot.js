@@ -63,3 +63,17 @@ export const WING_BEAT_DEG = 18;
 // barely moves a wing that extends horizontally away from it — the ratified
 // quantity was always the beat, and scaleY was a guess at how to drive one.
 export const WING_BEAT_MS = 80;
+
+// Base-cut width in pixels: `design/pipeline/cut.py`'s `BASE = 320` sized to
+// the longer side, which lands the width (the character box's short side, at
+// `MASCOT_ASPECT`) at 309. Above this, the base raster upsamples. Move this
+// only if `cut.py`'s `BASE` moves.
+//
+// One dimension is enough to test even though the box has two, and not by
+// luck: `MASCOT_ASPECT` is the same ratio in the master and in every cut, so
+// width and height cross their own limits together by construction —
+// `size * MASCOT_WIDTH_FRACTION * pixelRatio > MASCOT_BASE_PX` and the
+// equivalent height test agree to 0.009 of a `size` unit (Pixel, 2026-08-25:
+// @3x 150.73 vs 150.74, @2x 226.10 vs 226.11). A height branch would only add
+// a second, differently-rounded threshold to maintain.
+export const MASCOT_BASE_PX = 309;

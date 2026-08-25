@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet } from 'react-native';
+import { Animated, Image, PixelRatio, StyleSheet } from 'react-native';
 import {
   HINGE,
   MASCOT_ASPECT,
+  MASCOT_BASE_PX,
   MASCOT_WIDTH_FRACTION,
   WING_BEAT_DEG,
   WING_BEAT_MS,
@@ -53,6 +54,25 @@ import {
 const WING = require('../../assets/mascot-wing.png');
 const BODY = require('../../assets/mascot-body.png');
 
+// Hero LOD, `design/pipeline/`-cut and landing with its first real mount
+// above `MASCOT_BASE_PX` (Lumen's ruling, thread 01325980, requirement 3) —
+// one writer for the character's pixels, so the bundle carries no megabytes
+// nothing draws until a caller actually needs them. Metro's dependency
+// collector treats a `require` wrapped in try/catch as an OPTIONAL
+// dependency: verified empirically (`expo export`, clean bundle, zero
+// warnings) that it does not fail resolution when the file is absent, unlike
+// a bare top-level `require` of a missing asset, which throws unconditionally
+// at bundle time regardless of whether the branch is ever reached. That is
+// what makes "switch first, asset later" buildable rather than just ordered.
+let HERO_WING = null;
+let HERO_BODY = null;
+try {
+  HERO_WING = require('../../assets/mascot-wing-hero.png');
+  HERO_BODY = require('../../assets/mascot-body-hero.png');
+} catch (e) {
+  // Not cut yet. Falls through to the base raster at every size.
+}
+
 // `beat` lets a caller drive the wing itself with an Animated.Value in [0,1].
 // The component owns the beat's GEOMETRY — where the hinge is, how far the
 // wing swings — and the caller may own its RHYTHM, which is the same split
@@ -78,6 +98,16 @@ export const MascotBee = ({ size = 44, flutter = false, beat: driven, wingStyle 
 
   const width = size * MASCOT_WIDTH_FRACTION;
   const height = width / MASCOT_ASPECT;
+
+  // Hero LOD: a plain ternary, recomputed every render, never memoised — the
+  // hinge-offset hazard two comments down applies here too, and `size` is
+  // exactly the prop a memo would freeze. One dimension is enough because
+  // `MASCOT_ASPECT` makes both cross their limits together (see
+  // `MASCOT_BASE_PX`'s comment). Falls back to the base raster whenever the
+  // hero pair hasn't landed yet, independent of size.
+  const useHero = width * PixelRatio.get() > MASCOT_BASE_PX;
+  const wingSource = useHero && HERO_WING ? HERO_WING : WING;
+  const bodySource = useHero && HERO_BODY ? HERO_BODY : BODY;
 
   // The wing pivots at its root, which is at (0.427, 0.505) of the character
   // box and so *not* at the view's centre — RN rotates about the centre, so
@@ -120,9 +150,9 @@ export const MascotBee = ({ size = 44, flutter = false, beat: driven, wingStyle 
         {/* Wings first: they are behind the body in the render, and that is
             the whole reason the split is lossless. */}
         <Animated.View style={[StyleSheet.absoluteFill, beatStyle, wingStyle]}>
-          <Image source={WING} style={{ width, height }} resizeMode="contain" />
+          <Image source={wingSource} style={{ width, height }} resizeMode="contain" />
         </Animated.View>
-        <Image source={BODY} style={{ width, height }} resizeMode="contain" />
+        <Image source={bodySource} style={{ width, height }} resizeMode="contain" />
       </Animated.View>
     </Animated.View>
   );
