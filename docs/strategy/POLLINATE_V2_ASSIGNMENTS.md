@@ -151,11 +151,11 @@ Small project, no dependencies, can run alongside Project 16.
 | ID | Owner | Est | Issue | Deps |
 |---|---|---|---|---|
 | **COPY-9** | Lumen | M | **Rewrite the two promise sentences** in `legalCopy.js` — `The short version` and `What we do not do`. **Narrow, don't delete:** keep "we never read your entries / never sell or share / no ad networks / no cross-app tracking," retire "zero telemetry." Update the TRIPWIRE block (lines 20–37) in the same edit — it names these exact sentences | Colin: confirm §5A |
-| **ENG-74** | Fizz | M | Crash reporting (Sentry). Today only the in-app `ErrorBoundary` exists — we cannot currently see a crash at all. **Must land in the same commit as COPY-9** | COPY-9 |
-| **ENG-75** | Fizz | M | First-party product analytics. **No IDFA, no ad SDKs, no cross-app tracking — this is what keeps us out of ATT.** Event + screen telemetry only | COPY-9 |
-| **ENG-75.1** | Fizz | S | Opt-out toggle in Account settings, honored client-side (GDPR/CCPA) | ENG-75 |
-| **ENG-75.2** | Fizz | S | **Gate `check:no-content-telemetry`** — assert no entry/reflection text is ever passed to an analytics or crash call. This is the half of the promise we are keeping, so enforce it in CI rather than by convention | ENG-74, ENG-75 |
-| **COPY-10** | Lumen | S | Sub-processor disclosure — Sentry + analytics vendor join Supabase in `Where it lives`, with accurate regions | COPY-9 |
+| **ENG-74** | Pollen | M | Crash reporting (Sentry). Today only the in-app `ErrorBoundary` exists — we cannot currently see a crash at all. **Must land in the same commit as COPY-9** | COPY-9 |
+| **ENG-75** | Pollen | M | First-party product analytics. **No IDFA, no ad SDKs, no cross-app tracking — this is what keeps us out of ATT.** Event + screen telemetry only | COPY-9 |
+| **ENG-75.1** | Pollen | S | Opt-out toggle in Account settings, honored client-side (GDPR/CCPA) | ENG-75 |
+| **ENG-75.2** | Pollen | S | **Gate `check:no-content-telemetry`** — assert no entry/reflection text is ever passed to an analytics or crash call. This is the half of the promise we are keeping, so enforce it in CI rather than by convention | ENG-74, ENG-75 |
+| **COPY-10** | Lumen | S | Sub-processor disclosure — Sentry + analytics vendor join Supabase in `Where your information is kept`, with accurate regions | COPY-9 |
 | **OPS-6** | Bumble | S | **App Store Connect privacy nutrition labels** — declare Diagnostics + Usage Data. Currently declares neither; shipping ENG-74/75 without this is a metadata violation | ENG-74, ENG-75 |
 
 ---
