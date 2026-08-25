@@ -1,7 +1,9 @@
 # Pollinate V2 — Specification
 
-**Status:** Draft for Colin's ruling. Not yet ratified.
-**Date:** 2026-08-24
+**Status:** Adopted as the governing V2 spec by Colin, 2026-08-25 (#CEO action
+items, event `d99dd08d…`); amended by Colin's Amendment 2026-08-25 (event
+`ad945232…`, this file's bytes) — §6 closed, nothing left waiting on Colin.
+**Date:** 2026-08-24 (adopted 2026-08-25, amended 2026-08-25)
 **Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
@@ -856,7 +858,7 @@ never sell or share anything about you.*
 2. **App Store Connect privacy nutrition labels** must declare Diagnostics
    (crash data) and Usage Data. Currently they would declare neither.
 3. **Sub-processor disclosure** — Sentry and the analytics vendor join Supabase
-   in the `Where it lives` section, with `HOSTING_REGION` accurate for each.
+   in the `Where your information is kept` section, with `HOSTING_REGION` accurate for each.
 4. Nothing here unblocks the four `legalCopy.js` placeholders (`LEGAL_ENTITY`,
    `CONTACT_EMAIL`, `HOSTING_REGION`, `EFFECTIVE_DATE`) — those still mechanically
    gate the consent checkbox and still need Colin.
