@@ -1,0 +1,280 @@
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { theme } from '../constants/theme';
+import { hiveCoverTheme } from '../constants/hiveThemes';
+import { HiveStore } from '../services/HiveStore';
+import { PressableScale } from './PressableScale';
+import { GradientCard } from './GradientCard';
+import { StaggeredItem } from './StaggeredItem';
+
+// DES-16 — "File this to…". Files today's saved entry into one or more of
+// the user's hives as a frozen COPY (Fizz's routing, msg `3da67b75`): the
+// personal journal row is never touched, so this component owns no risk to
+// Today, the streak, Recap, Wrapped, or the once-per-day constraint — all of
+// that stays exactly as it was before this file existed.
+//
+// Not a sheet — GUIDES/POLLINATE_V2_DES16_FILE_TO_HIVE.md §2. It is an
+// in-place expansion of the entry card it lives inside, the same archetype
+// `IdeasAccordion` already established.
+export const FileToHive = ({ entry, hives }) => {
+  const [open, setOpen] = useState(false);
+  const [filedIds, setFiledIds] = useState(() => new Set());
+  const [filedLoading, setFiledLoading] = useState(false);
+  const [raceSealedIds, setRaceSealedIds] = useState(() => new Set());
+  const [failure, setFailure] = useState(null);
+
+  // §1a(b)/§5 — taken on expand, not on mount, since the whole point is to
+  // catch a filing that happened on another device. Re-fires every time the
+  // chevron opens, not just the first time.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setFiledLoading(true);
+    HiveStore.getFiledHiveIds(entry.date)
+      .then((ids) => {
+        if (cancelled) return;
+        setFiledIds(ids);
+      })
+      .catch((err) => {
+        // No copy slot for this failure (§1a(b) doesn't rule one) — rows
+        // simply stay untagged and untappable below, which is the same
+        // "unresolved, so no press" state the in-flight window already
+        // has to handle.
+        console.warn('FileToHive: failed to read filed set', err);
+      })
+      .finally(() => {
+        if (!cancelled) setFiledLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, entry.date]);
+
+  const toggle = () => {
+    setFailure(null);
+    setOpen((o) => !o);
+  };
+
+  const commitTo = async (hive) => {
+    setFailure(null);
+    // Optimistic close (§5) — the consequence is stated one line above the
+    // rows, the list is short, and tapping a live row is itself the commit.
+    // The close is synchronous with the tap, so there is no render in which
+    // a second row is both visible and tappable.
+    setOpen(false);
+    try {
+      // §1a(a) — `entry.date` is a 'YYYY-MM-DD' string; parse it as LOCAL
+      // midnight, not UTC, or every user west of UTC files the copy dated
+      // yesterday.
+      await HiveStore.addHiveEntry(hive.id, new Date(`${entry.date}T00:00:00`), entry.text, entry.theme);
+      setFiledIds((prev) => new Set(prev).add(hive.id));
+    } catch (err) {
+      // §5 — on failure the expansion stays open and gains a line above the
+      // rows, so the reopen here overrides the optimistic close above.
+      setOpen(true);
+      if (err?.code === '42501') {
+        // §1a(c) — a sealed race: refused at the database, not dropped.
+        setRaceSealedIds((prev) => new Set(prev).add(hive.id));
+        setFailure(`${hive.subjectName}'s hive was sealed. Nothing more can go in.`);
+      } else {
+        setFailure("We couldn't file it. Try again.");
+      }
+    }
+  };
+
+  const filedHives = hives.filter((h) => filedIds.has(h.id));
+  let collapsedLabel = 'File this to…';
+  if (filedHives.length === 1) collapsedLabel = `Filed to ${filedHives[0].subjectName}'s hive.`;
+  else if (filedHives.length > 1) collapsedLabel = `Filed to ${filedHives.length} hives.`;
+
+  const rows = hives.length > 5 ? (
+    <ScrollableRows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} filedLoading={filedLoading} onCommit={commitTo} />
+  ) : (
+    <Rows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} filedLoading={filedLoading} onCommit={commitTo} />
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.rule} />
+      <PressableScale
+        style={styles.affordanceRow}
+        onPress={toggle}
+        accessibilityLabel="File today's entry into one of your hives"
+        accessibilityState={{ expanded: open }}
+      >
+        <Text style={styles.affordanceText}>{collapsedLabel}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={theme.colors.inkSoft} />
+      </PressableScale>
+
+      {open && (
+        <View style={styles.expansion}>
+          <Text style={styles.consequence}>Once filed, it stays there.</Text>
+          {failure && <Text style={styles.failure}>{failure}</Text>}
+          {rows}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const ROW_HEIGHT = 52;
+
+const Rows = ({ hives, filedIds, raceSealedIds, filedLoading, onCommit }) => (
+  <View style={styles.rowList}>
+    {hives.map((hive, index) => (
+      <StaggeredItem key={hive.id} index={index} count={hives.length}>
+        <HiveRow
+          hive={hive}
+          filed={filedIds.has(hive.id)}
+          sealed={!!hive.sealedAt || raceSealedIds.has(hive.id)}
+          disabled={filedLoading}
+          onPress={onCommit}
+        />
+      </StaggeredItem>
+    ))}
+  </View>
+);
+
+// §5 — beyond five hives the list scrolls at a fixed height rather than
+// growing the card past the viewport. Nested inside the screen's own
+// vertical ScrollView, same as the horizontal hive shelf already is.
+const ScrollableRows = ({ hives, filedIds, raceSealedIds, filedLoading, onCommit }) => (
+  <ScrollView style={styles.scrollRows} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+    <Rows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} filedLoading={filedLoading} onCommit={onCommit} />
+  </ScrollView>
+);
+
+const HiveRow = ({ hive, filed, sealed, disabled, onPress }) => {
+  const cover = hiveCoverTheme(hive.coverTheme);
+  const memoryLabel = hive.entryCount === 1 ? '1 memory' : `${hive.entryCount} memories`;
+  const tag = sealed ? 'SEALED' : filed ? 'FILED' : null;
+  const tappable = !tag && !disabled;
+
+  const body = (
+    <>
+      <GradientCard
+        style={styles.swatch}
+        contentStyle={[styles.swatchFill, { backgroundColor: cover.base }]}
+        colors={theme.gradients.sheen}
+      />
+      <View style={styles.rowText}>
+        <Text style={styles.rowName}>{hive.subjectName}</Text>
+        <Text style={styles.rowCount}>{memoryLabel}</Text>
+      </View>
+      {tag && <Text style={styles.rowTag}>{tag}</Text>}
+    </>
+  );
+
+  if (!tappable) {
+    // §5 — a tagged row takes no press handler at all, rather than a
+    // disabled PressableScale whose fade is the dim §23.9.2a rules out for
+    // an ink-tier label.
+    return (
+      <View
+        style={styles.row}
+        accessible
+        accessibilityLabel={tag ? `${hive.subjectName}, ${memoryLabel}, ${tag}` : `${hive.subjectName}, ${memoryLabel}`}
+      >
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <PressableScale
+      style={styles.row}
+      onPress={() => onPress(hive)}
+      haptic={Haptics.ImpactFeedbackStyle.Medium}
+      pressedColor={theme.colors.pressedOnLight}
+      accessibilityLabel={`${hive.subjectName}, ${memoryLabel}`}
+    >
+      {body}
+    </PressableScale>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    marginTop: 20,
+    width: '100%',
+  },
+  rule: {
+    height: 1,
+    backgroundColor: theme.colors.surfaceBorder,
+    width: '100%',
+  },
+  affordanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingTop: 16,
+  },
+  affordanceText: {
+    ...theme.type.bodySm,
+    fontFamily: theme.fonts.bodySemiBold,
+    color: theme.colors.ink,
+  },
+  expansion: {
+    paddingTop: 16,
+  },
+  consequence: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+  },
+  failure: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  rowList: {
+    paddingTop: 8,
+    gap: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    borderRadius: theme.borderRadius.small,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+    backgroundColor: theme.colors.rowVeil,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  swatch: {
+    width: 28,
+    height: 28,
+  },
+  swatchFill: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorderStrong,
+  },
+  rowText: {
+    flex: 1,
+    gap: 2,
+  },
+  rowName: {
+    ...theme.type.bodySm,
+    fontFamily: theme.fonts.bodySemiBold,
+    color: theme.colors.ink,
+  },
+  rowCount: {
+    fontFamily: theme.fonts.bodyMedium,
+    fontSize: 12,
+    color: theme.colors.inkSoft,
+  },
+  scrollRows: {
+    maxHeight: 5 * ROW_HEIGHT,
+  },
+  rowTag: {
+    ...theme.type.label,
+    color: theme.colors.inkSoft,
+  },
+});

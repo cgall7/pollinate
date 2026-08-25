@@ -212,6 +212,28 @@ export const HiveStore = {
     return toHiveEntry(data);
   },
 
+  // DES-16 §1a(b) — which of the user's hives already hold a copy of the
+  // entry dated `entryDateKey`, so the file-to-hive picker can tag a row
+  // FILED instead of letting a second tap write a duplicate into a keepsake
+  // volume. One round trip rather than N calls to getHiveEntries (one per
+  // hive, all-dates). `entryDateKey` is expected to already be the
+  // 'YYYY-MM-DD' string off an entry row (e.g. `entry.date`) — passed
+  // straight through rather than re-derived via `toISODate`, which is the
+  // exact westward mis-parse `addHiveEntry`'s own caller has to route
+  // around (§1a(a)).
+  async getFiledHiveIds(entryDateKey) {
+    const client = requireSupabase();
+    const userId = await requireUserId(client);
+    const { data, error } = await client
+      .from('entries')
+      .select('hive_id')
+      .eq('user_id', userId)
+      .eq('entry_date', entryDateKey)
+      .not('hive_id', 'is', null);
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => row.hive_id));
+  },
+
   // 8b.6 — the recipient's side of the send act (`docs/strategy/
   // Pollinate_Delivery_Slices.md` §8b.5's "Recipient read-access ruling").
   // Reads through the two subject-scoped policies that migration ships —
