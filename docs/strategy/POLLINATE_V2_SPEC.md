@@ -691,7 +691,7 @@ strategic payoff.
 |---|---|
 | **3.1.5(i)** | Self-custodial wallets permitted — **developer must be enrolled as an Organization**, not an Individual. Currently unset (`DEVELOPMENT_TEAM` empty). |
 | **3.2.1(vii)** | Optional P2P gifts are exempt from IAP if 100% goes to the receiver and nothing is unlocked. Zaps must be **purely optional and unlock nothing.** Damus is the precedent. |
-| **3.1.1** | Crypto may **not** unlock features. The $2.99/mo subscription must use Apple IAP. Sats can never buy Pollinate Plus. |
+| **3.1.1** | Crypto may **not** unlock features. The Pollinate Plus subscription ($39.99/yr — §17.5) must use Apple IAP. Sats can never buy Pollinate Plus. |
 | **3.1.5(v)** | No currency for completing tasks. **"Earn sats for your streak" is banned.** No zap rewards for journaling. |
 | **2.3.1(a)** | No hidden or dormant features. The wallet is created **only on explicit consent**, when the user first chooses to zap — never at signup. |
 | **2.3 / 2.3.5** | Metadata must reflect the core experience. Stay in **Lifestyle**; the wallet is genuinely secondary. Precedent: Fountain (podcasts + Lightning) sits in Entertainment, not Finance. |
