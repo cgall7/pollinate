@@ -5,7 +5,7 @@
 // script used to compare two `.mov` FILE SIZES against a 15% threshold.
 // Pixel measured that metric apart: the encoder writes a whole frame the
 // moment any pixel changes, so presence cost 1.01x and 3x the amplitude cost
-// 813x against 811x for 1x — nothing can land between 1.00x and a 1.15% bar.
+// 813x against 811x for 1x — nothing can land between 1.00x and a 1.15x bar.
 // It now captures lossless PNG bursts twice each way and asks two separate
 // questions: a binary TRIPWIRE (does anything move outside the declared
 // Breath region, beyond the ambient control's own noise floor) and a
