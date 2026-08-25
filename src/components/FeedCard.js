@@ -82,15 +82,24 @@ export const FeedCard = ({ share, onLikeToggled }) => {
     }
   };
 
-  // §18.1.1: demo shares are keepsakes — readable, never interactive. The
-  // paler content is the week-list twin of the grid's paler demo cells, and
-  // dropping the actions row (their counts are zeroed by construction) is
+  // §18.1.1: demo shares are keepsakes — readable, never interactive.
+  // Dropping the actions row (their counts are zeroed by construction) is
   // what keeps a tap from firing toggleLike('demo-N') at Supabase.
+  //
+  // §23.9.1 — A LABEL RETIRES THE REGISTER. The paler content used to be the
+  // week-list twin of the grid's paler demo cells; it is gone. A dim is a
+  // WHISPER that a card is not real and this label SAYS SO, and once you have
+  // the label the dim is actively harmful — it spends legibility to
+  // communicate something already said in words. The comb keeps its `0.45`
+  // (Lumen, 2026-08-25: a label retires a register only when it SHARES THE
+  // REGISTER'S SCOPE — co-located with the object and present in every state
+  // the register covers; a seat's initials are furniture, and this card is
+  // testimony). The label is on the AUTHOR, because it is the person who is
+  // fictional, not the sentence.
   const isDemo = share.isDemo ?? false;
 
   return (
     <View style={styles.card}>
-      <View style={isDemo && styles.demoRegister}>
       <View style={styles.header}>
         <Avatar
           name={share.isOwn ? 'You' : share.author?.display_name ?? 'Someone'}
@@ -98,14 +107,16 @@ export const FeedCard = ({ share, onLikeToggled }) => {
           size={36}
         />
         <View style={styles.headerText}>
-          <Text style={styles.author}>{share.isOwn ? 'You' : share.author?.display_name ?? 'Someone'}</Text>
+          <View style={styles.authorRow}>
+            <Text style={styles.author}>{share.isOwn ? 'You' : share.author?.display_name ?? 'Someone'}</Text>
+            {isDemo && <Text style={styles.sampleLabel}>SAMPLE</Text>}
+          </View>
           <Text style={styles.date}>{formatDate(share.entryDate)}</Text>
         </View>
       </View>
       <PaperBlock paper={share.paper} style={styles.contentBlock}>
         <Text style={[styles.content, { color: paperInk(share.paper) }]}>"{share.content}"</Text>
       </PaperBlock>
-      </View>
 
       {!isDemo && (
       <View style={styles.actionsRow}>
@@ -169,15 +180,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     ...theme.shadows.card,
   },
-  // Demo register, R55's physics applied to the card: the card surface
-  // stays opaque and only the CONTENT dims against it, so dimming changes
-  // strength, never hue — a translucent white card over Sunlit Honey would
-  // drift warm, the exact failure the comb's surface-backing fix killed.
-  // 0.7 keeps the quote readable; the number is provisional until Pixel
-  // widens §18.1.2's "grid parity" line for cards (Sage's 17:02 ask).
-  demoRegister: {
-    opacity: 0.7,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -187,10 +189,32 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
   },
+  // The author line is a row so the §23.9.1 label sits beside the name it
+  // qualifies. `flexShrink` on the name and not on the label is what keeps a
+  // long display name from pushing SAMPLE off the card — the name wraps, the
+  // label stays.
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   author: {
     ...theme.type.bodySm,
     fontFamily: theme.fonts.bodySemiBold,
     color: theme.colors.textPrimary,
+    flexShrink: 1,
+  },
+  // §23.9.1's label: the existing eyebrow register, which is what the app
+  // already uses to mark a thing's CATEGORY rather than its content, in
+  // `inkSoft` on the card's own `surface` — 6.31:1, and it clears 4.5:1 only
+  // BECAUSE the card is no longer dimmed. Under the deleted 0.7 the same
+  // token rendered 3.22:1 on the `date` node beneath it, which is the live
+  // WCAG failure this commit repairs (bodySm is 14px, so the 3:1 large-scale
+  // path was never available).
+  sampleLabel: {
+    ...theme.type.label,
+    color: theme.colors.inkSoft,
+    flexShrink: 0,
   },
   date: {
     ...theme.type.bodySm,

@@ -1,4 +1,9 @@
-node_modules/
+# No trailing slash: `node_modules/` matches DIRECTORIES ONLY, so a worktree
+# that symlinks its node_modules at the shared checkout sees an unignored file
+# and a broad `git add` commits a mode-120000 path. That merges as "untracked
+# working tree files would be overwritten" in every checkout with a real
+# directory there, and as a dangling symlink in a fresh clone.
+node_modules
 
 # Expo
 .expo/
