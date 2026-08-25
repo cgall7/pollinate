@@ -106,7 +106,7 @@ Today  |  Hive  |  Garden
 | Tab | What it is | Free tier | Paid tier (Pollinate Plus, $39.99/yr — V2 §17.5) | MVP1 status |
 |---|---|---|---|---|
 | **Today** | Journal + Private Hives | Unlimited private hives, unlimited entries (V2 §17.5 — the paywall meters *delivery*, never creation or writing). Daily journal full. | Same writing surface; Plus buys every delivery after the first. | ✅ Full |
-| **Hive** | Honeycomb + feed + social seeds | Unlimited friends (ruled 2026-08-25, V2 §17.5.6 — the graph is never metered; a friend cap would make combs impossible on free). Can receive unlimited. | Same — no graph meter on any tier. | ✅ Full |
+| **Hive** | Honeycomb + feed + social seeds | Unlimited friends (ruled 2026-08-25, V2 §17.5.2a — the graph is never metered; a friend cap would make combs impossible on free). Can receive unlimited. | Same — no graph meter on any tier. | ✅ Full |
 | ~~**Wallet**~~ | ~~Gifting~~ | ~~Shell: "Coming Soon"~~ | ~~Cash App gifting via iMessage links~~ | **Row superseded 2026-08-26** — no Wallet tab; balance lives in the comb, admin behind the Account door (`POLLINATE_V2_NAVIGATION.md`) |
 | **Garden** | Recap, Wrapped, history | Full solo features | Full + social features (Phase 3) | ✅ Full (solo) |
 
@@ -202,7 +202,7 @@ The review prompt is the app's core re-engagement mechanic. It's not a notificat
 | Entries per hive | Unlimited | Unlimited |
 | Delivery | **First delivery free, forever** | Every delivery after the first |
 | Export | Free, forever, never metered (V2 §17.4 — the durability guarantee) | Same |
-| Review cadence | Monthly, yearly, or manual — ungated (ruled 2026-08-25, V2 §17.5.6: the review ritual is the return mechanic; gating it starves the delivery meter) | Same — no cadence gate on any tier |
+| Review cadence | Monthly, yearly, or manual — ungated (ruled 2026-08-25, V2 §17.5.2a: the review ritual is the return mechanic; gating it starves the delivery meter) | Same — no cadence gate on any tier |
 
 #### Acceptance Criteria
 
@@ -312,7 +312,7 @@ Each friend is a hexagon in a living honeycomb. The visualization IS the app's s
 - States computed from backend data, updated in real-time
 
 **Free vs. Paid:**
-- No split (ruled 2026-08-25, V2 §17.5.6): unlimited friends on every tier — the graph is never metered. Receiving is unlimited everywhere.
+- No split (ruled 2026-08-25, V2 §17.5.2a): unlimited friends on every tier — the graph is never metered. Receiving is unlimited everywhere.
 
 **Acceptance Criteria:**
 - User can add friends via each method
@@ -405,11 +405,11 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 |---|---|
 | Daily journal | Full, unlimited |
 | Private hives | **Unlimited, forever** *(V2 §17.5, ruled 2026-08-24 — supersedes the 2026-08-19 "1 hive, lifetime" line; writing is the moat and is never metered)* |
-| Review cadence | **Monthly, yearly, or manual — ungated** (ruled 2026-08-25, V2 §17.5.6) |
+| Review cadence | **Monthly, yearly, or manual — ungated** (ruled 2026-08-25, V2 §17.5.2a) |
 | Delivery | **First delivery free, forever**; every later delivery requires Plus (V2 §17.5) |
 | Export | Free, forever, on every tier (V2 §17.4) |
-| Social seeds | **Unlimited** — no count; abuse handled by rate limit (~5/week, a guard not a tier — V2 §17.5.6) |
-| Public hives (social) | **Unlimited friends** (V2 §17.5.6 — the graph is never metered) |
+| Social seeds | **Unlimited** — no count; abuse handled by rate limit (~5/week, a guard not a tier — V2 §17.5.2a) |
+| Public hives (social) | **Unlimited friends** (V2 §17.5.2a — the graph is never metered) |
 | Feed | Full access (view and react) |
 | Receiving | Unlimited (can receive unlimited seeds, hives, notes) |
 | Garden (Recap, Wrapped) | Full |
@@ -419,11 +419,11 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 
 | Feature | Paid unlocks |
 |---|---|
-| Delivery | **Every delivery after the free first one** — this is what Plus buys, and per V2 §17.5.6 it is the *only* meter (V2 §17.5.2) |
-| ~~Review cadence~~ | Moved to free — ungated on every tier (ruled 2026-08-25, V2 §17.5.6) |
-| ~~Social seeds~~ | Moved to free — no count on any tier; abuse is a rate limit, not a price (V2 §17.5.6) |
-| ~~Public hives / friends~~ | Moved to free — the graph is never metered (V2 §17.5.6) |
-| ~~"Bloom When" / Surprise / Reciprocal seeds~~ | Moved to free — *derived* from §17.5.6's principle (seeding is distribution, and distribution is never metered); flag to Colin if a seed-type gate was intended to survive |
+| Delivery | **Every delivery after the free first one** — this is what Plus buys, and per V2 §17.5.2a it is the *only* meter (V2 §17.5.2) |
+| ~~Review cadence~~ | Moved to free — ungated on every tier (ruled 2026-08-25, V2 §17.5.2a) |
+| ~~Social seeds~~ | Moved to free — no count on any tier; abuse is a rate limit, not a price (V2 §17.5.2a) |
+| ~~Public hives / friends~~ | Moved to free — the graph is never metered (V2 §17.5.2a) |
+| ~~"Bloom When" / Surprise / Reciprocal seeds~~ | Moved to free — *derived* from §17.5.2a's principle (seeding is distribution, and distribution is never metered); flag to Colin if a seed-type gate was intended to survive |
 | ~~Gifting (Cash App links)~~ | Cancelled (V2 §5.7); zaps are free on every tier and unlock nothing (V2 §17.5.5) |
 | Premium hexagon themes | Unlocked (cosmetic — neither practice nor graph, so the principle permits it) |
 | Advanced Garden visualizations | Unlocked (Phase 3) |

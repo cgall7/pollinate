@@ -468,35 +468,6 @@ and the correct response is `DES-17`, not a price change.
   willingness to pay for self-custody products and an unusually strong evangelism
   culture. **Judge 19c on acquisition, never on monetization.**
 
-#### 17.5.6 The metering principle (ruled 2026-08-25, Colin; event `5139a250…`)
-
-The COPY-11 sweep flagged the old free/paid splits on review cadence, friend
-connections and seeds as unaddressed by §17.5. Ruled: **remove every one of
-them. Delivery is the only meter.**
-
-- **Review cadence — no gate, any tier.** The review ritual is the return
-  mechanic (§0). Gated to yearly, a free user has eleven months with no reason
-  to open the app and churns *before* accumulating enough to deliver — the gate
-  that maximizes conversion at delivery is no gate on the review.
-- **Friend connections — no cap.** A vestige of `send_hive`'s
-  accepted-connection requirement; delivery now works by link with no install
-  (§17.2b), so connections aren't load-bearing for the artifact. A 1-friend
-  free tier would also make combs (§18.2, cap 20) impossible on free, killing
-  the seeded-friend-group cold start.
-- **Seeds — no count, and *not* folded into the delivery meter.** A seed is
-  structurally a one-entry delivery, but every seed is a bloom moment landing
-  on someone who may not have the app — a reveal-generation machine feeding
-  §17.5.3's number. Metering the cheapest viral action to protect a paywall is
-  backwards. Abuse is handled by a **rate limit** (~5/week — an implementation
-  constant, a guard, never a tier), not a price.
-
-The generalizing rule, quoted so the next question answers itself:
-
-> ***Meter the artifact. Never the practice, never the graph.
-> Writing, reviewing, connecting and seeding are practice or distribution —
-> they build the moat and feed the funnel. The finished, delivered volume is
-> the product, and it's the only thing that costs money.***
-
 ---
 
 ## 4. Project 18 — Collective Hives & Combs

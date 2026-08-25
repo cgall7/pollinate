@@ -18,7 +18,7 @@ We sit at the intersection of three proven markets — gratitude apps ($1.3B), s
 
 **Delivery is a spectrum, not a gate (added 2.1).** A Private Hive must be worth keeping even if its person can never install the app — a young child, a grandparent, someone you've lost. The hive is a letter drawer, not an outbox: it is valuable at zero deliveries, because the compiling itself is the practice. Delivery paths, in order of arrival: **(1) send in-app** (Slice 1) — the full bloom; **(2) send as a link** (post-Slice 1) — a beautiful web-read moment that doubles as the viral loop, since the recipient's first experience of Pollinate is the strongest thing we make; **(3) keep, or export as a keepsake** (later) — for the person who will never install anything. The moat is accumulated *time*, not features — no competitor can copy a year of someone's entries.
 
-**Business model (superseded 2026-08-24 — `POLLINATE_V2_SPEC.md` §17.5 governs; encoded 2026-08-25):** Freemium, metered at **delivery**. The free tier is unlimited hives and unlimited entries, forever, plus the **first delivery free, forever** — writing is the moat and is never metered (this reverses the 2026-08-19 "1 hive, lifetime" ruling that stood here, which put the paywall at the `private_hives` insert path). **Pollinate Plus** ($39.99/year, annual only — the monthly plan is retired, not repriced) buys every delivery after the first. Export is free on every tier forever (V2 §17.4 — the durability guarantee). The old friend/seed/review-cadence tier splits are **removed** (ruled 2026-08-25, V2 §17.5.6 — "meter the artifact, never the practice, never the graph"): review cadence ungated, friends uncapped, seeds uncounted (abuse is a ~5/week rate limit, not a price). Delivery is the only meter. The money layer is nectar zaps (V2 §5): self-custodial, 100% to the receiver, never revenue — the Cash-App-links-via-iMessage plan is cancelled (V2 §5.7). We are not a money transmitter (V2 §5.6).
+**Business model (superseded 2026-08-24 — `POLLINATE_V2_SPEC.md` §17.5 governs; encoded 2026-08-25):** Freemium, metered at **delivery**. The free tier is unlimited hives and unlimited entries, forever, plus the **first delivery free, forever** — writing is the moat and is never metered (this reverses the 2026-08-19 "1 hive, lifetime" ruling that stood here, which put the paywall at the `private_hives` insert path). **Pollinate Plus** ($39.99/year, annual only — the monthly plan is retired, not repriced) buys every delivery after the first. Export is free on every tier forever (V2 §17.4 — the durability guarantee). The old friend/seed/review-cadence tier splits are **removed** (ruled 2026-08-25, V2 §17.5.2a — "meter the artifact, never the practice, never the graph"): review cadence ungated, friends uncapped, seeds uncounted (abuse is a ~5/week rate limit, not a price). Delivery is the only meter. The money layer is nectar zaps (V2 §5): self-custodial, 100% to the receiver, never revenue — the Cash-App-links-via-iMessage plan is cancelled (V2 §5.7). We are not a money transmitter (V2 §5.6).
 
 > **Build Slices:**
 > - **Slice 1 (Demo Mode):** Journal + private hives + social seeds + honeycomb + feed. No money. TestFlight / internal testing. Validates the core emotional and social loop.
@@ -125,7 +125,7 @@ Pollinate is a **freemium consumer app**. The only revenue stream is subscriptio
 | Private Hives | Unlimited, forever | Unlimited |
 | Delivery | **First delivery free, forever** | Every delivery after the first |
 | Export | Free, forever (V2 §17.4) | Same |
-| Friend connections / seeds / review cadence | Ungated on every tier (ruled 2026-08-25, V2 §17.5.6 — the practice and the graph are never metered; seeds abuse-rate-limited ~5/week, not priced) | Same |
+| Friend connections / seeds / review cadence | Ungated on every tier (ruled 2026-08-25, V2 §17.5.2a — the practice and the graph are never metered; seeds abuse-rate-limited ~5/week, not priced) | Same |
 | Honeycomb visualization | ✓ | ✓ |
 | Social feed | ✓ | ✓ |
 | Garden / recap / history | ✓ | ✓ |
@@ -230,14 +230,14 @@ By Phase 3, active users have:
 - Private Hives full of months or years of entries for people they love
 - Pending seeds scheduled months out
 - A gratitude graph showing months/years of connections
-- Review cadence prompts (any cadence, every tier — V2 §17.5.6) that surface "trips down memory lane"
+- Review cadence prompts (any cadence, every tier — V2 §17.5.2a) that surface "trips down memory lane"
 - An Annual Harvest they want to share
 
 **Switching cost:** Leaving Pollinate means abandoning your hive history — the gratitude you've been building FOR someone — your pending seeds, and your accumulated social graph. Same moat as Venmo ("all my friends are here") but deeper ("all my gratitude history for the people I love is here").
 
 **Retention mechanics:**
 - Private Hives: accumulated entries create emotional lock-in. You can't recreate months of gratitude for your child or partner on a new app.
-- Review prompts: "trip down memory lane" notifications at the user's chosen cadence (ungated on every tier — V2 §17.5.6) drive re-engagement by surfacing past entries at the right moment.
+- Review prompts: "trip down memory lane" notifications at the user's chosen cadence (ungated on every tier — V2 §17.5.2a) drive re-engagement by surfacing past entries at the right moment.
 - Seeds: 2 seeds/month × 12 months = 24 future touchpoints
 - Bloom notifications: drive re-engagement on scheduled dates
 - Dormant hexagons: visual nudge to reconnect with friends you haven't appreciated recently
@@ -307,7 +307,7 @@ Once a friend group is exchanging gratitude, seeds, and packages on Pollinate, t
 The gratitude graph grows over months and years. Hive history, pending seeds, connection states, review cadence data — deeply personal and unrepeatable. Switching apps means abandoning emotional history.
 
 ### 4. Future Pull (Seeds + Review Prompts)
-Every seed is a scheduled reason to return. A user with 24 pending seeds has 24 future obligations to open the app. Review prompts — at the user's chosen cadence, on every tier (V2 §17.5.6) — create "trip down memory lane" moments that surface past entries and drive re-engagement. No competitor has this dual mechanism. They all rely on willpower-based daily habits, which fail.
+Every seed is a scheduled reason to return. A user with 24 pending seeds has 24 future obligations to open the app. Review prompts — at the user's chosen cadence, on every tier (V2 §17.5.2a) — create "trip down memory lane" moments that surface past entries and drive re-engagement. No competitor has this dual mechanism. They all rely on willpower-based daily habits, which fail.
 
 ### 5. Brand & Metaphor Coherence
 The bee ecosystem isn't a skin — it's a cohesive design language mapping metaphor to mechanics. Hives, seeds, honeycomb, pollination, bloom — every term reinforces the emotional logic of the product. Competitors can copy features, but they can't copy the coherence of the world.
@@ -388,7 +388,7 @@ Before shipping Slice 1 (Demo Mode) to TestFlight / internal testers:
 - [ ] A user can create a Private Hive, write entries for someone, and see all their entries
 - [ ] A user can seal a Private Hive with no recipient (the grandmother/child/lost-someone case — must complete with no connection required)
 - [ ] A user can send a sealed hive to a connected friend
-- [ ] A "trip down memory lane" review prompt fires correctly at the user's configured cadence (cadence is ungated on every tier — V2 §17.5.6)
+- [ ] A "trip down memory lane" review prompt fires correctly at the user's configured cadence (cadence is ungated on every tier — V2 §17.5.2a)
 - [ ] A user can plant a seed (time-capsule message) with a future bloom date
 - [ ] Seed bloom notifications fire correctly and on time
 - [ ] The Honeycomb feed shows real activity from the user's Hive
