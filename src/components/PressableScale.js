@@ -99,7 +99,7 @@ export const PressableScale = ({
           <Animated.View
             pointerEvents="none"
             style={[
-              StyleSheet.absoluteFillObject,
+              StyleSheet.absoluteFill,
               { backgroundColor: pressedColor, opacity: colorOpacity, borderRadius: StyleSheet.flatten(style)?.borderRadius },
             ]}
           />
