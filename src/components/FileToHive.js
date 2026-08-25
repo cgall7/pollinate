@@ -18,43 +18,49 @@ import { StaggeredItem } from './StaggeredItem';
 // Not a sheet — GUIDES/POLLINATE_V2_DES16_FILE_TO_HIVE.md §2. It is an
 // in-place expansion of the entry card it lives inside, the same archetype
 // `IdeasAccordion` already established.
+const READ_ERROR_MESSAGE = "Couldn't check your hives.";
+
 export const FileToHive = ({ entry, hives }) => {
   const [open, setOpen] = useState(false);
   const [filedIds, setFiledIds] = useState(() => new Set());
-  const [filedLoading, setFiledLoading] = useState(false);
-  const [filedError, setFiledError] = useState(false);
+  // §16.5 makes the client the ONLY enforcement against same-hive re-filing —
+  // the database has no dedupe by design (`HiveStore.js:188-191`). So this
+  // can't be a "loading" flag that clears on both success and failure: rows
+  // must stay untappable until a read RESOLVES SUCCESSFULLY, fail-closed,
+  // because a flaky network is exactly when someone re-taps. Ruled by Lumen
+  // (2026-08-25) after review upgraded the fail-open version to blocking.
+  const [readResolved, setReadResolved] = useState(false);
+  const [readFailed, setReadFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [raceSealedIds, setRaceSealedIds] = useState(() => new Set());
   const [failure, setFailure] = useState(null);
 
   // §1a(b)/§5 — taken on expand, not on mount, since the whole point is to
   // catch a filing that happened on another device. Re-fires every time the
-  // chevron opens, not just the first time.
+  // chevron opens, and again on `retryToken` — the retry action bumps it.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setFiledLoading(true);
-    setFiledError(false);
+    setReadResolved(false);
+    setReadFailed(false);
     HiveStore.getFiledHiveIds(entry.date)
       .then((ids) => {
         if (cancelled) return;
         setFiledIds(ids);
+        setReadResolved(true);
       })
       .catch((err) => {
         if (cancelled) return;
-        // No copy slot for this failure (§1a(b) doesn't rule one) — rows
-        // stay untagged and untappable below via `filedError`, since an
-        // unresolved read can't make the positive claim that a row is
-        // safe to file into.
         console.warn('FileToHive: failed to read filed set', err);
-        setFiledError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setFiledLoading(false);
+        setReadFailed(true);
+        AccessibilityInfo.announceForAccessibility(READ_ERROR_MESSAGE);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, entry.date]);
+  }, [open, entry.date, retryToken]);
+
+  const retryRead = () => setRetryToken((t) => t + 1);
 
   const toggle = () => {
     setFailure(null);
@@ -98,7 +104,7 @@ export const FileToHive = ({ entry, hives }) => {
   if (filedHives.length === 1) collapsedLabel = `Filed to ${filedHives[0].subjectName}'s hive.`;
   else if (filedHives.length > 1) collapsedLabel = `Filed to ${filedHives.length} hives.`;
 
-  const rowsDisabled = filedLoading || filedError;
+  const rowsDisabled = !readResolved;
   const rows = hives.length > 5 ? (
     <ScrollableRows hives={hives} filedIds={filedIds} raceSealedIds={raceSealedIds} disabled={rowsDisabled} onCommit={commitTo} />
   ) : (
@@ -128,6 +134,21 @@ export const FileToHive = ({ entry, hives }) => {
       {open && (
         <View style={styles.expansion}>
           <Text style={styles.consequence}>Once filed, it stays there.</Text>
+          {readFailed && (
+            // Rows below stay rendered but untappable (`rowsDisabled`) — this
+            // is not a takeover, it's the reason the rows aren't live yet.
+            <View style={styles.readErrorRow}>
+              <Text style={styles.readErrorText}>{READ_ERROR_MESSAGE}</Text>
+              <PressableScale
+                onPress={retryRead}
+                haptic={null}
+                accessibilityRole="button"
+                accessibilityLabel="Retry checking your hives"
+              >
+                <Text style={styles.readErrorAction}>Try again</Text>
+              </PressableScale>
+            </View>
+          )}
           {failure && <Text style={styles.failure}>{failure}</Text>}
           {rows}
         </View>
@@ -247,6 +268,22 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     textAlign: 'center',
     marginTop: 8,
+  },
+  readErrorRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  readErrorText: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+  },
+  readErrorAction: {
+    ...theme.type.bodySm,
+    color: theme.colors.ink,
+    textDecorationLine: 'underline',
   },
   rowList: {
     paddingTop: 8,
