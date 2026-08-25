@@ -17,8 +17,8 @@
 // What replaces it, per Lumen's ruling on the same thread, is two separate
 // questions in two separate currencies:
 //
-//   1. TRIPWIRE (binary): does anything move OUTSIDE the declared Breath
-//      region? This is the property Colin actually asked for — "Today is
+//   1. TRIPWIRE (binary): does anything move OUTSIDE the declared ambient
+//      regions? This is the property Colin actually asked for — "Today is
 //      completely still apart from one wing" — and a binary question does
 //      not need a percentage to answer it.
 //   2. AMPLITUDE (lossless, reported not thresholded): how much does the
@@ -26,6 +26,18 @@
 //      changed-pixel count, in the doctrine's own currency, not a codec's.
 //      No ceiling ships here because none has been ruled — this reports the
 //      number so a ceiling CAN be ruled, rather than inventing one.
+//
+// REWRITTEN AGAIN 2026-08-25 (same thread, Pixel's errand-clip finding):
+// "still except one breathing wing" is a property of Today, not of the app
+// — the Hive's own BloomRing marks breathe forever too, ratified ambient
+// (§21/6.4, R61), 17x louder by region-mean amplitude than the wing. A
+// tripwire hard-coded to the Breath box would red the Hive on its own
+// ratified design. Per Lumen's ruling, the single region became a
+// SCREEN-SCOPED REGISTRY (`scripts/lib/ambient-regions.mjs`): each screen
+// declares the regions it permits motion in, each entry citing the ruling
+// that licenses it, and the tripwire tests against their union. Undeclared
+// motion is red even if it's pretty — that is the property the bar was
+// always meant to name. `--screen` is now required on `analyze`.
 //
 // Still NOT `check-*.mjs`, for the same reason as before: this drives real
 // captures (a booted simulator, or a pre-recorded PNG burst) over real wall
@@ -40,18 +52,28 @@
 //   node scripts/measure-bee-idle-motion.mjs predict-region --size 44
 //   node scripts/measure-bee-idle-motion.mjs capture --label mounted-1 --seconds 20 [--device booted]
 //   node scripts/measure-bee-idle-motion.mjs capture --label suppressed-1 --seconds 20
-//   node scripts/measure-bee-idle-motion.mjs analyze --label mounted-1 --anchor-x N --anchor-y N --anchor-w N --anchor-h N
+//   node scripts/measure-bee-idle-motion.mjs analyze --label mounted-1 --screen today \
+//     --anchor-x N --anchor-y N --anchor-w N --anchor-h N
+//   node scripts/measure-bee-idle-motion.mjs analyze --label mounted-1 --screen hive \
+//     --anchor-x N --anchor-y N --anchor-w N --anchor-h N \
+//     --comb-x N --comb-y N --cell-size N [--blooming 0,3]
 //   node scripts/measure-bee-idle-motion.mjs compare
 //   node scripts/measure-bee-idle-motion.mjs self-test
 //
 // `capture` needs a booted simulator (`xcrun simctl io <device> screenshot`
 // in a tight loop — lossless PNGs, not a compressed `.mov`, because the
-// amplitude question needs real pixel values). `analyze` needs the
-// character box's on-screen rect in px — this script does not know where
-// the anchor resolved; §32.2 resolves it live against the actual render, so
-// whoever captured the burst has to supply it, the same way Pixel's own
-// measurement pairs a source PREDICTION with a device MEASUREMENT rather
-// than assuming either alone.
+// amplitude question needs real pixel values). `analyze` needs `--screen`
+// (`today` or `hive`, see `scripts/lib/ambient-regions.mjs`) plus the live
+// state that screen's declared regions can't derive on their own: the
+// character box's on-screen rect (`--anchor-*`, both screens — the bee is
+// resident on each), and on `hive` the comb cluster's on-screen origin
+// (`--comb-x/-y`), its cell size (`--cell-size`), and which spiral indices
+// are currently blooming (`--blooming`, comma-separated, defaults to none).
+// This script does not know where any of these resolved — §32.2 resolves
+// the anchor live against the actual render and which cells bloom is
+// runtime STATE, not geometry — so whoever captured the burst has to supply
+// them, the same way Pixel's own measurement pairs a source PREDICTION with
+// a device MEASUREMENT rather than assuming either alone.
 //
 // THE ONE INTEGRATION POINT THIS SCRIPT DOES NOT OWN — unchanged from the
 // first version: "bee suppressed" needs `EXPO_PUBLIC_SUPPRESS_BEE=true` to
@@ -72,7 +94,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { decodePNG, encodePNG } from './lib/png-codec.mjs';
-import { breathSweepFractionBBox, fractionBBoxToPx } from './lib/bee-breath-region.mjs';
+import { breathSweepFractionBBox } from './lib/bee-breath-region.mjs';
+import { bloomMarkRegionsPx } from './lib/bloom-ring-region.mjs';
+import { declaredRectsFor, declaredRegionsFor, SCREENS } from './lib/ambient-regions.mjs';
 import { BREATH_BEAT_DEG, MASCOT_ASPECT, MASCOT_WIDTH_FRACTION } from '../src/constants/mascot.js';
 
 const OUT_DIR = path.join(os.tmpdir(), 'bee-idle-motion');
@@ -115,14 +139,17 @@ const predictRegion = (size) => {
 
 // --- pure region classification, exercised by self-test AND by `analyze` --
 
-/** Is point (x,y) inside rect {minX,maxX,minY,maxY} (inclusive)? */
-const inRegion = (x, y, region) => x >= region.minX && x <= region.maxX && y >= region.minY && y <= region.maxY;
+/** Is point (x,y) inside ANY of `regions` (rects {minX,maxX,minY,maxY}, inclusive)? */
+const inRegions = (x, y, regions) =>
+  regions.some((r) => x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY);
 
 /**
  * Diff every consecutive frame pair in `frames` (array of {width,height,data}
  * RGBA buffers, all identical dimensions) and classify each changed pixel as
- * inside or outside `region` (px rect in the SAME coordinate space the
- * frames were captured in). Diffs every consecutive pair rather than just
+ * inside or outside `regions` (an array of px rects, in the SAME coordinate
+ * space the frames were captured in — a screen's declared-ambient UNION, per
+ * `scripts/lib/ambient-regions.mjs`; a pixel counts as "inside" if it falls
+ * in ANY one of them). Diffs every consecutive pair rather than just
  * first-vs-last: a periodic motion that returns to its start phase across a
  * whole number of cycles would otherwise read as static.
  *
@@ -132,7 +159,7 @@ const inRegion = (x, y, region) => x >= region.minX && x <= region.maxX && y >= 
  * needed there. Left configurable rather than hard-coded in case a future
  * capture path reintroduces dithering or scaling.
  */
-export const diffFrames = (frames, region, { noiseFloor = 0 } = {}) => {
+export const diffFrames = (frames, regions, { noiseFloor = 0 } = {}) => {
   if (frames.length < 2) throw new Error('need >= 2 frames to diff');
   const { width, height } = frames[0];
   for (const f of frames) {
@@ -159,7 +186,7 @@ export const diffFrames = (frames, region, { noiseFloor = 0 } = {}) => {
         if (delta <= noiseFloor) continue;
 
         const idx = y * width + x;
-        const inside = inRegion(x, y, region);
+        const inside = inRegions(x, y, regions);
         if (inside) {
           peakDeltaInside = Math.max(peakDeltaInside, delta);
           if (!seenChanged[idx]) changedInside += 1;
@@ -221,14 +248,14 @@ export const evaluate = (mountedSummaries, suppressedSummaries) => {
   const tripwire = leaks
     ? {
         verdict: 'LEAK',
-        detail: `mounted shows motion outside the declared region beyond the ambient floor (bee: ${mountedOutsidePx}px/peak-Δ${mountedOutsideDelta}, ambient: ${suppressedOutsidePx}px/peak-Δ${suppressedOutsideDelta})`,
+        detail: `mounted shows motion outside the declared regions beyond the ambient floor (bee: ${mountedOutsidePx}px/peak-Δ${mountedOutsideDelta}, ambient: ${suppressedOutsidePx}px/peak-Δ${suppressedOutsideDelta})`,
         excessPx,
         excessDelta,
         leakBBox: worstLeakBBox,
       }
     : {
         verdict: 'CONFINED',
-        detail: `mounted's outside-region signal (${mountedOutsidePx}px/peak-Δ${mountedOutsideDelta}) does not exceed the ambient floor (${suppressedOutsidePx}px/peak-Δ${suppressedOutsideDelta}) — nothing moves outside the declared Breath region`,
+        detail: `mounted's outside-region signal (${mountedOutsidePx}px/peak-Δ${mountedOutsideDelta}) does not exceed the ambient floor (${suppressedOutsidePx}px/peak-Δ${suppressedOutsideDelta}) — nothing moves outside this screen's declared ambient regions`,
       };
 
   const amplitude = {
@@ -280,7 +307,7 @@ const selfTest = () => {
 
   // --- PNG codec round-trip: encode then decode must reproduce the buffer
   const W = 20, H = 16;
-  const region = { minX: 4, maxX: 9, minY: 4, maxY: 9 };
+  const regions = [{ minX: 4, maxX: 9, minY: 4, maxY: 9 }];
   const base = solidFrame(W, H, [10, 20, 30]);
   const roundTripped = decodePNG(encodePNG(base));
   check('PNG round-trip preserves dimensions', [roundTripped.width, roundTripped.height], [W, H]);
@@ -288,13 +315,13 @@ const selfTest = () => {
 
   // --- diffFrames: a static burst (bee suppressed, nothing moves anywhere)
   const staticBurst = [base, base, base];
-  const staticDiff = diffFrames(staticBurst, region);
+  const staticDiff = diffFrames(staticBurst, regions);
   check('static burst: zero changed pixels anywhere', [staticDiff.changedInside, staticDiff.changedOutside], [0, 0]);
 
   // --- diffFrames: motion confined to the declared region (correct Breath)
   const insideFrame = withPatch(base, 5, 5, 3, [200, 200, 200]); // fully inside [4,9]x[4,9]
   const insideBurst = [base, insideFrame, base]; // oscillates, endpoints match — exercises "diff consecutive, not endpoints"
-  const insideDiff = diffFrames(insideBurst, region);
+  const insideDiff = diffFrames(insideBurst, regions);
   check('confined motion: changed pixels all counted inside', insideDiff.changedOutside, 0);
   check('confined motion: inside count matches patch area', insideDiff.changedInside, 9);
   check('confined motion: peak delta reflects the patch contrast', insideDiff.peakDeltaInside, 190);
@@ -302,9 +329,24 @@ const selfTest = () => {
   // --- diffFrames: a leak outside the declared region (the bug this exists to catch)
   const leakFrame = withPatch(insideFrame, 12, 2, 2, [255, 0, 0]); // outside [4,9]x[4,9]
   const leakBurst = [base, leakFrame, base];
-  const leakDiff = diffFrames(leakBurst, region);
+  const leakDiff = diffFrames(leakBurst, regions);
   check('leak: outside pixels detected', leakDiff.changedOutside, 4);
   check('leak: outside bbox matches the leak patch', leakDiff.outsideBBox, { minX: 12, maxX: 13, minY: 2, maxY: 3 });
+
+  // --- diffFrames: UNION semantics (the declared-ambient registry ruling —
+  // a screen can declare more than one region, e.g. Hive's wing + bloom
+  // rings, and a pixel is "inside" if it falls in ANY of them). A second,
+  // disjoint region placed exactly where the leak above landed must absorb
+  // it; a patch in the untouched gap between the two regions must not.
+  const twoRegions = [regions[0], { minX: 12, maxX: 13, minY: 2, maxY: 3 }];
+  const nowDeclaredDiff = diffFrames(leakBurst, twoRegions);
+  check('union: a second region absorbs what was previously a leak', nowDeclaredDiff.changedOutside, 0);
+  check('union: the same pixels now count as inside', nowDeclaredDiff.changedInside, insideDiff.changedInside + leakDiff.changedOutside);
+
+  const gapFrame = withPatch(leakFrame, 0, 0, 1, [0, 255, 0]); // outside BOTH declared regions; leakFrame's own leak patch is now absorbed by region 2
+  const gapBurst = [base, gapFrame, base];
+  const gapDiff = diffFrames(gapBurst, twoRegions);
+  check('union: a leak in the gap between two declared regions is still caught', gapDiff.changedOutside, 1);
 
   // --- evaluate: end-to-end verdict on realistic run sets
   const mountedClean = [insideDiff, insideDiff];
@@ -346,6 +388,56 @@ const selfTest = () => {
     closeEnough(bbox11.maxY, bbox41.maxY);
   check('breathSweepFractionBBox: bbox stable from 11 to 41 samples', stable, true);
 
+  // --- bloomMarkRegionsPx: geometry derived from the SAME source the ring
+  // draws from (HexShape's hexEdgeMarks + HoneycombGrid's own constants),
+  // not a second copy of either.
+  check('bloomMarkRegionsPx: no blooming cells -> no regions', bloomMarkRegionsPx({ size: 44, bloomingIndices: [], combOriginPx: { x: 0, y: 0 } }).length, 0);
+
+  const oneCellRegions = bloomMarkRegionsPx({ size: 44, bloomingIndices: [0], combOriginPx: { x: 0, y: 0 } });
+  check('bloomMarkRegionsPx: one blooming cell -> its six edge marks, each a valid rect', [
+    oneCellRegions.length,
+    oneCellRegions.every((r) => r.minX <= r.maxX && r.minY <= r.maxY),
+  ], [6, true]);
+
+  // Pixel's device measurement (errand-clip finding, thread 8d2c9a5d): "12
+  // BloomRing edge-marks, six on each of the two blooming cells." Two
+  // blooming cells -> twelve independent regions, not two merged boxes —
+  // the ring's own visual unit is the mark.
+  const twoCellRegions = bloomMarkRegionsPx({ size: 44, bloomingIndices: [0, 3], combOriginPx: { x: 100, y: 200 } });
+  check('bloomMarkRegionsPx: two blooming cells -> twelve regions', twoCellRegions.length, 12);
+
+  let outOfRangeThrew = false;
+  try {
+    bloomMarkRegionsPx({ size: 44, bloomingIndices: [99], combOriginPx: { x: 0, y: 0 } });
+  } catch {
+    outOfRangeThrew = true;
+  }
+  check('bloomMarkRegionsPx: an out-of-range spiral index throws rather than silently skipping', outOfRangeThrew, true);
+
+  // --- ambient-regions: the declared-ambient registry itself (Lumen's
+  // ruling) — Today declares one region, Hive declares wing + bloom-rings,
+  // and every declaration carries the citation that licenses it.
+  const wingState = { anchorX: 0, anchorY: 0, anchorW: 44, anchorH: 44 };
+  const todayRegions = declaredRegionsFor('today', { wing: wingState });
+  check('ambient-regions: today declares exactly one region, the wing', todayRegions.map((r) => r.name), ['wing']);
+  check('ambient-regions: today\'s wing cites the doctrine', todayRegions[0].citation, 'Bee Doctrine §State-2');
+
+  const hiveState = { wing: wingState, bloom: { size: 44, bloomingIndices: [0, 3], combOriginPx: { x: 0, y: 0 } } };
+  const hiveRegions = declaredRegionsFor('hive', hiveState);
+  check('ambient-regions: hive declares wing + bloom-rings, in order', hiveRegions.map((r) => r.name), ['wing', 'bloom-rings']);
+  check('ambient-regions: hive\'s bloom-rings cite R61', hiveRegions.find((r) => r.name === 'bloom-rings').citation, '§21/6.4, R61');
+
+  const hiveRects = declaredRectsFor('hive', hiveState);
+  check('ambient-regions: hive\'s flattened rects total wing(1) + bloom-marks(12)', hiveRects.length, 13);
+
+  let unknownScreenThrew = false;
+  try {
+    declaredRectsFor('nonexistent', {});
+  } catch {
+    unknownScreenThrew = true;
+  }
+  check('ambient-regions: an unknown screen throws rather than returning an empty (falsely CONFINED) region set', unknownScreenThrew, true);
+
   console.log(`\nself-test: ${pass} passed, ${fail} failed`);
   return fail === 0;
 };
@@ -384,6 +476,10 @@ const capture = async () => {
 const analyze = () => {
   const label = flag('label');
   if (!label) throw new Error('--label is required');
+  const screen = flag('screen');
+  if (!SCREENS.includes(screen)) {
+    throw new Error(`--screen is required and must be one of: ${SCREENS.join(', ')}`);
+  }
   const dir = path.join(OUT_DIR, label);
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
   if (files.length < 2) throw new Error(`need >= 2 frames in ${dir}, found ${files.length}`);
@@ -394,16 +490,35 @@ const analyze = () => {
   const anchorW = numFlag('anchor-w');
   const anchorH = numFlag('anchor-h');
   if ([anchorX, anchorY, anchorW, anchorH].some((v) => v === undefined || Number.isNaN(v))) {
-    throw new Error('--anchor-x/-y/-w/-h (px) are required — this script does not know where the anchor resolved, see file header');
+    throw new Error('--anchor-x/-y/-w/-h (px) are required on every screen — the bee is resident on both, see file header');
+  }
+  const state = { wing: { anchorX, anchorY, anchorW, anchorH } };
+
+  if (screen === 'hive') {
+    const combX = numFlag('comb-x');
+    const combY = numFlag('comb-y');
+    const cellSize = numFlag('cell-size');
+    if ([combX, combY, cellSize].some((v) => v === undefined || Number.isNaN(v))) {
+      throw new Error('--comb-x/-y and --cell-size (px) are required on --screen hive, see file header');
+    }
+    const bloomingIndices = flag('blooming', '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map(Number);
+    state.bloom = { size: cellSize, bloomingIndices, combOriginPx: { x: combX, y: combY } };
   }
 
-  const fracBBox = breathSweepFractionBBox({ sweepDeg: BREATH_BEAT_DEG });
-  const regionPx = fractionBBoxToPx(fracBBox, { x: anchorX, y: anchorY, width: anchorW, height: anchorH });
-  console.log('Declared region (px):', regionPx);
+  const declared = declaredRegionsFor(screen, state);
+  console.log(`Declared ambient regions for --screen ${screen}:`);
+  for (const region of declared) {
+    console.log(`  ${region.name} (${region.citation}): ${region.rects.length} rect(s)`);
+  }
+  const regionsPx = declared.flatMap((region) => region.rects);
 
-  const summary = diffFrames(frames, regionPx);
+  const summary = diffFrames(frames, regionsPx);
   const outFile = path.join(OUT_DIR, `${label}.summary.json`);
-  fs.writeFileSync(outFile, JSON.stringify({ region: regionPx, ...summary }, null, 2));
+  fs.writeFileSync(outFile, JSON.stringify({ screen, regions: declared, ...summary }, null, 2));
   console.log(`Wrote ${outFile}`);
   console.log(summary);
 };
@@ -449,7 +564,8 @@ if (cmd === 'predict-region') {
   if (!cmd) {
     console.log('\nUsage: predict-region [--size 44]');
     console.log('       capture --label <mounted-N|suppressed-N> [--seconds 20] [--device booted]');
-    console.log('       analyze --label <label> --anchor-x N --anchor-y N --anchor-w N --anchor-h N');
+    console.log('       analyze --label <label> --screen today|hive --anchor-x N --anchor-y N --anchor-w N --anchor-h N');
+    console.log('               [--comb-x N --comb-y N --cell-size N --blooming 0,3]  (hive only)');
     console.log('       compare');
   }
   process.exit(ok ? 0 : 1);
