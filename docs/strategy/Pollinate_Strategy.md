@@ -18,11 +18,11 @@ We sit at the intersection of three proven markets — gratitude apps ($1.3B), s
 
 **Delivery is a spectrum, not a gate (added 2.1).** A Private Hive must be worth keeping even if its person can never install the app — a young child, a grandparent, someone you've lost. The hive is a letter drawer, not an outbox: it is valuable at zero deliveries, because the compiling itself is the practice. Delivery paths, in order of arrival: **(1) send in-app** (Slice 1) — the full bloom; **(2) send as a link** (post-Slice 1) — a beautiful web-read moment that doubles as the viral loop, since the recipient's first experience of Pollinate is the strongest thing we make; **(3) keep, or export as a keepsake** (later) — for the person who will never install anything. The moat is accumulated *time*, not features — no competitor can copy a year of someone's entries.
 
-**Business model:** Freemium. The free tier gives users one private hive **ever** (lifetime — ruled by Colin 2026-08-19; see Slices 8b.5 cardinality ruling), one friend connection, one seed, full daily journal access, and a yearly review. Sealing and sending are always free and unconditional, regardless of tier: the paywall gates hive *creation*, and `sealed_at`/`sent_at` already cap every tier at ≤1 send per hive structurally, so the hive count is the only hive-side meter. **Pollinate Plus** ($2.99/month or $29.99/year) unlocks unlimited hives, friends, seeds, and monthly review cadence. Gifting happens via Cash App payment links shared through iMessage — Pollinate generates a gratitude note and a Cash App $cashtag link, the user sends it via iMessage, and Pollinate never touches money. We are not a money transmitter.
+**Business model (superseded 2026-08-24 — `POLLINATE_V2_SPEC.md` §17.5 governs; encoded 2026-08-25):** Freemium, metered at **delivery**. The free tier is unlimited hives and unlimited entries, forever, plus the **first delivery free, forever** — writing is the moat and is never metered (this reverses the 2026-08-19 "1 hive, lifetime" ruling that stood here, which put the paywall at the `private_hives` insert path). **Pollinate Plus** ($39.99/year, annual only — the monthly plan is retired, not repriced) buys every delivery after the first. Export is free on every tier forever (V2 §17.4 — the durability guarantee). The old friend/seed/review-cadence tier splits are not addressed by V2 §17.5 and are flagged for ruling, not carried forward as settled. The money layer is nectar zaps (V2 §5): self-custodial, 100% to the receiver, never revenue — the Cash-App-links-via-iMessage plan is cancelled (V2 §5.7). We are not a money transmitter (V2 §5.6).
 
 > **Build Slices:**
 > - **Slice 1 (Demo Mode):** Journal + private hives + social seeds + honeycomb + feed. No money. TestFlight / internal testing. Validates the core emotional and social loop.
-> - **Slice 2 (Public Launch):** Freemium paywall ($2.99/mo or $29.99/yr) + Cash App gifting via iMessage links. App Store / Play Store launch.
+> - **Slice 2 (Public Launch):** Freemium paywall per V2 §17.5 ($39.99/yr annual-only, metered at delivery) + nectar zaps (V2 §5; Cash App gifting cancelled, V2 §5.7). App Store / Play Store launch.
 > - **Slice 3+:** Transaction fee research (MDK / Lightning) IF legally viable. Requires formal legal counsel. Not committed.
 
 > **App Tab Bar:** Today (journal + private hives) | Hive (social) | Garden (recap, wrapped, history)
@@ -108,30 +108,34 @@ We don't launch to individuals. We launch to **pre-existing friend groups** who'
 
 ### Overview
 
-Pollinate is a **freemium consumer app**. The primary revenue stream is subscription. Gifting is facilitated through Cash App payment links — Pollinate never touches money and is not a money transmitter. Transaction fees are a future research topic only, deferred to Slice 3+ pending legal counsel.
+Pollinate is a **freemium consumer app**. The only revenue stream is subscription (V2 §17.5.5 enumerates what is explicitly *not* revenue: export, receiving, zaps, ads, bitcoin). Value transfer happens through self-custodial nectar zaps — Pollinate never touches money and is not a money transmitter (V2 §5.6). The Cash-App-links plan this section previously described is cancelled (V2 §5.7).
 
 ### Revenue Streams
 
 #### 1. Freemium Subscription (Primary — Slice 2)
 
-| Feature | Free Tier | Pollinate Plus ($2.99/mo or $29.99/yr) |
+> **Superseded 2026-08-24 (V2 §17.5, ruled by Colin; encoded 2026-08-25).** The
+> table below mirrors V2 §17.5 and must not drift from it. The previous version
+> of this table (1 hive lifetime free / $2.99-$29.99 / sends never metered) is
+> reversed: writing is unmetered everywhere and the paywall meters delivery.
+
+| Feature | Free Tier | Pollinate Plus ($39.99/yr, annual only) |
 |---|---|---|
 | Daily journal | Full access | Full access |
-| Private Hives | 1 hive, ever (lifetime — ruled 2026-08-19) | Unlimited |
-| Friend connections | 1 friend | Unlimited |
-| Seeds (time capsules) | 1 seed | Unlimited |
-| Review cadence | Yearly only | Monthly |
-| Sends (curated hive entries sent to friends; sealing and sending are unconditional and never gated — ruled 2026-08-19, see business model note above) | Free — never metered | Free — never metered (unlimited hives means unlimited sends in practice) |
+| Private Hives | Unlimited, forever | Unlimited |
+| Delivery | **First delivery free, forever** | Every delivery after the first |
+| Export | Free, forever (V2 §17.4) | Same |
+| Friend connections / seeds / review cadence | *Old tier splits not addressed by V2 §17.5 — flagged for ruling* | *Same flag* |
 | Honeycomb visualization | ✓ | ✓ |
 | Social feed | ✓ | ✓ |
 | Garden / recap / history | ✓ | ✓ |
 
-**Why this works:**
-- The free tier is genuinely useful — one hive (lifetime), full journal access, yearly reviews. Users can experience the core loop without paying.
-- The upgrade triggers are natural: a second hive (for another person), monthly reviews (instead of yearly), more seeds. These are needs that emerge from engagement, not artificial limits.
-- $2.99/month is impulse territory — less than a coffee. $29.99/year offers ~16% savings and anchors to annual commitment.
+**Why this works (V2 §17.5.1–.2):**
+- Pollinate's value is episodic — enormous at the reveal, quiet for eleven months. A monthly bill churns in the quiet stretch before the payoff; nobody in this category sells monthly.
+- The paywall sits at the delivery moment — realized value, peak willingness to pay — while writing stays unmetered, because accumulated time is the entire moat.
+- The first delivery is free forever: it preserves the viral reveal, and it is the demo. Annual renewal lands next to the ritual (a birthday, an anniversary), not in a dead month.
 
-#### 2. Cash App Gifting via iMessage (Slice 2 — No Revenue to Pollinate)
+#### 2. ~~Cash App Gifting via iMessage~~ — cancelled 2026-08-24 (V2 §5.7); superseded by nectar zaps (V2 §5, no revenue to Pollinate by design — G5)
 
 - Pollinate generates a gratitude note + a Cash App payment link ($cashtag + amount)
 - The user sends the link via iMessage — Pollinate never sends, receives, or holds money
@@ -151,12 +155,11 @@ Pollinate is a **freemium consumer app**. The primary revenue stream is subscrip
 
 | Metric | Estimate |
 |---|---|
-| Subscription price | $2.99/mo or $29.99/yr |
-| Free-to-paid conversion target | 5–8% |
-| Monthly revenue per paying user | $2.99 |
-| Annual revenue per paying user (annual plan) | $29.99 |
-| Blended ARPU (across free + paid, at 6% conversion) | ~$1.80/mo |
-| MAU needed for $1M ARR (at $1.80 ARPU/mo) | ~46K MAU |
+| Subscription price | $39.99/yr, annual only (V2 §17.5) |
+| Free-to-paid conversion target | 4% (V2 §17.5.3) |
+| Annual revenue per paying user | $39.99 (~$34 net of Apple 15% — Small Business Program, OPS-7) |
+| Installs needed for ~$1M net ARR (at 4% conversion) | ~730K installs (V2 §17.5.3) |
+| The metric the model rests on | Reveal→signup rate (V2 §17.5.3; instrumented first, ENG-78) |
 | CAC (community-led, low paid acquisition) | $2–5 |
 | Target LTV (12-month retention × subscription) | $20–36 |
 | Gross margin | ~95% (no payment processing costs) |
@@ -320,7 +323,7 @@ No single competitor covers social gratitude + Private Hives (practice-as-gift) 
 |---|---|---|---|
 | Low daily journal/hive entry rate | Medium | High | Make journaling frictionless — quick entry flow, prompts/suggestions, streak-free design. Private Hives add motivation: you're writing FOR someone, not just for yourself. The social feed and review prompts are the motivators, not a streak nag. |
 | Low seed plant rate | Medium | High | Auto-suggest seeds from contacts/birthdays. Make planting a seed as easy as sending a note. |
-| Freemium conversion too low | Medium | High | Ensure free tier is useful but upgrade triggers are natural (second hive, monthly reviews — sends are never metered, ruled 2026-08-19, see business model note). Test paywall placement and messaging. The emotional payoff of receiving a package should drive recipients to start their own hive and eventually upgrade. |
+| Freemium conversion too low | Medium | High | The paywall sits at the delivery moment (V2 §17.5, ruled 2026-08-24 — writing is never metered). If conversion is low, diagnose the reveal before the price: `ENG-78`'s reveal→signup number decides, and the correct response to a bad number is `DES-17`, not a price change (V2 §17.5.3). |
 | Regulatory uncertainty if we pursue transaction fees | High (if pursued) | High | Defer all transaction fee work to Slice 3+. Require formal legal counsel before any engineering investment. Cash App link model (Slice 2) carries zero regulatory risk. |
 | User acquisition cost too high | Low | High | Community-led growth (seeded groups). Viral loop: receive package → download → start hive → send to others. Low CAC. No money friction in core loop. |
 | Big Tech launches a competitor | Low | High | Network effects + data accumulation + Private Hives mechanic + brand coherence are hard to replicate quickly. We'll have a head start. |

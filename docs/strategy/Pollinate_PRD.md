@@ -45,7 +45,7 @@ The network grows. The honeycomb fills in. The garden accumulates.
 | Slice | Focus | Money? | Distribution |
 |---|---|---|---|
 | **Slice 1: Demo Mode** | Journal + private hives + social seeds + honeycomb + feed | No | TestFlight / internal track |
-| **Slice 2: Public Launch** | Freemium paywall ($2.99/mo or $29.99/yr) + Cash App gifting via iMessage | Cash App links (Pollinate is NOT a money transmitter) | App Store / Play Store |
+| **Slice 2: Public Launch** | Revenue model per `POLLINATE_V2_SPEC.md` §17.5 (ruled 2026-08-24: $39.99/yr annual-only, paywall at *delivery*, first delivery free forever) + nectar zaps (V2 §5 — the Cash-App-via-iMessage plan is superseded, V2 §5.7) | Zaps are self-custodial, 100% to receiver (Pollinate is NOT a money transmitter — V2 §5.6) | App Store / Play Store |
 | **Slice 3: Transaction Research** | Evaluate MDK/Lightning integration IF transaction fees make sense. Requires legal/compliance research. | TBD based on research | — |
 
 ---
@@ -76,7 +76,7 @@ Pollinate is not a utility app. It's an **emotional experience.** Every interact
 - 25–45 years old. Remembers birthdays, writes cards, plans surprises.
 - Wants to express gratitude that feels meaningful, not transactional.
 - The Private Hive concept is built for them: write gratitude about someone over months, revisit it on "trips down memory lane," and package the best moments to send when ready.
-- They'll pay $2.99/mo because this replaces greeting cards, gifts, and "thinking of you" texts.
+- They'll pay for Pollinate Plus ($39.99/yr — V2 §17.5) because this replaces greeting cards, gifts, and "thinking of you" texts — and the renewal lands next to the ritual (a birthday, an anniversary), not in a dead month.
 
 ### Persona B: "The Community Builder"
 - 22–40 years old. Runs a maker group, church community, recovery circle, or tight friend group.
@@ -87,7 +87,7 @@ Pollinate is not a utility app. It's an **emotional experience.** Every interact
 ### Persona C: "The Daily Practitioner"
 - Any age. Wants a daily gratitude practice that isn't lonely.
 - Starts with the journal. Discovers private hives. Gets hooked when they take their first "trip down memory lane" and realize how much they've written about someone they love.
-- Free tier is enough for them initially. They upgrade when they want more hives and monthly reviews (sends are never metered — ruled 2026-08-19; see §5.1).
+- Free tier is enough for them initially — writing is unmetered forever (V2 §17.5, ruled 2026-08-24). They upgrade at the delivery moment: every delivery after the first free one requires Plus.
 
 ---
 
@@ -103,9 +103,9 @@ Today  |  Hive  |  Garden
 > is deleted — the comb is the wallet and the account door moves to the top
 > right. Ruling and design spec: `POLLINATE_V2_NAVIGATION.md`.
 
-| Tab | What it is | Free tier | Paid tier ($2.99/mo) | MVP1 status |
+| Tab | What it is | Free tier | Paid tier (Pollinate Plus, $39.99/yr — V2 §17.5) | MVP1 status |
 |---|---|---|---|---|
-| **Today** | Journal + Private Hives | 1 private hive. Daily journal full. | Unlimited private hives. | ✅ Full |
+| **Today** | Journal + Private Hives | Unlimited private hives, unlimited entries (V2 §17.5 — the paywall meters *delivery*, never creation or writing). Daily journal full. | Same writing surface; Plus buys every delivery after the first. | ✅ Full |
 | **Hive** | Honeycomb + feed + social seeds | 1 friend in public hives. Can receive unlimited. | Unlimited friends in public hives. | ✅ Full |
 | ~~**Wallet**~~ | ~~Gifting~~ | ~~Shell: "Coming Soon"~~ | ~~Cash App gifting via iMessage links~~ | **Row superseded 2026-08-26** — no Wallet tab; balance lives in the comb, admin behind the Account door (`POLLINATE_V2_NAVIGATION.md`) |
 | **Garden** | Recap, Wrapped, history | Full solo features | Full + social features (Phase 3) | ✅ Full (solo) |
@@ -189,12 +189,20 @@ The review prompt is the app's core re-engagement mechanic. It's not a notificat
 
 #### Free vs. Paid
 
-| | Free | Paid ($2.99/mo or $29.99/yr) |
+> **Superseded 2026-08-24 (V2 §17.5, ruled by Colin; encoded 2026-08-25).** This
+> table previously encoded the 2026-08-19 "1 hive, lifetime" model (free tier =
+> one hive ever, paywall at the `private_hives` insert path, sends never
+> metered). That model is reversed: writing is unmetered on every tier and the
+> paywall meters **delivery**. `POLLINATE_V2_SPEC.md` §17.5 governs; the table
+> below mirrors it and must not drift from it.
+
+| | Free | Pollinate Plus ($39.99/yr, annual only) |
 |---|---|---|
-| Private hives | 1 hive, ever (lifetime — ruled 2026-08-19) | Unlimited hives |
+| Private hives | Unlimited, forever | Unlimited |
 | Entries per hive | Unlimited | Unlimited |
-| Review cadence | Yearly only | Monthly, yearly, or manual |
-| Send | Free — never metered *(ruled 2026-08-19: free "1 hive" is **lifetime**, so the paywall gates hive creation, not the send; structurally every tier gets ≤1 send per hive because `sealed_at`/`sent_at` are one-directional. See Slices 8b.5 cardinality ruling.)* | Free — same; unlimited hives means unlimited sends in practice |
+| Delivery | **First delivery free, forever** | Every delivery after the first |
+| Export | Free, forever, never metered (V2 §17.4 — the durability guarantee) | Same |
+| Review cadence | *Not addressed by V2 §17.5 — the old Yearly-free / Monthly-Plus split is flagged for ruling, not carried forward as settled* | *Same flag* |
 
 #### Acceptance Criteria
 
@@ -367,9 +375,9 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | **Cash App links (Slice 2)** | Pollinate generates links, Cash App handles money | ❌ No — we don't touch money | Possible affiliate revenue (research) |
 | **MDK with platform fees** | Pollinate processes Lightning payments, takes 1% | ⚠️ Possibly — depends on structuring | 1% of tip volume |
 | **MDK as non-custodial wallet** | Users self-custody, Pollinate only provides UX | ⚠️ Possibly less risky, but untested legally | 1% of tip volume |
-| **Subscription only** | No transaction fees. Revenue from $2.99/mo subscriptions only | ❌ No money movement at all | $2.99–29.99/user |
+| **Subscription only** | No transaction fees. Revenue from Pollinate Plus subscriptions only | ❌ No money movement at all | $39.99/user/yr (~$34 net of Apple 15% — V2 §17.5.3) |
 
-**Recommendation for Slice 2:** Start with Cash App links. It's clean, legal, and gets money into the product without regulatory risk. Research MDK/Lightning and transaction fees in parallel for a potential Slice 3.
+**Recommendation for Slice 2 (superseded 2026-08-24):** ~~Start with Cash App links.~~ The Cash-App-links plan is cancelled (V2 §5.7). The money layer is nectar zaps — self-custodial, 100% to the receiver, never a revenue line (V2 §5, §17.5.5); revenue is subscription only.
 
 ---
 
@@ -397,9 +405,10 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | Feature | Free limit |
 |---|---|
 | Daily journal | Full, unlimited |
-| Private hives | **1 hive, ever** (lifetime — ruled 2026-08-19) |
-| Review cadence | **Yearly only** |
-| Send | Never metered *(ruled 2026-08-19 — the paywall gates hive creation; see the flag above)* |
+| Private hives | **Unlimited, forever** *(V2 §17.5, ruled 2026-08-24 — supersedes the 2026-08-19 "1 hive, lifetime" line; writing is the moat and is never metered)* |
+| Review cadence | Yearly only *(flagged — not addressed by V2 §17.5; needs a ruling before Slice 2 paywall work)* |
+| Delivery | **First delivery free, forever**; every later delivery requires Plus (V2 §17.5) |
+| Export | Free, forever, on every tier (V2 §17.4) |
 | Social seeds | **1 active seed at a time** |
 | Public hives (social) | **1 friend** |
 | Feed | Full access (view and react) |
@@ -407,28 +416,26 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | Garden (Recap, Wrapped) | Full |
 | Gifting | Not available (Slice 2) |
 
-### Paid Tier — "Pollinate Plus" ($2.99/month or $29.99/year)
+### Paid Tier — "Pollinate Plus" ($39.99/year, annual only — V2 §17.5; the monthly plan is retired, not repriced)
 
 | Feature | Paid unlocks |
 |---|---|
-| Private hives | **Unlimited hives** |
-| Review cadence | **Monthly, yearly, or manual** |
-| Send | Never metered *(ruled 2026-08-19 — see the flag in §5.1)* |
+| Delivery | **Every delivery after the free first one** — this is what Plus buys (V2 §17.5.2) |
+| Review cadence | Monthly, yearly, or manual *(flagged — not addressed by V2 §17.5; needs a ruling)* |
 | Social seeds | **Unlimited active seeds** |
 | Public hives | **Unlimited friends** |
 | "Bloom When" conditional seeds | Unlocked |
 | Surprise seeds (random date) | Unlocked |
 | Reciprocal seeds | Unlocked |
-| Gifting (Cash App links) | Unlocked (Slice 2) |
+| ~~Gifting (Cash App links)~~ | Cancelled (V2 §5.7); zaps are free on every tier and unlock nothing (V2 §17.5.5) |
 | Premium hexagon themes | Unlocked |
 | Advanced Garden visualizations | Unlocked (Phase 3) |
 
 ### Why This Model Works
 
 - **Receiving is always free.** The viral loop works: someone sends you a hive, you download Pollinate to read it, you're hooked. No paywall between you and receiving gratitude.
-- **The upgrade trigger is natural.** A free user creates one private hive for Mom for Mother's Day. They love it. They want to do the same for Dad for Father's Day. "Upgrade to create unlimited hives." That's a natural, motivated upgrade — not a nag.
-- **$2.99/mo is impulse territory.** Less than a coffee. For something that replaces greeting cards and gift planning.
-- **$29.99/yr is a 17% discount.** Annual subscribers are the backbone.
+- **The upgrade trigger is the delivery moment** (V2 §17.5, ruled 2026-08-24). Creation converts at the empty state — the moment of lowest emotional investment. Delivery is realized value and peak willingness to pay; writing stays unmetered because accumulated time is the entire moat.
+- **$39.99/yr, annual only.** A monthly bill on an episodic product churns in the quiet months before the payoff (V2 §17.5.1 — nobody in this category sells monthly). Annual lands the renewal next to the ritual: a birthday, an anniversary, a yearly review.
 - **No transaction fees in the core model.** Revenue comes from subscriptions. If we add transaction fees later (Slice 3+), it's upside, not the foundation.
 
 ---
