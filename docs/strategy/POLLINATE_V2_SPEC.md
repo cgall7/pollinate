@@ -1,7 +1,7 @@
 # Pollinate V2 — Specification
 
-**Status:** Adopted as the governing V2 spec by Colin, 2026-08-25 (#CEO action items, event `d99dd08daeeb5fef9c27d071d87cf239028fb85441a565bb086c6c5b306db5d5`: "add them as our updated ones … start working on the assignments"). That go-ahead is recorded as confirming the §6 rulings; §6 items that name a further action keep their actor (Sage: ratify §18.1's recursion-safe shape before any migration; Colin: the enrollments behind OPS-3 and OPS-7). Adoption encoded by Lumen 2026-08-25.
-**Date:** 2026-08-24 (adopted 2026-08-25)
+**Status:** Draft for Colin's ruling. Not yet ratified.
+**Date:** 2026-08-24
 **Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
@@ -200,6 +200,47 @@ alter table public.entries
 or one volume unlocking each birthday. **Husband–wife:** seal a volume every
 anniversary, forever.
 
+#### 17.1a Implementation refinements (ruled 2026-08-25)
+
+Three constraints on `ENG-46`/`ENG-47`, from reviewing the shipped client against
+the proposed re-point. These are acceptance criteria, not suggestions.
+
+**R1 — Resolve `volume_id` in a trigger. The client does not change.**
+`HiveStore.addHiveEntry` inserts `{user_id, hive_id, content, entry_date, theme}`
+with no `volume_id`. The obvious fix — "HiveStore starts setting it" — creates a
+client/server deploy-ordering hazard, and **on a mobile app we do not control when
+users update**: an old binary in the wild would keep inserting NULL forever.
+
+Instead, a `BEFORE INSERT` trigger on `entries` stamps `volume_id` from the hive's
+currently-open volume whenever `hive_id is not null and volume_id is null`. Old
+binaries keep working, `addHiveEntry` and the `ENG-42` filing RPC both get it for
+free, and there is no ordering hazard to manage.
+
+**R2 — "The currently-open volume" is a database guarantee, not an assumption.**
+R1's trigger is only deterministic if exactly one open volume exists per hive:
+
+```sql
+create unique index hive_volumes_one_open_per_hive
+  on public.hive_volumes (hive_id) where sealed_at is null;
+```
+
+`seal_volume()`'s "stamp N, open N+1" is then protected by the index — a
+double-seal race cannot produce two open volumes, it errors. Same spirit as the
+one-directional `sealed_at` guard (`20260815000004`).
+
+**R3 — `ENG-46` ships as two migrations, not one.**
+
+1. **Additive:** `hive_volumes`, `entries.volume_id`, the R2 index, the R1
+   trigger, backfill Volume 1. Changes no behavior; safe to sit in production
+   indefinitely.
+2. **Re-point:** move the three sites (`entries_insert_own`/`update_own`, the
+   sealed-entries immutability trigger, `send_hive`) from
+   `private_hives.sealed_at` to the join through `volume_id`.
+
+Between the two, every existing row has a correct `volume_id` and every new insert
+gets one. **There is no window in which the client writes NULL against policies
+that require it.** Ordering is the acceptance criterion.
+
 ### 17.2 Delivery
 
 Three exits from a sealed volume. Only the first exists today.
@@ -326,6 +367,54 @@ us infrastructure.
 **Why the first delivery is free forever.** It preserves the viral reveal, and it
 is the demo. Nobody should have to pay to find out what the product does.
 
+#### 17.5.2a The three secondary gates (ruled 2026-08-25)
+
+Raised by the pricing sweep: §17.5.2 defined the delivery meter but was silent on
+the old free/paid splits for **review cadence**, **friend connections** and
+**seeds**. Four table rows carried a "flagged for ruling" marker pending this.
+
+**Ruled: all three gates are removed. Volume delivery is the only meter.**
+
+| Old gate | Ruled | Why |
+|---|---|---|
+| Review cadence — yearly free / monthly Plus | **Removed. All cadences free.** | The review ritual is the return mechanic (§0). Gated to yearly, a free user has eleven months with no reason to open the app — they churn *before* accumulating enough to deliver, and never reach the meter. **The gate that maximizes conversion at delivery is no gate on the review.** A free user on monthly reviews arrives at the paywall with a fatter hive and more sunk investment. |
+| Friend connections — 1 free / unlimited Plus | **Removed. Unlimited, all tiers, including combs.** | A vestige of the pre-`ENG-48` architecture where `send_hive` required an accepted connection; delivery is now link-based with no install (§17.2b). It also contradicts the GTM: combs cap at 20 (§18.2), so a 1-friend free tier makes combs impossible on free and kills the seeded-friend-group cold start. |
+| Seeds — 1 free / unlimited Plus | **Removed. Unlimited and free. Not folded into the delivery meter.** | A seed is structurally a one-entry delivery, so folding it in is tempting — resist. Every seed is a bloom landing on someone who may not have the app, which makes seeds a reveal-generation machine feeding §17.5.3. Metering the cheapest viral action to protect a paywall is backwards. **Abuse is a rate limit (~5/week), not a price** — different problem, different tool. |
+
+**The principle, so this generalises without another ruling:**
+
+> **Meter the artifact. Never the practice, never the graph.**
+> Writing, reviewing, connecting and seeding are practice or distribution — they
+> build the moat and feed the funnel. The finished, delivered volume is the
+> product, and it is the only thing that costs money.
+
+#### 17.5.2b The hole this exposes: the hero use case pays nothing
+
+Stating this plainly rather than letting it hide, because it was not visible when
+§17.5 was written and it changes what "success" looks like.
+
+With **unlimited everything free** plus **the first delivery free forever**, the
+18-year mother–son user — the emotional hero of this entire product — **pays $0
+across eighteen years and delivers for free at the end.**
+
+That is not a bug to patch by re-adding gates. Gates on writing would destroy the
+accumulated time that *is* the moat. It is a fact to plan around:
+
+1. **The hero emotional use case is not the hero revenue use case.** The 18-year
+   mother is the marketing story and the virality engine, not the ARPU. Revenue
+   comes from the **multi-hive, multi-delivery** user — partner *and* kids *and*
+   parents *and* comb rotations — who blows past one delivery in year one.
+2. **The long-horizon case is monetised by the legacy tier, not the
+   subscription** (§17.5.4, ~$199 one-time). A hive with a 10+ year unlock is
+   precisely the escrowed-delivery product: verified beneficiary email, annual
+   address-still-resolves confirmation. **The mother's willingness to pay is for
+   certainty, not for features** — and certainty is the one thing a free tier
+   structurally cannot offer. That is the correct capture point for her, and it
+   moves the legacy tier from "nice Slice 3 idea" to **the answer for the
+   flagship use case.**
+3. **`ENG-80` (legacy tier) should be re-read against this.** It was scoped as a
+   second-order line; on this reading it is closer to core.
+
 #### 17.5.3 The number the business actually rests on
 
 Net of Apple's 15% (see `OPS-7`), $39.99 yields ~$34/subscriber/year.
@@ -410,6 +499,43 @@ action"). Widening it needs the same care that block shows:
   it's sealed.* It preserves the surprise for the co-authors too, and then
   everyone — contributors and recipient — sees all of it at the reveal.
 - Only the owner can seal. Only the owner can deliver.
+
+##### 18.1a Scoping constraints (ruled 2026-08-25)
+
+**C1 — Sequenced after volumes land and settle.** The "contributors see only
+their own until seal" rule joins through `volume_id → hive_volumes.sealed_at`
+(§17.1). Building contributor RLS against a schema mid-migration doubles the
+recursion surface for no gain. Volumes ship, stabilise, *then* Project 18 gets a
+branch.
+
+**C2 — `is_collective` is set at creation and immutable.** A hive is solo or
+collective **from birth**. Converting a solo hive to collective later would
+retroactively expose existing entries to a brand-new reader — that is how privacy
+incidents happen. Enforce with the same one-directional trigger pattern as
+`sealed_at` (`20260815000004`).
+
+Two payoffs: the solo path keeps `20260815000001`'s owner-only policies
+**completely untouched**, and contributor policies branch on an immutable boolean
+rather than on the existence of `hive_contributors` rows — which change over time
+and would otherwise make a policy's behaviour time-dependent.
+
+**C3 — On reversing the 2026-08-15 stance.** That call was right for what it
+described and it stays right. Re-read it: it is an argument about a hive with an
+audience of one, whose subject is not a party to it. That is still every solo
+hive, and those policies do not move. What changes is that a second object now
+exists which the 08-15 reasoning never contemplated — a hive with multiple
+*authors*, which is a different thing from a hive with multiple *readers*. This
+is a scoped extension, not a repudiation.
+
+**C4 — Contributor removal (ruled now, so it cannot stall the build).**
+The case: dad writes into mom's hive for their son; they divorce.
+
+- Removal **stops new writes.** It does **not** delete existing entries — they
+  were written for the *subject*, not the owner, and deleting them would let an
+  owner erase someone else's gift to their child.
+- A contributor may delete **their own** entries while the volume is open.
+- After seal, everything is immutable for everyone, contributors included —
+  consistent with `20260815000006`.
 
 ### 18.2 Combs (the local friend group)
 
@@ -730,7 +856,7 @@ never sell or share anything about you.*
 2. **App Store Connect privacy nutrition labels** must declare Diagnostics
    (crash data) and Usage Data. Currently they would declare neither.
 3. **Sub-processor disclosure** — Sentry and the analytics vendor join Supabase
-   in the `Where your information is kept` section, with `HOSTING_REGION` accurate for each.
+   in the `Where it lives` section, with `HOSTING_REGION` accurate for each.
 4. Nothing here unblocks the four `legalCopy.js` placeholders (`LEGAL_ENTITY`,
    `CONTACT_EMAIL`, `HOSTING_REGION`, `EFFECTIVE_DATE`) — those still mechanically
    gate the consent checkbox and still need Colin.
@@ -745,29 +871,24 @@ whether Memory Lane gets opened, which prompts produce entries).
 
 ---
 
-## 6. Rulings needed from Colin before work starts
+## 6. Rulings — all closed 2026-08-25
 
-> **2026-08-25:** Colin's adoption go-ahead (event `d99dd08d…`, see Status header)
-> is recorded as confirming items 1, 3, 5 and 6. Item 2 was already ruled
-> 2026-08-24. Item 4 is confirmed as direction — Sage still owes the §18.1 shape
-> ratification before any migration is written. Item 7 is confirmed as intent —
-> the enrollment itself is OPS-3 (Bumble, with Colin for the DUNS/legal-entity
-> steps). If any of this over-reads the go-ahead, say so in the channel and this
-> block gets amended.
+**This section is empty. Nothing in this document is waiting on Colin.**
 
-1. **Volumes replace one-shot seal** — confirm. Everything in §3 depends on it.
-2. ~~Printed book at $79–$129~~ and ~~$2.99/mo pricing~~ — **both ruled
-   2026-08-24.** Print cancelled, digital only (§17.4). Revenue model ruled:
-   $39.99/yr annual-only, paywall moved from hive creation to delivery, first
-   delivery free forever (§17.5). **This reverses the 2026-08-19 "1 hive,
-   lifetime" ruling** and owes a doc sweep (`COPY-11`).
-3. **Web reveal requires no install** — confirm; this constrains the animation
-   work (it must run in a browser, which shapes how DES-14 is built).
-4. **`private_hives` widens from owner-only to owner + contributors** — this
-   reverses an explicit architectural stance in `20260815000001`; Sage should
-   ratify the recursion-safe shape in §18.1 before any migration is written.
-5. **Simulated nectar (19a) ships to friends & family before any real sats** —
-   confirm the phasing is not reordered under enthusiasm.
-6. **Bitcoin stays out of all store-facing copy** — confirm §5.5.2.
-7. **Apple Developer Program: Organization enrollment** — required by 3.1.5(i)
-   for 19b, and a multi-week process (DUNS). Start it now if 19b is real.
+All seven original rulings are decided and recorded in
+`Pollinate_The_Ruling.md`, Amendment 2026-08-25 (and, for pricing, the
+2026-08-24 entry):
+
+| # | Ruling | Where the decision lives |
+|---|---|---|
+| 1 | Volumes replace one-shot seal — **yes** | §17.1, §17.1a |
+| 2 | ~~Printed book~~ → cancelled; revenue model ruled | §17.4, §17.5, §17.5.2a |
+| 3 | Web reveal requires no install — **yes** | §17.2(b), DES-17 |
+| 4 | Multi-writer hives — **yes, scoped** | §18.1, §18.1a |
+| 5 | Simulated nectar before real sats — **yes** | §5.3 |
+| 6 | Bitcoin out of store-facing copy — **yes** | §5.5.2, §5.4 |
+| 7 | Apple Organization enrolment — **yes, started** | `OPS-3`, §5.4 |
+
+**Still owned by Sage, not Colin:** ratification of the recursion-safe
+contributor RLS shape (§18.1) before Project 18 gets a branch. That is an
+engineering sign-off, not a product ruling.
