@@ -243,14 +243,14 @@ export const PackageOpenScreen = ({ navigation, route }) => {
               <Animated.View
                 style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
               >
-                <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
+                <ScrollView style={styles.entryScrollView} contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
                   <Text style={styles.entryText}>{step.text}</Text>
                 </ScrollView>
                 {!nectarConsent && (
                   <PressableScale
                     onPress={() => setNectarConsentSheetOpen(true)}
                     haptic={null}
-                    style={styles.nectarDoor}
+                    containerStyle={styles.nectarDoor}
                     accessibilityLabel="Give a gift"
                   >
                     <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
@@ -349,6 +349,9 @@ const styles = StyleSheet.create({
     maxHeight: '62%',
     ...theme.shadows.floating,
   },
+  entryScrollView: {
+    flex: 1,
+  },
   entryScroll: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -357,13 +360,16 @@ const styles = StyleSheet.create({
     ...theme.type.bodyLg,
     color: theme.colors.ink,
   },
-  // DES-28 D3 — the consent bootstrap door. Bottom-right of the card, same
-  // slot Deezine's spec reserves for the post-consent drop icon so the two
-  // never occupy different corners of the same surface.
+  // DES-28 D3, corrected per Pixel's review (2026-08-26): the door used to
+  // float `position: absolute` over the card, which let a full-width line
+  // of entry text pass under it undetected — a float can't respect content.
+  // It's now the card's second flex child, below the scrolling entry text,
+  // so it owns its own 32pt row instead of overlapping content. Still
+  // bottom-right, same slot Deezine's spec reserves for the post-consent
+  // drop icon.
   nectarDoor: {
-    position: 'absolute',
-    right: theme.spacing.md,
-    bottom: theme.spacing.md,
+    alignSelf: 'flex-end',
+    marginTop: theme.spacing.sm,
     width: 32,
     height: 32,
     borderRadius: theme.borderRadius.full,
