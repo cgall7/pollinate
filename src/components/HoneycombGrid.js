@@ -3,9 +3,14 @@ import { View, Text, Animated, StyleSheet, Pressable, Easing } from 'react-nativ
 import * as Haptics from 'expo-haptics';
 import Svg, { Polygon, Path, Line, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
 import { theme } from '../constants/theme';
-import { BLOOM_RING_INSET, BLOOM_MARK_EDGE_FRACTION, BLOOM_MARK_STROKE_WIDTH } from '../constants/bloomRing';
+import {
+  BLOOM_RING_INSET,
+  BLOOM_MARK_EDGE_FRACTION,
+  BLOOM_MARK_STROKE_WIDTH,
+  BLOOM_FLOOR_OPACITY,
+} from '../constants/bloomRing';
 import { hexTintFor } from './Avatar';
-import { hexPoints, hexEdgeMarks, hexSealPath } from './HexShape';
+import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_RUNGS, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
 import { useSvgId } from '../utils/svgId';
 import { DURATIONS, HONEY, HONEY_EASING, PRESS, STAGGER_MS, useReducedMotion } from '../constants/motion';
 import { drip as dripHaptics } from '../constants/haptics';
@@ -90,12 +95,9 @@ const DEMO_OPACITY = 0.45;
 // now measured against the contrast bar it has to clear, not against
 // GlowOrb's.
 const BLOOM_BREATHE_MS = 2400;
-// Ring floor. inkSoft on a wash is ink-on-ground, so this is a luminance
-// question (WCAG 1.4.11 non-text, 3:1) — 0.45 measured 1.93:1/1.94:1 on
-// the two real-member grounds (washSky/washYellow), 47% of every cycle
-// below the bar. 0.75 clears both at 3.30:1/3.34:1 with margin; the
-// crossing point is 0.700. Peak (1.0) and cadence are untouched.
-const BLOOM_FLOOR_OPACITY = 0.75;
+// BLOOM_FLOOR_OPACITY now lives in constants/bloomRing.js, alongside the
+// ring's other geometry — DES-24 §6.4 row 10 needs the real number in a
+// check gate, not a second copy of it.
 
 // The blooming state: a segmented ring, not a wash, because fill is spent
 // on identity (`hexTintFor`) and its range is capped by whichever tint a
@@ -105,7 +107,15 @@ const BLOOM_FLOOR_OPACITY = 0.75;
 // independent and stack with `seeded` for free (a cell can be both).
 // Static under Reduce Motion — the ring itself never disappears (R46); only
 // the breathe does.
-const BloomRing = ({ size, reduced }) => {
+//
+// DES-24 §6.4 row 10 (device-measured): on a honeyed cell, three of the six
+// edge marks sit inside the honey body, where `inkSoft` floors at 2.609
+// against the 3.0 bar for 2022ms of every 4800ms breathe. `honeyed` swaps
+// the mark colour to `ink` (5.644 at the same floor) — a strength change,
+// not a hue change (LCh: `ink`/`inkSoft` are h 90.94°/91.44°, half a degree
+// apart). Requires the honey body drawn first — see draw order in
+// `FilledCell` below (§6.4: "the blooming ring is drawn after the honey body").
+const BloomRing = ({ size, reduced, honeyed }) => {
   const pulse = useRef(new Animated.Value(1)).current;
   const marks = useMemo(() => hexEdgeMarks(size, BLOOM_RING_INSET, BLOOM_MARK_EDGE_FRACTION), [size]);
 
@@ -133,12 +143,47 @@ const BloomRing = ({ size, reduced }) => {
           y1={y1}
           x2={x2}
           y2={y2}
-          stroke={theme.colors.inkSoft}
+          stroke={honeyed ? theme.colors.ink : theme.colors.inkSoft}
           strokeWidth={BLOOM_MARK_STROKE_WIDTH}
           strokeLinecap="round"
         />
       ))}
     </AnimatedG>
+  );
+};
+
+// DES-24 §2-4/§6.4: the `honeyed` level is a region, not a badge — a
+// horizontal `ink` line (the meniscus) whose height IS the level. `rung` is
+// 0-4 (25% steps); 0 renders nothing. Gated on `isOwn` by the caller (§6.2:
+// resolves the seeded+honeyed collision by constraint, since an own cell can
+// never be seeded — `no_self_seed` — and honeyed is own-cell-only per
+// §5.2(b); §6.4 row 4: the gate's second job is keeping a descending initial
+// like "Q" out of the honey, since the own cell's glyph is always "You").
+//
+// The `surface` backing is drawn here, unconditionally, above whatever the
+// cell is already painted with (tint OR avatar photo) — §3 (R55 one layer
+// down: without it the same honey reads amber on washYellow and grey-brown
+// on washSky) and §6.5(a) (a photo-backed own cell needs the same backing,
+// drawn above the photo, not the unconditional `surface` polygon at the
+// bottom of the stack, which sits BENEATH the photo).
+const HoneyFill = ({ size, rung }) => {
+  const h = honeyHMax(size) * HONEY_RUNGS[rung];
+  const points = useMemo(() => hexHoneyPoints(size, h), [size, h]);
+  const meniscus = useMemo(() => hexHoneyMeniscus(size, h), [size, h]);
+  if (!h) return null;
+  return (
+    <>
+      <Polygon points={points} fill={theme.colors.surface} />
+      <Polygon points={points} fill={theme.colors.accentDeep} fillOpacity={0.5} />
+      <Line
+        x1={meniscus.x1}
+        y1={meniscus.y1}
+        x2={meniscus.x2}
+        y2={meniscus.y2}
+        stroke={theme.colors.ink}
+        strokeWidth={1.5}
+      />
+    </>
   );
 };
 
@@ -148,6 +193,10 @@ const FilledCell = ({ member, size, selected, reduced }) => {
   const sealPath = useMemo(() => hexSealPath(size), [size]);
   const tint = hexTintFor(member.name);
   const register = member.isDemo && !selected ? DEMO_OPACITY : 1;
+  // Rung mapping from a real balance is DES-24 §7's open item — it wants
+  // 19a's drop distribution, which doesn't exist yet. No producer sets this
+  // today; it stays 0 (no visible fill) until that mapping is built.
+  const honeyed = Boolean(member.isOwn && member.honeyRung);
 
   return (
     <View>
@@ -181,11 +230,15 @@ const FilledCell = ({ member, size, selected, reduced }) => {
         ) : (
           <Polygon points={points} fill={tint} fillOpacity={register} />
         )}
+        {/* Honey enters above the tint/avatar and below the seal (§6.4: the
+            blooming ring's ink-vs-inkSoft ruling measures the ring drawn
+            OVER the honey body — the other order is a different picture). */}
+        {honeyed && <HoneyFill size={size} rung={member.honeyRung} />}
         {/* Seeded: knocked out to whatever's already painted above (the
             avatar/tint), not a second colour — R51's register rule. Drawn
             in this same Svg so the hole shows that fill, not a blank gap. */}
         {member.seeded && <Path d={sealPath} fill={theme.colors.ink} fillRule="evenodd" />}
-        {member.blooming && <BloomRing size={size} reduced={reduced} />}
+        {member.blooming && <BloomRing size={size} reduced={reduced} honeyed={honeyed} />}
         {/* Beat 1 (Lane D): surface -> ink on tap, width held constant at
             2.5pt — "no width change, the luxury is restraint here." Width
             used to jump 2 -> 2.5 with the colour; that's the one part of

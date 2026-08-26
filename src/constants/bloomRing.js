@@ -15,3 +15,12 @@
 export const BLOOM_RING_INSET = 4.5;
 export const BLOOM_MARK_EDGE_FRACTION = 0.3;
 export const BLOOM_MARK_STROKE_WIDTH = 2.5;
+
+// Ring floor. inkSoft on a wash is ink-on-ground, so this is a luminance
+// question (WCAG 1.4.11 non-text, 3:1) — 0.45 measured 1.93:1/1.94:1 on the
+// two real-member grounds (washSky/washYellow), 47% of every cycle below the
+// bar. 0.75 clears both at 3.30:1/3.34:1 with margin; the crossing point is
+// 0.700. Peak (1.0) and cadence are untouched. Also the ground DES-24 §6.4
+// row 10 measures the honeyed-cell ink/inkSoft swap against — a check gate
+// needs the real number, not a second copy of it.
+export const BLOOM_FLOOR_OPACITY = 0.75;
