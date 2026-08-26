@@ -256,3 +256,19 @@ export const hasNectarConsent = (consent) =>
 // The one field name above, exported so the gate asserts the predicate and
 // the migration agree rather than asserting a literal it also owns.
 export const NECTAR_CONSENT_FIELD = 'consented_at';
+
+// THE TWO OBJECTS BY WHICH CONSENT ITSELF IS ESTABLISHED OR READ — Pixel's
+// §12.7 routing, corrected in §12.7a. Of the 32 reserved query identifiers
+// (check-nectar-consent.mjs's rule E), these two cannot be conditioned on
+// `nectarConsent` without reproducing the §10 bootstrap deadlock one layer
+// down: `nectar_consents` is the row `getConsent()` reads to FIND OUT
+// whether the flag should be true, and `consent_to_nectar()` is the RPC that
+// MAKES it true. Gating either read on its own answer is not a stricter
+// gate, it is a gate that can never open.
+//
+// This is a PROPERTY OF THE OBJECT, not a per-call-site exemption list — the
+// distinction Pixel's ruling insists on. A future money identifier is never
+// added here; only an identifier that is itself part of HOW consent is
+// established or read belongs in this set, and there are exactly two of
+// those in this schema today (nectar_ledger.sql + nectar_sim_service.sql).
+export const NECTAR_CONSENT_BOOTSTRAP_OBJECTS = ['nectar_consents', 'consent_to_nectar'];
