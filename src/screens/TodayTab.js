@@ -11,6 +11,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { StaggeredItem } from '../components/StaggeredItem';
 import { FileToHive } from '../components/FileToHive';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { currentStreak, nextMilestone } from '../utils/dateRanges';
@@ -211,7 +212,9 @@ export const TodayTab = ({ navigation }) => {
           {entry ? (
             <View style={styles.quoteCard}>
               <Text style={styles.themeBadge}>{entry.theme}</Text>
-              <Text style={styles.gratitudeText}>"{entry.text}"</Text>
+              <PaperBlock paper={entry.paper}>
+                <Text style={[styles.gratitudeText, { color: paperInk(entry.paper) }]}>"{entry.text}"</Text>
+              </PaperBlock>
               {/* DES-16 §4 — "File this to…". Zero hives or a failed hive
                   read both withhold the affordance: the shelf below already
                   owns the zero-hives door and the failure copy, and this

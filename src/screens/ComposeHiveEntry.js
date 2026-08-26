@@ -5,6 +5,7 @@ import { HiveStore } from '../services/HiveStore';
 import { tagEntry } from '../utils/themeTagger';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
+import { PaperPicker } from '../components/PaperPicker';
 
 // 8b.3 — compose a new entry into an existing hive (Design Language §3's
 // Compose Entry Screen). Date is always today, read-only, matching the spec
@@ -12,6 +13,7 @@ import { BackButton } from '../components/BackButton';
 export const ComposeHiveEntryScreen = ({ navigation, route }) => {
   const { hiveId, subjectName } = route.params;
   const [text, setText] = useState('');
+  const [paper, setPaper] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -21,7 +23,7 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
     setError(null);
     try {
       const body = text.trim();
-      await HiveStore.addHiveEntry(hiveId, new Date(), body, tagEntry(body));
+      await HiveStore.addHiveEntry(hiveId, new Date(), body, tagEntry(body), paper);
       navigation.goBack();
     } catch (err) {
       console.warn('ComposeHiveEntryScreen: failed to save entry', err);
@@ -64,6 +66,9 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
         {error === 'unknown' && (
           <Text style={styles.errorText}>Couldn't save this entry. Check your connection and try again.</Text>
         )}
+        <View style={styles.paperPickerWrap}>
+          <PaperPicker paper={paper} onChange={setPaper} />
+        </View>
         <PrimaryButton onPress={handleSave} disabled={!text.trim() || saving} style={styles.cta}>
           Save
         </PrimaryButton>
@@ -111,6 +116,9 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.danger,
     marginTop: 12,
+  },
+  paperPickerWrap: {
+    marginTop: 20,
   },
   cta: {
     marginTop: 20,

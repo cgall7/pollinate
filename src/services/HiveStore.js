@@ -49,6 +49,7 @@ const toHiveEntry = (row) => ({
   text: row.content,
   theme: row.theme,
   savedAt: row.created_at,
+  paper: row.paper,
 });
 
 export const HiveStore = {
@@ -197,7 +198,8 @@ export const HiveStore = {
   // failure — callers must gate the UI (HiveDetailScreen hides "+ Add
   // Entry" once `sealedAt` is set) and must not report a 42501 the way
   // they'd report a dropped connection.
-  async addHiveEntry(hiveId, date, text, themeTag) {
+  // `paper` defaults to null (Cream) — see EntryStore.saveEntry's comment.
+  async addHiveEntry(hiveId, date, text, themeTag, paper = null) {
     const client = requireSupabase();
     const userId = await requireUserId(client);
     const body = text.trim();
@@ -205,7 +207,7 @@ export const HiveStore = {
 
     const { data, error } = await client
       .from('entries')
-      .insert({ user_id: userId, hive_id: hiveId, content: body, entry_date: toISODate(date), theme: themeTag })
+      .insert({ user_id: userId, hive_id: hiveId, content: body, entry_date: toISODate(date), theme: themeTag, paper })
       .select()
       .single();
     if (error) throw error;

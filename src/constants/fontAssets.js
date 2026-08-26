@@ -13,6 +13,7 @@ import {
   PlusJakartaSans_400Regular_Italic,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { DancingScript_700Bold } from '@expo-google-fonts/dancing-script';
+import { PlayfairDisplay_400Regular } from '@expo-google-fonts/playfair-display';
 
 // Maps every family name referenced in theme.js to the module useFonts()
 // needs to register it under. Keep this in sync with src/constants/theme.js.
@@ -33,4 +34,5 @@ export const fontAssets = {
   'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
   'PlusJakartaSans-Italic': PlusJakartaSans_400Regular_Italic,
   'DancingScript-Bold': DancingScript_700Bold,
+  'PlayfairDisplay-Regular': PlayfairDisplay_400Regular,
 };

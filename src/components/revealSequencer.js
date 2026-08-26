@@ -246,6 +246,7 @@ export const buildRevealSequence = (entries) => {
       text: entry.text,
       words: countWords(entry.text),
       savedAt: entry.savedAt,
+      paper: entry.paper,
     };
   });
   return steps.sort((a, b) => {

@@ -8,6 +8,7 @@ import { HiveStore } from '../services/HiveStore';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
 import {
   STUB_GRAMMAR,
@@ -197,7 +198,9 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
               style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
             >
               <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
-                <Text style={styles.entryText}>{step.text}</Text>
+                <PaperBlock paper={step.paper}>
+                  <Text style={[styles.entryText, { color: paperInk(step.paper) }]}>{step.text}</Text>
+                </PaperBlock>
               </ScrollView>
             </Animated.View>
             <View style={styles.railTrack}>

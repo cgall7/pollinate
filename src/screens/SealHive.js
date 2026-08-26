@@ -8,6 +8,7 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { KeepsakeBee } from '../components/KeepsakeBee';
 import { CelebrationRays } from '../components/CelebrationRays';
 import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
@@ -156,7 +157,9 @@ export const SealHiveScreen = ({ navigation, route }) => {
           {entries.map((entry) => (
             <View key={entry.id} style={styles.entryCard}>
               <Text style={styles.entryDate}>{longDate(entry.date)}</Text>
-              <Text style={styles.entryText}>{entry.text}</Text>
+              <PaperBlock paper={entry.paper}>
+                <Text style={[styles.entryText, { color: paperInk(entry.paper) }]}>{entry.text}</Text>
+              </PaperBlock>
             </View>
           ))}
         </ScrollView>

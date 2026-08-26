@@ -6,6 +6,7 @@ import { HoneycombStore } from '../services/HoneycombStore';
 import { PressableScale } from './PressableScale';
 import { BeeTransition } from './BeeTransition';
 import { Avatar } from './Avatar';
+import { PaperBlock, paperInk } from './PaperBlock';
 
 // Like delivery (Sunbeam §11.2): a short lift-off from the heart, carrying
 // the like away rather than the long claim-screen traversal. Same glide
@@ -101,7 +102,9 @@ export const FeedCard = ({ share, onLikeToggled }) => {
           <Text style={styles.date}>{formatDate(share.entryDate)}</Text>
         </View>
       </View>
-      <Text style={styles.content}>"{share.content}"</Text>
+      <PaperBlock paper={share.paper} style={styles.contentBlock}>
+        <Text style={[styles.content, { color: paperInk(share.paper) }]}>"{share.content}"</Text>
+      </PaperBlock>
       </View>
 
       {!isDemo && (
@@ -193,12 +196,14 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.textSecondary,
   },
+  contentBlock: {
+    marginBottom: 14,
+  },
   content: {
     fontFamily: theme.fonts.bodyItalic,
     fontSize: 18,
     lineHeight: 26,
     color: theme.colors.textPrimary,
-    marginBottom: 14,
   },
   actionsRow: {
     flexDirection: 'row',
