@@ -20,7 +20,7 @@ export const CHROME_TOP_GAP = theme.spacing.sm; // 8
 // bug: on main, entryFrame's old flat `paddingTop: 100` doubled as the
 // collision guard against the close button above it (100 was exactly the
 // button's bottom edge) -- content-independent, by construction. This
-// token's `insets.top + CHROME_TOP_GAP` (~55-63pt) puts the button's *top*
+// token's `insets.top + CHROME_TOP_GAP` puts the button's *top*
 // inside the content region instead, so what now keeps the vertically
 // centered entry card off the button is the centering arithmetic
 // (`clear = 0.19*contentHeight - 38`, always positive past ~200pt content
