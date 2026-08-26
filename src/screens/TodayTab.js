@@ -5,6 +5,7 @@ import { theme } from '../constants/theme';
 import { EntryStore } from '../services/EntryStore';
 import { HiveStore } from '../services/HiveStore';
 import { FlyingBee } from '../components/FlyingBee';
+import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -147,7 +148,13 @@ export const TodayTab = ({ navigation }) => {
           which suppresses itself structurally by declaring nothing to land on
           — same outcome, and the two must not be collapsed into one rule,
           because one is about tone and the other is about geometry. */}
-      <FlyingBee active perches={error ? null : perches} />
+      {/* The third suppression, and the only one that is not a design
+          decision: `SUPPRESS_BEE` is the idle-motion instrument's control
+          build (`measure-bee-idle-motion.mjs`), off in every real build. It
+          sits at the call site with the other two because that is where this
+          screen already says who gets a bee — see the constant for why it
+          must not be read anywhere else. */}
+      {!SUPPRESS_BEE && <FlyingBee active perches={error ? null : perches} />}
 
       <PerchField perches={perches}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -166,19 +173,19 @@ export const TodayTab = ({ navigation }) => {
           }
         />
 
-        {/* Anchors alternate sides down the screen — R122, and on this screen
-            it is not a preference. Every `StaggeredItem` is a full-width card
-            in one 24pt column, so anchoring them all on the same side gives
-            the set ZERO x-extent, `facingFor` never crosses its one-body-width
-            threshold, and the bee flies every sortie facing the same way. The
-            ≥44pt span is asserted by `check-bee-attitude` row K4 ("the set is
-            not a column") against these declarations, so a later edit that
-            quietly puts them back in a column fails rather than ships. K4
-            checks the unconditional subset too: an extent that rests on a
-            conditional anchor is an extent some render state does not have —
-            here that subset is entry-card (right) + hive-shelf (left), which
-            is why the shelf sits left after the quiet-page cut removed the
-            footer that used to carry the left side. */}
+        {/* Sides used to be about x-extent: the bee sortied between these
+            anchors, and a set of full-width blocks all anchored on one side
+            gave him nothing to turn around for (R122). The Bee Doctrine
+            retires the idle sortie, so there is no set any more — there is one
+            RESIDENCE, marked `home` below, and the other anchors are errand
+            landing sites that nothing lands on yet.
+            What a side decides now is whether the bee stands on the words.
+            R122a: he rests AT the anchor (the hover that displaced him by one
+            17.3pt radius is retired with the rest of it), drawn centred on it,
+            spanning 30.07pt at size 44. On a left-aligned full-width block
+            `on: 'left'` is where the glyphs BEGIN — that is the live defect
+            this pass fixes, the streak caption reading "2 ays to 3." under a
+            resting bee — and `on: 'right'` is the trailing gutter. */}
 
         {/* The streak, spoken instead of scored (Colin, UX Design thread
             2026-08-17: quiet morning page). The scoreboard card's numerals
@@ -190,7 +197,13 @@ export const TodayTab = ({ navigation }) => {
             alone, where before this state said it twice. */}
         {!error && (
           <StaggeredItem index={0}>
-            <PerchAnchor id="streak-whisper" on="left" at={0.5}>
+            {/* HOME. Measured, not eyeballed: the block runs x 24..378 at
+                402pt wide, the longest caption ("You've caught every
+                milestone. Keep going.") sets 293.20pt at bodySm/PlusJakarta
+                Medium 14, so the glyphs end at 317.20 and the bee's character
+                spans 362.97..393.03. 45.77pt of clear gutter to his left,
+                8.97pt of screen to his right. */}
+            <PerchAnchor id="streak-whisper" on="right" at={0.5} home>
               <Text style={styles.whisper}>{streakCaption(streak)}</Text>
             </PerchAnchor>
           </StaggeredItem>

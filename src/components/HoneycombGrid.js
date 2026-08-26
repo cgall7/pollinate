@@ -3,6 +3,7 @@ import { View, Text, Animated, StyleSheet, Pressable, Easing } from 'react-nativ
 import * as Haptics from 'expo-haptics';
 import Svg, { Polygon, Path, Line, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
 import { theme } from '../constants/theme';
+import { BLOOM_RING_INSET, BLOOM_MARK_EDGE_FRACTION, BLOOM_MARK_STROKE_WIDTH } from '../constants/bloomRing';
 import { hexTintFor } from './Avatar';
 import { hexPoints, hexEdgeMarks, hexSealPath } from './HexShape';
 import { useSvgId } from '../utils/svgId';
@@ -62,12 +63,10 @@ const initialsFor = (name) => {
 // of demo/real, and 0.45 is restored as R55's device-measured fill value.
 const DEMO_OPACITY = 0.45;
 
-// §21/6.4 (Pixel-ruled 2026-08-13, mock 2dcdce11): the blooming ring's two
-// load-bearing numbers, measured against selection's solid 2.5pt stroke so
-// the two states differ in form (dashed vs. continuous) rather than only in
-// weight, which read as the same mark at a glance.
-const BLOOM_RING_INSET = 4.5;
-const BLOOM_MARK_EDGE_FRACTION = 0.3;
+// The ring's geometry constants live in `src/constants/bloomRing.js`, not
+// here (imported below) — `scripts/lib/bloom-ring-region.mjs` needs them
+// with a bare `node` import to derive the tripwire's Hive ambient region,
+// and this file's JSX only Metro/Babel can parse.
 
 // Breathing cadence: no `DURATIONS.breathe` constant exists yet (motion.js
 // still lists honeycomb breathing loops as unextracted §14.1 follow-up), so
@@ -125,7 +124,7 @@ const BloomRing = ({ size, reduced }) => {
           x2={x2}
           y2={y2}
           stroke={theme.colors.inkSoft}
-          strokeWidth={2.5}
+          strokeWidth={BLOOM_MARK_STROKE_WIDTH}
           strokeLinecap="round"
         />
       ))}

@@ -15,6 +15,7 @@ import { HoneycombGrid, HIVE_SLOTS, personKey } from '../components/HoneycombGri
 import { ScreenHeader } from '../components/ScreenHeader';
 import { BeeTransition } from '../components/BeeTransition';
 import { FlyingBee } from '../components/FlyingBee';
+import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { demoHiveShares } from '../constants/demoHive';
 import { DEMO_CONTENT } from '../constants/demoMode';
@@ -461,12 +462,16 @@ const HoneycombFeed = () => {
 
           It leaves over `PRESENCE_FADE_MS` rather than disappearing; that is
           FlyingBee's, and it is the same 160ms as the descent. */}
-      <FlyingBee
-        active
-        perches={hiveView === 'week' ? null : perches}
-        pollinate={pollination}
-        onPollinateEnd={() => setPollination(null)}
-      />
+      {/* `SUPPRESS_BEE` is the idle-motion instrument's control build, off in
+          every real build — see the constant. */}
+      {!SUPPRESS_BEE && (
+        <FlyingBee
+          active
+          perches={hiveView === 'week' ? null : perches}
+          pollinate={pollination}
+          onPollinateEnd={() => setPollination(null)}
+        />
+      )}
       <PerchField perches={perches}>
       <ScrollView
         style={styles.scroll}
@@ -526,9 +531,12 @@ const HoneycombFeed = () => {
           // inbox, `+` inside it composes — and the two entry points beside
           // each other behaving differently would have been a thing to learn
           // for no reason.
-          // §32.2 anchor. `on="right"` and it is the only anchor on this
-          // screen that starts life at the right edge, so it carries the
-          // set's x-extent the same way TodayTab's badge does.
+          // §32.2 anchor, and an errand LANDING site rather than a residence.
+          // `on="right"` resolves to the screen's right content edge, which on
+          // a right-aligned icon row is 15pt of the gift icon — fine for a bee
+          // that arrives, stays a beat and leaves, disqualifying for one that
+          // lives there (R122a: legality is judged at the rest position, and a
+          // resident's rest position is permanent).
           <PerchAnchor id="header-actions" on="right" at={0.5} style={styles.headerActions}>
             <PressableScale
               onPress={() => navigation.getParent()?.navigate('Seeds')}
@@ -560,7 +568,19 @@ const HoneycombFeed = () => {
         }
       />
 
-      <PerchAnchor id="view-toggle" on="left" at={0.5}>
+      {/* HOME — Bee Doctrine State 1, the one residence on this screen.
+          `on="right"` puts him at x = 378 on a 402pt screen, so the character
+          spans 362.97..393.03. The toggle is a full-width pill with two flex:1
+          seats and `alignItems: 'center'` labels, so the right seat's glyphs
+          ("Last 7 days", ~65pt) sit around 257..322 — about 41pt clear of him.
+          He perches on the pill's empty end, not on its words.
+          OPEN, and named rather than discovered later: on the WEEK arm that
+          right seat carries `viewToggleSeatActive`'s washYellow, and the
+          mascot's body is yellow. A yellow bee on a yellow seat is a contrast
+          question a rendered frame decides, not a measurement — it is on the
+          device list for this pass, and the Today arm the demo films is
+          `surface` white underneath him. */}
+      <PerchAnchor id="view-toggle" on="right" at={0.5} home>
         <HiveViewToggle view={hiveView} onChange={setHiveView} />
       </PerchAnchor>
 
