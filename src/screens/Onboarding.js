@@ -22,7 +22,7 @@ import { CelebrationBadge } from '../components/CelebrationBadge';
 import { CelebrationRays } from '../components/CelebrationRays';
 import { IdeasAccordion } from '../components/IdeasAccordion';
 import { FlyingBee } from '../components/FlyingBee';
-import { DEMO_CONTENT } from '../constants/demoMode';
+import { DEMO_CONTENT, DEMO_LOGIN_EMAIL, DEMO_LOGIN_PASSWORD } from '../constants/demoMode';
 import { OnboardingState } from '../services/onboardingState';
 import { HoneycombStore } from '../services/HoneycombStore';
 import { PendingOnboardingWrites } from '../services/pendingOnboardingWrites';
@@ -124,7 +124,16 @@ let hasArcedThisLaunch = false;
 // Two affordances, no third: Begin (write), and a quiet way back in for
 // someone who already has an account. The demo skip stays DEMO_CONTENT-gated
 // and below both.
-const LandingStep = ({ step, onNext, onSignIn, onSkipDemo, splashHidden }) => {
+const LandingStep = ({
+  step,
+  onNext,
+  onSignIn,
+  onSkipDemo,
+  onContinueAsDemo,
+  demoLoginBusy,
+  demoLoginError,
+  splashHidden,
+}) => {
   const { width } = useWindowDimensions();
   // Starting the arc on mount used to spend its whole flight behind the
   // still-visible splash (§13.3 follow-up, Pixel/Sage 2026-08-12: "once per
@@ -210,6 +219,20 @@ const LandingStep = ({ step, onNext, onSignIn, onSkipDemo, splashHidden }) => {
           <Text style={styles.skipDemoText}>Skip to the logged-in view (demo)</Text>
         </PressableScale>
       )}
+      {/* Colin's one-tap pitch login (thread 83a020e9, 2026-08-26): a real
+          session against a pre-built demo account, not the no-session skip
+          above — every screen behind it loads real data. Only renders when
+          the credentials are actually configured (DEMO_LOGIN_EMAIL is a
+          gitignored .env value, never committed), so a build without them
+          shows nothing here rather than a button that always fails. */}
+      {DEMO_CONTENT && (DEMO_LOGIN_EMAIL && (
+        <>
+          <PressableScale onPress={onContinueAsDemo} style={styles.skipDemoLink} disabled={demoLoginBusy}>
+            <Text style={styles.skipDemoText}>{demoLoginBusy ? 'Signing in…' : 'Continue as demo'}</Text>
+          </PressableScale>
+          {demoLoginError && <Text style={styles.demoLoginErrorText}>{demoLoginError}</Text>}
+        </>
+      ))}
     </StepShell>
   );
 };
@@ -760,6 +783,8 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [subjectName, setSubjectName] = useState('');
+  const [demoLoginBusy, setDemoLoginBusy] = useState(false);
+  const [demoLoginError, setDemoLoginError] = useState(null);
 
   // Both pre-auth answers buffer, because neither can be written when it is
   // collected: STEP_ENTRY and STEP_WHO both happen before STEP_ACCOUNT, and
@@ -786,6 +811,26 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
     next();
   };
   const flushPendingWrites = () => PendingOnboardingWrites.flush();
+
+  // Colin's one-tap pitch login (thread 83a020e9, 2026-08-26). Unlike
+  // onSkipDemo (below), this creates a REAL session before finishing — every
+  // screen behind it loads the demo account's real data instead of hitting
+  // "not signed in." Guards a double-tap and surfaces a failure inline
+  // instead of leaving the button looking dead, the two things onSkipDemo
+  // never had to handle since it can't fail.
+  const handleContinueAsDemo = async () => {
+    if (demoLoginBusy) return;
+    setDemoLoginBusy(true);
+    setDemoLoginError(null);
+    try {
+      await HoneycombStore.signIn(DEMO_LOGIN_EMAIL, DEMO_LOGIN_PASSWORD);
+      finish();
+    } catch (err) {
+      console.warn('Onboarding: demo login failed', err);
+      setDemoLoginError("Couldn't sign in to the demo account. Check your connection and try again.");
+      setDemoLoginBusy(false);
+    }
+  };
 
   // App.js's onDone is `navigation.replace('Main')`, which must not run
   // twice — the account step can reach it both by its own onNext and by the
@@ -830,6 +875,9 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
             setStep(STEP_ACCOUNT);
           }}
           onSkipDemo={finish}
+          onContinueAsDemo={handleContinueAsDemo}
+          demoLoginBusy={demoLoginBusy}
+          demoLoginError={demoLoginError}
           splashHidden={splashHidden}
         />
       );
@@ -1103,5 +1151,11 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     textDecorationLine: 'underline',
+  },
+  demoLoginErrorText: {
+    ...theme.type.bodySm,
+    color: theme.colors.danger,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

@@ -44,3 +44,18 @@ export const DEMO_MODE = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 // express — a store-bound build no longer collapses onto the pitch
 // build's branch and inherits demo content it shouldn't have.
 export const DEMO_CONTENT = __DEV__ || DEMO_MODE;
+
+// Colin's one-tap "Continue as demo" login (thread 83a020e9, 2026-08-26):
+// the existing "Skip to the logged-in view (demo)" link creates no session
+// at all (WP-10(c)'s own scope — it's the error-state QA affordance, not a
+// pitch path), so a real pitch needs a real account. Same two traps as
+// DEMO_MODE apply to any new process.env read in this file: direct
+// `process.env.X` member reads, never destructured.
+//
+// Deliberately absent from every eas.json profile and from every value ever
+// committed here — this repo is public. The real credentials live only in a
+// gitignored .env (see .env.example), so the button below renders only on
+// whatever machine/build actually has them set, and is silently absent
+// everywhere else rather than rendering broken.
+export const DEMO_LOGIN_EMAIL = process.env.EXPO_PUBLIC_DEMO_LOGIN_EMAIL;
+export const DEMO_LOGIN_PASSWORD = process.env.EXPO_PUBLIC_DEMO_LOGIN_PASSWORD;

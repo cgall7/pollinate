@@ -196,6 +196,24 @@ check('DEMO_CONTENT operands are __DEV__ and DEMO_MODE, identifiers, either orde
 check('no destructured `const { X } = process.env` in demoMode.js',
   destructuredProcessEnvIn(constantsAst), []);
 
+// --- demoMode.js: the demo-login credential pair ---------------------------
+// Colin's one-tap "Continue as demo" button (thread 83a020e9, 2026-08-26)
+// needs real Supabase credentials from the environment. Same trap as
+// DEMO_MODE applies to any process.env read in this file — a destructured
+// `const { X } = process.env` silently resolves to undefined at runtime —
+// so these get the identical direct-member-read shape assertion. Unlike
+// DEMO_MODE these are plain values, not a `=== 'true'` comparison: nothing
+// to compare a string credential against.
+for (const name of ['DEMO_LOGIN_EMAIL', 'DEMO_LOGIN_PASSWORD']) {
+  const decl = topLevelConst(constantsAst, name);
+  check(`demoMode.js declares a top-level ${name} const`, Boolean(decl), true);
+  check(
+    `${name} is a direct process.env.EXPO_PUBLIC_${name} member read`,
+    isProcessEnvMember(decl?.init, `EXPO_PUBLIC_${name}`),
+    true
+  );
+}
+
 // --- App.js: consumes the constant, never re-derives it -------------------
 // The circular-import pressure runs the other way — a screen needing
 // DEMO_MODE and importing App.js — but the regression this catches is
@@ -232,6 +250,24 @@ check('production profile sets EXPO_PUBLIC_DEMO_MODE "false"',
 const envExample = await readFile(path.join(ROOT, '.env.example'), 'utf8');
 check('.env.example lists EXPO_PUBLIC_DEMO_MODE',
   /^EXPO_PUBLIC_DEMO_MODE=/m.test(envExample), true);
+
+for (const name of ['DEMO_LOGIN_EMAIL', 'DEMO_LOGIN_PASSWORD']) {
+  check(`.env.example lists EXPO_PUBLIC_${name} (with no value)`,
+    new RegExp(`^EXPO_PUBLIC_${name}=$`, 'm').test(envExample), true);
+}
+
+// --- eas.json never carries a real demo-login value -------------------------
+// This repo is public. EXPO_PUBLIC_DEMO_MODE is a boolean flag, harmless to
+// commit; the login pair is a real account's real credentials, and belongs
+// only in a gitignored .env (checked above) — never in a profile block that
+// ships with the source tree. Absence in EVERY profile, not just production,
+// because `preview` is exactly the profile someone would be tempted to wire
+// this into directly instead of through .env.
+for (const profile of ['development', 'preview', 'production']) {
+  for (const name of ['EXPO_PUBLIC_DEMO_LOGIN_EMAIL', 'EXPO_PUBLIC_DEMO_LOGIN_PASSWORD']) {
+    check(`eas.json's ${profile} profile sets no ${name}`, eas.build?.[profile]?.env?.[name], undefined);
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
