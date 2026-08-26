@@ -46,7 +46,61 @@
 // direction and is the convention every gate in this repo already follows.
 export const NECTAR_CONSENT_GUARD = 'nectarConsent';
 
-// THE WORD RESERVE. Money words that may not be rendered outside the guard.
+// THE SECOND GUARD, AND IT EXISTS BECAUSE THE FIRST ONE CANNOT HOLD THE
+// CONSENT SHEET.
+//
+// The reserve below says a money word may only render under `nectarConsent`.
+// Sage's bootstrap ruling puts a consent sheet in front of that flag: a door
+// icon on D3 opens a sheet that EXPLAINS nectar and STATES the starter grant,
+// and it is shown to a user for whom `nectarConsent` is false — by
+// construction, that is the only audience it ever has. So the sheet's copy is
+// money words rendered pre-consent, and there is no spelling of the first
+// guard that admits it: put the sheet under `nectarConsent` and it can never
+// open, which is the same deadlock one layer down that the ruling just
+// resolved.
+//
+// Measured rather than predicted, on this tree: a probe component carrying
+// three plausible sheet strings reds B4 three times.
+//
+// So the carve-out is a second guard name rather than a file exemption. An
+// exemption list names WHO is allowed; this names WHAT they are allowed to be
+// behind, which is the property Apple 2.3.1(a) is actually about: content that
+// is not permanently visible, reached only by the user's own tap.
+//
+// AND A NAME IS ONLY WORTH THAT IF THE NAME MEANS SOMETHING. `isUnderGuard`
+// compares an identifier's spelling and has no binding resolution, so a second
+// guard name, left as a name, would be a second freely-shadowable door rather
+// than a bounded one — strictly worse than the first, because it would be
+// advertised as bounded. Four rows in check-nectar-consent.mjs hold it, and
+// none of them maintains a list:
+//
+//   B6  every binding of a guard name is a shape the census can classify
+//   B7  a binding shows its AUTHORITY — `nectarConsent` from hasNectarConsent(),
+//       the sheet's state from a useState initialised false (default CLOSED,
+//       exactly as C1 makes consent's default NO)
+//   B8  a guard passed as a prop is fed by an identifier of the same name
+//   B9  the sheet's open state has at most one door (Sage's D3 ruling)
+//
+// THE SHEET LIVES IN ITS OWN FILE AND TAKES THE OPEN STATE AS A PROP. That is
+// the shape to build, because isUnderGuard is a WITHIN-FILE ancestor walk — a
+// component whose copy sits at its own top level, guarded only by the parent's
+// conditional, has no guard ancestor in its own file and reds. Verified green
+// on a probe pair rather than asserted: a host holding `const
+// [nectarConsentSheetOpen, setSheetOpen] = useState(false)` beside `const
+// nectarConsent = hasNectarConsent(consentRow)`, passing the first to a
+// `NectarConsentSheet` that re-wraps its own body in it.
+//
+// CORRECTION, and it matters to whoever writes the sheet: an earlier note here
+// said the affirmative ("Turn on nectar") "sits under no conditional at all,
+// because a button that grants consent cannot be conditioned on consent." That
+// is false, and the probe pair is what falsified it. The affirmative is not
+// conditioned on CONSENT, it is conditioned on the SHEET BEING OPEN — it sits
+// inside the same `{nectarConsentSheetOpen && …}` as the rest of the sheet
+// body and passes with it. The two conditions were being read as one.
+export const NECTAR_CONSENT_SHEET_GUARD = 'nectarConsentSheetOpen';
+
+// THE WORD RESERVE. Money words that may not be rendered outside EITHER guard
+// above (`nectarConsent`, or the consent sheet's own closed-by-default state).
 //
 // Each of these is measured against this tree, not assumed. Over the 1025
 // rendered strings App.js + src/**/*.js hold at 35194bd (re-measured after
@@ -119,13 +173,22 @@ export const NECTAR_SURFACES = [
   {
     id: 'entry-card-affordance',
     deliverable: 'DES-28 D3',
-    preConsent: 'Cards bloom and reveal exactly as they do today. No drop icon.',
+    preConsent:
+      'Cards bloom and reveal exactly as they do today, plus ONE neutral door ' +
+      'icon carrying no money word. No presets, no amounts, no drop icon.',
     host: 'src/screens/PackageOpen.js',
     anchor: 'styles.entryCard',
     note:
-      'The card sits inside the reveal tap area, whose Pressable advances the ' +
-      'sequence. A control added here shares its region with "tap anywhere to ' +
-      'continue" — a placement question ENG-64 inherits, not a styling one.',
+      'AMENDED by Sage\'s bootstrap ruling (2026-08-26): D3 is the single ' +
+      'bootstrap point, so its pre-consent state is no longer nothing. The ' +
+      'original "no drop icon" left the app with no path from unconsented to ' +
+      'consented at all — every zap-adjacent surface was gated on a flag only a ' +
+      'zap could set. The door is a DOOR, NOT A SWITCH: tapping it opens the ' +
+      'consent sheet, and only the sheet\'s affirmative fires consent_to_nectar() ' +
+      '(Bumble: the first call irreversibly mints the starter grant, so an ' +
+      'accidental tap would be a permanent mint attributed to a decision nobody ' +
+      'saw). The card sits inside the reveal tap area, whose Pressable advances ' +
+      'the sequence — a placement question ENG-64 inherits, not a styling one.',
   },
   {
     id: 'author-notification',

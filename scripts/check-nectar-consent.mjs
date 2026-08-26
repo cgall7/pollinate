@@ -53,11 +53,13 @@ import {
   POSITIONS,
   collectRenderedStrings,
   isUnderGuard,
+  walkWithAncestry,
   PositionVocabularyError,
 } from './lib/rendered-strings.mjs';
 import {
   NECTAR_CONSENT_FIELD,
   NECTAR_CONSENT_GUARD,
+  NECTAR_CONSENT_SHEET_GUARD,
   NECTAR_RESERVE,
   NECTAR_SURFACES,
   hasNectarConsent,
@@ -172,19 +174,216 @@ check(
   []
 );
 
+// TWO GUARDS, NOT AN EXEMPTION LIST. `nectarConsent` covers every surface that
+// exists once the user has a wallet; the sheet guard covers the one surface
+// whose entire audience is users who do not. Both are POSITIVE-POLARITY names,
+// so isUnderGuard reads them with no change to the walker — the carve-out is a
+// second name in the same rule, not a second rule.
+const GUARDS = [NECTAR_CONSENT_GUARD, NECTAR_CONSENT_SHEET_GUARD];
 const reserveHits = allStrings.filter((s) => matchesReserve(s.value));
 const unguardable = reserveHits.filter((s) => !GUARDABLE.has(s.position));
 const unguarded = reserveHits.filter(
-  (s) => GUARDABLE.has(s.position) && !isUnderGuard(s.ancestors, NECTAR_CONSENT_GUARD)
+  (s) => GUARDABLE.has(s.position) && !GUARDS.some((g) => isUnderGuard(s.ancestors, g))
 );
 check(
-  `B4 every rendered money word sits under the \`${NECTAR_CONSENT_GUARD}\` guard`,
+  `B4 every rendered money word sits under one of the guards (${GUARDS.join(' | ')})`,
   unguarded.map((s) => `${s.rel}:${s.line} ${JSON.stringify(s.value)}`),
   []
 );
 check(
   'B5 no money word is authored where a guard could never reach it (alert / module scope)',
   unguardable.map((s) => `${s.rel}:${s.line} [${s.position}] ${JSON.stringify(s.value)}`),
+  []
+);
+
+// B6-B9 MAKE THE GUARD NAMES MEAN SOMETHING.
+//
+// B4 asks whether a money word sits under a conditional SPELLED with a guard
+// name. That is all `isUnderGuard` can ask: it walks a string's ancestors and
+// compares an identifier's name. It has no scope table and no binding
+// resolution, so it cannot distinguish the real predicate's result from any
+// other value that happens to carry the same spelling. Fizz demonstrated the
+// consequence on a probe branch and it reproduces here: a component holding
+// `const [nectarConsent] = useState(false)` as its own sheet-open state wraps
+// money copy in `{nectarConsent && …}` and goes green, with nothing in it
+// connected to consent at all.
+//
+// THE USE SITE CANNOT RESOLVE A BINDING; THE DECLARATION SITE CAN BE
+// ENUMERATED. So the fix is not a better recogniser at the top of the walk —
+// it is a census at the bottom. Every binding of a guard name, by ANY
+// declaration shape, is classified and made to show its authority:
+//
+//   nectarConsent            must be initialised from `hasNectarConsent(…)`
+//   nectarConsentSheetOpen   must be a useState whose initialiser is false
+//
+// and a name RECEIVED as a prop is legal only where every JSX site feeding it
+// passes an identifier of the same name — which is itself a binding in its own
+// file, so the rule closes on itself without cross-file identity tracking.
+//
+// THE PREVIOUS VERSION OF THIS BLOCK IS WHY THE CENSUS IS SHAPED THIS WAY. It
+// enumerated `useState` array-pattern declarators only, which is the shape the
+// sheet was expected to use, so it red correctly on a second door and on
+// `useState(true)` — and was structurally blind to `const
+// nectarConsentSheetOpen = true`, a one-line binding that satisfies B4 and was
+// not a member of the population at all. Measured on probe files, not
+// predicted: three pre-consent money strings, all green. A population defined
+// by the shape you expect licenses every shape you did not, which is the same
+// error as enumerating a role by its values instead of its structure.
+//
+// CANNOT-TELL FAILS, throughout. An import of a guard name, a reassignment, a
+// bare function parameter, an object pattern destructured from something other
+// than props — none of these are shapes this tree uses, and each would leave a
+// binding whose authority the census cannot state. They red with the shape
+// named, the same convention as `isUnderGuard`'s own comment: extend the
+// recogniser against a legitimate case when one appears, rather than
+// pre-approving shapes nothing uses.
+//
+// ZERO FEEDERS IS DELIBERATELY LEGAL. A component that receives a guard prop
+// nothing passes holds `undefined`, which is falsy, so its copy does not
+// render — the failure is dead code, not exposed money words. Both guard names
+// fail in the safe direction on absence, which is the same property C1 pins
+// for the predicate itself.
+const GUARD_AUTHORITY = {
+  [NECTAR_CONSENT_GUARD]: {
+    describe: 'initialised from hasNectarConsent(…)',
+    ok: (init) => {
+      let found = false;
+      walkWithAncestry(init, (n) => {
+        if (
+          n.type === 'CallExpression' &&
+          n.callee.type === 'Identifier' &&
+          n.callee.name === 'hasNectarConsent'
+        ) found = true;
+      });
+      return found;
+    },
+  },
+  [NECTAR_CONSENT_SHEET_GUARD]: {
+    describe: 'a useState initialised false (the sheet defaults CLOSED)',
+    ok: (init) => {
+      const isUseState =
+        init && init.type === 'CallExpression' &&
+        ((init.callee.type === 'Identifier' && init.callee.name === 'useState') ||
+         (init.callee.type === 'MemberExpression' &&
+          init.callee.property &&
+          init.callee.property.name === 'useState'));
+      if (!isUseState) return false;
+      const arg = init.arguments[0];
+      // No argument at all is `undefined`, which is falsy and therefore closed.
+      return arg === undefined || (arg.type === 'BooleanLiteral' && arg.value === false);
+    },
+  },
+};
+const GUARD_NAMES = Object.keys(GUARD_AUTHORITY);
+
+// Does a binding pattern bind one of the guard names? Returns the names it
+// binds, so an ObjectPattern renaming (`{ nectarConsent: x }`) does NOT count
+// as binding the guard — it binds `x`, and `x` is not a name B4 reads.
+const patternBinds = (pat) => {
+  const names = [];
+  if (!pat) return names;
+  if (pat.type === 'Identifier') {
+    if (GUARD_NAMES.includes(pat.name)) names.push(pat.name);
+  } else if (pat.type === 'ArrayPattern') {
+    for (const el of pat.elements) names.push(...patternBinds(el));
+  } else if (pat.type === 'ObjectPattern') {
+    for (const p of pat.properties) {
+      if (p.type === 'ObjectProperty') names.push(...patternBinds(p.value));
+      else if (p.type === 'RestElement') names.push(...patternBinds(p.argument));
+    }
+  } else if (pat.type === 'AssignmentPattern') {
+    names.push(...patternBinds(pat.left));
+  } else if (pat.type === 'RestElement') {
+    names.push(...patternBinds(pat.argument));
+  }
+  return names;
+};
+
+const bindings = [];
+const attrFeeds = [];
+for (const { rel, ast } of parsed) {
+  walkWithAncestry(ast, (node) => {
+    const at = (n) => `${rel}:${n.loc.start.line}`;
+
+    if (node.type === 'VariableDeclarator') {
+      for (const name of patternBinds(node.id)) {
+        // An object pattern off `props` is a received prop; off anything else
+        // (a hook's return, a call) the census cannot state the authority.
+        if (node.id.type === 'ObjectPattern') {
+          const fromProps = node.init && node.init.type === 'Identifier' && node.init.name === 'props';
+          bindings.push(fromProps
+            ? { rel, at: at(node), name, kind: 'received' }
+            : { rel, at: at(node), name, kind: 'unclassified', shape: 'destructured from something other than `props`' });
+        } else {
+          bindings.push({ rel, at: at(node), name, kind: 'root', init: node.init });
+        }
+      }
+      return;
+    }
+
+    if (node.params) {
+      for (const p of node.params) {
+        for (const name of patternBinds(p)) {
+          bindings.push(p.type === 'ObjectPattern' || (p.type === 'AssignmentPattern' && p.left.type === 'ObjectPattern')
+            ? { rel, at: at(node), name, kind: 'received' }
+            : { rel, at: at(node), name, kind: 'unclassified', shape: 'a bare function parameter' });
+        }
+      }
+    }
+
+    if (node.type === 'ImportSpecifier' || node.type === 'ImportDefaultSpecifier') {
+      for (const name of patternBinds(node.local)) {
+        bindings.push({ rel, at: at(node), name, kind: 'unclassified', shape: 'an import' });
+      }
+      return;
+    }
+
+    if (node.type === 'AssignmentExpression') {
+      for (const name of patternBinds(node.left)) {
+        bindings.push({ rel, at: at(node), name, kind: 'unclassified', shape: 'a reassignment' });
+      }
+      return;
+    }
+
+    if (node.type === 'JSXAttribute' && node.name.type === 'JSXIdentifier' &&
+        GUARD_NAMES.includes(node.name.name)) {
+      const v = node.value;
+      const passesSameName =
+        v && v.type === 'JSXExpressionContainer' &&
+        v.expression.type === 'Identifier' &&
+        v.expression.name === node.name.name;
+      attrFeeds.push({
+        rel, at: at(node), name: node.name.name, ok: passesSameName,
+        shape: v === null ? 'shorthand (always true)' : v.type === 'JSXExpressionContainer' ? v.expression.type : v.type,
+      });
+    }
+  });
+}
+
+const roots = bindings.filter((b) => b.kind === 'root');
+check(
+  `B6 every binding of a guard name (${GUARD_NAMES.join(', ')}) is a shape the census can classify`,
+  bindings.filter((b) => b.kind === 'unclassified').map((b) => `${b.at} \`${b.name}\` is ${b.shape}`),
+  []
+);
+check(
+  'B7 every guard name bound directly shows its authority (a spelling is not a binding)',
+  roots
+    .filter((b) => !GUARD_AUTHORITY[b.name].ok(b.init))
+    .map((b) => `${b.at} \`${b.name}\` is not ${GUARD_AUTHORITY[b.name].describe}`),
+  []
+);
+check(
+  'B8 every guard passed as a prop is fed by an identifier of the same name',
+  attrFeeds.filter((f) => !f.ok).map((f) => `${f.at} ${f.name}={${f.shape}}`),
+  []
+);
+check(
+  `B9 the consent sheet's open state (\`${NECTAR_CONSENT_SHEET_GUARD}\`) has at most one door`,
+  (() => {
+    const doors = roots.filter((b) => b.name === NECTAR_CONSENT_SHEET_GUARD);
+    return doors.length <= 1 ? [] : doors.map((b) => b.at);
+  })(),
   []
 );
 
