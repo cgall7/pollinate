@@ -2,7 +2,7 @@
 
 **What changed:** Instead of a single Phase 1 MVP, we're slicing the work into two delivery milestones:
 
-1. **Slice 1: Demo Mode** — Full product works end-to-end for friends & family testing. No paywall. Every feature is free. No money — wallet is a shell, no payments, no tips. Distributed via TestFlight / internal track. Goal: validate the core loop with real users.
+1. **Slice 1: Demo Mode** — Full product works end-to-end for friends & family testing. No paywall. Every feature is free. No money — no payments, no tips (~~wallet is a shell~~ — superseded 2026-08-26: there is no Wallet tab at all; three-tab bar, see `POLLINATE_V2_NAVIGATION.md`). Distributed via TestFlight / internal track. Goal: validate the core loop with real users.
 2. **Slice 2: Public Launch** — After testing validates the loop, ship to App Store / Play Store with a freemium model. Free tier with limited features, paid tier "Pollinate Plus" ($2.99/month or $29.99/year). Cash App gifting via iMessage links. Monetization layers turn on.
 
 ---
@@ -36,7 +36,7 @@
 - [ ] Qualitative: NPS: 30+
 - [ ] No critical data loss (entries, friendships, seeds, hives): 0 incidents
 
-> ⚠️ **Wallet & money deferred to Slice 2.** The Wallet tab exists as a shell in Slice 1 — showing a "Coming Soon" message. There is **no MDK integration, no funding flows, no tips, no Cash App gifting** in Slice 1. This is intentional: Slice 1 validates the social-gratitude loop (journaling, friendships, seeds, private hives, blooms, feed) **without money**. Cash App gifting, Lightning, tipping, and escrow all move to Slice 2 or later.
+> ⚠️ **Wallet & money deferred to Slice 2.** ~~The Wallet tab exists as a shell in Slice 1 — showing a "Coming Soon" message.~~ *(Superseded 2026-08-26: the Wallet tab is deleted, the tab bar is `Today | Hive | Garden`, and balance lives in the comb — `POLLINATE_V2_NAVIGATION.md`.)* There is **no MDK integration, no funding flows, no tips, no Cash App gifting** in Slice 1. This is intentional: Slice 1 validates the social-gratitude loop (journaling, friendships, seeds, private hives, blooms, feed) **without money**. Cash App gifting, Lightning, tipping, and escrow all move to Slice 2 or later.
 
 ---
 
@@ -220,7 +220,7 @@
 
 | #    | Issue           | Description                                                                                     | Est | Labels                |
 | ---- | --------------- | ----------------------------------------------------------------------------------------------- | --- | --------------------- |
-| 10.1 | Tab bar         | Today, Hive, Wallet (shell only — "Coming Soon"), Garden. Badge counts.                         | S   | ios, android, design  |
+| 10.1 | Tab bar         | ~~Today, Hive, Wallet (shell only — "Coming Soon"), Garden.~~ **Amended 2026-08-26:** `Today · Hive · Garden` — three tabs, no Wallet shell (`POLLINATE_V2_NAVIGATION.md`, ENG-81/82). Badge counts. | S   | ios, android, design  |
 | 10.2 | Home screen     | Quick stats (pending seeds, unread, hive activity). Quick actions (send note, plant seed, create private hive). | M   | ios, android, design  |
 | 10.3 | Deep linking    | Push notification deep links + invite links. Route to correct screen.                           | M   | ios, android          |
 | 10.4 | Settings screen | Account, privacy, notification preferences, logout.                                             | S   | ios, android          |
@@ -243,7 +243,7 @@
 | 11.5 | Seed bloom timing test            | Plant seeds with 1-min, 1-hour, 1-day blooms. Verify notifications.                                            | S   | qa, testing         |
 | 11.6 | Privacy test                      | Verify feed respects privacy. Private notes hidden. Public blooms visible. Package contents never in feed.     | S   | qa, testing         |
 | 11.7 | Recruit 30+ testers               | Friends & family across 3+ groups. Recruit testers for the social-gratitude loop.                              | M   | growth, launch      |
-| 11.8 | Demo mode flag                    | Backend feature flag: `demo_mode = true`. Disables paywall. All features unlocked. Wallet tab shows "Coming Soon." | S   | backend             |
+| 11.8 | Demo mode flag                    | Backend feature flag: `demo_mode = true`. Disables paywall. All features unlocked. ~~Wallet tab shows "Coming Soon."~~ *(Superseded 2026-08-26 — no Wallet tab, `POLLINATE_V2_NAVIGATION.md`.)* | S   | backend             |
 
 
 ---
@@ -260,7 +260,7 @@
 | Timeline      | 4–6 weeks build + 2–4 weeks testing                                                         |
 | Critical path | 1.4 (Database setup), 10.1 (App shell/tab bar), 8b.1 (Private hive model), 6.3 (Hexagon grid), 8b.4/8b.6 (Bloom animations) |
 | Distribution  | TestFlight + internal track (invite-only)                                                   |
-| Monetization  | None. Wallet is a shell ("Coming Soon"). All features free. No money, no tips, no payments. |
+| Monetization  | None. ~~Wallet is a shell ("Coming Soon").~~ *(Superseded 2026-08-26 — no Wallet tab, `POLLINATE_V2_NAVIGATION.md`.)* All features free. No money, no tips, no payments. |
 | Success gate  | 30+ testers, 3+ journal entries/wk, 20%+ shared to feed, 10+ seeds planted, 5+ blooms, 10+ private hives created, 5+ reviews completed, 5+ packages sent, 30%+ D7 retention, 80%+ bloom open rate, NPS 30+ |
 
 
@@ -291,7 +291,7 @@
 | 15.3 | Gift composition screen        | User writes gratitude note, enters Cash App amount + recipient $cashtag, generates link. Note + link stored in Pollinate. | M   | ios, android, design  |
 | 15.4 | Share via iMessage / share sheet | Share gratitude note + Cash App link via iMessage extension (iOS) or system share sheet (cross-platform). Recipient receives a link. | L   | ios, android          |
 | 15.5 | Recipient opens gift           | Recipient taps link → opens Pollinate → sees gratitude note with bloom animation → taps Cash App link to claim payment in Cash App. | M   | ios, android, design  |
-| 15.6 | Wallet tab → Gifting hub       | Replace "Coming Soon" shell with gifting entry point. Show sent/received gifts history. Quick action: "Send a gift." | M   | ios, android, design  |
+| 15.6 | ~~Wallet tab → Gifting hub~~       | ~~Replace "Coming Soon" shell with gifting entry point.~~ **Superseded 2026-08-26:** there is no Wallet tab to convert (`POLLINATE_V2_NAVIGATION.md`). Money surfaces are ruled there: emotional/frequent in the comb, administrative/rare behind the Account door. | M   | ios, android, design  |
 | 15.7 | Gift feed event                | Privacy-respecting feed event: "Colin sent gratitude to [Name]" (no amounts revealed). Appears in honeycomb feed. | S   | backend, ios, android |
 
 

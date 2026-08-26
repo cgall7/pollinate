@@ -25,7 +25,8 @@ We sit at the intersection of three proven markets — gratitude apps ($1.3B), s
 > - **Slice 2 (Public Launch):** Freemium paywall ($2.99/mo or $29.99/yr) + Cash App gifting via iMessage links. App Store / Play Store launch.
 > - **Slice 3+:** Transaction fee research (MDK / Lightning) IF legally viable. Requires formal legal counsel. Not committed.
 
-> **App Tab Bar:** Today (journal + private hives) | Hive (social) | Wallet (shell in Slice 1, Cash App links in Slice 2) | Garden (recap, wrapped, history)
+> **App Tab Bar:** Today (journal + private hives) | Hive (social) | Garden (recap, wrapped, history)
+> *(Amended 2026-08-26 — the Wallet slot, "shell in Slice 1, Cash App links in Slice 2", is deleted: the comb is the wallet, admin behind the Account door. `POLLINATE_V2_NAVIGATION.md`.)*
 
 ---
 
@@ -390,7 +391,7 @@ Before shipping Slice 1 (Demo Mode) to TestFlight / internal testers:
 - [ ] The Honeycomb feed shows real activity from the user's Hive
 - [ ] Hexagon UI renders with correct visual states
 - [ ] At least 2 seeded groups have been tested end-to-end (real users, real gratitude, real hives)
-- [ ] Wallet tab is present as a shell (Cash App links come in Slice 2)
+- ~~[ ] Wallet tab is present as a shell (Cash App links come in Slice 2)~~ *(Superseded 2026-08-26 — the launch checklist now asserts the opposite: three tabs, no Wallet shell. `POLLINATE_V2_NAVIGATION.md`.)*
 - [ ] Push notifications work for all key events (seed bloom, package received, review prompt, hive entry shared)
 
 **If any of the above fail, we don't ship.** The core loop — writing gratitude, keeping Private Hives, packaging and sharing, planting seeds — must work end-to-end.
