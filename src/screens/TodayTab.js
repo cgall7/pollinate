@@ -63,10 +63,9 @@ export const TodayTab = ({ navigation }) => {
           // Streak reads every entry, not just this year's — Recap already
           // fixed this (RecapTab.js: "'BEST EVER' was measuring the calendar
           // year, so a record set in December vanished on New Year's Day").
-          // Today had the same bug one tab over: a year-scoped streak resets
-          // to 1 on January 1st mid-run, while the header's StreakBadge and
-          // Recap's badge disagree on the same day (Pixel, thread 19e90cf8,
-          // 2026-08-13). "THIS YEAR" stays year-scoped — it says so.
+          // Today had the same bug: a year-scoped streak resets to 1 on
+          // January 1st mid-run (Pixel, thread 19e90cf8, 2026-08-13).
+          // "THIS YEAR" stays year-scoped — it says so.
           setStreak(currentStreak(allEntries, now));
         } catch (err) {
           // requireUserId (EntryStore.js) throws 'Not signed in' with no
