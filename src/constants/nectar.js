@@ -49,7 +49,8 @@ export const NECTAR_CONSENT_GUARD = 'nectarConsent';
 // THE WORD RESERVE. Money words that may not be rendered outside the guard.
 //
 // Each of these is measured against this tree, not assumed. Over the 1025
-// rendered strings App.js + src/**/*.js hold at 7fe6133:
+// rendered strings App.js + src/**/*.js hold at 35194bd (re-measured after
+// ENG-65 merged; that renderer added copy to none of them):
 //
 //   \bnectar\b        0 hits    clean discriminator
 //   \bzap\w*\b        0 hits    clean discriminator, ALL INFLECTIONS
@@ -138,7 +139,7 @@ export const NECTAR_SURFACES = [
       'SeedsInbox, ReceivedPackages — each a list of objects addressed to you. ' +
       'A zap notification is author-side and event-shaped ("X zapped your entry"), ' +
       'which is a different subject and a different row. Scoped: no event feed ' +
-      'found in src/screens at 7fe6133. Declared unprobeable — this row is a ' +
+      'found in src/screens at 35194bd. Declared unprobeable — this row is a ' +
       'completeness declaration, not an absence proof.',
   },
   {
@@ -149,19 +150,46 @@ export const NECTAR_SURFACES = [
     probe: 'noActionMenu',
     note:
       'THE CONTAINER DOES NOT EXIST. The deliverable adds a row to an existing ' +
-      '"Send note · Plant seed" menu. There is no such menu at 7fe6133 and none on ' +
-      'any remote branch: ComposeNote and PlantSeed are reached from two separate ' +
-      'inbox screens, never from one sheet. The probe is exactly that fact, so the ' +
+      '"Send note · Plant seed" menu. There is no such menu at 35194bd and none on ' +
+      'any of the 181 github branches swept: ComposeNote and PlantSeed are reached ' +
+      'from two separate inbox screens, never from one sheet. The probe is exactly that fact, so the ' +
       'day someone builds the menu this row reds and asks for the placement.',
   },
 ];
 
 // The only part of consent that design owns: THE DEFAULT IS NO.
 //
-// Pure over whatever record 19a's account provisioning settles on — it reads
-// one field and treats every other shape as no. Undefined, null, a record
-// with no consent field, and an explicitly-null timestamp are all "has not
-// consented", because the failure this predicate exists to prevent is a
+// THE SUBJECT IS A CONSENT ROW, NOT AN ACCOUNT. When this module was written
+// the record did not exist and the predicate read `account.nectarConsentAt`,
+// a camelCase field nothing in this app produces. 19a's service layer landed
+// it a few hours later (bumble/nectar-sim-service @ 3a17ca2, migration
+// 20260826000005): `nectar_consents` is one row per consenting user, its one
+// fact is `consented_at`, and both shapes the client can hold carry that
+// name — `consent_to_nectar()` is `returns table (consented_at, ...)`, and
+// `nectar_consents_select_own` grants a direct select of the same column.
+//
+// The spelling matters because THIS APP READS POSTGRES ROWS RAW. There is no
+// snake_case-to-camelCase mapping anywhere in src/ (72 snake_case field reads
+// at 35194bd; SeedsStore's `shapeSeed` flattens an embed and spreads the rest
+// through unchanged). So `nectarConsentAt` would not have been merely a wrong
+// name: it is a field no producer writes, which means the predicate returns
+// NO for a user who has consented, forever, on a surface that is supposed to
+// appear — and D6 keeps this module importer-free, so no gate here could have
+// caught it. Same class as ENG-46's `sent_at` predicates, mine this time.
+//
+// PASS THE ROW, NOT THE RPC RESULT. supabase-js hands back an ARRAY for a
+// `returns table` function, and an array is truthy with no `consented_at`, so
+// `hasNectarConsent(data)` is a silent permanent NO. C4 pins that verdict so
+// it is a known edge rather than a discovery. The predicate keeps ONE input
+// shape on purpose: accepting both would put the ambiguity inside the one
+// function whose entire job is to have no ambiguity.
+//
+// Every other shape is "has not consented" — undefined, null, no row, a null
+// timestamp — because the failure this predicate exists to prevent is a
 // nectar surface appearing while the answer is merely UNKNOWN.
-export const hasNectarConsent = (account) =>
-  Boolean(account && account.nectarConsentAt);
+export const hasNectarConsent = (consent) =>
+  Boolean(consent && consent.consented_at);
+
+// The one field name above, exported so the gate asserts the predicate and
+// the migration agree rather than asserting a literal it also owns.
+export const NECTAR_CONSENT_FIELD = 'consented_at';

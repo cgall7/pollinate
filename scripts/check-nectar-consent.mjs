@@ -24,9 +24,10 @@
 //                      against a synthetic corpus with known verdicts —
 //                      otherwise a broken regex and a clean tree are the
 //                      same green.
-//   C  default is NO   evaluates `hasNectarConsent` over the shapes an
-//                      unprovisioned account can take. Evaluated, not
-//                      regexed.
+//   C  default is NO   evaluates `hasNectarConsent` over the shapes a
+//                      consent record can take, and checks the field it
+//                      reads against the migration that declares the column.
+//                      Evaluated, not regexed.
 //   D  placement       for a surface whose container EXISTS, the declared
 //                      anchor must still be there — a rename reds instead of
 //                      silently orphaning a placement. For a surface whose
@@ -55,6 +56,7 @@ import {
   PositionVocabularyError,
 } from './lib/rendered-strings.mjs';
 import {
+  NECTAR_CONSENT_FIELD,
   NECTAR_CONSENT_GUARD,
   NECTAR_RESERVE,
   NECTAR_SURFACES,
@@ -198,20 +200,89 @@ check(
 const NO_CONSENT_SHAPES = [
   ['undefined', undefined],
   ['null', null],
-  ['{}', {}],
-  ['{ nectarConsentAt: null }', { nectarConsentAt: null }],
-  ['{ nectarConsentAt: undefined }', { nectarConsentAt: undefined }],
-  ['{ nectarConsentAt: "" }', { nectarConsentAt: '' }],
+  ['{} (no row)', {}],
+  ['{ consented_at: null }', { consented_at: null }],
+  ['{ consented_at: undefined }', { consented_at: undefined }],
+  ['{ consented_at: "" }', { consented_at: '' }],
 ];
 check(
-  'C1 hasNectarConsent is false for every unprovisioned account shape',
+  'C1 hasNectarConsent is false for every un-consented row shape',
   NO_CONSENT_SHAPES.filter(([, v]) => hasNectarConsent(v) !== false).map(([n]) => n),
   []
 );
 check(
   'C2 hasNectarConsent is true once a consent timestamp exists',
-  hasNectarConsent({ nectarConsentAt: '2026-08-26T00:00:00Z' }),
+  hasNectarConsent({ consented_at: '2026-08-26T00:00:00Z' }),
   true
+);
+
+// C3 the predicate and the exported field name must be THE SAME FACT, by
+// evaluation. Two constants that agree because someone read both is exactly
+// the arrangement C4 then checks against a third artifact for nothing.
+check(
+  `C3 hasNectarConsent keys off NECTAR_CONSENT_FIELD ('${NECTAR_CONSENT_FIELD}')`,
+  [hasNectarConsent({ [NECTAR_CONSENT_FIELD]: '2026-08-26T00:00:00Z' }), hasNectarConsent({ nectarConsentAt: '2026-08-26T00:00:00Z' })],
+  [true, false]
+);
+
+// C4 THE ROW THAT WOULD HAVE CAUGHT THE DEFECT THIS PREDICATE SHIPPED WITH.
+// It read `account.nectarConsentAt` — camelCase, in an app that reads
+// Postgres rows raw — so it answered NO for a consented user forever, and
+// nothing lexical could see it because D6 keeps this module importer-free.
+// A predicate over a database row is only correct RELATIVE TO A SCHEMA, so
+// the row asserts against the schema and not against a literal this file
+// also owns.
+//
+// It self-upgrades rather than skipping. Before 19a's service layer merges
+// there is no `nectar_consents` in supabase/migrations, and the assertion is
+// that the field is the name ratified against bumble/nectar-sim-service @
+// 3a17ca2 (migration 20260826000005: `consented_at`, carried identically by
+// `consent_to_nectar()`'s return table and the direct select the
+// `nectar_consents_select_own` policy grants). The moment that migration
+// lands the same row asserts membership in the real column list, and a
+// column rename reds here instead of silently returning NO on a surface that
+// is supposed to appear.
+const migrationDir = path.join(ROOT, 'supabase', 'migrations');
+let consentTableSrc = null;
+try {
+  for (const f of (await readdir(migrationDir)).sort()) {
+    const src = await readFile(path.join(migrationDir, f), 'utf8');
+    if (/create table (?:if not exists )?public\.nectar_consents\s*\(/i.test(src)) consentTableSrc = src;
+  }
+} catch {
+  /* no migrations directory in this tree */
+}
+if (consentTableSrc) {
+  const body = consentTableSrc.slice(consentTableSrc.search(/create table (?:if not exists )?public\.nectar_consents\s*\(/i));
+  const decl = body.slice(body.indexOf('(') + 1, body.indexOf(');'));
+  const columns = decl
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('--') && !/^(constraint|primary key|unique|check|foreign key)\b/i.test(l))
+    .map((l) => l.split(/\s+/)[0]);
+  check(
+    `C4 NECTAR_CONSENT_FIELD is a real column of nectar_consents (${columns.join(', ')})`,
+    columns.includes(NECTAR_CONSENT_FIELD),
+    true
+  );
+} else {
+  check(
+    'C4 no nectar_consents migration in this tree — field pinned to the name ratified at bumble/nectar-sim-service@3a17ca2',
+    NECTAR_CONSENT_FIELD,
+    'consented_at'
+  );
+}
+
+// C5 THE SHAPE TRAP, pinned rather than discovered. supabase-js returns an
+// ARRAY for a `returns table` function, and an array is truthy with no
+// `consented_at` — so handing `data` straight to the predicate is a silent
+// permanent NO, the same failure mode as the camelCase field and just as
+// invisible. The predicate deliberately keeps one input shape; this row
+// records the verdict for the other one so the next reader finds it stated.
+check(
+  'C5 an rpc result array is not a consent record (pass the row, not `data`)',
+  hasNectarConsent([{ consented_at: '2026-08-26T00:00:00Z' }]),
+  false
 );
 
 // --- D. Placement --------------------------------------------------------
