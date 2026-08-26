@@ -9,7 +9,6 @@ import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { StreakBadge } from '../components/StreakBadge';
 import { StaggeredItem } from '../components/StaggeredItem';
 import { FileToHive } from '../components/FileToHive';
 import { HiveCard } from '../components/HiveCard';
@@ -159,20 +158,11 @@ export const TodayTab = ({ navigation }) => {
 
       <PerchField perches={perches}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScreenHeader
-          eyebrow={longDate(now)}
-          title={greeting(now)}
-          right={
-            error ? null : (
-              // Right side, and the only anchor on this screen that is not a
-              // full-width block: the badge sits in the header's own right
-              // slot, so it carries most of the set's x-extent by itself.
-              <PerchAnchor id="badge" on="right" at={0.5}>
-                <StreakBadge streak={streak} />
-              </PerchAnchor>
-            )
-          }
-        />
+        {/* DES-27 (Pixel, 2026-08-26): the header badge retired — the line
+            beneath it (`streakCaption` below) already says the same number
+            ("185 days to 365."), and the corner it sat in is now the
+            account door's reserved column. */}
+        <ScreenHeader eyebrow={longDate(now)} title={greeting(now)} />
 
         {/* Sides used to be about x-extent: the bee sortied between these
             anchors, and a set of full-width blocks all anchored on one side

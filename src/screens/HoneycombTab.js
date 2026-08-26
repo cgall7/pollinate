@@ -20,7 +20,7 @@ import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { demoHiveShares } from '../constants/demoHive';
 import { DEMO_CONTENT } from '../constants/demoMode';
-import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
+import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { isBlooming } from '../utils/hiveState';
 
 // Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
@@ -766,13 +766,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 18,
+    // DES-27: the account door's fixed top-right column. `marginEnd`, never
+    // `marginRight` — MainTabs.js carries the scar from that exact trap.
+    marginEnd: DOOR_RESERVE,
   },
   scroll: {
     flex: 1,
   },
   content: {
     padding: 24,
-    paddingTop: 60,
+    // DES-27: unified with Today/Garden at 72 — Hive's header sat 12pt
+    // higher than the other two tabs before this.
+    paddingTop: 72,
     paddingBottom: TAB_CLEARANCE,
   },
   loadingContainer: {

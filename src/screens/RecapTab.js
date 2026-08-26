@@ -19,7 +19,6 @@ import { recentMonths, currentStreak, longestStreak } from '../utils/dateRanges'
 import { DevVersionTag } from '../components/DevVersionTag';
 import { DEMO_CONTENT } from '../constants/demoMode';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { StreakBadge } from '../components/StreakBadge';
 import { StaggeredItem } from '../components/StaggeredItem';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
 import { PressableScale } from '../components/PressableScale';
@@ -240,19 +239,12 @@ export const RecapTab = () => {
           of mismatch nobody files a bug for and everybody trips on. The
           monthly recap is still what the screen opens on — the month pager
           below names each month itself. */}
+      {/* DES-27 (Pixel, 2026-08-26): the header badge retired — `StatsCard`
+          below already reads the same number ("180 CURRENT"), and the
+          corner it sat in is now the account door's reserved column. */}
       <ScreenHeader
         eyebrow={unknown ? null : months[activeIndex]?.label}
         title="Garden"
-        // §23.1 — the badge is an assertion about the user's practice, and on a
-        // read that did not return there is nothing to make it from. Omit the
-        // slot rather than draw `StreakBadge streak={0}`, which is not absence:
-        // it is a hollow hexagon with a `0` in it, telling a forty-day user
-        // they have no streak. Pixel caught the identical line surviving the
-        // identical fix on TodayTab an hour ago (`TodayTab.js:115`) — the
-        // header sits four lines above the block everything else lives in, and
-        // proximity beat the list. STALE keeps the badge: those rows are real,
-        // and the stale line says they may be old.
-        right={unknown ? null : <StreakBadge streak={streak} />}
       />
 
       {/* §23.7 — the stale line comes BEFORE the content it qualifies, so a
