@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Animated, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { SPRINGS, PRESS } from '../constants/motion';
 
 // Shared tap feedback for every primary interaction: a light haptic tick
 // plus a spring scale-down, so choices and buttons feel physical instead
@@ -16,7 +17,7 @@ export const PressableScale = ({
   // Undefined by default: zero change for every existing consumer.
   containerStyle,
   children,
-  scaleTo = 0.96,
+  scaleTo = PRESS.standard,
   haptic = Haptics.ImpactFeedbackStyle.Light,
   disabled,
   // A caller showing its own in-place state (e.g. PrimaryButton's spinner)
@@ -53,8 +54,7 @@ export const PressableScale = ({
   const animateTo = (value) => {
     Animated.spring(scale, {
       toValue: value,
-      friction: 6,
-      tension: 200,
+      ...SPRINGS.press,
       useNativeDriver: true,
     }).start();
   };
