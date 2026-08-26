@@ -49,12 +49,24 @@
 //      first argument (or in each element, for an array upsert/insert).
 //
 // SCOPE OF THE CLAIM. This does not resolve a payload built from a variable
-// (`update(payload)` where `payload` is assembled elsewhere) or route through
-// a wrapper function — same limit check-entry-writes.mjs names for its own
-// call-site census. Nothing on this path does either today; if that changes,
-// it lands red-on-a-trap only in the sense that a real write existed and
-// this gate did not see it, which is the failure mode to widen the walk for,
-// not silence.
+// (`update(payload)` where `payload` is assembled elsewhere), a bucket/table
+// name held in a constant (`from(AVATAR_BUCKET)` — found by Lumen's ratify
+// pass, 2026-08-26; deliberately not built, see her reasoning below), or
+// route through a wrapper function — same limit check-entry-writes.mjs names
+// for its own call-site census. Nothing on this path does either today; if
+// that changes, it lands red-on-a-trap only in the sense that a real write
+// existed and this gate did not see it, which is the failure mode to widen
+// the walk for, not silence. A named miss is a residual; an unnamed one is a
+// surprise — this comment is what keeps the const-name gap the former.
+//
+// OPTIONAL CHAINING IS NORMALIZED, NOT A RESIDUAL. Lumen's same pass found
+// `supabase?.storage.from('avatars').upload(...)` exits 0 on the first
+// version of this gate: one `?.` anywhere in the chain retypes it
+// `OptionalCallExpression`/`OptionalMemberExpression`, and every check below
+// tested the plain types only. `isCallExpr`/`isMemberExpr` treat the two
+// pairs as equivalent everywhere a chain is walked, so this is closed, not
+// merely documented — the const-name gap above is the one left open on
+// purpose.
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -104,6 +116,12 @@ const walk = (node, visit) => {
   }
 };
 
+// `foo?.bar()` and `foo?.bar.baz()` type as OptionalCallExpression /
+// OptionalMemberExpression, not the plain node types — every chain walk
+// below goes through one of these two instead of a bare `.type === '...'`.
+const isCallExpr = (n) => n?.type === 'CallExpression' || n?.type === 'OptionalCallExpression';
+const isMemberExpr = (n) => n?.type === 'MemberExpression' || n?.type === 'OptionalMemberExpression';
+
 // True if `node` is `X.from(<literal>)` for the given table/bucket name,
 // walked down through however many `.eq()`/`.select()`-style calls sit
 // between it and the write — Supabase's builder chains grow leftward.
@@ -111,8 +129,8 @@ const chainContainsFromCall = (node, name) => {
   let cur = node;
   while (cur) {
     if (
-      cur.type === 'CallExpression' &&
-      cur.callee?.type === 'MemberExpression' &&
+      isCallExpr(cur) &&
+      isMemberExpr(cur.callee) &&
       !cur.callee.computed &&
       cur.callee.property?.type === 'Identifier' &&
       cur.callee.property.name === 'from' &&
@@ -121,7 +139,7 @@ const chainContainsFromCall = (node, name) => {
     ) {
       return true;
     }
-    cur = cur.type === 'CallExpression' ? cur.callee?.object : cur.type === 'MemberExpression' ? cur.object : null;
+    cur = isCallExpr(cur) ? cur.callee?.object : isMemberExpr(cur) ? cur.object : null;
   }
   return false;
 };
@@ -157,8 +175,8 @@ for (const file of files) {
   }
 
   walk(ast.program, (node) => {
-    if (node.type !== 'CallExpression') return;
-    if (node.callee?.type !== 'MemberExpression' || node.callee.computed) return;
+    if (!isCallExpr(node)) return;
+    if (!isMemberExpr(node.callee) || node.callee.computed) return;
     const verb = node.callee.property?.name;
 
     // Rule 1: `<...>.storage.from('avatars').upload(...)`.
@@ -167,8 +185,8 @@ for (const file of files) {
       const hasStorage = (() => {
         let cur = obj;
         while (cur) {
-          if (cur.type === 'MemberExpression' && !cur.computed && cur.property?.name === 'storage') return true;
-          cur = cur.type === 'CallExpression' ? cur.callee?.object : cur.type === 'MemberExpression' ? cur.object : null;
+          if (isMemberExpr(cur) && !cur.computed && cur.property?.name === 'storage') return true;
+          cur = isCallExpr(cur) ? cur.callee?.object : isMemberExpr(cur) ? cur.object : null;
         }
         return false;
       })();
