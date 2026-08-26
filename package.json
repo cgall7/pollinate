@@ -39,6 +39,7 @@
     "check:date-ranges-utils": "node scripts/check-date-ranges-utils.mjs",
     "check:hive-state-utils": "node scripts/check-hive-state-utils.mjs",
     "check:nectar-ledger": "node scripts/check-nectar-ledger.mjs",
+    "check:hive-volumes": "node scripts/check-hive-volumes.mjs",
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",
