@@ -15,3 +15,16 @@ import { theme } from '../constants/theme';
 // carries forward, so the fixed screens match the one screen that was never
 // broken instead of inventing a new number.
 export const CHROME_TOP_GAP = theme.spacing.sm; // 8
+
+// MemoryLane.js's entryFrame is a one-off consequence of this token, not a
+// bug: on main, entryFrame's old flat `paddingTop: 100` doubled as the
+// collision guard against the close button above it (100 was exactly the
+// button's bottom edge) -- content-independent, by construction. This
+// token's `insets.top + CHROME_TOP_GAP` (~55-63pt) puts the button's *top*
+// inside the content region instead, so what now keeps the vertically
+// centered entry card off the button is the centering arithmetic
+// (`clear = 0.19*contentHeight - 38`, always positive past ~200pt content
+// height), not the padding. Pixel verified this holds across two devices x
+// two builds, worst-case card height, 2026-08-26. Anyone touching
+// MemoryLane's centering should know it's carrying a job the padding used
+// to carry.
