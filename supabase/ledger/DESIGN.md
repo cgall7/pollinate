@@ -13,7 +13,7 @@ IDs, continuous reconciliation invariant. Builds directly on
 findings in [[MDK_NEXTJS_SPIKE]].
 
 **Artifacts** (all in `supabase/ledger/`):
-- `schema.sql` — the schema
+- `../migrations/20260826000001_nectar_ledger.sql` — the schema (promoted from `schema.sql` here on 2026-08-26, simulated mode only)
 - `verify/` — 48 assertions executed against real Postgres, plus the mutation
   harness proving they discriminate (`npm test`, `npm run mutate`)
 

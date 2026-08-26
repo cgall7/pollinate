@@ -69,4 +69,10 @@ export const SENTINELS = {
   },
   '20260824000001_private_hives_relationship': { kind: 'column', table: 'private_hives', column: 'relationship' },
   '20260824000002_entries_reflection': { kind: 'column', table: 'entries', column: 'reflection' },
+  // The ledger revokes everything from anon and grants select to authenticated
+  // only, so the anon probe answers 42501 — which the column rule above
+  // documents as LIVE (column resolution precedes the privilege check; a
+  // missing table/column would answer 42P01/42703 instead). rails_mode is
+  // also the schema's most load-bearing column: the simulated/live tripwire.
+  '20260826000001_nectar_ledger': { kind: 'column', table: 'ledger_settings', column: 'rails_mode' },
 };

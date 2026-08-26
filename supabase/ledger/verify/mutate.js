@@ -14,5 +14,9 @@ const patched = src.replace(
   `    check('schema applies cleanly', true);
     await client.query(${JSON.stringify(mutations[MUT])});
     console.log('  !! MUTATION ACTIVE: ${MUT}');`
-).replace('const PORT = 55433;', 'const PORT = 55500;');
+).replace('const PORT = 55433;', 'const PORT = 55500;')
+// Distinct port AND distinct data dir: test.js rmSync's its own pgdata on
+// startup, so a mutation run sharing the directory with a concurrent plain
+// run gets its cluster files deleted out from under it (58P01 mid-suite).
+ .replace("path.join(__dirname, 'pgdata')", "path.join(__dirname, 'pgdata-mut')");
 fs.writeFileSync('test.mut.js', patched);

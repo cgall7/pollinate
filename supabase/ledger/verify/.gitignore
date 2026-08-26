@@ -1,3 +1,4 @@
 node_modules/
 pgdata/
+pgdata-mut/
 test.mut.js

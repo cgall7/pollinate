@@ -1,10 +1,11 @@
-// Executes POLLINATE_LEDGER_SCHEMA.sql against a real Postgres and asserts every
+// Executes the nectar ledger migration against a real Postgres and asserts every
 // invariant the schema claims. Not a mock: embedded-postgres runs actual PG.
 const EmbeddedPostgres = require('embedded-postgres').default || require('embedded-postgres');
 const fs = require('fs');
 const path = require('path');
 
-const SCHEMA = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
+const SCHEMA = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'migrations', '20260826000001_nectar_ledger.sql'), 'utf8');
 
 // Minimal stand-ins for what Supabase already provides.
 const SHIM = `

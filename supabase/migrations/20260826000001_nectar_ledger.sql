@@ -1,11 +1,19 @@
 -- ============================================================================
 -- Pollinate — nectar ledger core schema
 --
--- STATUS: designed and executed against Postgres 17, NOT YET APPLIED anywhere.
--- Deliberately not committed as a migration in the app repo: the app's Supabase
--- project runs its migrations, and this schema must not exist in a live database
--- until the Strike/agent-of-payee licensing question is answered. See
--- PLANS/POLLINATE_LEDGER_DESIGN.md for the rationale behind every choice here.
+-- STATUS: promoted to a real migration 2026-08-26 (Sage's ruling), SIMULATED
+-- MODE ONLY. `ledger_settings.rails_mode` below defaults to 'simulated', and
+-- the mode-guard trigger rejects any real (non-simulated) Strike observation
+-- while that holds — so applying this migration operates no real money.
+--
+-- GATE ON FLIPPING rails_mode TO 'live': that flip is a separate, still-
+-- embargoed decision. It requires answers to two questions this milestone
+-- explicitly deferred — Strike agent-of-payee for third-party API customers
+-- (../ledger/DESIGN.md §9) and the settlement currency of a paid USD-quoted
+-- invoice (§13). Do not flip it, in any environment, until both are ruled on.
+--
+-- See ../ledger/DESIGN.md for the rationale behind every choice here; the
+-- verify/ suite next to it executes this file against a real Postgres.
 --
 -- Model: strict double-entry. Postgres is the system of record for who owns what;
 -- Strike is a payment rail we reconcile *against*, never a source of truth we
