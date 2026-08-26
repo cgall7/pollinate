@@ -347,45 +347,116 @@ async function main() {
       }
     }
 
-    // 9. seal_volume() directly — the primitive future clients will use —
-    // seals Volume 2 (still open) and opens Volume 3.
+    // 9/10. seal_volume() has NO grant to authenticated, not just anon
+    // (Lumen's review, thread 83a020e9): the only live caller is seal_hive's
+    // internal `perform`, which runs as the DEFINER (checked against the
+    // owner's privilege, not the original caller's) — so revoking
+    // authenticated costs the happy path nothing while closing the one way
+    // a direct call could seal a volume without seal_hive's
+    // private_hives.sealed_at mirror. `set_config(..., true)` is LOCAL to
+    // the current transaction — outside an explicit BEGIN each statement is
+    // its own transaction and the role reverts before the next one runs
+    // (silently back to postgres, which bypasses everything) —
+    // begin/rollback, same as check-hive-state-rls.mjs.
+    for (const [role, label] of [['authenticated', 'authenticated (even the owner)'], ['anon', 'anon']]) {
+      await client.query('begin');
+      try {
+        if (role === 'authenticated') {
+          await client.query("select set_config('role', 'authenticated', true)");
+          await client.query("select set_config('request.jwt.claims', $1, true)", [
+            JSON.stringify({ sub: OWNER, role: 'authenticated' }),
+          ]);
+        } else {
+          await client.query("select set_config('role', 'anon', true)");
+        }
+        await client.query('select public.seal_volume($1)', [hiveId]);
+        await client.query('rollback');
+        bad(`seal_volume() is revoked from ${label}`, 'call succeeded');
+      } catch (e) {
+        await client.query('rollback');
+        if (e.code === '42501') {
+          ok(`seal_volume() is revoked from ${label}`);
+        } else {
+          bad(`seal_volume() is revoked from ${label}`, `wrong error: ${firstLine(e)}`);
+        }
+      }
+    }
+
+    // 11. The underlying logic still opens Volume 3 when something with
+    // owner privilege calls it — proven as `postgres` (the same effective
+    // privilege seal_hive's nested definer call runs with), since no live
+    // API surface can reach a second seal today. "The hive never dies" is a
+    // schema fact, not yet a reachable one — Project 17.2 is what gives a
+    // client a reason to call seal_volume() directly.
     try {
-      await asUser(OWNER, () => client.query('select public.seal_volume($1)', [hiveId]));
-      ok('seal_volume() succeeds directly on the open volume');
+      await asPostgres(() => client.query('select public.seal_volume($1)', [hiveId]));
+      ok("the hive never dies: sealing Volume 2 (as the seal_hive-equivalent privilege) opens Volume 3");
     } catch (e) {
-      bad('seal_volume() succeeds directly on the open volume', firstLine(e));
+      bad("the hive never dies: sealing Volume 2 (as the seal_hive-equivalent privilege) opens Volume 3", firstLine(e));
     }
     const { rows: v3Rows } = await client.query(
       'select ordinal, sealed_at from public.hive_volumes where hive_id = $1 order by ordinal',
       [hiveId]
     );
     if (v3Rows.length === 3 && v3Rows[1].sealed_at !== null && v3Rows[2].sealed_at === null) {
-      ok('the hive never dies: sealing Volume 2 opens Volume 3');
+      ok('sealing Volume 2 stamped it and opened Volume 3');
     } else {
-      bad('the hive never dies: sealing Volume 2 opens Volume 3', `hive_volumes rows: ${JSON.stringify(v3Rows)}`);
+      bad('sealing Volume 2 stamped it and opened Volume 3', `hive_volumes rows: ${JSON.stringify(v3Rows)}`);
     }
 
-    // 10. seal_volume() is anon-revoked, same shape as seal_hive/send_hive.
-    // `set_config(..., true)` is LOCAL to the current transaction -- outside
-    // an explicit BEGIN, each statement is its own transaction and the role
-    // reverts before the next one runs (silently back to postgres, which
-    // bypasses everything). begin/rollback, same as check-hive-state-rls.mjs.
-    await client.query('begin');
+    // 12. PROBE 1/2 (Lumen): hive_id = A, volume_id = B's open volume, both
+    // owned by the same caller — closed by the composite FK
+    // (hive_id, volume_id) -> hive_volumes(hive_id, id). Without it this
+    // insert succeeded and the entry escaped hive A's seal entirely (A's
+    // seal_volume matches by volume_id, never touching a row whose
+    // volume_id points at B).
+    const { rows: hiveBRows } = await asUser(OWNER, () =>
+      client.query("insert into public.private_hives (owner_id, subject_name) values ($1, 'Hive B') returning id", [OWNER])
+    );
+    const hiveBId = hiveBRows[0].id;
+    const { rows: hiveBVolRows } = await client.query(
+      'select id from public.hive_volumes where hive_id = $1 and sealed_at is null',
+      [hiveBId]
+    );
+    const hiveBOpenVolumeId = hiveBVolRows[0].id;
     try {
-      await client.query("select set_config('role', 'anon', true)");
-      await client.query('select public.seal_volume($1)', [hiveId]);
-      await client.query('rollback');
-      bad('seal_volume() is revoked from anon', 'anon call succeeded');
+      await asUser(OWNER, () =>
+        client.query(
+          'insert into public.entries (user_id, content, entry_date, hive_id, volume_id) values ($1, $2, current_date, $3, $4)',
+          [OWNER, 'cross-hive volume_id', hiveId, hiveBOpenVolumeId]
+        )
+      );
+      bad('PROBE 1/2: hive_id/volume_id from different owned hives is rejected', 'insert succeeded');
     } catch (e) {
-      await client.query('rollback');
-      if (e.code === '42501') {
-        ok('seal_volume() is revoked from anon');
+      if (/foreign key|violates/.test(e.message)) {
+        ok('PROBE 1/2: hive_id/volume_id from different owned hives is rejected');
       } else {
-        bad('seal_volume() is revoked from anon', `wrong error: ${firstLine(e)}`);
+        bad('PROBE 1/2: hive_id/volume_id from different owned hives is rejected', `wrong error: ${firstLine(e)}`);
       }
     }
 
-    // 11. A second hive, left unsealed, as the control: proves the
+    // 13. PROBE 3 (Lumen): hive_id = null with a real volume_id set —
+    // closed by entries_volume_id_requires_hive_id. Without it, a
+    // "personal journal" entry silently rides into whichever hive's volume
+    // that id names, and gets flipped to 'packaged' the next time that
+    // hive's current volume seals.
+    try {
+      await asUser(OWNER, () =>
+        client.query(
+          'insert into public.entries (user_id, content, entry_date, volume_id) values ($1, $2, current_date, $3)',
+          [OWNER, 'null hive_id, real volume_id', hiveBOpenVolumeId]
+        )
+      );
+      bad('PROBE 3: volume_id set with hive_id null is rejected', 'insert succeeded');
+    } catch (e) {
+      if (/violates check constraint|entries_volume_id_requires_hive_id/.test(e.message)) {
+        ok('PROBE 3: volume_id set with hive_id null is rejected');
+      } else {
+        bad('PROBE 3: volume_id set with hive_id null is rejected', `wrong error: ${firstLine(e)}`);
+      }
+    }
+
+    // 14. A second hive, left unsealed, as the control: proves the
     // re-pointed guard scopes to the sealed volume, not to hive_id in
     // general.
     const { rows: openHiveRows } = await asUser(OWNER, () =>

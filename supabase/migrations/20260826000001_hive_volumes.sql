@@ -146,6 +146,31 @@ set volume_id = v.id
 from public.hive_volumes v
 where v.hive_id = e.hive_id and v.ordinal = 1 and e.hive_id is not null;
 
+-- Lumen's review (thread 83a020e9, 2026-08-26): the single-column
+-- `volume_id references hive_volumes(id)` FK above proves volume_id names
+-- SOME open volume of SOME owned hive -- never that it's the SAME hive
+-- named by this row's own hive_id. A crafted insert (hive_id = A,
+-- volume_id = B's open volume, both owned by the same caller) passes every
+-- policy above; sealing A then never touches it (seal_volume matches by
+-- volume_id, not hive_id), so the "only entries the hive actually owns"
+-- guarantee 20260819000003 built the seal RPC to hold stops being a DB fact
+-- and becomes an accident of well-behaved callers. Two constraints, not one
+-- -- the composite FK alone is satisfied (MATCH SIMPLE) whenever EITHER
+-- column is null, so it does nothing against hive_id = null paired with a
+-- real volume_id (a personal-journal entry silently annexed into whichever
+-- hive's volume that id names, flipped to 'packaged' the moment that hive
+-- next seals). The check below is what actually closes that second path.
+alter table public.hive_volumes
+  add constraint hive_volumes_hive_id_id_key unique (hive_id, id);
+
+alter table public.entries
+  add constraint entries_hive_id_volume_id_fkey
+    foreign key (hive_id, volume_id) references public.hive_volumes (hive_id, id);
+
+alter table public.entries
+  add constraint entries_volume_id_requires_hive_id
+    check (volume_id is null or hive_id is not null);
+
 -- private_hives.sealed_at/.sent_at keep their one-directional triggers
 -- (20260815000004, 20260819000001) -- do not attempt to drop them, the
 -- triggers guarantee they cannot lie -- but the sealed-content ENFORCEMENT

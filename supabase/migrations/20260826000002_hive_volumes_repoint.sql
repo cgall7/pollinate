@@ -120,9 +120,20 @@ begin
 end;
 $$;
 
+-- No `grant execute ... to authenticated` here, unlike seal_hive/send_hive
+-- (Lumen's review, thread 83a020e9, 2026-08-26): seal_hive() below still
+-- reaches this function fine without it -- a SECURITY DEFINER function's
+-- internal calls check the DEFINER's own privilege, not the original
+-- caller's -- so leaving authenticated ungranted costs the happy path
+-- nothing. Granting it would make seal_volume directly callable over
+-- PostgREST today, with no client that has a reason to (Project 17.2 is
+-- what gives one). A direct call would seal Volume 1 without stamping
+-- private_hives.sealed_at -- the one way to make seal_hive's mirror lie --
+-- bounded (send_hive still refuses until seal_hive's own stamp lands) but
+-- not worth leaving open before anything needs it.
 revoke all on function public.seal_volume(uuid) from public;
 revoke execute on function public.seal_volume(uuid) from anon;
-grant execute on function public.seal_volume(uuid) to authenticated;
+revoke execute on function public.seal_volume(uuid) from authenticated;
 
 -- seal_hive() (20260819000003) is retired by seal_volume() above, but the
 -- shipped client still calls it by name (HiveStore.js:158) and reads
