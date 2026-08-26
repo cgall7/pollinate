@@ -67,7 +67,7 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
   // deep links land directly in the expanded form, in the right mode, and
   // doing that in the initialiser means the collapsed buttons never render
   // for a frame first.
-  const [expanded, setExpanded] = useState(startAt === 'signup' || startAt === 'signin');
+  const [expanded, setExpanded] = useState(startAt === 'signin');
   const [mode, setMode] = useState(startAt === 'signin' ? 'signin' : 'signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
