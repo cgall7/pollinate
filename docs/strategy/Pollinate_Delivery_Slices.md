@@ -5,6 +5,8 @@
 1. **Slice 1: Demo Mode** — Full product works end-to-end for friends & family testing. No paywall. Every feature is free. No money — no payments, no tips (~~wallet is a shell~~ — superseded 2026-08-26: there is no Wallet tab at all; three-tab bar, see `POLLINATE_V2_NAVIGATION.md`). Distributed via TestFlight / internal track. Goal: validate the core loop with real users.
 2. **Slice 2: Public Launch** — After testing validates the loop, ship to App Store / Play Store with the V2 revenue model (`POLLINATE_V2_SPEC.md` §17.5, ruled 2026-08-24): unlimited hives and entries free forever, first delivery free forever, "Pollinate Plus" at $39.99/year (annual only) buying every delivery after the first. The Cash-App-via-iMessage gifting plan is cancelled (V2 §5.7); the money layer is nectar zaps (V2 §5).
 
+> **Amendment, 2026-08-26 (Colin, CEO channel: "V2 is mvp1"):** The two-milestone split above no longer sets release order. Slice 2's money layer — Project 12 (Freemium Paywall) and the nectar zap system (V2 §5) — ships in the same MVP1 release as Slice 1, not deferred to a later public-launch phase. The "Slice 1 / Slice 2" headings below are now a work-breakdown convenience, not a sequencing gate — read both as one MVP1 scope. Project 15 (Cash App gifting) stays cancelled, superseded by nectar zaps per line above.
+
 ---
 
 
@@ -274,7 +276,7 @@
 
 **Goal:** After demo testing validates the loop, ship to App Store / Play Store with a freemium model. Free tier with limited features; paid tier "Pollinate Plus" unlocks unlimited usage. Cash App gifting via iMessage links enables gratitude-with-money without Pollinate being a money transmitter.
 
-**Prerequisite:** Demo Mode success criteria met (see above).
+**Prerequisite:** ~~Demo Mode success criteria met (see above).~~ *(Superseded 2026-08-26 — see amendment at top of doc: this section builds concurrently with Slice 1 as one MVP1 release, not gated on Slice 1 testing results.)*
 
 **Duration:** 3–4 weeks of additional build, then public launch.
 
