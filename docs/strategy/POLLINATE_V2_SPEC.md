@@ -3,7 +3,10 @@
 **Status:** Adopted as the governing V2 spec by Colin, 2026-08-25 (#CEO action
 items, event `d99dd08d…`); amended by Colin's Amendment 2026-08-25 (event
 `ad945232…`, this file's bytes) — §6 closed, nothing left waiting on Colin.
-**Date:** 2026-08-24 (adopted 2026-08-25, amended 2026-08-25)
+Amended 2026-08-26 (navigation ruling, event `4e4d6d3d…`): §5.2(b) honeyed-mark
+correction; tab bar 4 → 3 per `POLLINATE_V2_NAVIGATION.md` and the 2026-08-26
+amendment in `Pollinate_The_Ruling.md`.
+**Date:** 2026-08-24 (adopted 2026-08-25, amended 2026-08-25 and 2026-08-26)
 **Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
@@ -624,9 +627,22 @@ Four experiences, in order of how uniquely Pollinate they are:
 zap flies a honey drop along the existing pollination flight path between two
 hexagons. Denominate in **nectar drops**, not sats, in all default UI.
 
-**(b) The honeycomb *is* the wallet.** Received nectar visibly fills your hexagon
-cell. Hexagons already carry visual states (blooming / seeded / dormant); add
-**honeyed**. There is no Wallet tab in this design — your balance is your comb.
+**(b) The honeycomb *is* the wallet.** Received nectar shows on your own hexagon
+cell as a third state **mark** — `honeyed` — stacking with the blooming ring.
+
+> **Corrected 2026-08-26.** An earlier draft said nectar "fills" the cell. It
+> cannot: `HexShape.js:32` / `HoneycombGrid.js:91` carry a Pixel ruling of
+> 2026-08-13 — *cell fill is identity, marks and rings are state.* Fill is a
+> name-hashed identity tint whose range is capped per tint (a `washSky` member's
+> range measured under half of `washYellow`'s), so a fill-borne balance would
+> read permanently quieter for some members than others. Marks are
+> tint-independent; state lives there. The mark's geometry is already designed
+> and measured: DES-24 (workspace `GUIDES/POLLINATE_V2_DES24_HONEYED_HEXAGON.md`) — the
+> honeyed+seeded combination is unreachable by construction (honeyed is
+> own-cell-only; `no_self_seed`, `20260813000002`), and blooming-over-honey is
+> measured and ruled (the ring stays ink). There is no Wallet tab in this
+> design — your balance is your comb.
+
 Nobody else has this, and it is the single best argument that Pollinate's bitcoin
 layer is native rather than bolted on.
 

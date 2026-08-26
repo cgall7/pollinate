@@ -169,13 +169,35 @@ lands with the Slice 2 paywall.
 |---|---|---|---|---|
 | **OPS-7** | Colin | S | **Enroll in the Apple Small Business Program — 15% instead of 30% under $1M/yr.** A form, worth a third of revenue. Do this week | — |
 | **COPY-11** | Lumen | M | **Ruling sweep.** Retired tokens: `$2.99`, `/mo`, `monthly`, `1 hive`, `lifetime`. Sweep `Pollinate_PRD.md` §5.1, `Pollinate_Strategy.md` §4, `Pollinate_Delivery_Slices.md`. Follow the `README.md` ritual — eye-read cited rows first, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate" | — |
-| **ENG-76** | Fizz | L | **Paywall: meter delivery, not creation.** Unlimited hives and entries free forever; **first delivery free forever**; every delivery after requires Plus. Annual-only IAP at $39.99 | ENG-48, ENG-49 |
+| **ENG-76** | Fizz | L | **Paywall: meter volume delivery, and nothing else** (ruled 2026-08-25, spec §17.5.2a — review cadence, friend and seed gates all removed; seeds get a rate limit, not a paywall). Unlimited hives and entries free forever; **first delivery free forever**; every delivery after requires Plus. Annual-only IAP at $39.99 | ENG-48, ENG-49 |
 | **ENG-78** | Fizz | M | **Reveal→signup funnel instrumentation. The single highest-priority analytics event in the app** — it is the number the business rests on (§17.5.3). Ships with `ENG-51`, not after | ENG-51, ENG-75 |
+| **ENG-76.1** | Fizz | S | Seed rate limit (~5/week, all tiers) — abuse control, explicitly **not** a paywall surface (§17.5.2a) | ENG-76 |
 | **ENG-77** | Fizz | M | **Gifted subscription** bundled with delivery, via Apple IAP | ENG-76 |
 | **ENG-79** | Fizz | M | Family / comb plan — $79/yr, up to 6 seats *(Slice 3)* | ENG-76, ENG-58 |
-| **ENG-80** | Sage+Fizz | L | Legacy tier — $199 one-time: escrowed delivery, verified beneficiary email, annual address-still-resolves confirmation *(Slice 3)* | ENG-49, ENG-76 |
+| **ENG-80** | Sage+Fizz | L | **Legacy tier — $199 one-time.** Escrowed delivery, verified beneficiary email, annual address-still-resolves confirmation. **Re-scope: closer to core than second-order** — per §17.5.2b this is the *only* capture point for the flagship 18-year use case, which otherwise pays $0 *(Slice 3)* | ENG-49, ENG-76 |
 | **DES-26** | Pixel | M | Paywall surfaces at the delivery moment — must not intrude on the seal/reveal emotion | ENG-76 |
 | **COPY-12** | Lumen | S | Pricing + gift copy. Never "upgrade to unlock" language at the reveal | ENG-76 |
+
+---
+
+## 8A. Project 22 — Navigation (Slice 1, ships now)
+
+Ruled 2026-08-26. Spec: `POLLINATE_V2_NAVIGATION.md`. No dependency on Project
+19 — this is a Slice 1 cleanup that makes the current build better on its own.
+
+| ID | Owner | Est | Issue | Deps |
+|---|---|---|---|---|
+| **ENG-81** | Fizz | M | **Tab bar 4 → 3.** Delete the `Wallet` `Tab.Screen` + `TAB_ICONS` entry; delete `src/screens/WalletTab.js` (only importer is `MainTabs.js` — verified). Re-run `check:nav-depth` | DES-27 |
+| **ENG-82** | Fizz | M | **Account door → top right.** Remove from `TabDock`; render once in `MainTabs` as a safe-area top-right overlay, `pointerEvents="box-none"`. Collapse `endInset` to `SIDE_INSET` and delete the `useHasAccountDoor()` branch — signed-out and signed-in bars become identical | DES-27 |
+| **DES-27** | Pixel | M | **Brief: `DESIGN_BRIEF_V2_NAVIGATION.md` Part A.** Three-tab capsule + top-right door. Symmetric capsule at full width, icon re-spacing for 3, door placement/size against safe area on all three tabs | — |
+| **DES-28** | Deezine | L | **Brief: `DESIGN_BRIEF_V2_NAVIGATION.md` Part B.** Zap surfaces 1–4. Honeyed hexagon mark (never a fill — spec §5.2(b)), the `PackageOpen` react slot, the per-entry drop, the action-menu row. **All four gated behind wallet consent** — design the pre-consent state too, which is "exactly as today" | ships with 19a |
+
+> Sequencing (verified 2026-08-26, not part of the ruling): `ENG-81`/`ENG-82`
+> edit `MainTabs.js`, which five branches in the standing merge queue also
+> touch. The standing queue lands first; the nav change is cut on top. `DES-27`
+> proceeds immediately (no diff to merge against). For `DES-28` Surface 1, the
+> honeyed mark inherits DES-24 (workspace `GUIDES/POLLINATE_V2_DES24_HONEYED_HEXAGON.md`)
+> rather than re-deriving it — see spec §5.2(b).
 
 ---
 

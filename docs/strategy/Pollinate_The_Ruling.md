@@ -376,6 +376,61 @@ while everything else proceeds.
 | Anything still waiting on me? | **No. Spec §6 is empty.** |
 
 
+---
+
+## Amendment — 2026-08-26 (navigation: three tabs, door to the top right)
+
+**This supersedes the 2026-08-17 tab bar ruling.** Full design spec:
+`POLLINATE_V2_NAVIGATION.md`.
+
+### The tab bar is now three: `Today | Hive | Garden`
+
+**Wallet is removed.** Spec §5.2(b) already ruled that the honeycomb *is* the
+wallet — your balance is honey filling your own hexagon, not a number on a fifth
+screen. A Wallet tab would leave a permanent, empty, crypto-shaped hole in the
+tab bar of a gratitude app: wrong for users, wrong for App Review, wrong for our
+positioning. The tab bar was the last place the old wallet plan was still
+standing. It's gone.
+
+Three tabs is better on its own terms anyway — Today writes, Hive connects,
+Garden reflects. Three verbs, nothing extra to explain.
+
+### The account door moves to the top right
+
+One render site in `MainTabs`, not per-screen headers — it must not drift a pixel
+between tabs, and `headerShown: false` stays false everywhere. Because it no
+longer sits beside the capsule, the capsule is symmetric at full width and the
+signed-out and signed-in tab bars become identical.
+
+### Where money lives, since it has no tab
+
+> **Emotional and frequent lives in the comb. Administrative and rare lives
+> behind the door. Neither gets a tab.**
+
+Zaps happen in the moment — the reveal, an entry, a hexagon. Balance is honey in
+your hex on the Hive tab. Funding, withdrawal and the Lightning address are
+Account settings, because they're rare and boring.
+
+**All of it is invisible until a user consents to a wallet.** Pre-consent there
+is no honey, no zap affordance, and `PackageOpen` ends with a plain Close exactly
+as it does today. Consent fires on the first zap attempt, never at signup.
+
+### This ships now, not with the wallet
+
+Removing a shell tab and moving an avatar is Slice 1 work with no dependency on
+Project 19. It makes the build we're testing better today. `Wallet` appears in
+exactly one file outside its own screen — this is a contained change.
+
+| Question | Answer |
+|---|---|
+| What's the tab bar? | **Today \| Hive \| Garden.** Three. |
+| Where's the Wallet tab? | **Deleted.** The comb is the wallet. |
+| Where's the account door? | **Top right**, over content, all three tabs. |
+| Where do zaps live? | **In the moment** — reveal, entry, hexagon. No tab. |
+| Where's fund/withdraw? | **Account → Nectar.** Rare and boring, so it's behind the door. |
+| When does any of it appear? | **Only after wallet consent.** Before that, nothing changes. |
+| Does this wait for Slice 2? | **No.** Tabs and door ship now. |
+
 The team is executing well. The ambiguity was mine to resolve. It's resolved now. We're building one app. The journal is where gratitude starts. Private hives are where you journal gratitude for someone, revisit it on trips down memory lane, and package it to share. The Hive is where it's shared. The Garden is where you see it all. Money comes later.
 
 Let's go. 🐝
