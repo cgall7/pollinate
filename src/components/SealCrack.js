@@ -4,9 +4,22 @@ import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
 import { BeeTransition } from './BeeTransition';
-import { StripedBee } from './StripedBee';
+import { MascotBee } from './MascotBee';
 import { CelebrationRays } from './CelebrationRays';
 
+// ┌─ NOT WIRED YET, AND HERE IS HOW TO TELL THAT FROM ORPHANED ─────────┐
+// │ Zero importers in `src/` + `App.js` (every other hit is prose in a  │
+// │ comment). Early, not abandoned:                                     │
+// │   consumer   Seeds, per R83 — this takes ONE prop (`onCracked`) and │
+// │              has zero Wrapped coupling, so §14.2 gives it a HOME,   │
+// │              not a dependency, and Seeds should be its first real   │
+// │              consumer. §14.2 Beat 0 is the second.                  │
+// │   owner      Pixel (this component) / Bumble (Seeds spine)          │
+// │   FALSIFIER  if Seeds ships without a seal gesture AND §14.2's      │
+// │              Wrapped build is closed or re-spec'd without Beat 0,   │
+// │              this is dead — delete it, don't maintain it.           │
+// └─────────────────────────────────────────────────────────────────────┘
+//
 // §14.2 Beat 0 — The Seal. Full gold field, spiral mark static, the bee
 // glides in (BeeTransition already uses the ratified 9/60 glide spring) and
 // lands on the mark. Tap cracks the seal — medium haptic + accentBurst
@@ -132,14 +145,17 @@ export const SealCrack = ({ onCracked }) => {
           // the same spot BeeTransition's flight was already ending at.
           //
           // §17.3 correction: this bee is not a standing/keepsake bee — it
-          // is the last frame of a BeeTransition flight, crossfading from
-          // the `StripedBee` that BeeTransition renders internally. Register
-          // follows provenance: a bee that flew in stays in flight register
-          // (painted `bandColor={accent}`) even standing on gold, so props
-          // here are prop-identical to BeeTransition's internal render —
-          // same size, same bandColor — and the crossfade never pops.
+          // is the last frame of a BeeTransition flight, crossfading from the
+          // bee that BeeTransition renders internally. Register follows
+          // provenance: a bee that flew in stays in flight register even
+          // standing on gold, so this must stay prop-identical to
+          // BeeTransition's internal render or the crossfade pops.
+          //
+          // R83: that render is now `MascotBee`, so this is too. The contract
+          // this comment states is exactly what a swap on one side of it would
+          // have broken — dormantly, since SealCrack has no importers yet.
           <Animated.View pointerEvents="none" style={[styles.beeAnchor, { opacity: staticBeeOpacity }]}>
-            <StripedBee size={22} bandColor={theme.colors.accent} />
+            <MascotBee size={22} />
           </Animated.View>
         )}
         <Image
@@ -187,7 +203,7 @@ const styles = StyleSheet.create({
     left: EYE_LEFT,
     marginTop: -11,
     marginLeft: -11,
-    // R22 (Pixel): the landed static <StripedBee> is an earlier sibling than
+    // R22 (Pixel): the landed static bee is an earlier sibling than
     // <Image> with no zIndex of its own — RN paints in tree order
     // regardless of position:absolute. It was invisible only because its
     // footprint fell entirely inside the mark's transparent eye; matches
@@ -212,7 +228,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   flash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.accentBurst,
   },
 });

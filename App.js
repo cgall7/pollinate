@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
+import * as Notifications from 'expo-notifications';
 import { theme } from './src/constants/theme';
 import { fontAssets } from './src/constants/fontAssets';
 import { OnboardingFlow } from './src/screens/Onboarding';
@@ -11,67 +12,77 @@ import { LockScreen, InputScreen } from './src/screens/CoreRitual';
 import { EveningMirror } from './src/screens/EveningMirror';
 import { LegalScreen } from './src/screens/Legal';
 import { AccountScreen } from './src/screens/Account';
+import { NotesInbox } from './src/screens/NotesInbox';
+import { ComposeNote } from './src/screens/ComposeNote';
+import { PlantSeed } from './src/screens/PlantSeed';
+import { SeedsInbox } from './src/screens/SeedsInbox';
+import { CreateHiveFlow } from './src/screens/CreateHive';
+import { HiveDetailScreen } from './src/screens/HiveDetail';
+import { ComposeHiveEntryScreen } from './src/screens/ComposeHiveEntry';
+import { SealHiveScreen } from './src/screens/SealHive';
+import { SendHiveScreen } from './src/screens/SendHive';
+import { MemoryLaneScreen } from './src/screens/MemoryLane';
+import { ReceivedPackagesScreen } from './src/screens/ReceivedPackages';
+import { PackageOpenScreen } from './src/screens/PackageOpen';
+import { PollinateWrapped } from './src/screens/PollinateWrapped';
 import { MainTabs } from './src/navigation/MainTabs';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { OnboardingState } from './src/services/onboardingState';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
+import { EntryStore } from './src/services/EntryStore';
+import { tagEntry } from './src/utils/themeTagger';
+import { DEMO_MODE } from './src/constants/demoMode';
+import { resolveInitialRouteWithTimeout } from './src/utils/resolveInitialRoute';
+import { isNudgeResponse } from './src/services/dailyNudge';
+import { rearmDailyNudge } from './src/services/rearmDailyNudge';
 
 const Stack = createStackNavigator();
 
+// Daily Nudge half A (`PLANS/DAILY_NUDGE_SPEC.md` §4.1) — re-arm the window
+// on every foreground. The function itself now lives in
+// `src/services/rearmDailyNudge.js` (Account.js's settings row needs it too,
+// and this file imports Account.js — see that module's header for why the
+// function had to move rather than be imported back).
+//
+// §4.1's OTHER re-arm — "on every entry save" — is the `onUnlock` handler
+// below, and it is not optional now that half B's ask names the condition
+// out loud (`NUDGE_ASK_LABEL`, `src/constants/nudgeCopy.js`: "Let me know on
+// days my page is still blank"). Without it the consent is factually wrong
+// about the one behaviour it describes:
+//
+//   08:00  resume  -> re-arm; today is unwritten, so today 20:00 is armed
+//   09:00  write   -> nothing cancels it
+//   20:00          -> the nudge fires on a day they wrote
+//
+// A written day only leaves the schedule when `reconcile` runs AGAIN, so
+// dropping today needs a SECOND resume, after the save and before the hour.
+// Write in the morning and don't reopen the app — the most ordinary day this
+// app has — and it fires anyway. (This comment previously claimed the
+// foreground re-arm "covers the common case" and attributed the save to
+// `CoreRitual.js`. Both were wrong: the foreground that PRECEDES a write is
+// the one that armed today, and `CoreRitual.js:142` says in its own words
+// that it does not save. Sage measured it; a justification comment is a
+// dependency, and that one justified nothing.)
+//
+// The Celebration "yes" handler does NOT go through this function — it has
+// no session (`requireUserId` throws) and needs no read, because at that
+// beat the user has written exactly today. `src/screens/Onboarding.js` says
+// so at the call site. The pre-auth buffer's later flush needs no re-arm
+// either: it writes the same day the handler already reconciled against, so
+// the window it would compute is the one already scheduled.
+
 SplashScreen.preventAutoHideAsync();
 
-// Demo-mode only (Colin, 2026-08-09): every time the app comes back to the
-// foreground it should reopen at onboarding, even if someone finished it
-// or was sitting on Main a minute ago — the pitch should always be fresh
-// for whoever's about to see it. Flip this off once the app is past the
-// demo phase. This flag now gates BOTH demo behaviours: the
-// foreground-resume reset below, and forcing every cold launch to start at
-// Onboarding. With it off, cold launches route on the persisted completion
-// flag / live session instead (resolveInitialRoute), so flipping this one
-// constant really is the whole switch.
-const DEMO_MODE = true;
-
-// Cold-launch routing, only consulted when DEMO_MODE is off. Completed
-// onboarding on this device, or an existing signed-in session (fresh
-// install by a returning user), both land on Main. Any storage failure
-// falls back to Onboarding — the worst case is seeing the flow again,
-// never being locked out of it.
-const resolveInitialRoute = async () => {
-  try {
-    if (await OnboardingState.isComplete()) return 'Main';
-    if (isSupabaseConfigured && supabase) {
-      // getSession() can hit the network (token refresh past the 90s expiry
-      // margin), so this branch is the slow path. Writing the flag here makes
-      // it self-healing: users who predate the flag — everyone who completed
-      // onboarding before it shipped — pay this path once, then read the
-      // local key on every launch after.
-      const { data } = await supabase.auth.getSession();
-      if (data?.session) {
-        OnboardingState.markComplete().catch(() => {});
-        return 'Main';
-      }
-    }
-  } catch (e) {
-    // fall through
-  }
-  return 'Onboarding';
-};
-
-// getSession's refresh has no app-level timeout, and while the resolve is
-// pending the splash can never hide (NavigationContainer isn't mounted, so
-// onReady can't fire). On a dead or captive-portal network that's a frozen
-// splash — the one state a user can't back out of. Racing a short timeout
-// keeps the worst case at "see onboarding again," which is the designed
-// fallback. With the self-healing write above, a user hits this window at
-// most once — after that the route resolves from local storage.
-const ROUTE_RESOLVE_TIMEOUT_MS = 3000;
-const resolveInitialRouteWithTimeout = () =>
-  Promise.race([
-    resolveInitialRoute(),
-    new Promise((resolve) => {
-      setTimeout(() => resolve('Onboarding'), ROUTE_RESOLVE_TIMEOUT_MS);
-    }),
-  ]);
+// DEMO_MODE gates both demo behaviours below: the foreground-resume reset,
+// and forcing every cold launch to start at Onboarding. With it off, cold
+// launches route on the persisted completion flag / live session instead
+// (resolveInitialRouteWithTimeout, src/utils/resolveInitialRoute.js — pulled
+// out of this file so check-resolve-initial-route.mjs can exercise it
+// without a renderer). Defined in src/constants/demoMode.js, not here —
+// CoreRitual.js/HoneycombTab.js/Onboarding.js's demo-only affordances need
+// the derived DEMO_CONTENT constant next to it, and importing from App.js
+// would be circular (App.js imports all three screens).
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -85,6 +96,16 @@ export default function App() {
   const [splashHidden, setSplashHidden] = useState(false);
   const navigationRef = useRef(null);
   const appState = useRef(AppState.currentState);
+  // Independent of `appState` above — that ref is only maintained while the
+  // DEMO_MODE listener is registered (it early-returns and never subscribes
+  // otherwise), so the nudge re-arm needs its own foreground-transition
+  // tracking to run in every build.
+  const nudgeAppState = useRef(AppState.currentState);
+  // Bumped by ErrorBoundary's reset. Changing a subtree's `key` is what
+  // forces React to unmount and remount it fresh, rather than reconcile
+  // onto the same instances that just threw — a plain setState re-render
+  // wouldn't touch component state a crash left in a bad shape.
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     Font.loadAsync(fontAssets).then(() => setFontsLoaded(true));
@@ -92,7 +113,7 @@ export default function App() {
 
   useEffect(() => {
     if (DEMO_MODE) return;
-    resolveInitialRouteWithTimeout().then(setInitialRoute);
+    resolveInitialRouteWithTimeout({ OnboardingState, isSupabaseConfigured, supabase }).then(setInitialRoute);
   }, []);
 
   useEffect(() => {
@@ -107,10 +128,47 @@ export default function App() {
     return () => subscription.remove();
   }, []);
 
+  // Daily Nudge §4.1 — re-arm on every foreground, in every build. Runs once
+  // on mount (the app is "foregrounding" from cold start too) and again on
+  // every background -> active transition.
+  useEffect(() => {
+    rearmDailyNudge();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const resuming = nudgeAppState.current.match(/inactive|background/) && nextState === 'active';
+      if (resuming) rearmDailyNudge();
+      nudgeAppState.current = nextState;
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // §C12 — tap routing, navigation only. Registered unconditionally: no
+  // notification is ever scheduled while `NUDGE_TITLE`/`NUDGE_BODY` are
+  // still the sentinel (`reconcile()`'s content guard, and the sentinel
+  // check above), so this listener has nothing to catch yet, but it costs
+  // nothing to have wired ahead of half B.
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (isNudgeResponse(response)) {
+        navigationRef.current?.navigate('Main', { screen: 'Today' });
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
       await SplashScreen.hideAsync();
       setSplashHidden(true);
+      // §C12 cold-start read — a tap that launched the app from terminated
+      // can fire before `addNotificationResponseReceivedListener` above is
+      // attached, so it needs the paired one-shot read. Composed into this
+      // callback rather than a second `onReady` prop (`NotificationContainer`
+      // only takes one) and read after the splash hides so `navigationRef`
+      // is already mounted.
+      const lastResponse = await Notifications.getLastNotificationResponseAsync();
+      if (isNudgeResponse(lastResponse)) {
+        navigationRef.current?.navigate('Main', { screen: 'Today' });
+      }
     }
   }, [fontsLoaded]);
 
@@ -121,65 +179,156 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
-        <Stack.Navigator
-          initialRouteName={initialRoute}
-          screenOptions={{
-            headerShown: false,
-            cardStyle: { backgroundColor: theme.colors.background }
-          }}
-        >
-          <Stack.Screen name="Onboarding">
-            {(props) => (
-              <OnboardingFlow
-                {...props}
-                startAt={props.route.params?.startAt}
-                onDone={() => props.navigation.replace('Main')}
-                splashHidden={splashHidden}
-              />
-            )}
-          </Stack.Screen>
+    <ErrorBoundary onReset={() => setResetKey((k) => k + 1)}>
+      <AuthProvider key={resetKey}>
+        <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
+          <Stack.Navigator
+            initialRouteName={initialRoute}
+            screenOptions={{
+              headerShown: false,
+              cardStyle: { backgroundColor: theme.colors.background }
+            }}
+          >
+            <Stack.Screen name="Onboarding">
+              {(props) => (
+                <OnboardingFlow
+                  {...props}
+                  startAt={props.route.params?.startAt}
+                  onDone={() => props.navigation.replace('Main')}
+                  splashHidden={splashHidden}
+                />
+              )}
+            </Stack.Screen>
 
-          <Stack.Screen name="Lock">
-            {(props) => (
-              <LockScreen
-                {...props}
-                onOpen={() => props.navigation.navigate('Input')}
-              />
-            )}
-          </Stack.Screen>
+            <Stack.Screen name="Lock">
+              {(props) => (
+                <LockScreen
+                  {...props}
+                  onOpen={() => props.navigation.navigate('Input')}
+                />
+              )}
+            </Stack.Screen>
 
-          <Stack.Screen name="Input">
-            {(props) => (
-              <InputScreen
-                {...props}
-                onUnlock={() => props.navigation.replace('Main')}
-              />
-            )}
-          </Stack.Screen>
+            <Stack.Screen name="Input">
+              {(props) => (
+                <InputScreen
+                  {...props}
+                  onUnlock={async (text) => {
+                    // InputScreen stopped saving itself when the pre-auth
+                    // onboarding paths started buffering its text instead
+                    // (P0-2 fix, thread 19e90cf8). This is the one caller with
+                    // a real session already — it owns the write now.
+                    await EntryStore.saveEntry(new Date(), text, tagEntry(text));
+                    props.navigation.replace('Main');
+                    // §4.1's save-side re-arm, and it sits AFTER the
+                    // navigation on purpose (Sage, 250bc4e9). This promise is
+                    // the honey unlock's own: CoreRitual holds the unlocking
+                    // overlay for the whole life of `onUnlock`, resetting
+                    // only on the error path because success is expected to
+                    // navigate away. Put the re-arm above `replace` and a
+                    // Supabase select, a scheduled-notification enumeration,
+                    // up to seven cancels, two AsyncStorage reads and up to
+                    // six SERIAL `scheduleNotificationAsync` calls all land
+                    // inside that animation. Below it, the screen is already
+                    // gone and the work is invisible.
+                    //
+                    // Still awaited rather than floated, so the ordering is
+                    // legible and a future throw is not silently orphaned.
+                    // It cannot reject today — the whole body after the
+                    // sentinel guard is one try/catch (see above) — which is
+                    // what makes running it past `replace` safe: CoreRitual's
+                    // `.catch` would otherwise alert and animate a screen
+                    // that has already unmounted.
+                    await rearmDailyNudge();
+                  }}
+                />
+              )}
+            </Stack.Screen>
 
-          <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Main" component={MainTabs} />
 
-          <Stack.Screen name="Legal" component={LegalScreen} options={{ presentation: 'modal' }} />
+            {/* Private Hives (8b.2/8b.3, hero — PLANS/Pollinate_Delivery_Slices.md
+                Project 8b). Pushed from Today's hive shelf via getParent(),
+                same as Lock/Input above: a flow you go deeper into, not a
+                utility sheet, so no `presentation: 'modal'`. */}
+            <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
+            <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
+            <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
+            {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
+                found: the 8b.2-8b.7 arc was live at the data layer with no
+                button anywhere to trigger it). Design Language §5-6, condensed
+                per Lumen's ruling same thread. Both plain pushes, same
+                reasoning as their HiveDetail siblings. */}
+            <Stack.Screen name="SealHive" component={SealHiveScreen} />
+            <Stack.Screen name="SendHive" component={SendHiveScreen} />
+            {/* 8b.4 Trip Down Memory Lane — the author's bloom moment, first of
+                the reveal engine's two mount points (`revealSequencer.js`
+                header). Pushed from HiveDetail, not modal, for the same
+                reason as its siblings above: this is a place you go, not a
+                sheet over the place you were. */}
+            <Stack.Screen name="MemoryLane" component={MemoryLaneScreen} />
 
-          {/* Opened by the account door beside the tab capsule (MainTabs
-              Option C). A modal, not a tab: it's the app's only route to
-              sign-out and the legal documents, and it's opened about twice
-              a year. */}
-          <Stack.Screen name="Account" component={AccountScreen} options={{ presentation: 'modal' }} />
+            {/* 8b.6 — the reveal engine's second mount point (revealSequencer.js's
+                own header names both by number). PackageOpen is a plain push, not
+                modal, same reasoning as MemoryLane above: a place you go, not a
+                sheet over the place you were. ReceivedPackages IS a modal — it's
+                an inbox opened from chrome, same category as Notes/Seeds below,
+                not a flow you go deeper into. */}
+            <Stack.Screen name="ReceivedPackages" component={ReceivedPackagesScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="PackageOpen" component={PackageOpenScreen} />
 
-          <Stack.Screen name="Evening">
-            {(props) => (
-              <EveningMirror
-                {...props}
-                gratitudeText="I am grateful for this beautiful day."
-                onClose={() => props.navigation.navigate('Main')}
-              />
-            )}
-          </Stack.Screen>
-        </Stack.Navigator>
-      </NavigationContainer>
-    </AuthProvider>
+            <Stack.Screen name="Legal" component={LegalScreen} options={{ presentation: 'modal' }} />
+
+            {/* Opened by the account door beside the tab capsule (MainTabs
+                Option C). A modal, not a tab: it's the app's only route to
+                sign-out and the legal documents, and it's opened about twice
+                a year. */}
+            <Stack.Screen name="Account" component={AccountScreen} options={{ presentation: 'modal' }} />
+
+            {/* Project 7 (Gratitude Notes, no-tip variant). Both modal: Notes
+                opens from the Honeycomb tab's header, Compose opens from
+                Notes' header, neither is a tab of its own yet — that's a
+                design placement call, not an engineering one. */}
+            <Stack.Screen name="Notes" component={NotesInbox} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="ComposeNote" component={ComposeNote} options={{ presentation: 'modal' }} />
+
+            {/* Project 8 (Seeds). 8.2 plants, 8.4 lists — a planted seed is no
+                longer invisible. 8.8's reveal choreography is still @Pixel's:
+                the sealed -> bloomed transition happens on SeedsInbox today
+                (§22.2's refetch), it just does not yet have a beat. Modal for
+                the same reason Compose is: where Seeds finally lives in the IA
+                is Project 10's call. */}
+            <Stack.Screen name="PlantSeed" component={PlantSeed} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Seeds" component={SeedsInbox} options={{ presentation: 'modal' }} />
+
+            {/* Project 10: Wrapped is no longer a tab (Colin's ruling — it
+                lives in the Garden). It has to be registered somewhere or the
+                screen ships unreachable, and a root-stack modal is the same
+                treatment Notes/Seeds/Compose get for the same reason.
+
+                `onComplete` is what makes it a screen rather than a trap: with
+                the prop undefined, `PollinateWrapped.js:147` sends the last
+                slide back to slide 0 forever — survivable when a tab bar sat
+                underneath it, not now that a modal covers the bar. Tapping past
+                the last beat returns you to the Garden. */}
+            <Stack.Screen name="Wrapped" options={{ presentation: 'modal' }}>
+              {(props) => (
+                <PollinateWrapped {...props} onComplete={() => props.navigation.goBack()} />
+              )}
+            </Stack.Screen>
+
+            <Stack.Screen name="Evening">
+              {(props) => (
+                <EveningMirror
+                  {...props}
+                  gratitudeText="I am grateful for this beautiful day."
+                  onClose={() => props.navigation.navigate('Main')}
+                />
+              )}
+            </Stack.Screen>
+          </Stack.Navigator>
+        </NavigationContainer>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

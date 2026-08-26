@@ -5,6 +5,27 @@ const requireSupabase = () => {
   return supabase;
 };
 
+// The week query's row cap. Exported so the screen can tell "got everything"
+// from "hit the cap": the cap is cut on `created_at` while the window is cut
+// on `entry_date`, so a full page means the older end of the week may be
+// silently missing and the view should say so.
+export const WEEK_FEED_LIMIT = 200;
+
+// One share row → the shape FeedCard and the grid mappers consume. Shared
+// by both feed queries so the two views can never drift apart on fields.
+const toFeedShare = (share, userId) => ({
+  id: share.id,
+  createdAt: share.created_at,
+  authorId: share.user_id,
+  isOwn: share.user_id === userId,
+  author: share.author,
+  content: share.entries?.content,
+  entryDate: share.entries?.entry_date,
+  likeCount: share.likes?.length ?? 0,
+  likedByMe: (share.likes ?? []).some((like) => like.user_id === userId),
+  commentCount: share.comments?.[0]?.count ?? 0,
+});
+
 export const HoneycombStore = {
   // --- Auth -----------------------------------------------------------
   async signUp(email, password, displayName) {
@@ -66,6 +87,19 @@ export const HoneycombStore = {
     if (error) throw error;
   },
 
+  // Only the addressee can move a row to 'blocked' (connections_update_addressee
+  // policy) — this only ever fires from an incoming request, never against an
+  // existing accepted connection you didn't originate. The row stays (not
+  // deleted), so `unique_pair` blocks the same requester from re-adding you.
+  async blockRequest(connectionId) {
+    const client = requireSupabase();
+    const { error } = await client
+      .from('honeycomb_connections')
+      .update({ status: 'blocked', responded_at: new Date().toISOString() })
+      .eq('id', connectionId);
+    if (error) throw error;
+  },
+
   async listIncomingRequests() {
     const client = requireSupabase();
     const {
@@ -97,39 +131,65 @@ export const HoneycombStore = {
     return (data ?? []).map((row) => (row.requester_id === user.id ? row.addressee : row.requester));
   },
 
+  // Project 6.7 — facts, not derived states (see the migration comment for
+  // why). Each row is { member_id, display_name, avatar_url, last_entry_date,
+  // last_note_received_at } for one accepted connection. Callers derive
+  // `blooming` with src/utils/hiveState.js; `active` was struck from MVP1
+  // entirely (R59, thread e10d0fed) — the Today comb's own membership filter
+  // already is "posted today," so a treatment true of every cell it can draw
+  // is not a signal. last_entry_date still ships as a plain fact (e.g. "last
+  // shared N days ago"), just not as an Active-state input.
+  async listHiveState() {
+    const client = requireSupabase();
+    const { data, error } = await client.rpc('list_hive_state');
+    if (error) throw error;
+    return data ?? [];
+  },
+
   // --- Entries & sharing -----------------------------------------------
-  async shareEntry({ date, text, theme }) {
+  // Takes the id of an existing entries row (EntryStore.saveEntry already
+  // wrote it) and marks it shared, rather than inserting a second row for
+  // the same day. Used to insert a fresh entries row from the passed-in
+  // text/theme — every share doubled that day's entry (one private, one
+  // shared-but-mislabeled-private), which inflated getAllEntries()' count
+  // for streak/Recap/Wrapped and left two cards for the same gratitude
+  // once a real 'entries.theme' column existed to tell them apart (thread
+  // 19e90cf8, Sage/Bumble, 2026-08-13). visibility: 'shared' also mirrors
+  // what the shares row already means, per the entries_hive_visibility
+  // migration comment.
+  async shareEntry({ entryId }) {
     const client = requireSupabase();
     const {
       data: { user },
     } = await client.auth.getUser();
 
-    const { data: entry, error: entryError } = await client
+    const { data: entry, error: updateError } = await client
       .from('entries')
-      .insert({ user_id: user.id, content: text, entry_date: date })
+      .update({ visibility: 'shared' })
+      .eq('id', entryId)
+      .eq('user_id', user.id)
       .select()
       .single();
-    if (entryError) throw entryError;
+    if (updateError) throw updateError;
 
     const { error: shareError } = await client.from('shares').insert({ entry_id: entry.id, user_id: user.id });
     if (shareError) throw shareError;
   },
 
+  // Was `.from('entries').select('id, shares(id)').eq('entry_date', date)
+  // .limit(1)` with no `.order()` — correct only while one entry per day
+  // was guaranteed. P0-2 (entries_hive_visibility migration) lifts that
+  // guarantee, so `.limit(1)` reads an unordered index and returns
+  // whichever row Postgres happens to store first — not random, reliably
+  // wrong: with no journal-then-share write order, that's consistently
+  // the day's first-inserted row, not the shared one (Sage measured 12/12
+  // runs, thread 19e90cf8, 2026-08-13). has_shared_date checks existence
+  // directly instead of reading one row's shares embed.
   async hasSharedDate(date) {
     const client = requireSupabase();
-    const {
-      data: { user },
-    } = await client.auth.getUser();
-    const { data, error } = await client
-      .from('entries')
-      .select('id, shares(id)')
-      .eq('user_id', user.id)
-      .eq('entry_date', date)
-      .limit(1);
+    const { data, error } = await client.rpc('has_shared_date', { p_date: date });
     if (error) throw error;
-    // shares(id) is a to-one embed (unique entry_id) — PostgREST returns an
-    // object, not an array, so `.length` is always undefined here.
-    return Boolean(data?.[0]?.shares?.id);
+    return Boolean(data);
   },
 
   // --- Feed ---------------------------------------------------------------
@@ -146,17 +206,61 @@ export const HoneycombStore = {
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) throw error;
-    return (data ?? []).map((share) => ({
-      id: share.id,
-      createdAt: share.created_at,
-      isOwn: share.user_id === user.id,
-      author: share.author,
-      content: share.entries?.content,
-      entryDate: share.entries?.entry_date,
-      likeCount: share.likes?.length ?? 0,
-      likedByMe: (share.likes ?? []).some((like) => like.user_id === user.id),
-      commentCount: share.comments?.[0]?.count ?? 0,
+    return (data ?? []).map((share) => toFeedShare(share, user.id));
+  },
+
+  // 8b.7 — hive_send_events (20260819000002) is a separate table from
+  // `shares` on purpose (see the migration comment): reusing shares would
+  // reopen the leak the entries_update_own mirror guard exists to close.
+  // Separate table means separate query; `kind: 'send'` is how
+  // HoneycombTab tells this card apart from a FeedCard share when merging
+  // the two lists for render.
+  async listSendEvents() {
+    const client = requireSupabase();
+    const {
+      data: { user },
+    } = await client.auth.getUser();
+    const { data, error } = await client
+      .from('hive_send_events')
+      .select(
+        'id, created_at, sender_id, recipient_id, sender:profiles!hive_send_events_sender_id_fkey(display_name, avatar_url), recipient:profiles!hive_send_events_recipient_id_fkey(display_name, avatar_url)'
+      )
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      kind: 'send',
+      id: row.id,
+      createdAt: row.created_at,
+      isSender: row.sender_id === user.id,
+      isRecipient: row.recipient_id === user.id,
+      senderName: row.sender?.display_name ?? 'Someone',
+      senderAvatarUrl: row.sender?.avatar_url,
+      recipientName: row.recipient?.display_name ?? 'Someone',
     }));
+  },
+
+  // The last-7-days window for the hive's week view. Filters on
+  // `entries.entry_date` — the day the gratitude is *about* — because
+  // that's the key the week view groups under; filtering on `created_at`
+  // instead could let a share slip into the window while its day header
+  // falls outside it. The `!inner` join is what makes the `.gte()` prune
+  // parent share rows rather than just nulling out the embed.
+  async listFeedSince(sinceISO) {
+    const client = requireSupabase();
+    const {
+      data: { user },
+    } = await client.auth.getUser();
+    const { data, error } = await client
+      .from('shares')
+      .select(
+        'id, created_at, user_id, author:profiles(display_name, avatar_url), entries!inner(content, entry_date), likes(user_id), comments(count)'
+      )
+      .gte('entries.entry_date', sinceISO)
+      .order('created_at', { ascending: false })
+      .limit(WEEK_FEED_LIMIT);
+    if (error) throw error;
+    return (data ?? []).map((share) => toFeedShare(share, user.id));
   },
 
   async toggleLike(shareId, currentlyLiked) {

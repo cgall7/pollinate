@@ -27,6 +27,13 @@
 //     in the same paragraph, and turns `profiles.phone_hash` real.
 //   * Flow C app-locking adds a data category this policy has no section for.
 //     It needs new copy, NOT a pre-written sentence — see below.
+//   * Daily-nudge open-rate or conversion metrics falsify two sentences here:
+//     "nothing here reports what you do back to us or to anyone else" in
+//     'The short version', and "We do not include analytics, attribution or
+//     crash-reporting tools" in 'What we do not do'. Cited by heading and by
+//     the sentence, not by line: a comment in this file moves the lines it
+//     cites, which is how the first draft of this entry shipped both numbers
+//     three short.
 //
 // On Flow C specifically, because the obvious reassuring line — "we can see
 // that you locked apps, we cannot see which ones" — is not one sentence:
@@ -79,7 +86,11 @@
 // predicate it derives through. (Caught by Sage.)
 const FILL = {
   LEGAL_ENTITY: {
-    value: null, // 'Gratitude', or the registered company name
+    // Still null on purpose after the Pollinate rebrand (§19.4): "Pollinate"
+    // is a product name, not a registered entity, and filling this with the
+    // app's name is exactly the false-fill the publish gate below exists to
+    // prevent. Wants the registered company name.
+    value: null,
     // Has to read as a noun phrase in two different sentences: "published by X"
     // in the policy and "an agreement between you and X" in the terms.
     placeholder: '[our legal name — to be named before launch]',

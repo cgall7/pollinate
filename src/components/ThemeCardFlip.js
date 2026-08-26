@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../constants/theme';
 import { SPRINGS, DURATIONS, useReducedMotionState } from '../constants/motion';
-import { StripedBee } from './StripedBee';
+import { KeepsakeBee } from './KeepsakeBee';
 
 // §14.2 Beat 3 "What You Loved" — one physical card that 3D-flips from a
 // gold back to reveal a theme word (Nunito ExtraBold) + one real entry
@@ -13,7 +13,7 @@ import { StripedBee } from './StripedBee';
 //
 // Built pre-replay on purpose (Pixel's merge-window call, 2026-08-11):
 // this file is new and its only deps (theme, motion, Bee) are outside
-// design-pass's 14-file diffstat. Wiring into GratitudeWrapped.js waits
+// design-pass's 14-file diffstat. Wiring into PollinateWrapped.js waits
 // for the settled tree per §12.5's build-order gate.
 const FLIP_PERSPECTIVE = 800;
 
@@ -82,16 +82,20 @@ export const ThemeCardFlip = ({ themeWord, snippet, caption, delay = 0, onReveal
         style={[
           styles.card,
           styles.back,
-          StyleSheet.absoluteFillObject,
+          StyleSheet.absoluteFill,
           { transform: [{ perspective: FLIP_PERSPECTIVE }, { rotateY: backRotate }] },
         ]}
       >
         {/* Much bigger than the 28pt glyph it replaces. The back is the full
             card — roughly 345 × 128 of unbroken gold — and drawing it at
             mock scale made the problem obvious: a 28pt bee on that field is
-            a speck, not a mark. `fieldColor` is the card's own gold, so the
-            band is cut out of the field rather than painted over it. */}
-        <StripedBee size={64} fieldColor={theme.colors.goldField} />
+            a speck, not a mark.
+
+            R83: the knockout is now carried by the mascot's own geometry
+            rather than by a `fieldColor` prop, so this takes no colour. The
+            band is still cut out of the field rather than painted over it —
+            the cut is in the asset's alpha, which is why it needs no field. */}
+        <KeepsakeBee size={64} />
       </Animated.View>
       <Animated.View
         style={[

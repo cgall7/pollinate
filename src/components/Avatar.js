@@ -33,6 +33,29 @@ const initialsFor = (name) => {
 
 export const avatarColorFor = (name) => AVATAR_WASHES[hashName(name || '') % AVATAR_WASHES.length];
 
+// The comb's own rotation (§18.1.2/R55, restated R59). A hive cell is an
+// 88pt surface, not a sub-40pt swatch, so it can't use AVATAR_WASHES: that
+// rotation contains `accent` and `accentDeep`, and at 88pt those read as
+// emphasis/selection (§11), not identity — a member who happens to hash to
+// marigold would look selected when nobody selected them. (R59 retired the
+// cap's other reason, "gold is reserved for the shared-today cell" — that
+// state doesn't exist in the comb — so this is the one the cap has always
+// actually rested on.) `washPeach` is out by its own token text ("no new
+// uses at any size"). These two are the only tokens whose own comments
+// permit a hive surface.
+//
+// Same `hashName`, so a name always yields the same circle/hex pair. That is
+// DETERMINISM, not correlation — mod 5 and mod 2 of one hash have no visible
+// relationship (Sam's circle is `accentDeep`, his hex `washSky`; Maya's are
+// `washSky` and `washYellow`). Determinism is the property worth having; the
+// word "correlated" promises a color match that was never there.
+//
+// Two tints and nothing distributing them: see the monochrome invariant in
+// demoHive.js before adding names to the demo set.
+const HEX_TINTS = [theme.colors.washYellow, theme.colors.washSky];
+
+export const hexTintFor = (name) => HEX_TINTS[hashName(name || '') % HEX_TINTS.length];
+
 export const Avatar = ({ name, avatarUrl, size = 48 }) => {
   const dimStyle = { width: size, height: size, borderRadius: size / 2 };
 
@@ -53,7 +76,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: theme.colors.glassRim,
   },
   image: {
     backgroundColor: theme.colors.surfaceBorder,

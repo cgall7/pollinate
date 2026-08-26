@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Animated } from 'react-native';
 import { theme } from '../constants/theme';
-import { DURATIONS, useReducedMotion } from '../constants/motion';
+import { DURATIONS, SPRINGS, useReducedMotion } from '../constants/motion';
 
 const RAY_COUNT = 18;
 const PARTICLE_COUNT = 7;
@@ -61,7 +61,7 @@ const Ray = ({ index, angle }) => {
   useEffect(() => {
     Animated.sequence([
       Animated.delay(300 + index * 60),
-      Animated.spring(progress, { toValue: 1, friction: 6, tension: 100, useNativeDriver: true }),
+      Animated.spring(progress, { toValue: 1, ...SPRINGS.ray, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -71,6 +71,14 @@ const Ray = ({ index, angle }) => {
         styles.ray,
         {
           opacity: progress,
+          // §28.13 correction 1: this is the one transform array in the app
+          // whose entries really are frozen. `progress` is the array's only
+          // node and it is a `useRef` value, so its identity never changes and
+          // the props node is never rebuilt — which bakes `rotate` and
+          // `translateY` into the native config at first commit. Both are
+          // constant (`angle` is fixed per ray, `RADIUS` is a module const), so
+          // the freeze is invisible and correct. It stops being either if a
+          // caller ever animates `angle`.
           transform: [{ rotate: `${angle}deg` }, { translateY: -RADIUS }, { scaleY: progress }],
         },
       ]}
@@ -112,7 +120,7 @@ const styles = StyleSheet.create({
   // (48, 48) offset this replaces was only correct inside a 96pt box, a
   // contract SealCrack violated within a day of it existing (R17 §1).
   stage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

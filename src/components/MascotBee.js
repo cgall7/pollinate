@@ -1,0 +1,200 @@
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Image, PixelRatio, StyleSheet } from 'react-native';
+import {
+  BREATH_BEAT_DEG,
+  BREATH_CYCLE_MS,
+  HINGE,
+  MASCOT_ASPECT,
+  MASCOT_BASE_PX,
+  MASCOT_WIDTH_FRACTION,
+  WING_BEAT_DEG,
+  WING_BEAT_MS,
+} from '../constants/mascot';
+
+// §19.5 / R79 — **the mascot itself, flying.** Colin: "never have any other
+// bee than our mascot." A redraw cannot satisfy that by construction — the
+// best flat cousin is still a likeness — so the character in flight is the
+// ratified 3D render, split into two layers so it can still beat its wings.
+//
+// **Why a split raster has parts.** R70 concluded it doesn't, off the render's
+// alpha: 89% fully opaque, no second population. That measured a *material*
+// property when separability is a *geometric* one — the only thing you cannot
+// recover is what something else is painted over. The wings sit entirely
+// behind and to the left of the body; body pixels straddle the wing span in 22
+// of 1254 rows, and those rows are legs, which belong to the body layer
+// anyway. So a mask splits it and nothing has to be painted back in.
+//
+// **The cutout does not use R70's luma key.** That recipe took alpha from
+// luminance against the black plate, which is right for the wings — genuinely
+// translucent, and bright enough that luma tracks their opacity — and wrong by
+// construction wherever the subject is dark. The mascot's dark pixels are its
+// bands, eyes, brows and antennae: every feature that carries the character.
+// Measured on the first split, the bands recomposited at median max-channel
+// 117 against the source's 42, because their alpha averaged 0.752 and the
+// cream ground came through. The yellow body reproduced exactly, which is why
+// the recipe looked solved — it had been validated on the pixels that could
+// not fail it. Alpha now comes from a filled subject mask (a dark band is
+// interior, whatever its luma) and the luma ramp survives only inside the wing
+// region. Bands rebuild at 17.0 against the source's 17.0.
+// Pipeline: `.scratch/r82-mascot-flight/build_layers.py`.
+//
+// **The character is not levelled.** Its body axis is drawn climbing (−45.6°
+// abdomen-to-head, −55.3° by thickness-weighted PCA — two measurements that
+// agree on a quantity which turns out not to decide anything). Rotating the
+// body level tips the *head*, because the head is already drawn upright: what
+// a viewer reads as the character's attitude is set by the face, not the body
+// axis. Rendered side by side at the four real cruise attitudes, the drawn
+// pose reads upright and airborne at every one and the levelled pose reads as
+// a face-plant. So the drawn pose IS the flight pose, and `bank` tips it from
+// there. Sheet: `.scratch/r82-mascot-flight/flight_attitudes.png`.
+//
+// Sizing is a drop-in for `StripedBee`: `size` is the box side, and the
+// character is drawn at `MASCOT_WIDTH_FRACTION` of it — the same fraction of
+// its box that StripedBee's drawing occupies (0.683), so every anchored call
+// site keeps its footprint. It comes out taller (0.708 vs 0.47 of the box),
+// which is the head and the trailing abdomen that StripedBee doesn't have.
+const WING = require('../../assets/mascot-wing.png');
+const BODY = require('../../assets/mascot-body.png');
+
+// Hero LOD, `design/pipeline/`-cut and landing with its first real mount
+// above `MASCOT_BASE_PX` (Lumen's ruling, thread 01325980, requirement 3) —
+// one writer for the character's pixels, so the bundle carries no megabytes
+// nothing draws until a caller actually needs them. Metro's dependency
+// collector treats a `require` wrapped in try/catch as an OPTIONAL
+// dependency: verified empirically (`expo export`, clean bundle, zero
+// warnings) that it does not fail resolution when the file is absent, unlike
+// a bare top-level `require` of a missing asset, which throws unconditionally
+// at bundle time regardless of whether the branch is ever reached. That is
+// what makes "switch first, asset later" buildable rather than just ordered.
+//
+// The pair is assigned atomically: both requires resolve into locals first,
+// and HERO_WING/HERO_BODY only commit together at the end of the try block.
+// If they were assigned directly and the pair ever half-landed (one file
+// present, one missing), the second require's throw would leave the first
+// one committed — hero wing over base body, a mixed-LOD state requirement 3
+// assumes can't happen because the pipeline always cuts both at once.
+let HERO_WING = null;
+let HERO_BODY = null;
+try {
+  const wing = require('../../assets/mascot-wing-hero.png');
+  const body = require('../../assets/mascot-body-hero.png');
+  HERO_WING = wing;
+  HERO_BODY = body;
+} catch (e) {
+  // Not cut yet, or cut incompletely. Falls through to the base raster.
+}
+
+// `beat` lets a caller drive the wing itself with an Animated.Value in [0,1].
+// The component owns the beat's GEOMETRY — where the hinge is, how far the
+// wing swings — and the caller may own its RHYTHM, which is the same split
+// §12.5.1b makes for springs: a named curve fixes shape, not duration. The
+// hero pose needs it: a held bee flicks twice and rests, and a bee that
+// buzzes continuously at 148pt reads like a loading spinner rather than a
+// character. `flutter` is the built-in loop for everything that is in transit.
+// `breath` is the doctrine's State 2 and it is the SAME channel as `flutter`,
+// not a second one. A perched bee and an airborne bee both move exactly one
+// thing — the wing, about its hinge — and they differ in how far and how
+// slowly. Giving Breath its own transform would be two mechanisms for one
+// gesture, and the first time they were both live the wing would carry two
+// drivers on one value (R83's rule, and R46's).
+//
+// So the mode picks the sweep and the rhythm, and nothing else changes:
+//
+//     flutter   18deg   80ms out, 80ms back      airborne
+//     breath     2deg   2100ms out, 2100ms back  perched
+//
+// `flutter` wins if both are passed. That is not a preference: an airborne bee
+// whose host also asked for breath is a host that has not noticed the bee took
+// off, and the wing that reads correctly there is the flying one.
+export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: driven, wingStyle }) => {
+  const own = useRef(new Animated.Value(0)).current;
+  const beat = driven ?? own;
+  const breathing = breath && !flutter;
+  const animated = flutter || breathing;
+
+  useEffect(() => {
+    if (!animated || driven) return undefined;
+    // The doctrine asks Breath for "ease-in-out, symmetric (not a spring — a
+    // measured breath)", and that is what a `timing` with no `easing` already
+    // is: `TimingAnimation.js:77` defaults to `easeInOut()`. So the curve is
+    // STATED here rather than changed — the flutter path keeps whatever the
+    // default is by continuing not to pass one, because writing the default
+    // out longhand on a shipped wingbeat is a behaviour change wearing a
+    // clarification's clothes if the two ever turn out not to be identical.
+    const halfMs = breathing ? BREATH_CYCLE_MS / 2 : WING_BEAT_MS;
+    const curve = breathing ? { easing: Easing.inOut(Easing.ease) } : null;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(own, { toValue: 1, duration: halfMs, ...curve, useNativeDriver: true }),
+        Animated.timing(own, { toValue: 0, duration: halfMs, ...curve, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animated, breathing, driven, own]);
+
+  const width = size * MASCOT_WIDTH_FRACTION;
+  const height = width / MASCOT_ASPECT;
+
+  // Hero LOD: a plain ternary, recomputed every render, never memoised — the
+  // hinge-offset hazard two comments down applies here too, and `size` is
+  // exactly the prop a memo would freeze. One dimension is enough because
+  // `MASCOT_ASPECT` makes both cross their limits together (see
+  // `MASCOT_BASE_PX`'s comment). Falls back to the base raster whenever the
+  // hero pair hasn't landed yet, independent of size.
+  const useHero = width * PixelRatio.get() > MASCOT_BASE_PX;
+  const wingSource = useHero && HERO_WING ? HERO_WING : WING;
+  const bodySource = useHero && HERO_BODY ? HERO_BODY : BODY;
+
+  // The wing pivots at its root, which is at (0.427, 0.505) of the character
+  // box and so *not* at the view's centre — RN rotates about the centre, so
+  // the pivot is composed by hand. R81's transform-order fact decides the
+  // order: RN folds the array left to right onto a row vector, so the last
+  // entry is applied first. Reading right to left this is
+  // `translate(−offset) → rotate → translate(+offset)`, i.e. rotation about
+  // the root. `transformOrigin` would express the same thing in one line;
+  // this way carries no assumption about how it is plumbed on either platform.
+  const offsetX = (HINGE.x - 0.5) * width;
+  const offsetY = (HINGE.y - 0.5) * height;
+  // §28.13 correction 1: the four offsets below are plain numbers sharing a
+  // natively driven transform array, which is the frozen-at-first-commit shape.
+  // They are live only because the `rotate` entry builds a NEW interpolation on
+  // every render: a new node identity changes the memo hook's composite key, so
+  // the props node is rebuilt and the offsets are re-read. **Hoisting that
+  // interpolate into a `useMemo` — the R89 pattern — silently freezes the wing
+  // hinge at whatever `size` was on first commit.** If it ever needs
+  // memoising, the offsets have to become nodes in the same change.
+  // The sweep is the mode's, and it is read here rather than at the top so the
+  // interpolation below is rebuilt on every render along with it — see the
+  // paragraph under this one, which is load-bearing.
+  const sweepDeg = breathing ? BREATH_BEAT_DEG : WING_BEAT_DEG;
+  const beatStyle = animated || driven
+    ? {
+        transform: [
+          { translateX: offsetX },
+          { translateY: offsetY },
+          {
+            rotate: beat.interpolate({
+              inputRange: [0, 1],
+              outputRange: [`-${sweepDeg / 2}deg`, `${sweepDeg / 2}deg`],
+            }),
+          },
+          { translateX: -offsetX },
+          { translateY: -offsetY },
+        ],
+      }
+    : null;
+
+  return (
+    <Animated.View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={{ width, height }}>
+        {/* Wings first: they are behind the body in the render, and that is
+            the whole reason the split is lossless. */}
+        <Animated.View style={[StyleSheet.absoluteFill, beatStyle, wingStyle]}>
+          <Image source={wingSource} style={{ width, height }} resizeMode="contain" />
+        </Animated.View>
+        <Image source={bodySource} style={{ width, height }} resizeMode="contain" />
+      </Animated.View>
+    </Animated.View>
+  );
+};

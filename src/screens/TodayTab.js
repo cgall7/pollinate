@@ -3,12 +3,18 @@ import { StyleSheet, View, Text, ActivityIndicator, ScrollView } from 'react-nat
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../constants/theme';
 import { EntryStore } from '../services/EntryStore';
+import { HiveStore } from '../services/HiveStore';
 import { FlyingBee } from '../components/FlyingBee';
+import { SUPPRESS_BEE } from '../constants/beeSuppression';
+import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { StreakBadge } from '../components/StreakBadge';
 import { StaggeredItem } from '../components/StaggeredItem';
-import { currentStreak, nextMilestone, startOfYear, endOfYear } from '../utils/dateRanges';
+import { FileToHive } from '../components/FileToHive';
+import { HiveCard } from '../components/HiveCard';
+import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
+import { currentStreak, nextMilestone } from '../utils/dateRanges';
+import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
 
 const greeting = (date) => {
   const hour = date.getHours();
@@ -31,24 +37,85 @@ const streakCaption = (streak) => {
 
 export const TodayTab = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [entry, setEntry] = useState(null);
   const [streak, setStreak] = useState(0);
-  const [total, setTotal] = useState(0);
+  // §32.2 — where the bee may land, held by the screen and read by the flight.
+  // Membership only: the coordinates are measured at the moment of choosing,
+  // so scrolling this list does not touch this value and does not re-render.
+  const perches = usePerchSet();
+  const [hives, setHives] = useState([]);
+  const [hivesError, setHivesError] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
         const now = new Date();
-        const [today, yearEntries] = await Promise.all([
-          EntryStore.getEntry(now),
-          EntryStore.getEntriesBetween(startOfYear(now), endOfYear(now)),
-        ]);
-        if (cancelled) return;
-        setEntry(today);
-        setStreak(currentStreak(yearEntries, now));
-        setTotal(yearEntries.length);
-        setLoading(false);
+        try {
+          const [today, allEntries] = await Promise.all([
+            EntryStore.getEntry(now),
+            EntryStore.getAllEntries(),
+          ]);
+          if (cancelled) return;
+          setError(false);
+          setEntry(today);
+          // Streak reads every entry, not just this year's — Recap already
+          // fixed this (RecapTab.js: "'BEST EVER' was measuring the calendar
+          // year, so a record set in December vanished on New Year's Day").
+          // Today had the same bug: a year-scoped streak resets to 1 on
+          // January 1st mid-run (Pixel, thread 19e90cf8, 2026-08-13).
+          // "THIS YEAR" stays year-scoped — it says so.
+          setStreak(currentStreak(allEntries, now));
+        } catch (err) {
+          // requireUserId (EntryStore.js) throws 'Not signed in' with no
+          // session — reachable via DEMO_MODE's Welcome skip link, which
+          // lands on Main with no auth. Without this catch, `loading` never
+          // flips and the tab spins forever instead of showing empty state
+          // (Sage/Pixel, thread 19e90cf8, 2026-08-13).
+          //
+          // `error` is what actually distinguishes this from a genuinely
+          // empty day (Pixel, thread 19e90cf8: setting entry/streak/total
+          // to their empty values here was asserting four specific false
+          // things — 0-day streak, 0 this year, "Write today to start your
+          // streak.", "Today's page is blank." — about a user we simply
+          // failed to read, not one who wrote nothing). §23 unknown state
+          // is Deezine's when it lands; this is the placeholder that keeps
+          // the read/write path honest until then.
+          if (cancelled) return;
+          console.warn('TodayTab: failed to load entries', err);
+          setError(true);
+          setEntry(null);
+          setStreak(0);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  // Independent of the journal fetch above and on its own error state — a
+  // failed hive list must not blank out an already-loaded journal (or vice
+  // versa), same reasoning as the `error` flag above: a read failure and a
+  // genuine zero-hives state are different facts and get different copy.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const list = await HiveStore.listHives();
+          if (cancelled) return;
+          setHivesError(false);
+          setHives(list);
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('TodayTab: failed to load hives', err);
+          setHivesError(true);
+          setHives([]);
+        }
       })();
       return () => {
         cancelled = true;
@@ -68,62 +135,150 @@ export const TodayTab = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* §12.2/§14.1: ambient cruise, default-on for Today idle. Absolutely
+      {/* §12.2/§14.1: ambient presence, default-on for Today idle. Absolutely
           positioned behind the content and never intercepts touches
-          (pointerEvents="none" throughout FlyingBee). */}
-      <FlyingBee active />
+          (pointerEvents="none" throughout FlyingBee).
 
+          §32.2 — `perches` is the whole of what the bee knows about this
+          screen. Passing null is how a state says "no bee": the error arm
+          withholds the badge and the CTA by design, and a mascot doing laps
+          over failure copy performs cheerfulness at failure (Lumen, ratified
+          2026-08-17). Note this is a DIFFERENT decision from the week feed's,
+          which suppresses itself structurally by declaring nothing to land on
+          — same outcome, and the two must not be collapsed into one rule,
+          because one is about tone and the other is about geometry. */}
+      {/* The third suppression, and the only one that is not a design
+          decision: `SUPPRESS_BEE` is the idle-motion instrument's control
+          build (`measure-bee-idle-motion.mjs`), off in every real build. It
+          sits at the call site with the other two because that is where this
+          screen already says who gets a bee — see the constant for why it
+          must not be read anywhere else. */}
+      {!SUPPRESS_BEE && <FlyingBee active perches={error ? null : perches} />}
+
+      <PerchField perches={perches}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScreenHeader
-          eyebrow={longDate(now)}
-          title={greeting(now)}
-          right={<StreakBadge streak={streak} />}
-        />
+        {/* DES-27 (Pixel, 2026-08-26, corrected): the header badge retired,
+            and NOT because the caption repeats it — `streakCaption` below
+            prints `nextMilestone(streak).remaining`, i.e. `target - streak`,
+            which equals the streak at exactly three values in 1..365 (7, 15,
+            30). At a 180-day streak the badge read `180` and this line reads
+            "185 days to 365." It goes because the corner is now the account
+            door's reserved column (`tabBarLayout.js`, DOOR_RESERVE) and
+            because this screen states the streak as a sentence rather than a
+            score — see the whisper's own comment below. Consequence, on
+            purpose: Today prints the streak length nowhere; Garden's
+            StatsCard does. */}
+        <ScreenHeader eyebrow={longDate(now)} title={greeting(now)} />
 
-        <StaggeredItem index={0}>
-          <View style={styles.streakCard}>
-            <Text style={styles.streakCaption}>{streakCaption(streak)}</Text>
-            <View style={styles.statDivider} />
-            <View style={styles.statRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{streak}</Text>
-                <Text style={styles.statLabel}>DAY STREAK</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{total}</Text>
-                <Text style={styles.statLabel}>THIS YEAR</Text>
-              </View>
-            </View>
-          </View>
-        </StaggeredItem>
+        {/* Sides used to be about x-extent: the bee sortied between these
+            anchors, and a set of full-width blocks all anchored on one side
+            gave him nothing to turn around for (R122). The Bee Doctrine
+            retires the idle sortie, so there is no set any more — there is one
+            RESIDENCE, marked `home` below, and the other anchors are errand
+            landing sites that nothing lands on yet.
+            What a side decides now is whether the bee stands on the words.
+            R122a: he rests AT the anchor (the hover that displaced him by one
+            17.3pt radius is retired with the rest of it), drawn centred on it,
+            spanning 30.07pt at size 44. On a left-aligned full-width block
+            `on: 'left'` is where the glyphs BEGIN — that is the live defect
+            this pass fixes, the streak caption reading "2 ays to 3." under a
+            resting bee — and `on: 'right'` is the trailing gutter. */}
+
+        {/* The streak, spoken instead of scored (Colin, UX Design thread
+            2026-08-17: quiet morning page). The scoreboard card's numerals
+            duplicated the header badge ("7") and Recap's year count; what
+            survives is the one line that was ever a goal rather than a
+            number. Hidden on error — a streak caption is an assertion about
+            a user we failed to read, not one who wrote nothing (Pixel,
+            thread 19e90cf8); the entry card below carries the error copy
+            alone, where before this state said it twice. */}
+        {!error && (
+          <StaggeredItem index={0}>
+            {/* HOME. Measured, not eyeballed: the block runs x 24..378 at
+                402pt wide, the longest caption ("You've caught every
+                milestone. Keep going.") sets 293.20pt at bodySm/PlusJakarta
+                Medium 14, so the glyphs end at 317.20 and the bee's character
+                spans 362.97..393.03. 45.77pt of clear gutter to his left,
+                8.97pt of screen to his right. */}
+            <PerchAnchor id="streak-whisper" on="right" at={0.5} home>
+              <Text style={styles.whisper}>{streakCaption(streak)}</Text>
+            </PerchAnchor>
+          </StaggeredItem>
+        )}
 
         <StaggeredItem index={1}>
+          <PerchAnchor id="entry-card" on="right" at={0.5}>
           {entry ? (
             <View style={styles.quoteCard}>
               <Text style={styles.themeBadge}>{entry.theme}</Text>
               <Text style={styles.gratitudeText}>"{entry.text}"</Text>
+              {/* DES-16 §4 — "File this to…". Zero hives or a failed hive
+                  read both withhold the affordance: the shelf below already
+                  owns the zero-hives door and the failure copy, and this
+                  card naming a destination class the user can't reach would
+                  be the §23.10 failure one register down. */}
+              {!hivesError && hives.length > 0 && <FileToHive entry={entry} hives={hives} />}
+            </View>
+          ) : error ? (
+            // No CTA: a failed read can't rule out today already having an
+            // entry, and the write button routes into saveEntry's update
+            // branch on a day that turns out to be shared — reopening the
+            // edit-after-share hazard Pixel's own enumeration had ruled
+            // latent (thread 19e90cf8). Placeholder copy; Deezine's when
+            // §23 lands.
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>We couldn't reach your journal.</Text>
+              <Text style={styles.emptyBody}>Check your connection and try again.</Text>
             </View>
           ) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>Today's page is blank.</Text>
               <Text style={styles.emptyBody}>
-                One line is enough. Write it, and your apps unlock for the day.
+                One line is enough. Write it, and your day opens.
               </Text>
               <PrimaryButton onPress={() => navigation.getParent()?.navigate('Lock')}>
                 Write today's entry
               </PrimaryButton>
             </View>
           )}
+          </PerchAnchor>
         </StaggeredItem>
 
-        {entry && (
-          <StaggeredItem index={2}>
-            <Text style={styles.footerText}>
-              Saved and unlocked. Share it with your hive, or come back tomorrow.
-            </Text>
-          </StaggeredItem>
-        )}
+        {/* Private Hives shelf (8b.2/8b.3, WP-1 §26.1). Indices 0–1 above
+            are the journal's; this is the next cascade step, so the two
+            shelves settle in reading order. The written-state footer that
+            used to sit between them narrated exactly what this shelf now IS
+            ("share it with your hive") — the affordance replaced its own
+            caption in the quiet-page cut. `hivesError` never blanks the
+            shelf into nothing — the door card still renders, since it's a
+            local navigation target with no data dependency, same reasoning
+            as the journal's own error branch not hiding its CTA. */}
+        <StaggeredItem index={2}>
+          <PerchAnchor id="hive-shelf" on="left" at={0.5}>
+          <View style={styles.hiveShelf}>
+            <Text style={styles.shelfLabel}>PRIVATE HIVES</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.hiveRow}
+            >
+              {hives.map((hive) => (
+                <HiveCard
+                  key={hive.id}
+                  hive={hive}
+                  onPress={() => navigation.getParent()?.navigate('HiveDetail', { hiveId: hive.id })}
+                />
+              ))}
+              <StartHiveDoorCard onPress={() => navigation.getParent()?.navigate('CreateHive')} />
+            </ScrollView>
+            {hivesError && (
+              <Text style={styles.hiveErrorText}>We couldn't reach your hives right now.</Text>
+            )}
+          </View>
+          </PerchAnchor>
+        </StaggeredItem>
       </ScrollView>
+      </PerchField>
     </View>
   );
 };
@@ -140,39 +295,12 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     paddingTop: 72,
-    paddingBottom: 140,
+    paddingBottom: TAB_CLEARANCE,
   },
-  streakCard: {
-    backgroundColor: theme.colors.washYellow,
-    borderRadius: theme.borderRadius.large,
-    padding: 24,
-    marginBottom: 16,
-  },
-  streakCaption: {
-    ...theme.type.bodyLg,
-    color: theme.colors.ink,
-    textAlign: 'center',
-  },
-  statDivider: {
-    height: 1,
-    backgroundColor: theme.colors.surfaceBorderStrong,
-    marginVertical: 20,
-  },
-  statRow: {
-    flexDirection: 'row',
-  },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    ...theme.type.display,
-    color: theme.colors.accentDeep,
-  },
-  statLabel: {
-    ...theme.type.label,
+  whisper: {
+    ...theme.type.bodySm,
     color: theme.colors.inkSoft,
-    marginTop: 4,
+    marginBottom: 16,
   },
   emptyCard: {
     backgroundColor: theme.colors.surface,
@@ -200,14 +328,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.surfaceBorder,
     borderRadius: theme.borderRadius.large,
-    padding: 28,
+    paddingHorizontal: 28,
+    paddingVertical: 40,
     alignItems: 'center',
     ...theme.shadows.card,
   },
   themeBadge: {
     ...theme.type.label,
     color: theme.colors.accentDeep,
-    backgroundColor: theme.colors.accentDeep + '1A',
+    backgroundColor: theme.colors.accentDeepWash,
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: theme.borderRadius.full,
@@ -216,15 +345,26 @@ const styles = StyleSheet.create({
   },
   gratitudeText: {
     fontFamily: theme.fonts.bodyItalic,
-    fontSize: 24,
+    fontSize: 26,
     color: theme.colors.ink,
     textAlign: 'center',
-    lineHeight: 34,
+    lineHeight: 37,
   },
-  footerText: {
+  hiveShelf: {
+    marginTop: 28,
+  },
+  shelfLabel: {
+    ...theme.type.label,
+    color: theme.colors.inkSoft,
+    marginBottom: 12,
+  },
+  hiveRow: {
+    gap: 12,
+    paddingRight: 8,
+  },
+  hiveErrorText: {
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
-    textAlign: 'center',
-    marginTop: 20,
+    marginTop: 12,
   },
 });
