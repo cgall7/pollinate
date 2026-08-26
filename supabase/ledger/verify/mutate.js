@@ -8,10 +8,17 @@ const mutations = {
   fundmatch: `drop trigger ledger_postings_funding_matches_invoice on public.ledger_postings;`,
   immutable: `drop trigger ledger_postings_immutable on public.ledger_postings;`,
   modeguard: `drop trigger strike_invoice_polls_mode_guard on public.strike_invoice_polls;`,
+  zapimmutable: `drop trigger nectar_zaps_immutable on public.nectar_zaps;`,
 };
+// zapimmutable drops a trigger the 19a service migration creates, so it must
+// inject after that migration applies; the ledger-core mutations inject after
+// the core schema as before.
+const anchor = MUT === 'zapimmutable'
+  ? "    check('19a service layer applies cleanly', true);"
+  : "    check('schema applies cleanly', true);";
 const patched = src.replace(
-  "    check('schema applies cleanly', true);",
-  `    check('schema applies cleanly', true);
+  anchor,
+  `${anchor}
     await client.query(${JSON.stringify(mutations[MUT])});
     console.log('  !! MUTATION ACTIVE: ${MUT}');`
 ).replace('const PORT = 55433;', 'const PORT = 55500;')

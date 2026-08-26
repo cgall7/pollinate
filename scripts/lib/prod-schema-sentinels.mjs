@@ -88,4 +88,18 @@ export const SENTINELS = {
     args: { p_hive_id: '00000000-0000-0000-0000-000000000000' },
     expect: '42501',
   },
+  // Same anon-revoke shape as seal_hive/seal_volume: record_zap is the 19a
+  // service layer's most load-bearing artifact, and anon has no EXECUTE on
+  // it, so 42501 is what "this migration landed" looks like from outside.
+  '20260826000005_nectar_sim_service': {
+    kind: 'rpc',
+    fn: 'record_zap',
+    args: {
+      p_zap_id: '00000000-0000-0000-0000-000000000000',
+      p_target_kind: 'entry',
+      p_target_id: '00000000-0000-0000-0000-000000000000',
+      p_amount_drops: 1,
+    },
+    expect: '42501',
+  },
 };
