@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useSvgId } from '../utils/svgId';
+import { svgStopProps } from '../utils/svgStopProps';
 
 // Corner-to-corner color wash behind a card, so hero content reads as
 // catching light instead of sitting on a flat white rect. Stops come from
@@ -10,7 +11,15 @@ import { useSvgId } from '../utils/svgId';
 // The shadow has to live on the outer `style` view: `overflow: hidden` is
 // what clips the wash to the rounded corners, and on the same node it
 // silently kills RN shadows on iOS.
-export const GradientCard = ({ colors, style, contentStyle, children }) => {
+//
+// `contentStyle` (the clip/fill/rim node) must stay unpadded. The wash's
+// `width="100%"`/`height="100%"` resolve against that node's *content* box
+// while `absoluteFill`'s insets resolve against its *padding* box — with
+// padding on this node those are two different boxes, and the wash falls
+// short on every side by the padding amount. `innerStyle` is a second,
+// padded node the wash never sizes against, so a caller's padding never
+// touches the box the percentage resolves to.
+export const GradientCard = ({ colors, style, contentStyle, innerStyle, children }) => {
   const gradientId = useSvgId('cardWash');
 
   return (
@@ -30,14 +39,14 @@ export const GradientCard = ({ colors, style, contentStyle, children }) => {
                 <Stop
                   key={color + i}
                   offset={`${(i / (colors.length - 1)) * 100}%`}
-                  stopColor={color}
+                  {...svgStopProps(color)}
                 />
               ))}
             </LinearGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradientId})`} />
         </Svg>
-        {children}
+        <View style={innerStyle}>{children}</View>
       </View>
     </View>
   );

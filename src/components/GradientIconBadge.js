@@ -4,6 +4,7 @@ import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { useSvgId } from '../utils/svgId';
+import { svgStopProps } from '../utils/svgStopProps';
 
 // A small colored-glass roundel behind a glyph — the category cue that lets
 // a stack of insight cards read at a glance instead of as a wall of
@@ -27,7 +28,7 @@ export const GradientIconBadge = ({
               <Stop
                 key={color + i}
                 offset={`${(i / (colors.length - 1)) * 100}%`}
-                stopColor={color}
+                {...svgStopProps(color)}
               />
             ))}
           </LinearGradient>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
@@ -15,6 +17,26 @@ import { tagEntry } from '../utils/themeTagger';
 import { HIVE_COVER_THEMES, REVIEW_CADENCE_OPTIONS } from '../constants/hiveThemes';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
+import { GradientCard } from '../components/GradientCard';
+import { BackButton } from '../components/BackButton';
+import { LinkButton } from '../components/LinkButton';
+import { SPRINGS } from '../constants/motion';
+
+// E6 — the checkmark used to pop in with no transition, simultaneous with
+// the E5 border-width jump. Border width is now constant (see
+// `themeCard`/`themeCardSelected`), so this is the only motion on select,
+// and it gets to be the whole event: a spring pop, not a hard cut.
+const SelectedCheck = () => {
+  const scale = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...SPRINGS.pop }).start();
+  }, [scale]);
+  return (
+    <Animated.View style={[styles.themeCheck, { transform: [{ scale }] }]}>
+      <Ionicons name="checkmark-circle" size={22} color={theme.colors.ink} />
+    </Animated.View>
+  );
+};
 
 // 8b.2 — Create Private Hive flow, one root-stack screen with four internal
 // beats (Design Language §2), the same shape Onboarding.js already uses for
@@ -33,8 +55,19 @@ export const CreateHiveFlow = ({ navigation }) => {
   const [saveError, setSaveError] = useState(false);
 
   const step = STEPS[stepIndex];
+  // E13 — leaving step 0 exits the flow entirely and every other state
+  // (subjectName, entryText) resets with it. Stepping back within the flow
+  // (stepIndex > 0) never loses anything, since this component's state
+  // persists across steps, so only the exit itself needs a guard.
   const goBack = () => {
     if (stepIndex === 0) {
+      if (subjectName.trim()) {
+        Alert.alert('Discard this hive?', "You'll lose what you've entered so far.", [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
+        ]);
+        return;
+      }
       navigation.goBack();
       return;
     }
@@ -52,7 +85,10 @@ export const CreateHiveFlow = ({ navigation }) => {
       if (body) {
         await HiveStore.addHiveEntry(hive.id, new Date(), body, tagEntry(body));
       }
-      navigation.navigate('Main', { screen: 'Today' });
+      // E12 — land inside the hive you just made, not on Today. Deezine is
+      // scoring the arrival ceremony separately; this is just the
+      // navigation it will land on top of.
+      navigation.navigate('HiveDetail', { hiveId: hive.id });
     } catch (err) {
       console.warn('CreateHiveFlow: failed to create hive', err);
       setSaveError(true);
@@ -63,13 +99,20 @@ export const CreateHiveFlow = ({ navigation }) => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, step !== 'who' && styles.containerCream]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <PressableScale onPress={goBack} style={styles.backButton} accessibilityLabel="Go back">
-          <Ionicons name="chevron-back" size={22} color={theme.colors.ink} />
-        </PressableScale>
+        <BackButton onPress={goBack} />
+      </View>
+
+      {/* E9 — four steps, no way to see how much of this you've committed
+          to. Dots, not a bar: the flow is a short fixed count of beats, not
+          a continuous fraction. */}
+      <View style={styles.progressRow} accessible={false} importantForAccessibility="no-hide-descendants">
+        {STEPS.map((s, i) => (
+          <View key={s} style={[styles.progressDot, i <= stepIndex && styles.progressDotActive]} />
+        ))}
       </View>
 
       {step === 'who' && (
@@ -87,9 +130,6 @@ export const CreateHiveFlow = ({ navigation }) => {
           <Text style={styles.helpText}>
             You'll be the only one who sees this hive unless you choose to send it later.
           </Text>
-          <PrimaryButton onPress={goNext} disabled={!subjectName.trim()} style={styles.cta}>
-            Next
-          </PrimaryButton>
         </View>
       )}
 
@@ -103,31 +143,32 @@ export const CreateHiveFlow = ({ navigation }) => {
                 <PressableScale
                   key={themeOption.id}
                   onPress={() => setCoverTheme(themeOption.id)}
-                  style={[
-                    styles.themeCard,
-                    { backgroundColor: themeOption.base },
-                    selected && styles.themeCardSelected,
-                  ]}
+                  style={[styles.themeCard, selected && styles.themeCardSelected]}
+                  containerStyle={styles.themeCardContainer}
                   accessibilityLabel={`${themeOption.label} cover${selected ? ', selected' : ''}`}
                 >
-                  {selected && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={22}
-                      color={theme.colors.ink}
-                      style={styles.themeCheck}
-                    />
-                  )}
-                  <Text style={[styles.themeLabel, { color: themeOption.textColor }]}>
-                    {themeOption.label}
-                  </Text>
+                  {/* E2/E3 — the cover never touches the page. It's an inset
+                      fill inside this `surface` mat (the mat is what
+                      `themeCard`'s own background renders), so separation is
+                      always cover-vs-white regardless of which ground the
+                      picker sits on, or which cover gets added next. The
+                      hairline rim + sheen are the material; the mat is the
+                      frame. */}
+                  <GradientCard
+                    style={styles.themeMaterial}
+                    contentStyle={[styles.themeFill, { backgroundColor: themeOption.base }]}
+                    innerStyle={styles.themeFillInner}
+                    colors={theme.gradients.sheen}
+                  >
+                    {selected && <SelectedCheck />}
+                    <Text style={[styles.themeLabel, { color: themeOption.textColor }]}>
+                      {themeOption.label}
+                    </Text>
+                  </GradientCard>
                 </PressableScale>
               );
             })}
           </View>
-          <PrimaryButton onPress={goNext} style={styles.cta}>
-            Next
-          </PrimaryButton>
         </View>
       )}
 
@@ -151,9 +192,6 @@ export const CreateHiveFlow = ({ navigation }) => {
               </PressableScale>
             );
           })}
-          <PrimaryButton onPress={goNext} style={styles.cta}>
-            Create Hive
-          </PrimaryButton>
         </View>
       )}
 
@@ -169,26 +207,42 @@ export const CreateHiveFlow = ({ navigation }) => {
             multiline
             maxLength={10000}
           />
-          {saveError && (
-            <Text style={styles.errorText}>Couldn't save the hive. Check your connection and try again.</Text>
-          )}
-          <PrimaryButton
-            onPress={() => finish(true)}
-            disabled={saving}
-            style={styles.cta}
-          >
-            Save & Start Writing
-          </PrimaryButton>
-          <PressableScale
-            onPress={() => finish(false)}
-            disabled={saving}
-            style={styles.skipLink}
-            accessibilityLabel="Skip and go to Today"
-          >
-            <Text style={styles.skipLinkText}>Skip & Go to Today</Text>
-          </PressableScale>
         </ScrollView>
       )}
+
+      {/* E10 — this footer sits outside every step's content container
+          (a plain View for the first three steps, a ScrollView for
+          'entry'), so it's the one CTA anchor point that's never asked to
+          pin itself inside a ScrollView, where `marginTop: 'auto'` is a
+          no-op. Every step renders through this same footer instead of
+          carrying its own pinned button. */}
+      <View style={styles.footer}>
+        {step === 'entry' && saveError && (
+          <Text style={styles.errorText}>Couldn't save the hive. Check your connection and try again.</Text>
+        )}
+        {step === 'who' && (
+          <PrimaryButton onPress={goNext} disabled={!subjectName.trim()}>
+            Next
+          </PrimaryButton>
+        )}
+        {step === 'cover' && <PrimaryButton onPress={goNext}>Next</PrimaryButton>}
+        {step === 'cadence' && <PrimaryButton onPress={goNext}>Create Hive</PrimaryButton>}
+        {step === 'entry' && (
+          <>
+            <PrimaryButton onPress={() => finish(true)} loading={saving}>
+              Save & Start Writing
+            </PrimaryButton>
+            <LinkButton
+              onPress={() => finish(false)}
+              disabled={saving}
+              style={styles.skipLink}
+              accessibilityLabel="Skip writing an entry and open the new hive"
+            >
+              Skip for Now
+            </LinkButton>
+          </>
+        )}
+      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -196,23 +250,30 @@ export const CreateHiveFlow = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // E8 — one ground for all four steps. `washYellow` is `theme.js`'s own
+    // "activation staging included" wash; a creation flow is exactly that.
+    // The old per-step swap (`background` on steps 2-4) was too small a
+    // shift to read as intent and just large enough to read as a glitch.
     backgroundColor: theme.colors.washYellow,
-  },
-  containerCream: {
-    backgroundColor: theme.colors.background,
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 24,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
+  progressRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    ...theme.shadows.card,
+    gap: 8,
+    paddingTop: 16,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surfaceBorderStrong,
+  },
+  progressDotActive: {
+    backgroundColor: theme.colors.ink,
   },
   content: {
     flex: 1,
@@ -238,27 +299,71 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     marginTop: 16,
   },
-  cta: {
-    marginTop: 'auto',
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   themeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+  },
+  // Layout-positioning keys (width, margin) belong on PressableScale's
+  // `containerStyle`, not `style` — `style` only ever reaches the inner
+  // transform layer, one node too deep to participate in `themeGrid`'s
+  // flex-wrap row at all (PressableScale.js's own R43 note). Landing them
+  // on `style` instead left the real flex item (the outer Pressable)
+  // sized by shrink-to-content while its child asked for '48%' of that
+  // same shrinking box — circular, and it silently resolved to the
+  // swatch's own content width instead of the grid math below.
+  themeCardContainer: {
+    // 48 + 48 = 96% < 100%: two per row can never overflow regardless of
+    // container width, because the slack is distributed by
+    // `justifyContent` instead of added by a `gap` on top of a fitted
+    // percentage (E4 — the three-across grid silently reflowed to two on
+    // narrower devices and always rendered an orphan 4th card either way).
+    width: '48%',
+    marginBottom: 12,
   },
   themeCard: {
-    width: '31%',
     aspectRatio: 1,
     borderRadius: theme.borderRadius.medium,
+    // E2/E3 — this is the mat, not the cover. `surface` white is the frame
+    // every cover material insets into, so cover-vs-ground separation is
+    // always cover-vs-white and never depends on which page ground a cover
+    // happens to share a value with.
+    backgroundColor: theme.colors.surface,
+    padding: 6,
+    ...theme.shadows.card,
+    // E5 — border width is constant at 3 whether selected or not, so
+    // selecting a card never shifts its contents. Unselected sits at
+    // transparent; the visible rim is a colour change, not a layout change.
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
+  themeCardSelected: {
+    // E7 — §4's law is "yellow never fills it"; a border is a fill of the
+    // edge. `ink` also reads at higher contrast against these near-white
+    // covers than `accent` ever did.
+    borderColor: theme.colors.ink,
+  },
+  themeMaterial: {
+    flex: 1,
+  },
+  themeFill: {
+    flex: 1,
+    borderRadius: theme.borderRadius.medium - 6,
+    // The hairline rim Lumen's ruling calls for on every cover surface —
+    // separation is guaranteed by the rim regardless of the base value,
+    // rather than depending on anyone re-checking ΔE00 by eye forever.
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorderStrong,
+  },
+  themeFillInner: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
     padding: 10,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-  },
-  themeCardSelected: {
-    borderWidth: 3,
-    borderColor: theme.colors.accent,
   },
   themeCheck: {
     position: 'absolute',
@@ -324,12 +429,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   skipLink: {
-    alignItems: 'center',
+    alignSelf: 'center',
     marginTop: 16,
-    padding: 12,
-  },
-  skipLinkText: {
-    ...theme.type.bodySm,
-    color: theme.colors.inkSoft,
   },
 });
