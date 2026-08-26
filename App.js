@@ -213,12 +213,12 @@ export default function App() {
               {(props) => (
                 <InputScreen
                   {...props}
-                  onUnlock={async (text) => {
+                  onUnlock={async (text, paper) => {
                     // InputScreen stopped saving itself when the pre-auth
                     // onboarding paths started buffering its text instead
                     // (P0-2 fix, thread 19e90cf8). This is the one caller with
                     // a real session already — it owns the write now.
-                    await EntryStore.saveEntry(new Date(), text, tagEntry(text));
+                    await EntryStore.saveEntry(new Date(), text, tagEntry(text), paper);
                     props.navigation.replace('Main');
                     // §4.1's save-side re-arm, and it sits AFTER the
                     // navigation on purpose (Sage, 250bc4e9). This promise is

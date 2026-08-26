@@ -9,6 +9,7 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 
 const longDate = (isoDate) => {
   // entry_date is a plain 'YYYY-MM-DD' — parsing it as local midnight
@@ -180,9 +181,11 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         renderItem={({ item }) => (
           <View style={styles.entryCard}>
             <Text style={styles.entryDate}>{longDate(item.date)}</Text>
-            <Text style={styles.entryText} numberOfLines={4}>
-              {item.text}
-            </Text>
+            <PaperBlock paper={item.paper}>
+              <Text style={[styles.entryText, { color: paperInk(item.paper) }]} numberOfLines={4}>
+                {item.text}
+              </Text>
+            </PaperBlock>
           </View>
         )}
       />

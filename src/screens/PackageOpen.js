@@ -11,6 +11,7 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { NectarConsentSheet } from '../components/NectarConsentSheet';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
 import {
   STUB_GRAMMAR,
@@ -244,7 +245,9 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                 style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
               >
                 <ScrollView style={styles.entryScrollView} contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.entryText}>{step.text}</Text>
+                  <PaperBlock paper={step.paper}>
+                    <Text style={[styles.entryText, { color: paperInk(step.paper) }]}>{step.text}</Text>
+                  </PaperBlock>
                 </ScrollView>
                 {!nectarConsent && (
                   <PressableScale

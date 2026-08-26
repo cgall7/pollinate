@@ -102,4 +102,7 @@ export const SENTINELS = {
     },
     expect: '42501',
   },
+  // Same shape as 20260813000006_entries_theme_column — a plain nullable
+  // text column, no RLS change (sealed-hive immutability already covers it).
+  '20260826000007_entries_paper': { kind: 'column', table: 'entries', column: 'paper' },
 };

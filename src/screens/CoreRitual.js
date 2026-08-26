@@ -21,6 +21,7 @@ import { GlowOrb } from '../components/GlowOrb';
 import { WelcomeBee } from '../components/WelcomeBee';
 import { CelebrationBadge } from '../components/CelebrationBadge';
 import { CelebrationRays } from '../components/CelebrationRays';
+import { PaperPicker } from '../components/PaperPicker';
 import { DEMO_CONTENT } from '../constants/demoMode';
 
 // --- COMPONENT: LockScreen ---
@@ -92,6 +93,7 @@ export const LockScreen = ({ onOpen }) => {
 // --- COMPONENT: InputScreen ---
 export const InputScreen = ({ onUnlock }) => {
   const [text, setText] = useState('');
+  const [paper, setPaper] = useState(null);
   const [unlocking, setUnlocking] = useState(false);
   const formAnim = useRef(new Animated.Value(1)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -168,7 +170,7 @@ export const InputScreen = ({ onUnlock }) => {
           // forever with unlocking stuck true and no way to retry.
           // Promise.resolve wraps the demo-mode caller too (Onboarding.js's
           // LockDemoStep.onSave is synchronous), so this is safe either way.
-          Promise.resolve(onUnlock(text)).catch(() => {
+          Promise.resolve(onUnlock(text, paper)).catch(() => {
             Alert.alert("Couldn't save", "Your entry didn't save — try again.");
             Animated.parallel([
               Animated.timing(overlayOpacity, {
@@ -228,6 +230,10 @@ export const InputScreen = ({ onUnlock }) => {
             editable={!unlocking}
             maxLength={10000}
           />
+        </View>
+
+        <View style={styles.paperPickerWrap}>
+          <PaperPicker paper={paper} onChange={setPaper} />
         </View>
 
         <PrimaryButton onPress={handleSave} disabled={!text.trim() || unlocking}>
@@ -305,9 +311,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.surfaceBorder,
     borderRadius: theme.borderRadius.large,
     padding: 24,
-    marginBottom: 40,
+    marginBottom: 24,
     minHeight: 200,
     ...theme.shadows.card,
+  },
+  paperPickerWrap: {
+    marginBottom: 24,
   },
   textInput: {
     fontFamily: theme.fonts.body,

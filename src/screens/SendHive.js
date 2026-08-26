@@ -8,6 +8,7 @@ import { HiveStore } from '../services/HiveStore';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { BackButton } from '../components/BackButton';
 import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
 
@@ -134,7 +135,9 @@ export const SendHiveScreen = ({ navigation, route }) => {
           {entries.map((entry) => (
             <View key={entry.id} style={styles.entryCard}>
               <Text style={styles.entryDate}>{longDate(entry.date)}</Text>
-              <Text style={styles.entryText}>{entry.text}</Text>
+              <PaperBlock paper={entry.paper}>
+                <Text style={[styles.entryText, { color: paperInk(entry.paper) }]}>{entry.text}</Text>
+              </PaperBlock>
             </View>
           ))}
         </ScrollView>

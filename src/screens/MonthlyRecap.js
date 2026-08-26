@@ -8,6 +8,7 @@ import { StaggeredItem } from '../components/StaggeredItem';
 import { PressableScale } from '../components/PressableScale';
 import { ThemeCardFlip } from '../components/ThemeCardFlip';
 import { StripePattern } from '../components/StripeTexture';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { useSvgId } from '../utils/svgId';
 import { tagEntry } from '../utils/themeTagger';
 import { COLS, HEX_ASPECT, combLayout, hexAt, hexPoints } from '../utils/combGeometry';
@@ -157,7 +158,9 @@ const DayRevealCard = ({ monthName, day, entries, progress, reduced, w, h }) => 
 
     {entries.map((entry, index) => (
       <View key={`${entry.date}-${index}`} style={index > 0 && styles.revealEntryRule}>
-        <Text style={styles.revealQuote}>“{entry.text}”</Text>
+        <PaperBlock paper={entry.paper}>
+          <Text style={[styles.revealQuote, { color: paperInk(entry.paper) }]}>“{entry.text}”</Text>
+        </PaperBlock>
         <Text style={styles.revealTheme}>{entry.theme || tagEntry(entry.text)}</Text>
       </View>
     ))}

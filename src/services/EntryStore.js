@@ -34,6 +34,7 @@ const toEntry = (row) => ({
   theme: row.theme,
   savedAt: row.created_at,
   visibility: row.visibility,
+  paper: row.paper,
 });
 
 export const EntryStore = {
@@ -42,7 +43,10 @@ export const EntryStore = {
   // overwrite-on-resave behavior — editing the same day's entry twice
   // was never two entries, and shareEntry (HoneycombStore.js) depends on
   // there being exactly one row per day to share, not a second copy.
-  async saveEntry(date, text, themeTag) {
+  // `paper` defaults to null (Cream) — the one paid choice is 'evening'
+  // (entries_paper_valid, 20260826000007). Existing callers that don't pass
+  // it keep writing Cream, unchanged.
+  async saveEntry(date, text, themeTag, paper = null) {
     const client = requireSupabase();
     const userId = await requireUserId(client);
     const key = toISODate(date);
@@ -59,7 +63,7 @@ export const EntryStore = {
     if (existing) {
       const { data, error } = await client
         .from('entries')
-        .update({ content: text, theme: themeTag })
+        .update({ content: text, theme: themeTag, paper })
         .eq('id', existing.id)
         .select()
         .single();
@@ -69,7 +73,7 @@ export const EntryStore = {
 
     const { data, error } = await client
       .from('entries')
-      .insert({ user_id: userId, content: text, entry_date: key, theme: themeTag })
+      .insert({ user_id: userId, content: text, entry_date: key, theme: themeTag, paper })
       .select()
       .single();
     if (error) throw error;

@@ -21,6 +21,7 @@ const toFeedShare = (share, userId) => ({
   author: share.author,
   content: share.entries?.content,
   entryDate: share.entries?.entry_date,
+  paper: share.entries?.paper,
   likeCount: share.likes?.length ?? 0,
   likedByMe: (share.likes ?? []).some((like) => like.user_id === userId),
   commentCount: share.comments?.[0]?.count ?? 0,
@@ -201,7 +202,7 @@ export const HoneycombStore = {
     const { data, error } = await client
       .from('shares')
       .select(
-        'id, created_at, user_id, author:profiles(display_name, avatar_url), entries(content, entry_date), likes(user_id), comments(count)'
+        'id, created_at, user_id, author:profiles(display_name, avatar_url), entries(content, entry_date, paper), likes(user_id), comments(count)'
       )
       .order('created_at', { ascending: false })
       .limit(50);
@@ -254,7 +255,7 @@ export const HoneycombStore = {
     const { data, error } = await client
       .from('shares')
       .select(
-        'id, created_at, user_id, author:profiles(display_name, avatar_url), entries!inner(content, entry_date), likes(user_id), comments(count)'
+        'id, created_at, user_id, author:profiles(display_name, avatar_url), entries!inner(content, entry_date, paper), likes(user_id), comments(count)'
       )
       .gte('entries.entry_date', sinceISO)
       .order('created_at', { ascending: false })

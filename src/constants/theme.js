@@ -95,6 +95,19 @@ const pigment = {
   // next scrim being eyeballed against the wrong one.
   inkVeil: '#1A1500',
   inkSoft: '#6B5F3D', // Secondary text — ~6.1:1 on Sunlit Cream, AA-compliant.
+
+  // Entry paper — Evening (ENTRY_EXPRESSION_BRIEF.md, ratified 2026-08-26).
+  // A dark paper is a GROUND, not a text role, so it is its own pigment —
+  // never `ink`/`inkVeil` reused (ΔE00 7.5/9.7 from each, measured). Cream
+  // needs no token: it IS `backgroundWriting`, unchanged.
+  paperEvening: '#3A2F1F',
+  // The ONLY two inks ever painted inside a `paper === 'evening'` region.
+  // No alpha-of-ink token (`surfaceBorder`, `trackDim`, `pressedOnLight`,
+  // the family) may render there — R-EXT's dark-paper ink gate: dimming
+  // assumes a light ground, so on Evening it moves the mark toward the
+  // paper instead of away from it (§2.1, contrast tables).
+  paperEveningInk: '#E5D5B8', // 9.05:1 on paperEvening
+  paperEveningInkSoft: '#D0BFA0', // 7.25:1 on paperEvening
   textPrimary: '#221B03', // Alias of `ink`, kept for existing call sites.
   textSecondary: '#6B5F3D', // Alias of `inkSoft`, kept for existing call sites.
   textInverse: '#221B03', // Dark text for use on top of bright accent/accentDeep surfaces
@@ -284,6 +297,11 @@ export const theme = {
     bodyMedium: 'PlusJakartaSans-Medium',
     bodySemiBold: 'PlusJakartaSans-SemiBold',
     bodyItalic: 'PlusJakartaSans-Italic',
+    // Entry rendering ONLY (ENTRY_EXPRESSION_BRIEF.md ratification #5) —
+    // never headers/UI. Nunito keeps the app, Dancing Script keeps the
+    // wordmark. Weight/cut is Deezine's to confirm; Regular is the one
+    // face/one weight shipped here pending that pass.
+    entryDisplay: 'PlayfairDisplay-Regular',
   },
   spacing: {
     xs: 4,
@@ -313,6 +331,13 @@ export const theme = {
     label: { fontFamily: 'PlusJakartaSans-SemiBold', fontSize: 12, lineHeight: 16, letterSpacing: 2, textTransform: 'uppercase' },
     button: { fontFamily: 'Nunito-Bold', fontSize: 17, lineHeight: 22, letterSpacing: 0 },
     logo: { fontFamily: 'DancingScript-Bold', fontSize: 44 },
+    // Entry rendering ONLY — see `fonts.entryDisplay`. Voice's length-scaling
+    // ("a short entry renders monumental") is a separate, unspecified build
+    // lane (no thresholds pinned anywhere yet); this token is minted per the
+    // Tokens step of ENTRY_EXPRESSION_BRIEF.md's hardened spec but has no
+    // call site in this PR. Size matches `display` pending Deezine's weight/
+    // cut confirmation.
+    entryDisplay: { fontFamily: 'PlayfairDisplay-Regular', fontSize: 28, lineHeight: 34 },
   },
   // Two weights of elevation: `card` for content at rest, `floating` for
   // anything that should feel pressable/afloat (primary buttons, tab bar,
