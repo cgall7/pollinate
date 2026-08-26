@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   flash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.accentBurst,
   },
 });
