@@ -272,6 +272,165 @@ Entries live in `gratitude_entries_v1` as a local blob tied to no user. A year o
 | What's the most urgent task? | **Run the Supabase migration. Then fix journal storage. Both block testing.** |
 | What does Slice 1 validate? | **Social gratitude + delayed delivery (seeds). Not money.** |
 
+---
+
+## Amendment — 2026-08-25 (V2 direction: the six open rulings, closed)
+
+These close §6 of `POLLINATE_V2_SPEC.md`. That section is now empty — there is
+nothing left waiting on me. Full reasoning lives in the spec; this is the
+decision and what it means for your branch.
+
+### 1. Volumes replace one-shot seal — **YES**
+
+This isn't a feature, it's correcting a modelling error. Today's schema asserts
+*a hive is a gift*. The product says *a hive is a relationship*. While those are
+the same object, "a volume every birthday until he's 18" isn't a hard feature —
+it's unrepresentable. Everything in Project 17 hangs off it, and so does the
+legacy tier, which §17.5.2b just made the answer for our flagship use case.
+
+Three things are acceptance criteria, not suggestions (spec §17.1a):
+
+- **The client does not change.** A `BEFORE INSERT` trigger resolves `volume_id`
+  from the hive's open volume. "HiveStore starts setting it" is the wrong fix —
+  we don't control when users update, and an old binary would insert NULL forever.
+- **One open volume per hive is a DB guarantee** — partial unique index on
+  `(hive_id) where sealed_at is null`, so the trigger is deterministic and a
+  double-seal race errors instead of corrupting.
+- **ENG-46 ships as two migrations** — additive first (table, column, index,
+  trigger, backfill), re-point second. There must be no window where the client
+  writes NULL against policies that require it.
+
+### 2. Web reveal requires no install — **YES**
+
+If an 18-year-old has to hit an App Store page before reading eighteen years of
+letters from his mother, we've lost at the finish line. Nestori already advertises
+"no app required" and they're right to.
+
+Deezine: **DES-17** is a timing-and-easing spec that gets implemented twice, RN
+and browser — not an implementation. No Expo-only primitives in the shared reveal
+path. (Note: DES-14 and DES-17 got crossed in a recent thread — DES-14 is Pixel's
+relationship chip row. The critical-path item is DES-17.)
+
+### 3. Multi-writer hives — **YES on the product, scoped narrower**
+
+A six-author hive is new ground — Storyworth is single-author, Nestori is
+parent→child — and it's the only growth loop we have that doesn't need a feed.
+Four constraints before Sage ratifies a shape (spec §18.1a):
+
+- **Sequenced after volumes land and settle.** Contributor RLS joins through
+  `volume_id → hive_volumes.sealed_at`; building it mid-migration doubles the
+  recursion surface for nothing.
+- **`is_collective` set at creation, immutable.** Solo or collective from birth.
+  Converting later would retroactively expose existing entries to a new reader.
+- **Sage's 08-15 call stays right.** It argued about a hive with an audience of
+  one whose subject isn't a party to it — that's still every solo hive, and those
+  policies don't move. What's new is a hive with multiple *authors*, which the
+  08-15 reasoning never contemplated. Scoped extension, not repudiation.
+- **Contributor removal, ruled now so it can't stall the build:** removal stops
+  new writes and deletes nothing. Entries were written for the *subject*, not the
+  owner — an owner must not be able to erase someone else's gift to their child.
+  A contributor may delete their own entries while the volume is open. After
+  seal, immutable for everyone.
+
+Sage still owns the recursion-safe shape. Product is unblocked; no branch until
+that's signed off.
+
+### 4. Simulated nectar before real sats — **YES**
+
+Non-negotiable. It's the cheapest possible test of the riskiest assumption we
+have. If nobody zaps fake nectar, we've saved ourselves an SDK integration, a
+DUNS number, a legal opinion and an App Review fight.
+
+### 5. Bitcoin stays out of store-facing copy — **YES, with the boundary stated**
+
+Appears in: the wallet consent screen, Settings, ToS/Privacy Policy, and **App
+Review Notes, where it is mandatory.** Never appears in: App Store title,
+subtitle, description, keywords, screenshots, or the marketing site.
+
+"Out of store-facing copy" must never drift into "hidden from Apple" — concealing
+wallet functionality from review is a 2.3.1(a) violation and a rejection. Loud to
+Apple, quiet to users.
+
+### 6. Apple Organization enrolment — **YES, starting now**
+
+And it's decoupled from the bitcoin decision. Three reasons, only one of which is
+19b: 3.1.5(i) requires it for any wallet; converting Individual → Organization
+later is a real migration I don't want to run mid-launch; and an Individual
+account publishes under my personal legal name, which is the wrong signal for a
+product asking strangers to trust it with eighteen years of letters to their kid.
+
+Even if we killed bitcoin tomorrow I'd still enrol as an Organization. It's the
+longest lead item in the plan and it's pure paperwork — it runs in the background
+while everything else proceeds.
+
+### Summary — 2026-08-25
+
+| Question | Answer |
+|---|---|
+| Volumes replace one-shot seal? | **Yes.** Two migrations, DB-side `volume_id` resolver, client unchanged. |
+| Web reveal needs no install? | **Yes.** DES-17 is a portable spec, not an implementation. |
+| Multi-writer hives? | **Yes** — after volumes, opt-in at birth, immutable, Sage owns the RLS shape. |
+| Simulated nectar first? | **Yes.** No 19b work before 19a has tester data. |
+| Bitcoin in store copy? | **No** — but loud in App Review Notes. Never hidden from Apple. |
+| Apple Organization account? | **Yes. Started now**, regardless of whether bitcoin ships. |
+| Anything still waiting on me? | **No. Spec §6 is empty.** |
+
+
+---
+
+## Amendment — 2026-08-26 (navigation: three tabs, door to the top right)
+
+**This supersedes the 2026-08-17 tab bar ruling.** Full design spec:
+`POLLINATE_V2_NAVIGATION.md`.
+
+### The tab bar is now three: `Today | Hive | Garden`
+
+**Wallet is removed.** Spec §5.2(b) already ruled that the honeycomb *is* the
+wallet — your balance is honey filling your own hexagon, not a number on a fifth
+screen. A Wallet tab would leave a permanent, empty, crypto-shaped hole in the
+tab bar of a gratitude app: wrong for users, wrong for App Review, wrong for our
+positioning. The tab bar was the last place the old wallet plan was still
+standing. It's gone.
+
+Three tabs is better on its own terms anyway — Today writes, Hive connects,
+Garden reflects. Three verbs, nothing extra to explain.
+
+### The account door moves to the top right
+
+One render site in `MainTabs`, not per-screen headers — it must not drift a pixel
+between tabs, and `headerShown: false` stays false everywhere. Because it no
+longer sits beside the capsule, the capsule is symmetric at full width and the
+signed-out and signed-in tab bars become identical.
+
+### Where money lives, since it has no tab
+
+> **Emotional and frequent lives in the comb. Administrative and rare lives
+> behind the door. Neither gets a tab.**
+
+Zaps happen in the moment — the reveal, an entry, a hexagon. Balance is honey in
+your hex on the Hive tab. Funding, withdrawal and the Lightning address are
+Account settings, because they're rare and boring.
+
+**All of it is invisible until a user consents to a wallet.** Pre-consent there
+is no honey, no zap affordance, and `PackageOpen` ends with a plain Close exactly
+as it does today. Consent fires on the first zap attempt, never at signup.
+
+### This ships now, not with the wallet
+
+Removing a shell tab and moving an avatar is Slice 1 work with no dependency on
+Project 19. It makes the build we're testing better today. `Wallet` appears in
+exactly one file outside its own screen — this is a contained change.
+
+| Question | Answer |
+|---|---|
+| What's the tab bar? | **Today \| Hive \| Garden.** Three. |
+| Where's the Wallet tab? | **Deleted.** The comb is the wallet. |
+| Where's the account door? | **Top right**, over content, all three tabs. |
+| Where do zaps live? | **In the moment** — reveal, entry, hexagon. No tab. |
+| Where's fund/withdraw? | **Account → Nectar.** Rare and boring, so it's behind the door. |
+| When does any of it appear? | **Only after wallet consent.** Before that, nothing changes. |
+| Does this wait for Slice 2? | **No.** Tabs and door ship now. |
+
 The team is executing well. The ambiguity was mine to resolve. It's resolved now. We're building one app. The journal is where gratitude starts. Private hives are where you journal gratitude for someone, revisit it on trips down memory lane, and package it to share. The Hive is where it's shared. The Garden is where you see it all. Money comes later.
 
 Let's go. 🐝

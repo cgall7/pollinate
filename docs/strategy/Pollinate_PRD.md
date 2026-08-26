@@ -96,14 +96,18 @@ Pollinate is not a utility app. It's an **emotional experience.** Every interact
 ### Tab Bar
 
 ```
-Today  |  Hive  |  Wallet  |  Garden
+Today  |  Hive  |  Garden
 ```
+
+> **Amended 2026-08-26** (was `Today | Hive | Wallet | Garden`): the Wallet tab
+> is deleted — the comb is the wallet and the account door moves to the top
+> right. Ruling and design spec: `POLLINATE_V2_NAVIGATION.md`.
 
 | Tab | What it is | Free tier | Paid tier ($2.99/mo) | MVP1 status |
 |---|---|---|---|---|
 | **Today** | Journal + Private Hives | 1 private hive. Daily journal full. | Unlimited private hives. | ✅ Full |
 | **Hive** | Honeycomb + feed + social seeds | 1 friend in public hives. Can receive unlimited. | Unlimited friends in public hives. | ✅ Full |
-| **Wallet** | Gifting | Shell: "Coming Soon" | Cash App gifting via iMessage links | 🔲 Shell in MVP1, Cash App in Slice 2 |
+| ~~**Wallet**~~ | ~~Gifting~~ | ~~Shell: "Coming Soon"~~ | ~~Cash App gifting via iMessage links~~ | **Row superseded 2026-08-26** — no Wallet tab; balance lives in the comb, admin behind the Account door (`POLLINATE_V2_NAVIGATION.md`) |
 | **Garden** | Recap, Wrapped, history | Full solo features | Full + social features (Phase 3) | ✅ Full (solo) |
 
 ### Today Tab — "Where You Write"
@@ -124,9 +128,15 @@ The social layer. Activates when the user adds their first friend.
 - **Friend management** — add by email, username, contact sync, invite link
 - When a user sends a package from a private hive, the sharing event appears in the Hive feed
 
-### Wallet Tab — "Where You Gift" (Slice 2)
+### ~~Wallet Tab — "Where You Gift" (Slice 2)~~
 
-- **MVP1:** Shell only. Shows a beautiful "Coming Soon" state. No functionality.
+> **Section superseded 2026-08-26.** There is no Wallet tab
+> (`POLLINATE_V2_NAVIGATION.md`). Money surfaces are ruled there: zaps happen
+> in the moment (reveal, entry, hexagon), balance is honey in your own hexagon
+> on the Hive tab, funding/withdrawal live in Account → Nectar. The
+> no-money-transmitter constraints below stand — they moved, they didn't die.
+
+- ~~**MVP1:** Shell only. Shows a beautiful "Coming Soon" state. No functionality.~~
 - **Slice 2:** Cash App gifting via iMessage. Pollinate generates a gratitude note + a Cash App payment link. User sends via iMessage. Recipient reads the gratitude in Pollinate, taps the link to claim in Cash App. **Pollinate never touches the money.** We are NOT a money transmitter.
 
 ### Garden Tab — "Where You Reflect"
