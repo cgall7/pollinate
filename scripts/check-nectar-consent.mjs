@@ -14,7 +14,7 @@
 // way it survives contact with five future PRs is a gate that reds the first
 // time a nectar surface renders outside the guard.
 //
-// FOUR RULE GROUPS, and their honest strengths differ:
+// FIVE RULE GROUPS, and their honest strengths differ:
 //
 //   A  universe        the usual counts-before-loops (run-checks.mjs's
 //                      requirement on gates).
@@ -37,13 +37,53 @@
 //                      completeness row and says so in its own label: an
 //                      absence claim inherits the scope of the probe that
 //                      produced it, and "no probe" is a scope of nothing.
+//   E  query reserve   guards the ASK, not the render — B4's numeral hole
+//                      (`{balance}` beside a drop glyph shows no word) cannot
+//                      be closed by any rule that reads rendered strings, so
+//                      E reads what a surface FETCHES instead. A numeral
+//                      cannot exist client-side without a query, and every
+//                      query in this tree names its source as a string
+//                      literal. Population enumerated from the nectar
+//                      migrations in tree, not a hand list.
+//                        AUTHORITY LIVES AT THE RENDERED CONTROL, NOT THE
+//                      QUERY (Pixel's §12.7/§12.7a correction, 2026-08-26): a
+//                      store call is a statement, awaited in a handler body,
+//                      and a statement cannot be an expression's `&&`/`?:`
+//                      arm — 60 of 61 store calls on this tree take exactly
+//                      that shape. So E asks whether the CONTROL wired to the
+//                      call's enclosing handler is rendered under a guard,
+//                      and treats the call as inheriting that authority.
+//                      Two objects — `nectar_consents`, `consent_to_nectar` —
+//                      are exempted by property, not by call site: they are
+//                      how consent is itself established or read, and gating
+//                      either on `nectarConsent` reproduces the §10 bootstrap
+//                      deadlock one layer down.
 //
 // WHAT THIS GATE CANNOT DO. It is lexical. A nectar surface that renders no
 // string — a bare icon, an unlabelled pressable — is invisible to rule B.
 // That is not hypothetical: DES-28 D3 is exactly such a surface (a 16pt drop
 // icon). Rule D is what covers it, by anchor rather than by word, and rule D
-// only covers surfaces someone remembered to declare in NECTAR_SURFACES.
+// only covers surfaces someone remembered to declare in NECTAR_SURFACES. And
+// rule E has a dynamic-identifier hole of its own — a wrapper module that
+// builds a query name at runtime moves the literal, and the guard site, into
+// the wrapper; nothing in this tree does that today (measured in E's own
+// check below), but the day something does, E is blind to it exactly the way
+// B is blind to a bare numeral.
 // The population is a declaration; nothing here discovers a sixth surface.
+//
+// AND THE RENDER-AUTHORITY CHECK IS A WITHIN-FILE WALK, THE SAME LIMIT B6-B9
+// ALREADY NAME FOR isUnderGuard. It traces a handler name to every JSX
+// attribute feeding it IN THE SAME FILE the handler is declared in. A
+// component that takes a handler AS A PROP and wires it to a control inside
+// its OWN body — exactly NectarConsentSheet.js's shape, one file away from
+// PackageOpen.js's `handleNectarAffirm` — has no such attribute in the
+// handler's own file, so a genuine future case built that way would read as
+// CANNOT-TELL and fail safe (red on correct code) rather than pass. Today
+// that shape only exists for `consent_to_nectar()`, which is carved out by
+// property before this check ever runs — so it is a latent limit, not a
+// live hole, but the day D2's zap flow reuses the sheet's cross-file pattern
+// for a money identifier, extend the wiring search across the prop boundary
+// rather than trusting a red that may be a false one.
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,6 +97,7 @@ import {
   PositionVocabularyError,
 } from './lib/rendered-strings.mjs';
 import {
+  NECTAR_CONSENT_BOOTSTRAP_OBJECTS,
   NECTAR_CONSENT_FIELD,
   NECTAR_CONSENT_GUARD,
   NECTAR_CONSENT_SHEET_GUARD,
@@ -572,9 +613,229 @@ check('D5 noActionMenu probe control: both menu targets are still reachable some
 const surfaceImporters = parsed.filter(({ src }) => /\bNECTAR_SURFACES\b/.test(src)).map(({ rel }) => rel);
 check('D6 nothing in the app imports NECTAR_SURFACES (the exclusion in A1a holds)', surfaceImporters, []);
 
+// --- E. Query reserve ------------------------------------------------------
+// GUARDS THE ASK, NOT THE RENDER. B4 catches a money WORD; it cannot catch a
+// bare numeral (`{balance}` beside a drop glyph carries no word the reserve
+// matches). A numeral cannot exist client-side without a query that fetched
+// it, and every query this app writes names its source as a string literal
+// argument to `.from(...)` or `.rpc(...)` — see SeedsStore.js, NotesStore.js,
+// HiveStore.js, all of which use exactly that shape. So E asks the same
+// question B4 asks, one layer earlier: does a string literal naming a nectar
+// data object sit under one of the two guards, regardless of what it would
+// go on to render.
+//
+// ENUMERATED FROM THE MIGRATIONS IN TREE, same shape as C4 and for the same
+// reason — a hand-typed list of table/rpc names is a second copy of the
+// schema that can drift the moment a migration adds one. The population is
+// every `create table|view|function public.X` in a migration file whose
+// NAME contains "nectar" — that is `nectar_ledger.sql` and
+// `nectar_sim_service.sql` today, so the reserve carries the whole ledger
+// schema (`ledger_postings`, `strike_invoices`, …) as well as the
+// nectar-named objects themselves. That is over-inclusion in the same
+// direction every other rule here already commits to: a client string
+// literal naming an internal ledger table has no legitimate reason to exist
+// unguarded either, so a false member costs nothing and a missed one costs
+// a silent leak.
+const NECTAR_MIGRATION_FILE_RE = /nectar/i;
+const OBJECT_RE = /create\s+(?:or\s+replace\s+)?(table|view|function)\s+(?:if not exists\s+)?public\.(\w+)/gi;
+let nectarMigrationFiles = [];
+try {
+  nectarMigrationFiles = (await readdir(migrationDir)).filter((f) => NECTAR_MIGRATION_FILE_RE.test(f)).sort();
+} catch {
+  /* no migrations directory in this tree */
+}
+const QUERY_RESERVE = new Set();
+for (const f of nectarMigrationFiles) {
+  const src = await readFile(path.join(migrationDir, f), 'utf8');
+  for (const m of src.matchAll(OBJECT_RE)) QUERY_RESERVE.add(m[2]);
+}
+check(
+  `E0 the query reserve is non-empty, enumerated from ${nectarMigrationFiles.length} nectar migration(s)`,
+  QUERY_RESERVE.size > 0,
+  true
+);
+
+// E0a THE CARVE-OUT'S MEMBERSHIP IS FROZEN AND CHECKABLE, not trusted. Both
+// names must actually be reserved objects (else the carve-out would be
+// exempting nothing, or exempting a typo silently) and there must be exactly
+// these two — a THIRD name added here later is exactly the "exemption list
+// grows" failure Pixel's ruling rejects, so it has to be re-argued as a
+// property of the object rather than merged as a one-line addition.
+check(
+  'E0a the consent-bootstrap carve-out is exactly {nectar_consents, consent_to_nectar}, both real reserved objects',
+  [
+    NECTAR_CONSENT_BOOTSTRAP_OBJECTS.length,
+    NECTAR_CONSENT_BOOTSTRAP_OBJECTS.every((n) => QUERY_RESERVE.has(n)),
+  ],
+  [2, true]
+);
+const BOOTSTRAP = new Set(NECTAR_CONSENT_BOOTSTRAP_OBJECTS);
+
+// The two call shapes this app's data layer actually uses:
+// `client.from('table')` and `client.rpc('fn_name', {...})`. Anything else
+// (a computed member, a variable holding the method name) is outside this
+// walk's vocabulary — same convention as isUnderGuard's own comment: red on
+// a shape nothing in this tree uses would be a false negative no probe has
+// ever produced here, not a hole being knowingly left open.
+const QUERY_METHODS = new Set(['from', 'rpc']);
+const findQueryCalls = (ast) => {
+  const hits = [];
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'MemberExpression' &&
+      node.callee.property.type === 'Identifier' &&
+      QUERY_METHODS.has(node.callee.property.name) &&
+      node.arguments[0] &&
+      node.arguments[0].type === 'StringLiteral'
+    ) {
+      hits.push({ name: node.arguments[0].value, node, ancestors });
+    }
+  });
+  return hits;
+};
+
+// THE RENDER-AUTHORITY CHECK (§12.7a). A query call is a statement, awaited
+// in a handler body 60 times out of 61 measured on this tree — a position no
+// `&&`/`?:` guard can ever occupy, so asking `isUnderGuard` of the call
+// itself asks the wrong shape almost every time. Two ways a call can be
+// authorised:
+//
+//   (1) it sits directly under a guarded expression AT ITS OWN POSITION —
+//       an inline handler, `flag && <Btn onPress={() => call()}/>`. This is
+//       exactly what `isUnderGuard` already answers, unchanged.
+//   (2) it is inside a NAMED handler (`const handleX = () => {…}` or
+//       `function handleX() {…}`), and EVERY JSX attribute in the SAME FILE
+//       that passes `handleX` by identifier sits under a guard. Zero such
+//       attributes is CANNOT-TELL and fails in the safe direction — the same
+//       convention B6 already uses for a binding shape the census can't
+//       classify: a named handler this walk cannot connect to any rendered
+//       control is not evidence of safety, it is evidence of nothing.
+const findEnclosingHandlerName = (ancestors) => {
+  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+    const { node } = ancestors[i];
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.init &&
+      (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')
+    ) {
+      return node.id.name;
+    }
+    if (node.type === 'FunctionDeclaration' && node.id) return node.id.name;
+  }
+  return null;
+};
+const findHandlerWiring = (ast, handlerName) => {
+  const wiring = [];
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (
+      node.type === 'JSXAttribute' &&
+      node.value?.type === 'JSXExpressionContainer' &&
+      node.value.expression.type === 'Identifier' &&
+      node.value.expression.name === handlerName
+    ) {
+      wiring.push({ node, ancestors });
+    }
+  });
+  return wiring;
+};
+// Returns 'guarded', 'unguarded', or 'cannot-tell' (a named handler with no
+// traceable wiring in its own file — see the header note on the cross-file
+// limit this shares with `isUnderGuard`).
+const callAuthority = (hit, ast) => {
+  if (GUARDS.some((g) => isUnderGuard(hit.ancestors, g))) return 'guarded';
+  const handlerName = findEnclosingHandlerName(hit.ancestors);
+  if (!handlerName) return 'cannot-tell';
+  const wiring = findHandlerWiring(ast, handlerName);
+  if (wiring.length === 0) return 'cannot-tell';
+  return wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g))) ? 'guarded' : 'unguarded';
+};
+
+// E1 CALIBRATION, same reason as B3: zero non-bootstrap call sites in this
+// tree touch the reserve today (measured in E2's own count below), so a
+// broken extractor and a clean tree read identically without a probe with a
+// known answer. Each probe is its own tiny file, because wiring lookup is a
+// same-file walk.
+const QUERY_CALIBRATION = [
+  ['unguarded from(), inline', `client.from('nectar_zaps').select('amount_microusd');`, false],
+  ['&&-guarded from(), inline', `nectarConsent && client.from('nectar_zaps').select('amount_microusd');`, true],
+  ['ternary-guarded rpc(), inline', `nectarConsent ? client.rpc('record_zap', {}) : null;`, true],
+  ['unrelated table, not in the reserve', `client.from('seeds').select('id');`, true],
+  [
+    'named handler wired to a guarded control',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    true,
+  ],
+  [
+    'named handler wired to an UNguarded control',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       return <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  [
+    'named handler wired under an unrelated flag',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       return otherFlag && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  [
+    'named handler never wired to any JSX attribute — cannot-tell fails',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       return <View />;
+     }`,
+    false,
+  ],
+  [
+    'consent-bootstrap object, unguarded, inline — carved out by property',
+    `client.rpc('consent_to_nectar', {});`,
+    'exempt',
+  ],
+];
+const calibrationFailures = [];
+for (const [label, src, want] of QUERY_CALIBRATION) {
+  const ast = parse(src, { sourceType: 'module', plugins: ['jsx'] });
+  const hits = findQueryCalls(ast).filter((h) => QUERY_RESERVE.has(h.name));
+  const authorised = hits.every((h) =>
+    BOOTSTRAP.has(h.name) ? true : callAuthority(h, ast) === 'guarded'
+  );
+  const got = hits.some((h) => BOOTSTRAP.has(h.name)) ? 'exempt' : authorised ? true : false;
+  if (got !== want) calibrationFailures.push(`${label} — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+}
+check('E1 query-reserve calibration: guard, render-authority, cannot-tell, and carve-out probes all verify as expected', calibrationFailures, []);
+
+// E2 THE REAL QUESTION, over the same source universe A1 already enumerated.
+// Bootstrap objects are excluded from the population this check judges —
+// by property (E0a), not because any call site of theirs happened to look
+// guarded.
+const queryHits = [];
+for (const { rel, ast } of parsed) {
+  for (const h of findQueryCalls(ast)) {
+    if (QUERY_RESERVE.has(h.name) && !BOOTSTRAP.has(h.name)) {
+      queryHits.push({ rel, line: h.node.loc.start.line, name: h.name, ancestors: h.ancestors, ast });
+    }
+  }
+}
+const unguardedQueries = queryHits.filter((h) => callAuthority(h, h.ast) !== 'guarded');
+check(
+  `E2 every non-bootstrap query naming a reserved nectar identifier is authorised by a rendered guard (${GUARDS.join(' | ')})`,
+  unguardedQueries.map((h) => `${h.rel}:${h.line} ${h.name} [${callAuthority(h, h.ast)}]`),
+  []
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(
   `(${allStrings.length} rendered strings scanned, ${reserveHits.length} match the reserve, ` +
-    `${NECTAR_SURFACES.length} surfaces declared: ${hosted.length} hosted, ${unhosted.length} container-absent)`
+    `${NECTAR_SURFACES.length} surfaces declared: ${hosted.length} hosted, ${unhosted.length} container-absent, ` +
+    `${QUERY_RESERVE.size} query identifiers reserved from ${nectarMigrationFiles.length} migration(s), ` +
+    `${queryHits.length} non-bootstrap query call site(s) found, ${BOOTSTRAP.size} bootstrap object(s) carved out)`
 );
 if (fail > 0) process.exit(1);
