@@ -172,9 +172,10 @@ What replaces the original three guards:
    it, `h.sealed_at is null` is permanently true for new hives and this
    refusal — with every sealed-content policy reading the same column
    (`20260815000005`, `20260815000006`, `send_hive` `20260819000001`,
-   `seal_hive` `20260819000003`) — fails open silently. The re-point (or a
-   derived mirror) must ride the **same migration** that moves the seal's
-   writer to `hive_volumes.sealed_at`. Enumeration: Pixel, workspace
+   `seal_hive` `20260819000003`) — fails open silently. **Ruled (Sage,
+   2026-08-25): re-point, not a derived mirror** — see §17.1. Sequencing (which
+   migration, in what order) is §17.1a R3's acceptance criterion, not
+   restated here. Enumeration: Pixel, workspace
    `GUIDES/POLLINATE_V2_DES16_FILE_TO_HIVE.md` §7a, 2026-08-25. ENG-46's
    "comment as read-only history" row is **not sufficient** as written.
 2. **The direction guard evaporates** — there is no move to reverse. The
@@ -247,6 +248,25 @@ alter table public.entries
   one-directional immutability triggers and become **read-only history** — new
   code never writes them. Comment them as such; do not attempt to drop them
   (the triggers guarantee they cannot lie).
+- **Ruled (Sage, 2026-08-25): re-point every sealed-content check to the
+  volume, never a hive-level mirror of `sealed_at`.** Forced by the shape one
+  bullet up — sealing Volume N opens Volume N+1 in the same transaction, so a
+  hive has an open volume at every instant after creation except mid-write. A
+  hive-level mirror of "current volume's sealed_at" would read null
+  essentially always: it cannot distinguish "Volume 2 is open" from "nothing
+  has ever sealed," so it enforces nothing. §17.1a R3 places this re-point in
+  the second of the two migrations, never bundled with the writer move (no
+  window where the client writes NULL against a policy requiring it). Via
+  `entries.volume_id`:
+  `entries_insert_own`/`entries_update_own` WITH CHECK (`20260815000005`),
+  the insert/update/delete immutability trigger (`20260815000006`), and
+  `send_hive` (`20260819000001`) — each trading its
+  `private_hives.owner_id/sealed_at` join for
+  `exists (select 1 from hive_volumes v where v.id = entries.volume_id and
+  v.sealed_at is null and v.hive_id in (<caller's owned hives>))`.
+  `seal_hive` (`20260819000003`) is retired by `seal_volume(p_hive_id)` above,
+  which operates on `hive_volumes` directly and needs no re-point. Premise
+  recorded at §16.5 item 1; this is the resolution, not a restatement.
 
 **Mother–son:** Volume per birthday, 18 volumes, delivered as one package at 18 —
 or one volume unlocking each birthday. **Husband–wife:** seal a volume every
