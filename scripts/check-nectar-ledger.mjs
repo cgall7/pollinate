@@ -4,18 +4,20 @@
 //   npm run check:nectar-ledger
 //
 // Runs supabase/ledger/verify/test.js, which applies
-// supabase/migrations/20260826000001_nectar_ledger.sql and
-// 20260826000005_nectar_sim_service.sql to an embedded-postgres cluster
-// (port 55433 — see the port map in .github/workflows/test.yml) and asserts
-// their invariants (the suite prints its own count): postings balance to
-// zero, overdrafts are rejected at COMMIT, funding requires a matching
-// invoice poll, postings are immutable, the rails_mode guard refuses a real
-// Strike observation while the mode is 'simulated', and the 19a service
-// layer holds B0 (no zap without consent), exactly-once zap recording, and
-// the simulated-only starter grant. The rails_mode guard is the tripwire
-// Sage's 2026-08-26 promotion ruling leans on: the schema is authorized in
+// supabase/migrations/20260826000001_nectar_ledger.sql,
+// 20260826000005_nectar_sim_service.sql, and (as of the 2026-08-26 sats
+// override) 20260826000006_nectar_sats_override.sql to an embedded-postgres
+// cluster (port 55433 — see the port map in .github/workflows/test.yml) and
+// asserts their invariants (the suite prints its own count): postings
+// balance to zero, overdrafts are rejected at COMMIT, funding requires a
+// matching invoice poll, postings are immutable, the rails_mode guard
+// refuses a real Strike observation while the mode is 'simulated', and the
+// 19a service layer holds B0 (no zap without consent), exactly-once zap
+// recording, and the simulated-only starter grant — now denominated in sats,
+// 1 drop = 1 sat exact. The rails_mode guard is the tripwire Sage's
+// 2026-08-26 promotion ruling leans on: the schema is authorized in
 // simulated mode only, and flipping rails_mode to 'live' stays embargoed on
-// DESIGN.md §9/§13.
+// DESIGN.md §9/§13, unaffected by the sats override.
 //
 // The suite predates this gate — it was the branch's promotion evidence, run
 // by hand from supabase/ledger/verify/. This file exists so `npm test` runs
