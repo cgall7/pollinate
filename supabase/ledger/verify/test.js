@@ -6,18 +6,47 @@ const path = require('path');
 
 const SCHEMA = fs.readFileSync(
   path.join(__dirname, '..', '..', 'migrations', '20260826000001_nectar_ledger.sql'), 'utf8');
+const SERVICE = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'migrations', '20260826000005_nectar_sim_service.sql'), 'utf8');
 
-// Minimal stand-ins for what Supabase already provides.
+// Minimal stand-ins for what Supabase already provides. auth.uid() reads a
+// session setting so the service-layer tests can act as a signed-in user;
+// unset it answers null, exactly like the anon default the older sections
+// were written against.
 const SHIM = `
 create role anon;
 create role authenticated;
 create role service_role;
 create schema auth;
 create table auth.users (id uuid primary key);
-create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
+create function auth.uid() returns uuid language sql stable
+  as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
 create table public.profiles (
   id uuid primary key,
   display_name text not null
+);
+-- App tables record_zap() authorizes against — columns it touches only.
+create table public.private_hives (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles (id),
+  subject_profile_id uuid references public.profiles (id),
+  sent_at timestamptz
+);
+create table public.entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id),
+  visibility text not null default 'private',
+  hive_id uuid references public.private_hives (id)
+);
+create table public.shares (
+  id uuid primary key default gen_random_uuid(),
+  entry_id uuid not null unique references public.entries (id)
+);
+create table public.honeycomb_connections (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references public.profiles (id),
+  addressee_id uuid not null references public.profiles (id),
+  status text not null default 'pending'
 );
 `;
 
@@ -63,6 +92,14 @@ async function main() {
     check('schema applies cleanly', true);
   } catch (e) {
     check('schema applies cleanly', false, e.message);
+    console.log('\nCannot continue.\n');
+    process.exit(1);
+  }
+  try {
+    await client.query(SERVICE);
+    check('19a service layer applies cleanly', true);
+  } catch (e) {
+    check('19a service layer applies cleanly', false, e.message);
     console.log('\nCannot continue.\n');
     process.exit(1);
   }
@@ -423,6 +460,183 @@ async function main() {
 
   check('exactly one of two concurrent $6 spends applied',
     await balance(cAcct) === -USD(4), `carol balance = ${await balance(cAcct)}`);
+
+  // ---- 19a service layer: consent, provisioning, zaps ---------------------
+  console.log('\n— 19a service layer: consent (B0), starter grant, record_zap —');
+
+  const DROP = 1000; // microUSD per drop — must match nectar_drop_microusd()
+  const GRANT = 500; // drops — must match nectar_starter_grant_drops()
+
+  async function setUid(uid) {
+    await client.query(`select set_config('test.uid', $1, false)`, [uid ?? '']);
+  }
+  async function drops(userId) {
+    const r = await client.query(
+      `select available_microusd from public.user_nectar_balances where user_id = $1`, [userId]);
+    return r.rows.length ? Number(r.rows[0].available_microusd) / DROP : 0;
+  }
+  async function zap(zapId, kind, targetId, amount) {
+    const r = await client.query(
+      `select public.record_zap($1, $2, $3, $4) as txn`, [zapId, kind, targetId, amount]);
+    return r.rows[0].txn;
+  }
+
+  const dave = '66666666-6666-6666-6666-666666666666';
+  const erin = '77777777-7777-7777-7777-777777777777';
+  const frank = '88888888-8888-8888-8888-888888888888';
+  await client.query(
+    `insert into public.profiles (id, display_name) values ($1,'Dave'),($2,'Erin'),($3,'Frank')`,
+    [dave, erin, frank]);
+  // Dave↔Erin are friends; Dave↔Frank are NOT (pending only).
+  await client.query(
+    `insert into public.honeycomb_connections (requester_id, addressee_id, status)
+     values ($1,$2,'accepted'),($1,$3,'pending')`, [dave, erin, frank]);
+
+  // Erin sent Dave a package (hive1 + a 'sent' entry), shares a feed entry,
+  // and keeps a private one. hive2 went to Frank, not Dave. Dave has a shared
+  // entry of his own; so does Frank.
+  const hive1 = (await client.query(
+    `insert into public.private_hives (owner_id, subject_profile_id, sent_at)
+     values ($1,$2,now()) returning id`, [erin, dave])).rows[0].id;
+  const hive2 = (await client.query(
+    `insert into public.private_hives (owner_id, subject_profile_id, sent_at)
+     values ($1,$2,now()) returning id`, [erin, frank])).rows[0].id;
+  const entrySent = (await client.query(
+    `insert into public.entries (user_id, visibility, hive_id) values ($1,'sent',$2) returning id`,
+    [erin, hive1])).rows[0].id;
+  const entryShared = (await client.query(
+    `insert into public.entries (user_id, visibility) values ($1,'shared') returning id`,
+    [erin])).rows[0].id;
+  await client.query(`insert into public.shares (entry_id) values ($1)`, [entryShared]);
+  const entryPrivate = (await client.query(
+    `insert into public.entries (user_id, visibility) values ($1,'private') returning id`,
+    [erin])).rows[0].id;
+  const entryDave = (await client.query(
+    `insert into public.entries (user_id, visibility) values ($1,'shared') returning id`,
+    [dave])).rows[0].id;
+  await client.query(`insert into public.shares (entry_id) values ($1)`, [entryDave]);
+  const entryFrank = (await client.query(
+    `insert into public.entries (user_id, visibility) values ($1,'shared') returning id`,
+    [frank])).rows[0].id;
+  await client.query(`insert into public.shares (entry_id) values ($1)`, [entryFrank]);
+
+  const z = (n) => `99999999-9999-9999-9999-9999999999${String(n).padStart(2, '0')}`;
+
+  // B0: the gate holds before anything else works.
+  await setUid(dave);
+  await expectFail(client, 'B0: record_zap before consent is refused', () =>
+    zap(z(1), 'entry', entrySent, 10), /consent required/);
+
+  await expectFail(client, 'signed-out consent is refused', async () => {
+    await setUid(null);
+    try { await client.query(`select * from public.consent_to_nectar()`); }
+    finally { await setUid(dave); }
+  }, /not signed in/);
+
+  const consent1 = await client.query(`select * from public.consent_to_nectar()`);
+  check('consent returns the starter grant',
+    Number(consent1.rows[0].starter_grant_drops) === GRANT && consent1.rows[0].consented_at !== null,
+    JSON.stringify(consent1.rows));
+  const daveAccts = await client.query(
+    `select count(*)::int n from public.ledger_accounts where owner_user_id = $1`, [dave]);
+  check('consent provisions both user accounts', daveAccts.rows[0].n === 2);
+  check('starter grant is spendable at the placeholder rate', await drops(dave) === GRANT);
+
+  const grantTxn = await client.query(
+    `select t.kind, p.observed_state, p.is_simulated
+       from public.ledger_transactions t
+       join public.strike_invoice_polls p on p.id = t.source_poll_id
+      where t.memo = 'simulated starter grant'`);
+  check('grant rides the real funding path, marked simulated',
+    grantTxn.rows.length === 1 && grantTxn.rows[0].kind === 'funding'
+      && grantTxn.rows[0].observed_state === 'SIMULATED_GRANT'
+      && grantTxn.rows[0].is_simulated === true,
+    JSON.stringify(grantTxn.rows));
+
+  const consent2 = await client.query(`select * from public.consent_to_nectar()`);
+  check('consent replay grants nothing further',
+    Number(consent2.rows[0].starter_grant_drops) === 0 && await drops(dave) === GRANT);
+
+  // The zap itself, against the 'sent' package entry.
+  const txn1 = await zap(z(1), 'entry', entrySent, 100);
+  check('zap debits the sender', await drops(dave) === GRANT - 100);
+  check('zap credits a recipient who never consented (receiving needs no consent)',
+    await drops(erin) === 100);
+  const attr = await client.query(
+    `select nz.sender_id, nz.recipient_id, nz.target_kind, nz.target_id, nz.amount_drops, t.kind
+       from public.nectar_zaps nz join public.ledger_transactions t on t.id = nz.transaction_id
+      where nz.id = $1`, [z(1)]);
+  check('attribution row binds sender, recipient, target and amount to a tip',
+    attr.rows.length === 1 && attr.rows[0].sender_id === dave
+      && attr.rows[0].recipient_id === erin && attr.rows[0].target_kind === 'entry'
+      && attr.rows[0].target_id === entrySent && Number(attr.rows[0].amount_drops) === 100
+      && attr.rows[0].kind === 'tip',
+    JSON.stringify(attr.rows));
+
+  const txn1replay = await zap(z(1), 'entry', entrySent, 100);
+  check('zap replay returns the original transaction and credits once',
+    txn1replay === txn1 && await drops(erin) === 100);
+  await expectFail(client, 'zap id reuse with different parameters is rejected', () =>
+    zap(z(1), 'entry', entrySent, 50), /different parameters/);
+
+  // Surface rules.
+  await expectFail(client, 'self-zap is rejected', () =>
+    zap(z(2), 'entry', entryDave, 10), /your own/);
+  await expectFail(client, 'a private entry is not a zap surface', () =>
+    zap(z(3), 'entry', entryPrivate, 10), /target not found/);
+  await expectFail(client, "someone else's package is not yours to zap", () =>
+    zap(z(4), 'hive', hive2, 10), /target not found/);
+  await expectFail(client, 'no zap without a live accepted connection', () =>
+    zap(z(5), 'entry', entryFrank, 10), /not connected friends/);
+  await expectFail(client, 'amount below range is rejected', () =>
+    zap(z(6), 'entry', entrySent, 0), /between 1 and 1000/);
+  await expectFail(client, 'amount above range is rejected', () =>
+    zap(z(7), 'entry', entrySent, 1001), /between 1 and 1000/);
+
+  const txn2 = await zap(z(8), 'hive', hive1, 50);
+  check('the package itself is zappable by its recipient',
+    txn2 !== null && await drops(dave) === GRANT - 150 && await drops(erin) === 150);
+
+  await expectFail(client, 'insufficient nectar is a clear in-function error', () =>
+    zap(z(9), 'entry', entryShared, 1000), /insufficient nectar/);
+
+  // B0 is asymmetric: Erin holds 150 received drops but never consented, so
+  // she can be paid yet cannot pay.
+  await setUid(erin);
+  await expectFail(client, 'a credited but unconsented recipient still cannot send', () =>
+    zap(z(10), 'entry', entryDave, 10), /consent required/);
+  await setUid(null);
+
+  // Live mode: consent still works, the grant does not.
+  const grace = '99999999-aaaa-aaaa-aaaa-999999999999';
+  await client.query(`insert into public.profiles (id, display_name) values ($1,'Grace')`, [grace]);
+  await client.query(`update public.ledger_settings set rails_mode='live' where id`);
+  await setUid(grace);
+  const consentLive = await client.query(`select * from public.consent_to_nectar()`);
+  await setUid(null);
+  await client.query(`update public.ledger_settings set rails_mode='simulated' where id`);
+  check('live mode: consent provisions accounts but grants no simulated nectar',
+    Number(consentLive.rows[0].starter_grant_drops) === 0 && await drops(grace) === 0,
+    JSON.stringify(consentLive.rows));
+
+  // Attribution is part of the money trail: append-only like the ledger.
+  await expectFail(client, 'nectar_zaps rows are append-only', () =>
+    client.query(`update public.nectar_zaps set amount_drops = 999 where id = $1`, [z(1)]),
+    /append-only/);
+
+  // House revoke pattern actually landed.
+  const priv = await client.query(`
+    select has_function_privilege('anon', 'public.record_zap(uuid, public.nectar_zap_target_kind, uuid, bigint)', 'execute') as zap_anon,
+           has_function_privilege('authenticated', 'public.record_zap(uuid, public.nectar_zap_target_kind, uuid, bigint)', 'execute') as zap_auth,
+           has_function_privilege('anon', 'public.consent_to_nectar()', 'execute') as consent_anon,
+           has_function_privilege('authenticated', 'public.consent_to_nectar()', 'execute') as consent_auth,
+           has_function_privilege('authenticated', 'public.ledger_ensure_user_accounts(uuid)', 'execute') as helper_auth,
+           has_function_privilege('authenticated', 'public.ledger_house_account(public.ledger_account_kind)', 'execute') as house_auth`);
+  const pv = priv.rows[0];
+  check('RPCs: anon revoked, authenticated granted',
+    !pv.zap_anon && pv.zap_auth && !pv.consent_anon && pv.consent_auth, JSON.stringify(pv));
+  check('internal provisioning helpers are not client-callable',
+    !pv.helper_auth && !pv.house_auth, JSON.stringify(pv));
 
   // ---- re-verify globals after the mutating sections above ----------------
   console.log('\n— globals re-checked after all writes —');

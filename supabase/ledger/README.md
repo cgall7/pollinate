@@ -1,6 +1,13 @@
 # Nectar ledger
 
-**The schema now lives at `../migrations/20260826000001_nectar_ledger.sql`.**
+**The schema now lives at `../migrations/20260826000001_nectar_ledger.sql`,
+and the 19a simulated-nectar service layer (B0 consent, account provisioning,
+the starter grant, `record_zap()`) at
+`../migrations/20260826000005_nectar_sim_service.sql`.** In 19a there is no
+separate payments service: the SECURITY DEFINER RPCs in that second migration
+are the only write path into the ledger, and the two product numbers they
+carry (drops→microUSD rate, starter-grant size) are placeholders pending
+Colin's ratification — see that file's header.
 
 It started life here as `schema.sql`, deliberately kept out of `migrations/`
 while two real-money questions were open — whether Strike extends an
@@ -24,8 +31,9 @@ same warning at the point where someone would eventually flip it.
 | File | What it is |
 |---|---|
 | `../migrations/20260826000001_nectar_ledger.sql` | The double-entry ledger: accounts, transactions, postings, Strike observation tables, invariant triggers, RLS |
+| `../migrations/20260826000005_nectar_sim_service.sql` | The 19a service layer: `consent_to_nectar()`, `record_zap()`, zap attribution, the simulated starter grant |
 | `DESIGN.md` | Why every decision is what it is, and what's still open |
-| `verify/` | 48 assertions executed against a real Postgres, plus a mutation harness |
+| `verify/` | The assertion suite (it prints its own count) executed against a real Postgres, plus a mutation harness |
 
 ## Running the verification
 
@@ -42,9 +50,14 @@ in turn and confirms the suite fails without it — manual, like
 
 ```bash
 cd supabase/ledger/verify
-npm test          # applies the migration to a real PG, asserts 48 invariants
+npm test          # applies both migrations to a real PG, asserts the invariants
 npm run mutate    # drops each guard in turn, confirms the suite fails without it
 ```
+
+Three of the mutation runs (`overdraft`, `balanced`, `fundmatch`) go red by
+crash rather than by count: the 19a RPCs `SET CONSTRAINTS … IMMEDIATE` on
+those triggers by name, so with the guard dropped the layer refuses to run at
+all. That refusal is deliberate — see the migration's own comment.
 
 Verified against Postgres 17.10 and 18.4.
 
