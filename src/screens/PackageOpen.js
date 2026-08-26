@@ -5,9 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
+import { NectarStore } from '../services/NectarStore';
+import { hasNectarConsent } from '../constants/nectar';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { NectarConsentSheet } from '../components/NectarConsentSheet';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
 import {
   STUB_GRAMMAR,
@@ -53,6 +56,16 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   const [revealState, setRevealState] = useState(null);
   const [railFill, setRailFill] = useState(0);
 
+  // DES-28 D3 — the consent bootstrap door (Sage's ruling 2026-08-26).
+  // `nectarConsent` must be initialised from `hasNectarConsent(…)` and
+  // `nectarConsentSheetOpen` from a `useState(false)` — check-nectar-
+  // consent.mjs's B7 census reads the initialiser, not just the name.
+  const [nectarConsentRow, setNectarConsentRow] = useState(null);
+  const [nectarConsentSheetOpen, setNectarConsentSheetOpen] = useState(false);
+  const [nectarConsentSubmitting, setNectarConsentSubmitting] = useState(false);
+  const [nectarConsentError, setNectarConsentError] = useState(false);
+  const nectarConsent = hasNectarConsent(nectarConsentRow);
+
   const bloomOpacity = useRef(new Animated.Value(0)).current;
   const bloomScale = useRef(new Animated.Value(0.85)).current;
   const dateOpacity = useRef(new Animated.Value(0)).current;
@@ -87,6 +100,44 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       };
     }, [hiveId])
   );
+
+  // One read, on mount — `nectarConsent` only ever flips false→true within a
+  // session (no revocation path, nectar.js's table comment), so a re-check
+  // on every focus would be a round trip for an answer that cannot change
+  // back.
+  useEffect(() => {
+    let cancelled = false;
+    NectarStore.getConsent()
+      .then((row) => {
+        if (!cancelled) setNectarConsentRow(row);
+      })
+      .catch((err) => {
+        if (!cancelled) console.warn('PackageOpenScreen: failed to load nectar consent', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleNectarAffirm = async () => {
+    setNectarConsentSubmitting(true);
+    setNectarConsentError(false);
+    try {
+      const row = await NectarStore.consentToNectar();
+      setNectarConsentRow(row);
+      setNectarConsentSheetOpen(false);
+    } catch (err) {
+      console.warn('PackageOpenScreen: consent_to_nectar failed', err);
+      setNectarConsentError(true);
+    } finally {
+      setNectarConsentSubmitting(false);
+    }
+  };
+
+  const handleNectarDismiss = () => {
+    setNectarConsentError(false);
+    setNectarConsentSheetOpen(false);
+  };
 
   // Same rail as MemoryLane — R118's floor is per-step and per-tap, not
   // per-screen, so this call site owns the tick for the same reason that
@@ -195,6 +246,16 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                 <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
                   <Text style={styles.entryText}>{step.text}</Text>
                 </ScrollView>
+                {!nectarConsent && (
+                  <PressableScale
+                    onPress={() => setNectarConsentSheetOpen(true)}
+                    haptic={null}
+                    style={styles.nectarDoor}
+                    accessibilityLabel="Give a gift"
+                  >
+                    <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
+                  </PressableScale>
+                )}
               </Animated.View>
               <View style={styles.railTrack}>
                 <View style={[styles.railFill, { width: `${Math.round(railFill * 100)}%` }]} />
@@ -212,6 +273,15 @@ export const PackageOpenScreen = ({ navigation, route }) => {
           <PrimaryButton onPress={() => navigation.goBack()}>Close</PrimaryButton>
         </View>
       )}
+
+      <NectarConsentSheet
+        nectarConsentSheetOpen={nectarConsentSheetOpen}
+        senderName={pkg.senderName}
+        submitting={nectarConsentSubmitting}
+        error={nectarConsentError}
+        onAffirm={handleNectarAffirm}
+        onDismiss={handleNectarDismiss}
+      />
     </View>
   );
 };
@@ -286,6 +356,19 @@ const styles = StyleSheet.create({
   entryText: {
     ...theme.type.bodyLg,
     color: theme.colors.ink,
+  },
+  // DES-28 D3 — the consent bootstrap door. Bottom-right of the card, same
+  // slot Deezine's spec reserves for the post-consent drop icon so the two
+  // never occupy different corners of the same surface.
+  nectarDoor: {
+    position: 'absolute',
+    right: theme.spacing.md,
+    bottom: theme.spacing.md,
+    width: 32,
+    height: 32,
+    borderRadius: theme.borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   railTrack: {
     height: 4,
