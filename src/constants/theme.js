@@ -92,6 +92,10 @@ const colors = {
   // --- Boundaries and occlusion (all `inkVeil`) ---
   surfaceBorder: withAlpha(pigment.inkVeil, 0.08),
   surfaceBorderStrong: withAlpha(pigment.inkVeil, 0.14), // filled/selected card states need more than a hairline
+  // DES-16 §5's picker rows: a fill fainter than `pressedOnLight` (0.06) —
+  // these rows sit inside a card that already has its own `surface`/border,
+  // so the row needs only enough tint to read as a row, not a second card.
+  rowVeil: withAlpha(pigment.inkVeil, 0.03),
   // The modal scrim. Two `detailOverlay` sites shipped this literal, and
   // SeedsInbox's own comment says it matches NotesInbox *deliberately* —
   // "a seed detail and a note detail should be siblings." That was someone
