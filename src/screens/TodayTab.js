@@ -157,10 +157,17 @@ export const TodayTab = ({ navigation }) => {
 
       <PerchField perches={perches}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* DES-27 (Pixel, 2026-08-26): the header badge retired — the line
-            beneath it (`streakCaption` below) already says the same number
-            ("185 days to 365."), and the corner it sat in is now the
-            account door's reserved column. */}
+        {/* DES-27 (Pixel, 2026-08-26, corrected): the header badge retired,
+            and NOT because the caption repeats it — `streakCaption` below
+            prints `nextMilestone(streak).remaining`, i.e. `target - streak`,
+            which equals the streak at exactly three values in 1..365 (7, 15,
+            30). At a 180-day streak the badge read `180` and this line reads
+            "185 days to 365." It goes because the corner is now the account
+            door's reserved column (`tabBarLayout.js`, DOOR_RESERVE) and
+            because this screen states the streak as a sentence rather than a
+            score — see the whisper's own comment below. Consequence, on
+            purpose: Today prints the streak length nowhere; Garden's
+            StatsCard does. */}
         <ScreenHeader eyebrow={longDate(now)} title={greeting(now)} />
 
         {/* Sides used to be about x-extent: the bee sortied between these
