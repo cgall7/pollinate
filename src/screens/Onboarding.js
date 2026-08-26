@@ -392,6 +392,9 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
               // not on a judgement that the copy "looks done" — it is derived from
               // the unfilled values themselves, so it cannot drift out of sync.
               // `canSubmit` must not require `agreedToTerms` while it is false.
+              // This screen has two signup doors, Apple and email — a checkbox
+              // gated only here covers email and silently misses Apple. Name
+              // both doors when this lands, not just the email form.
               <Text style={styles.consentText}>
                 <Text style={styles.consentLink} onPress={() => navigation?.navigate('Legal', { tab: 'privacy' })}>
                   Privacy Policy
