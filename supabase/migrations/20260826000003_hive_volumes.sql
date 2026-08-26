@@ -6,7 +6,7 @@
 -- R3 (§17.1a): ships as two migrations, not one. This one is purely
 -- additive -- new table, new nullable column, backfill -- and changes no
 -- enforced behavior; it is safe to sit in production indefinitely. The
--- re-point (20260826000002) is what actually moves the sealed-content
+-- re-point (20260826000004) is what actually moves the sealed-content
 -- guards onto this table, and only lands once every row here already has a
 -- correct volume_id.
 
@@ -25,7 +25,7 @@ alter table public.hive_volumes enable row level security;
 
 -- Owner-only, same shape as private_hives itself (20260815000001): a volume
 -- has no party of its own, it belongs to the hive. Required so
--- 20260826000002's re-pointed WITH CHECK/USING subqueries -- which run as
+-- 20260826000004's re-pointed WITH CHECK/USING subqueries -- which run as
 -- the invoking `authenticated` role, not SECURITY DEFINER -- can actually
 -- see the row they're checking.
 create policy "hive_volumes_select_own"
@@ -34,7 +34,7 @@ create policy "hive_volumes_select_own"
 
 -- No insert/update/delete policy: hive_volumes has exactly two writers,
 -- both SECURITY DEFINER below (the entries-insert trigger and the
--- hive-insert trigger) plus seal_volume() in 20260826000002 -- same
+-- hive-insert trigger) plus seal_volume() in 20260826000004 -- same
 -- "nobody, not even the owner, writes this table directly" shape as
 -- hive_send_events (20260819000002).
 
@@ -57,7 +57,7 @@ alter table public.entries
 -- can't force to update. This trigger resolves it server-side instead:
 -- whenever hive_id is set and volume_id isn't, stamp the hive's
 -- currently-open volume. Fires BEFORE INSERT OR UPDATE, so
--- entries_insert_own/entries_update_own (re-pointed in 20260826000002) see
+-- entries_insert_own/entries_update_own (re-pointed in 20260826000004) see
 -- the resolved value on the row they actually check -- Postgres applies
 -- BEFORE ROW triggers before RLS WITH CHECK is evaluated, not after. Covers
 -- both writers R1 names: addHiveEntry's plain INSERT and the filing
@@ -174,27 +174,27 @@ alter table public.entries
 -- private_hives.sealed_at/.sent_at keep their one-directional triggers
 -- (20260815000004, 20260819000001) -- do not attempt to drop them, the
 -- triggers guarantee they cannot lie -- but the sealed-content ENFORCEMENT
--- moves off them as of 20260826000002. Comments corrected here, not in the
+-- moves off them as of 20260826000004. Comments corrected here, not in the
 -- migrations that shipped the original claims, per this schema's own
 -- standing rule (20260815000002's note on owns_entry(), reused verbatim by
 -- 20260819000001 point 7): the database is where the next reader checking
 -- what a column actually guards will look.
 comment on column public.private_hives.sealed_at is
-  'When Volume 1 was sealed. As of 20260826000001 (hive_volumes), a hive can '
+  'When Volume 1 was sealed. As of 20260826000003 (hive_volumes), a hive can '
   'outlive one seal -- hive_volumes.sealed_at is the per-volume fact and the '
-  'one entries/RLS enforcement actually reads (20260826000002). This column '
+  'one entries/RLS enforcement actually reads (20260826000004). This column '
   'keeps its one-directional trigger (20260815000004) and is mirrored, not '
-  'sourced, by seal_hive() (20260819000003, redefined in 20260826000002) '
+  'sourced, by seal_hive() (20260819000003, redefined in 20260826000004) '
   'purely so the shipped client''s existing sealedAt reads (HiveStore.js, '
   'HiveDetail.js) keep working without a client change in this ticket -- it '
   'is not the source of truth for anything past Volume 1.';
 
 comment on column public.private_hives.sent_at is
-  'When the hive was sent. As of 20260826000001 (hive_volumes), hive_volumes '
+  'When the hive was sent. As of 20260826000003 (hive_volumes), hive_volumes '
   'carries its own sent_at per volume for Project 17.2 (Delivery)''s future '
   'use, backfilled here as a one-time snapshot only -- nothing keeps it in '
   'sync with new sends yet. This column remains the live source of truth '
-  'send_hive() (20260819000001) reads and writes; 20260826000002 does not '
+  'send_hive() (20260819000001) reads and writes; 20260826000004 does not '
   'touch send_hive.';
 
 notify pgrst, 'reload schema';

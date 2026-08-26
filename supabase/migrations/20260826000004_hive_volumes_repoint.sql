@@ -1,5 +1,5 @@
 -- ENG-46, re-point half (Sage, thread 83a020e9, 2026-08-26). R3's second
--- migration -- ships only after 20260826000001's backfill, so every
+-- migration -- ships only after 20260826000003's backfill, so every
 -- existing row already carries a correct volume_id and there is no window
 -- where the client writes NULL against a policy that requires one.
 --
@@ -84,7 +84,7 @@ create policy "entries_delete_own"
 -- entries, stamp its sealed_at, open the next volume, all in one
 -- transaction so the flag and the entries it depends on can't split.
 -- Protected against a double-seal race by hive_volumes_one_open_per_hive
--- (R2, 20260826000001): the loser's insert of the next ordinal hits
+-- (R2, 20260826000003): the loser's insert of the next ordinal hits
 -- unique_violation instead of producing two open volumes.
 create function public.seal_volume(p_hive_id uuid)
 returns void
@@ -146,7 +146,7 @@ revoke execute on function public.seal_volume(uuid) from authenticated;
 -- sealed" precondition, same exception message SendHive.js/SealHive.js
 -- string-match on, checked BEFORE calling seal_volume() so a second call
 -- fails exactly like it always has instead of quietly sealing Volume 2.
--- This mirror is a deliberate, flagged deviation from 20260826000001's own
+-- This mirror is a deliberate, flagged deviation from 20260826000003's own
 -- "read-only history, never written by new code" comment -- the
 -- alternative is breaking every sealed-state read in the shipped app with
 -- no client change bundled in this migration. Drop the mirror write once

@@ -78,11 +78,11 @@ export const SENTINELS = {
   // hive_volumes is owner-only RLS with no anon grant beyond table-level
   // SELECT (same shape as private_hives itself, 20260815000001's sentinel
   // above) -- a real column resolves 200 with zero rows, not 42703/42501.
-  '20260826000001_hive_volumes': { kind: 'column', table: 'hive_volumes', column: 'hive_id' },
+  '20260826000003_hive_volumes': { kind: 'column', table: 'hive_volumes', column: 'hive_id' },
   // Same anon-revoke shape as seal_hive's own sentinel (20260819000003):
   // seal_volume is a new SECURITY DEFINER function with no anon EXECUTE, so
   // 42501 is what "this migration landed" looks like from outside.
-  '20260826000002_hive_volumes_repoint': {
+  '20260826000004_hive_volumes_repoint': {
     kind: 'rpc',
     fn: 'seal_volume',
     args: { p_hive_id: '00000000-0000-0000-0000-000000000000' },

@@ -57,6 +57,32 @@ if (onDisk.length === 0) {
   ok(`enumerated ${onDisk.length} migration file(s) in supabase/migrations/`);
 }
 
+// Version-prefix collision: two files whose leading timestamp (before the
+// first underscore) is identical are indistinguishable to the Supabase CLI's
+// remote history table, which keys on that prefix alone. Whichever one the
+// CLI records first satisfies the other's version forever -- the second
+// migration's SQL never reaches prod, silently, with a clean-looking
+// history. Caught live 2026-08-26: 20260826000001_hive_volumes and
+// 20260826000001_nectar_ledger landed in the same merge queue from two
+// independent branches that both picked the day's first free-looking
+// timestamp.
+const byPrefix = new Map();
+for (const version of onDisk) {
+  const prefix = version.split('_')[0];
+  if (!byPrefix.has(prefix)) byPrefix.set(prefix, []);
+  byPrefix.get(prefix).push(version);
+}
+for (const [prefix, versions] of byPrefix) {
+  if (versions.length > 1) {
+    bad(
+      `version prefix ${prefix} is shared by ${versions.length} files`,
+      `${versions.join(', ')} -- rename all but one to a unique timestamp before this reaches prod.`,
+    );
+  } else {
+    ok(`${prefix} is a unique version prefix`);
+  }
+}
+
 // Direction 1: every migration file is mapped. This is the commit-time
 // version of prod-schema-check's exit-1-on-unmapped rule.
 for (const version of onDisk) {

@@ -1,6 +1,6 @@
 // Gate for ENG-46's two migrations
-// (supabase/migrations/20260826000001_hive_volumes.sql,
-// supabase/migrations/20260826000002_hive_volumes_repoint.sql).
+// (supabase/migrations/20260826000003_hive_volumes.sql,
+// supabase/migrations/20260826000004_hive_volumes_repoint.sql).
 //
 //   npm run check:hive-volumes
 //
@@ -86,8 +86,8 @@ const APPLY = [
   '20260819000001_private_hives_send.sql',
   '20260819000002_hive_send_events.sql',
   '20260819000003_seal_hive.sql',
-  '20260826000001_hive_volumes.sql',
-  '20260826000002_hive_volumes_repoint.sql',
+  '20260826000003_hive_volumes.sql',
+  '20260826000004_hive_volumes_repoint.sql',
 ];
 
 const OWNER = '11111111-1111-1111-1111-111111111111';
