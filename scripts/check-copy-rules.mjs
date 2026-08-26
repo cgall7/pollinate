@@ -535,7 +535,12 @@ for (const [label, line] of FROZEN) check(`${label} is still rendered`, texts.ha
 // which is the same referent as the destination by D5's own ruling. `blank`
 // has two: the destination and the same ask.
 console.log(`\n--- E. reserved words stay on their one referent ---`);
-const RESERVED_WORD_RE = { page: /\bpage/i, blank: /\bblank/i };
+// Spelled-out inflections, not bare prefix-at-boundary: both words are strict
+// prefixes of unrelated English ("blanket", "pageant", "pager"), the same
+// property forbidden-words.mjs measured for `sin` ("single") and repaired the
+// same way. The prefix form false-fired on COPY-1's "under the blanket" —
+// a different word, not a new spend of the reserved one.
+const RESERVED_WORD_RE = { page: /\bpage(s|d)?\b/i, blank: /\bblank(s|ed|ly|ing)?\b/i };
 const RESERVED_ALLOW = {
   page: new Set([
     "Today's page is blank.",
