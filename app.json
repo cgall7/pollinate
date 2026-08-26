@@ -10,7 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/icon.png",
-      "bundleIdentifier": "xyz.pollinateapp.ios"
+      "bundleIdentifier": "xyz.pollinateapp.ios",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -21,6 +22,6 @@
     "web": {
       "bundler": "metro"
     },
-    "plugins": ["expo-notifications"]
+    "plugins": ["expo-notifications", "expo-apple-authentication"]
   }
 }

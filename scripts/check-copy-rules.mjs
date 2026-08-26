@@ -489,13 +489,22 @@ check('no import path is in the copy set', importPaths, []);
 // --- D. Copy frozen by a ruling is still on screen ----------------------
 //
 // The other half of a copy gate: a forbidden word must not appear, and a
-// ruled line must not quietly disappear. These four are frozen — R15's thesis
-// and its bookend, and §27's two opening screens (merged 51fb6e7). A rewrite
-// of any of them is a ruling, so it should cost a deliberate edit here.
+// ruled line must not quietly disappear. These three are frozen — R15's
+// thesis, and §27's two opening screens (merged 51fb6e7). A rewrite of any
+// of them is a ruling, so it should cost a deliberate edit here.
+//
+// R15's entry placeholder ("Today I was given…") is RETIRED here, not
+// replaced: it lived only on Onboarding.js's FirstEntryStep, and Zero Door
+// (PLANS/ONBOARDING_ZERO_DOOR_SPEC.md, Lumen 2026-08-26) deletes that beat
+// with no successor — the job moves to Today's quiet page, already shipped
+// with its own already-ratified voice, not this private copy following it
+// over. A frozen row pinned to a deleted screen is the same lie a green C6
+// row over deleted buffer machinery would be (check-onboarding-flow.mjs);
+// it retires in this commit rather than going red for a screen nobody can
+// bring back.
 console.log(`\n--- D. copy frozen by a ruling ---`);
 const FROZEN = [
   ['R15 thesis on Welcome', 'Start with what you were given.'],
-  ['R15 entry placeholder', 'Today I was given…'],
   ['§27.2 Welcome subhead', "One line a day. That's how it starts."],
   ['§27.1 write gate', 'Think of someone.'],
 ];

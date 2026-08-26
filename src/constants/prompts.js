@@ -7,18 +7,18 @@
 // blank page.
 //
 // THE SPARK REGISTER IS A COMPOSITION CONTRACT, NOT A STYLE PREFERENCE.
-// A spark is never rendered alone: both of IdeasAccordion's mounts hand the
-// tapped spark straight into a sentence — CoreRitual sets the input to
-// `I am grateful for ${spark}.`, Onboarding's Write beat to
-// `I'm grateful for ${spark}.`. So a spark must be a
-// LOWERCASE NOUN PHRASE — anything else lands mid-sentence as a capital,
-// and a leading preposition ("in a gesture") lands as broken grammar the
-// user then has to repair before they can write. Measured over this file:
-// 72/72 sparks are lowercase, 0/72 lead with a preposition, and no spark
-// string appears twice (a repeated chip in a four-chip row reads as a
-// rendering bug). check:copy-rules cannot see any of that — its walker asks
-// whether a word is allowed, not whether a fragment composes — so the
-// contract is written here and asserted in check:onboarding-flow section D.
+// A spark is never rendered alone: CoreRitual's SparkChips (its one
+// remaining consumer — Onboarding's IdeasAccordion mount was deleted with
+// the rest of One Door's Write beat, PLANS/ONBOARDING_ZERO_DOOR_SPEC.md)
+// hands the tapped spark straight into `I am grateful for ${spark}.`. So a
+// spark must be a LOWERCASE NOUN PHRASE — anything else lands mid-sentence
+// as a capital, and a leading preposition ("in a gesture") lands as broken
+// grammar the user then has to repair before they can write. Measured over
+// this file: 72/72 sparks are lowercase, 0/72 lead with a preposition, and
+// no spark string appears twice (a repeated chip in a four-chip row reads
+// as a rendering bug). check:copy-rules cannot see any of that — its walker
+// asks whether a word is allowed, not whether a fragment composes — so the
+// contract is written here and asserted in check:onboarding-flow section E.
 export const DAILY_PROMPTS = [
   {
     question: "Who made you smile this week?",

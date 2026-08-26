@@ -43,7 +43,14 @@ const WINDOW_MODULE = path.join(ROOT, 'src/services/nudgeWindow.js');
 const SERVICE_MODULE = path.join(ROOT, 'src/services/dailyNudge.js');
 const APP_JS = path.join(ROOT, 'App.js');
 const COPY_MODULE = path.join(ROOT, 'src/constants/nudgeCopy.js');
-const ONBOARDING_JS = path.join(ROOT, 'src/screens/Onboarding.js');
+// Was `src/screens/Onboarding.js` (the Celebration beat, half B) until
+// PLANS/ONBOARDING_ZERO_DOOR_SPEC.md §3 (Lumen, 2026-08-26): Zero Door
+// deletes that beat outright, and relocates the ask to the first-ever real
+// save inside the app instead — CoreRitual.js's InputScreen, which already
+// plays a celebration overlay for every save. Rows 11a/11b below moved with
+// it; rows 2c/3 needed no change, since they already walk every file in
+// `src/` rather than naming this one.
+const CORE_RITUAL_JS = path.join(ROOT, 'src/screens/CoreRitual.js');
 
 let pass = 0;
 let fail = 0;
@@ -889,12 +896,13 @@ console.log('\nJ. the ask does not render until its string is ratified');
 
   // 11b — the readiness flag must be READ by the screen that owns the beat.
   // Asserting the import alone would pass on an unused import, so this walks
-  // for an actual reference in Onboarding's own tree.
-  const onbSrc = allSrc.get(ONBOARDING_JS);
-  if (!onbSrc) {
-    bad('row 11b — the ask control is gated on the ratified-string flag', 'Onboarding.js not readable');
+  // for an actual reference in the owning screen's own tree — CoreRitual.js
+  // since Zero Door's relocation (§3), not Onboarding.js.
+  const coreRitualNudgeSrc = allSrc.get(CORE_RITUAL_JS);
+  if (!coreRitualNudgeSrc) {
+    bad('row 11b — the ask control is gated on the ratified-string flag', 'CoreRitual.js not readable');
   } else {
-    const ast = parseJs(onbSrc);
+    const ast = parseJs(coreRitualNudgeSrc);
     let readsReady = 0;
     let readsLabel = 0;
     let withdrawnLiteral = null;
@@ -905,15 +913,15 @@ console.log('\nJ. the ask does not render until its string is ratified');
       // Deezine's and lives in the constants module. Any literal starting
       // "Let me know" is a hardcoded ask by construction.
       if (n.type === 'StringLiteral' && /^Let me know/i.test(n.value)) {
-        withdrawnLiteral = `${path.relative(ROOT, ONBOARDING_JS)}:${n.loc.start.line} ${JSON.stringify(n.value)}`;
+        withdrawnLiteral = `${path.relative(ROOT, CORE_RITUAL_JS)}:${n.loc.start.line} ${JSON.stringify(n.value)}`;
       }
     });
     if (withdrawnLiteral) {
       bad('row 11b — the ask control is gated on the ratified-string flag', `the ask is a hardcoded literal in the screen: ${withdrawnLiteral} — copy belongs to nudgeCopy.js, and a literal here cannot be withdrawn by editing the constant`);
     } else if (readsReady < 1 || readsLabel < 1) {
-      bad('row 11b — the ask control is gated on the ratified-string flag', `Onboarding.js references NUDGE_ASK_READY ${readsReady}x and NUDGE_ASK_LABEL ${readsLabel}x — both must be read, or the sentinel guards nothing`);
+      bad('row 11b — the ask control is gated on the ratified-string flag', `CoreRitual.js references NUDGE_ASK_READY ${readsReady}x and NUDGE_ASK_LABEL ${readsLabel}x — both must be read, or the sentinel guards nothing`);
     } else {
-      ok(`row 11b — Onboarding.js gates the ask on NUDGE_ASK_READY and renders NUDGE_ASK_LABEL (no hardcoded ask literal)`);
+      ok(`row 11b — CoreRitual.js gates the ask on NUDGE_ASK_READY and renders NUDGE_ASK_LABEL (no hardcoded ask literal)`);
     }
   }
 }
