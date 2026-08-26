@@ -14,7 +14,7 @@
 // way it survives contact with five future PRs is a gate that reds the first
 // time a nectar surface renders outside the guard.
 //
-// FOUR RULE GROUPS, and their honest strengths differ:
+// FIVE RULE GROUPS, and their honest strengths differ:
 //
 //   A  universe        the usual counts-before-loops (run-checks.mjs's
 //                      requirement on gates).
@@ -37,12 +37,27 @@
 //                      completeness row and says so in its own label: an
 //                      absence claim inherits the scope of the probe that
 //                      produced it, and "no probe" is a scope of nothing.
+//   E  query reserve   guards the ASK, not the render — B4's numeral hole
+//                      (`{balance}` beside a drop glyph shows no money word)
+//                      cannot be closed by any rule that reads rendered
+//                      strings, so E reads what a surface FETCHES instead.
+//                      A numeral cannot exist client-side without a query,
+//                      and every query in this tree names its source as a
+//                      string literal — so a data identifier occurring
+//                      outside either guard reds even when the render it
+//                      would feed shows no word at all. Enumerated from the
+//                      nectar migrations in tree, not a hand list.
 //
 // WHAT THIS GATE CANNOT DO. It is lexical. A nectar surface that renders no
 // string — a bare icon, an unlabelled pressable — is invisible to rule B.
 // That is not hypothetical: DES-28 D3 is exactly such a surface (a 16pt drop
 // icon). Rule D is what covers it, by anchor rather than by word, and rule D
-// only covers surfaces someone remembered to declare in NECTAR_SURFACES.
+// only covers surfaces someone remembered to declare in NECTAR_SURFACES. And
+// rule E has a dynamic-identifier hole of its own — a wrapper module that
+// builds a query name at runtime moves the literal, and the guard site, into
+// the wrapper; nothing in this tree does that today (measured in E's own
+// check below), but the day something does, E is blind to it exactly the way
+// B is blind to a bare numeral.
 // The population is a declaration; nothing here discovers a sixth surface.
 
 import path from 'node:path';
@@ -572,9 +587,115 @@ check('D5 noActionMenu probe control: both menu targets are still reachable some
 const surfaceImporters = parsed.filter(({ src }) => /\bNECTAR_SURFACES\b/.test(src)).map(({ rel }) => rel);
 check('D6 nothing in the app imports NECTAR_SURFACES (the exclusion in A1a holds)', surfaceImporters, []);
 
+// --- E. Query reserve ------------------------------------------------------
+// GUARDS THE ASK, NOT THE RENDER. B4 catches a money WORD; it cannot catch a
+// bare numeral (`{balance}` beside a drop glyph carries no word the reserve
+// matches). A numeral cannot exist client-side without a query that fetched
+// it, and every query this app writes names its source as a string literal
+// argument to `.from(...)` or `.rpc(...)` — see SeedsStore.js, NotesStore.js,
+// HiveStore.js, all of which use exactly that shape. So E asks the same
+// question B4 asks, one layer earlier: does a string literal naming a nectar
+// data object sit under one of the two guards, regardless of what it would
+// go on to render.
+//
+// ENUMERATED FROM THE MIGRATIONS IN TREE, same shape as C4 and for the same
+// reason — a hand-typed list of table/rpc names is a second copy of the
+// schema that can drift the moment a migration adds one. The population is
+// every `create table|view|function public.X` in a migration file whose
+// NAME contains "nectar" — that is `nectar_ledger.sql` and
+// `nectar_sim_service.sql` today, so the reserve carries the whole ledger
+// schema (`ledger_postings`, `strike_invoices`, …) as well as the
+// nectar-named objects themselves. That is over-inclusion in the same
+// direction every other rule here already commits to: a client string
+// literal naming an internal ledger table has no legitimate reason to exist
+// unguarded either, so a false member costs nothing and a missed one costs
+// a silent leak.
+const NECTAR_MIGRATION_FILE_RE = /nectar/i;
+const OBJECT_RE = /create\s+(?:or\s+replace\s+)?(table|view|function)\s+(?:if not exists\s+)?public\.(\w+)/gi;
+let nectarMigrationFiles = [];
+try {
+  nectarMigrationFiles = (await readdir(migrationDir)).filter((f) => NECTAR_MIGRATION_FILE_RE.test(f)).sort();
+} catch {
+  /* no migrations directory in this tree */
+}
+const QUERY_RESERVE = new Set();
+for (const f of nectarMigrationFiles) {
+  const src = await readFile(path.join(migrationDir, f), 'utf8');
+  for (const m of src.matchAll(OBJECT_RE)) QUERY_RESERVE.add(m[2]);
+}
+check(
+  `E0 the query reserve is non-empty, enumerated from ${nectarMigrationFiles.length} nectar migration(s)`,
+  QUERY_RESERVE.size > 0,
+  true
+);
+
+// The two call shapes this app's data layer actually uses:
+// `client.from('table')` and `client.rpc('fn_name', {...})`. Anything else
+// (a computed member, a variable holding the method name) is outside this
+// walk's vocabulary — same convention as isUnderGuard's own comment: red on
+// a shape nothing in this tree uses would be a false negative no probe has
+// ever produced here, not a hole being knowingly left open.
+const QUERY_METHODS = new Set(['from', 'rpc']);
+const findQueryCalls = (ast) => {
+  const hits = [];
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'MemberExpression' &&
+      node.callee.property.type === 'Identifier' &&
+      QUERY_METHODS.has(node.callee.property.name) &&
+      node.arguments[0] &&
+      node.arguments[0].type === 'StringLiteral'
+    ) {
+      hits.push({ name: node.arguments[0].value, node, ancestors });
+    }
+  });
+  return hits;
+};
+
+// E1 CALIBRATION, same reason as B3: zero call sites in this tree touch the
+// reserve today (NectarStore does not exist yet — measured in E2's own
+// count below), so a broken extractor and a clean tree read identically
+// without a probe with a known answer. Five probes, parsed on the fly:
+// an unguarded `.from()`, the same call under each guard shape isUnderGuard
+// recognises (`&&` and the ternary), the one call that is REQUIRED to run
+// pre-consent (`consent_to_nectar()` itself, legitimately under the sheet
+// guard rather than the consent guard — it is how consent gets set), and an
+// unrelated table to confirm reserve membership is doing the filtering.
+const QUERY_CALIBRATION = [
+  ['unguarded from()', `client.from('nectar_zaps').select('amount_microusd');`, true],
+  ['&&-guarded from()', `nectarConsent && client.from('nectar_zaps').select('amount_microusd');`, false],
+  ['ternary-guarded rpc()', `nectarConsent ? client.rpc('record_zap', {}) : null;`, false],
+  ['sheet-guarded consent_to_nectar()', `nectarConsentSheetOpen && client.rpc('consent_to_nectar', {});`, false],
+  ['unrelated table, not in the reserve', `client.from('seeds').select('id');`, false],
+];
+const calibrationFailures = [];
+for (const [label, src, wantHit] of QUERY_CALIBRATION) {
+  const ast = parse(src, { sourceType: 'module', plugins: ['jsx'] });
+  const hits = findQueryCalls(ast).filter((h) => QUERY_RESERVE.has(h.name));
+  const gotHit = hits.some((h) => !GUARDS.some((g) => isUnderGuard(h.ancestors, g)));
+  if (gotHit !== wantHit) calibrationFailures.push(label);
+}
+check('E1 query-reserve calibration: known-guarded and known-unguarded probes verify as expected', calibrationFailures, []);
+
+// E2 THE REAL QUESTION, over the same source universe A1 already enumerated.
+const queryHits = [];
+for (const { rel, ast } of parsed) {
+  for (const h of findQueryCalls(ast)) {
+    if (QUERY_RESERVE.has(h.name)) queryHits.push({ rel, line: h.node.loc.start.line, name: h.name, ancestors: h.ancestors });
+  }
+}
+const unguardedQueries = queryHits.filter((h) => !GUARDS.some((g) => isUnderGuard(h.ancestors, g)));
+check(
+  `E2 every query naming a reserved nectar identifier sits under one of the guards (${GUARDS.join(' | ')})`,
+  unguardedQueries.map((h) => `${h.rel}:${h.line} ${h.name}`),
+  []
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(
   `(${allStrings.length} rendered strings scanned, ${reserveHits.length} match the reserve, ` +
-    `${NECTAR_SURFACES.length} surfaces declared: ${hosted.length} hosted, ${unhosted.length} container-absent)`
+    `${NECTAR_SURFACES.length} surfaces declared: ${hosted.length} hosted, ${unhosted.length} container-absent, ` +
+    `${QUERY_RESERVE.size} query identifiers reserved from ${nectarMigrationFiles.length} migration(s), ${queryHits.length} query call site(s) found)`
 );
 if (fail > 0) process.exit(1);
