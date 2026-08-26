@@ -15,6 +15,23 @@ const withAlpha = (hex, alpha) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+// The one legal way to write a pigment DERIVED from two others. A derived pigment
+// is not a third category — it resolves to a hex before anything sees it, and it
+// stays a stated function of its inputs so it retunes when they do. The rule is
+// the same as `withAlpha`'s: a hex that only *claims* in a comment to be "accent
+// warmed toward ink" is a hex that stops being that the next time either moves.
+const mix = (hexA, hexB, t) => {
+  const parse = (h) => {
+    const m = /^#([0-9A-Fa-f]{6})$/.exec(h);
+    if (!m) throw new Error(`mix() takes 6-digit hex pigments, got ${h}`);
+    return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  };
+  if (!(t >= 0 && t <= 1)) throw new Error(`mix() takes t in [0,1], got ${t}`);
+  const [a, b] = [parse(hexA), parse(hexB)];
+  const ch = (i) => Math.round(a[i] + (b[i] - a[i]) * t).toString(16).padStart(2, '0');
+  return `#${ch(0)}${ch(1)}${ch(2)}`.toUpperCase();
+};
+
 // SOLID PIGMENTS. Every colour in the system is either one of these or an alpha
 // of one of these — there is no third category, which is what makes `withAlpha`
 // the only legal way to write a translucent colour and makes a raw `rgba(...)`
@@ -101,6 +118,53 @@ const colors = {
   // "a seed detail and a note detail should be siblings." That was someone
   // doing the right thing by hand; this is the same thing with a name on it.
   scrim: withAlpha(pigment.inkVeil, 0.4),
+
+  // THE SPOTLIGHT DIM — the transient dim behind a hex tap. Not `scrim`, and the
+  // gap between them is the whole point: `scrim` means THE PAGE IS INERT, a modal
+  // owns it, tap anywhere to dismiss. This means THE PAGE IS STILL YOURS, one
+  // thing on it is lit, and it releases itself.
+  //
+  // R6 (GUIDES/HEX_TAP_SPEC_LUXURY_PASS.md): this was `inkVeil` @ 0.25, a token
+  // calibrated over `background` and then PAINTED ON THE CELLS. `inkVeil` keeps
+  // the page's hue because the page has hue to keep; `surface` is #FFFFFF and has
+  // none, so the same veil landed at C* 2.83 — achromatic. Five grey hexagons
+  // around one yellow one reads as "everyone else is offline," not as a spotlight,
+  // on a brand with no grey in it.
+  //
+  // DERIVED, and the derivation is what makes the alpha honest: hold the room's
+  // lightness EXACTLY where it already ships and buy the hue for free. Solved on
+  // the cell ground (`scripts/lib/color.mjs`) for the alpha that reproduces the
+  // shipped room L*, then rounded — 0.4191 -> 0.42:
+  //
+  //                             shipped inkVeil@0.25   this
+  //   room L* on a cell                79.30          79.26   <- held
+  //   spotlight dL*, cell ground       17.08          17.12   <- held
+  //   ink / inkSoft on the room    9.86 / 3.63    9.85 / 3.63 <- held
+  //   dE00 from `scrim` (page)          9.64          16.41   <- improved
+  //   C*                                2.83          28.06   <- the whole point
+  //   spotlight dL*, PAGE ground       17.75          16.98   <- the one that moves
+  //
+  // Reproduce: `node scripts/derive-spotlight-dim.mjs` — reads this file's own
+  // source and composites with `scripts/lib/color.mjs`. Computed from source;
+  // no pixels from any capture.
+  //
+  // The last row is the only figure that gives anything up, and it is the one
+  // `shadows.glow` below and Sage's `check-spotlight-dim` both publish: -0.77
+  // on the PAGE, against a floor of zero. It moves because the ruled pigment is
+  // warm and the page is warm, so it has less to subtract there. The cell is the
+  // ground this token is painted on, and on the cell it does not move at all.
+  //
+  // So this is a pure hue swap: nothing that was measured and accepted about the
+  // old value moves, and the tap reads LESS like an open modal than before, not
+  // more. `inkSoft` still misses 4.5:1 exactly as it did before — the standing
+  // rule is unchanged and is NOT new here: no secondary text under this dim.
+  // Graphic marks clear the 3:1 floor with the same headroom they had.
+  //
+  // Do not read the old "0.35 is DISQUALIFIED" ceiling as applying to 0.42. That
+  // ceiling was `inkVeil`'s: it came from `inkVeil`@0.35 collapsing to dE00 3.42
+  // against the scrimmed page. An alpha ceiling is a property of a PIGMENT's own
+  // curve, not a number that transfers when the pigment changes.
+  spotlightDim: withAlpha(mix(pigment.accentDeep, pigment.inkVeil, 0.25), 0.42),
 
   // --- Ink tiers ---
   // Placeholder text. DERIVED, not picked: 0.62 is the faintest alpha that still
@@ -293,6 +357,49 @@ export const theme = {
     //
     // An unknown level throws rather than defaulting: a typo silently rendering
     // at `bloom` is a design decision made by a spelling mistake.
+    //
+    // THE GROUND IS PART OF THE EQUATION, and these three numbers do not carry
+    // it. On this app's cream (`background` #FFF7CC) EVERY yellow at EVERY
+    // level makes the ground DARKER, not lighter — L* delta of ground vs
+    // ground-plus-glow, at `bloom`: `accentBurst` -2.26, `accent` -4.38,
+    // `accentDeep` -12.00. A glow that darkens its ground is a stain. You
+    // cannot make a light ground brighter; the page is already near white, so
+    // there is no luminance left to travel into.
+    //
+    // So the ruling is about DIRECTION, not magnitude, and a colour-difference
+    // number cannot see direction — ΔE00 is a distance, and "further away" on
+    // cream means "further into shadow." Ranking glow colours by ΔE00 picks the
+    // one that stains hardest. It is the wrong instrument for this question and
+    // the right one is L*.
+    //
+    // TWO CONSEQUENCES:
+    //   1. THE DIM IS NOT AN ENHANCEMENT, IT IS A PRECONDITION. Without a
+    //      dimmed surround there is no glow on this page at all — only a warm
+    //      bruise. Light needs somewhere dark to travel.
+    //   2. ONCE THE SURROUND IS DIMMED, THE HOTTEST STOP WINS. The spotlight
+    //      test — lit cell L* minus room L*, `bloom`, room dimmed by
+    //      `inkVeil`, on the PAGE. This table settled DIRECTION (which pigment
+    //      glows), and that ruling stands. It is NOT the current dim: R6 moved
+    //      `colors.spotlightDim` off `inkVeil` and onto a derived pigment,
+    //      because this table's ground is the page and the dim is painted on
+    //      the CELLS. Read the alpha column as inkVeil's, not as the token's.
+    //
+    //        dim    accentBurst      accentDeep
+    //        0.00      -2.26            -12.00     no spotlight either way
+    //        0.15      +9.63             -0.11     accentDeep still invisible
+    //        0.25     +17.75             +8.01     <- the dim this was ruled at
+    //
+    //      Live equivalent under R6, same page ground: +16.98. On the cell
+    //      ground the token is actually painted on: +17.12. See
+    //      `colors.spotlightDim` above for the full derivation.
+    //
+    //      `accentBurst` is the honey glow. `accentDeep` stays the bead's
+    //      shaded underside in `gradients.honey`, where it sits on the white
+    //      cell as material and not as light.
+    //
+    // DO NOT COMPENSATE BY RAISING THE ALPHA. These levels are a register
+    // shared with dark surfaces; a `peak` cranked until it reads on cream
+    // blows out on the Wrapped slides and the seal. Dim the room instead.
     glow: (color, level = 'bloom') => {
       const levels = {
         rest: { shadowOpacity: 0.18, shadowRadius: 12, elevation: 4 },
