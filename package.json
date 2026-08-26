@@ -16,6 +16,7 @@
     "check:migration-sentinels": "node scripts/check-migration-sentinels.mjs",
     "check:seed-view": "node scripts/check-seed-view.mjs",
     "check:hive-state-rls": "node scripts/check-hive-state-rls.mjs",
+    "check:honey-fill": "node scripts/check-honey-fill.mjs",
     "check:streaks": "node scripts/check-streaks.mjs",
     "check:share-visibility": "node scripts/check-share-visibility.mjs",
     "check:modal-dismiss": "node scripts/check-modal-dismiss.mjs",

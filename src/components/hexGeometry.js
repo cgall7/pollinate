@@ -100,3 +100,57 @@ export const hexSealPath = (size) => {
   };
   return `${ring(r)} ${ring(r * 0.5)}`;
 };
+
+// DES-24 (`GUIDES/POLLINATE_V2_DES24_HONEYED_HEXAGON.md`) §2-4, corrected on
+// device §6.4: the `honeyed` state is a fill LEVEL, not a badge. Honey pools
+// in the flat-bottom hex like a vessel; the region's own horizontal top edge
+// (the "meniscus") is the signal, not the region's colour (§2 measures why —
+// no colour clears WCAG 1.4.11 3:1 on both member tints, `ink` clears it 2x).
+//
+// The ceiling is the glyph box, not a typed constant (§4/§6.4): React Native
+// centres the LINE box (ascent+descent), not a cap-height box, so the own
+// cell's "You" glyph bottom sits at 1.1765 * size, not the cap-height guess
+// of 1.1470 the original spec used. That 0.0295*size correction is why this
+// is 0.6096, not the originally-published 0.639.
+const HONEY_GLYPH_BOTTOM_RATIO = 1.1765; // §6.4, device-measured
+const HONEY_GLYPH_CLEARANCE_RATIO = 0.08; // §4
+const HONEY_BOTTOM_EDGE_RATIO = 1.8660; // HexShape: flat bottom edge, size*(1+sin60)
+
+// h_max: 0.6096 * size = 26.82pt at a 44pt cell (§6.4, corrected).
+export const honeyHMax = (size) =>
+  (HONEY_BOTTOM_EDGE_RATIO - (HONEY_GLYPH_BOTTOM_RATIO + HONEY_GLYPH_CLEARANCE_RATIO)) * size;
+
+// Five rungs, never labelled (§4/§6.1) — the ladder is a register of how
+// honeyed the cell looks, not a readout; the exact balance is a numeral
+// elsewhere. The cap this maps real drops onto is DES-24 §7's open item
+// (wants 19a's drop distribution) — nothing in this repo computes a rung
+// from a balance yet, so no real member carries one.
+export const HONEY_RUNGS = [0, 0.25, 0.5, 0.75, 1];
+
+// The honey region: the cell clipped below the meniscus at height `h`. Every
+// rung sits below the hex's widest point (h_max 0.6096*size < 0.866*size,
+// the distance from the bottom edge to the side vertices), so the region is
+// always a trapezoid bounded by the two lower edges — no special case at the
+// side vertices. Returns an SVG points string, matching `hexPoints`' shape.
+export const hexHoneyPoints = (size, h) => {
+  const yBottom = HONEY_BOTTOM_EDGE_RATIO * size;
+  const yMeniscus = yBottom - h;
+  const halfWidthAt = (y) => size - ((y - size) / (HEX_HEIGHT_RATIO * size)) * 0.5 * size;
+  const hw = halfWidthAt(yMeniscus);
+  return [
+    `${size - hw},${yMeniscus}`,
+    `${size + hw},${yMeniscus}`,
+    `${1.5 * size},${yBottom}`,
+    `${0.5 * size},${yBottom}`,
+  ].join(' ');
+};
+
+// The meniscus line's own endpoints — same half-width the region's top edge
+// uses, so the `ink` line and the fill's edge always agree.
+export const hexHoneyMeniscus = (size, h) => {
+  const yBottom = HONEY_BOTTOM_EDGE_RATIO * size;
+  const yMeniscus = yBottom - h;
+  const halfWidthAt = (y) => size - ((y - size) / (HEX_HEIGHT_RATIO * size)) * 0.5 * size;
+  const hw = halfWidthAt(yMeniscus);
+  return { x1: size - hw, y1: yMeniscus, x2: size + hw, y2: yMeniscus };
+};
