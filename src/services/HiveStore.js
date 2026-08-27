@@ -42,6 +42,11 @@ export const REVIEW_CADENCES = ['monthly', 'yearly', 'manual'];
 const DEFAULT_COVER_THEME = 'sunlit-honey';
 const DEFAULT_REVIEW_CADENCE = 'yearly';
 
+// `authorId` is `entries.user_id` — RLS-readable by the hive subject via
+// `entries_select_as_hive_subject` regardless of who wrote the row (DES-21
+// §2 site #7: this mapper used to discard it). Not rendered anywhere yet —
+// DES-21 §4's signature waits on `entries.author_name_at_seal` (Sage's §8
+// ruling, thread b4533a52) before a NAME can join it.
 const toHiveEntry = (row) => ({
   id: row.id,
   hiveId: row.hive_id,
@@ -50,6 +55,7 @@ const toHiveEntry = (row) => ({
   theme: row.theme,
   savedAt: row.created_at,
   paper: row.paper,
+  authorId: row.user_id,
 });
 
 export const HiveStore = {
@@ -433,7 +439,7 @@ export const HiveStore = {
     const subjectId = await requireUserId(client);
     const { data: hives, error } = await client
       .from('private_hives')
-      .select('id, owner_id, subject_name, cover_theme, sealed_at, sent_at')
+      .select('id, owner_id, subject_name, cover_theme, sealed_at, sent_at, is_collective')
       .eq('subject_profile_id', subjectId)
       .not('sent_at', 'is', null)
       .order('sent_at', { ascending: false });
@@ -457,6 +463,9 @@ export const HiveStore = {
       coverTheme: h.cover_theme,
       sentAt: h.sent_at,
       senderName: senderNames.get(h.owner_id) || 'Someone',
+      // Not rendered yet — DES-21 §5's roster title holds until Sage's
+      // `author_name_at_seal` migration lands (thread b4533a52).
+      isCollective: h.is_collective,
     }));
   },
 
@@ -470,7 +479,7 @@ export const HiveStore = {
     const subjectId = await requireUserId(client);
     const { data: hive, error } = await client
       .from('private_hives')
-      .select('id, owner_id, subject_name, cover_theme, sealed_at, sent_at')
+      .select('id, owner_id, subject_name, cover_theme, sealed_at, sent_at, is_collective')
       .eq('id', hiveId)
       .eq('subject_profile_id', subjectId)
       .not('sent_at', 'is', null)
@@ -492,13 +501,23 @@ export const HiveStore = {
       .eq('id', hive.owner_id)
       .maybeSingle();
 
+    const entries = (entryRows ?? []).map(toHiveEntry);
+    // `writerCount` needs no schema change — every entry the subject can
+    // read here already carries `authorId` (DES-21 finding, thread
+    // b4533a52: `entries_select_as_hive_subject` has no author-friendship
+    // term). Not rendered yet — §5/§6's ruled copy wants names, not a
+    // count; this is the plumbing, not the UI call.
+    const writerCount = new Set(entries.map((e) => e.authorId)).size;
+
     return {
       id: hive.id,
       subjectName: hive.subject_name,
       coverTheme: hive.cover_theme,
       sentAt: hive.sent_at,
       senderName: sender?.display_name || 'Someone',
-      entries: (entryRows ?? []).map(toHiveEntry),
+      isCollective: hive.is_collective,
+      writerCount,
+      entries,
     };
   },
 };
