@@ -261,6 +261,32 @@ const COUNTS = Array.from({ length: 201 }, (_, i) => i);
   if (!bads) ok(`B2 every delay >= ${MIN_START_DELAY_MS}ms across 201 counts x 5 steps (no synchronous spring start)`);
 }
 
+// B2b — THE ROW THAT PINS THE CONSTANT B2 MEASURES AGAINST. B2 compares
+// every delay to `MIN_START_DELAY_MS`, which means B2 asserts that the
+// FUNCTION respects the constant — and says nothing whatever about the
+// constant. Set the floor to 0 and B2 goes green on a schedule whose first
+// segment starts synchronously, which is the exact device freeze R43
+// records. A threshold that is also the thing under test is not a
+// threshold. Two-sided on purpose, because the floor has two different
+// reasons and only one of them is R43's:
+//
+//   > 0   is the load-bearing half. `SpringAnimation.js:234` special-cases
+//         a FALSY delay to call `start()` synchronously inside the effect.
+//   <= one frame is what keeps it invisible. A floor of 300ms would satisfy
+//         R43 perfectly while silently holding every first word back a
+//         third of a second — a correctness fix that quietly becomes a
+//         timing decision nobody ratified.
+{
+  const FRAME_MS = 1000 / 60;
+  if (MIN_START_DELAY_MS <= 0) {
+    bad('B2b start floor', `MIN_START_DELAY_MS is ${MIN_START_DELAY_MS}: a falsy delay makes RN start the spring synchronously inside the effect (R43)`);
+  } else if (MIN_START_DELAY_MS > FRAME_MS) {
+    bad('B2b start floor', `MIN_START_DELAY_MS is ${MIN_START_DELAY_MS}ms, more than one 60fps frame (${FRAME_MS.toFixed(2)}ms) — that is a timing decision, not a floor`);
+  } else {
+    ok(`B2b MIN_START_DELAY_MS = ${MIN_START_DELAY_MS}ms: non-zero (no synchronous start) and within one 60fps frame (${FRAME_MS.toFixed(2)}ms, so invisible)`);
+  }
+}
+
 // B3 — monotonic. Words must not arrive out of order.
 {
   let bads = 0;
@@ -635,6 +661,118 @@ else bad('D0 calibration', 'the walker reported an absent identifier');
 {
   if (/useReducedMotionState/.test(componentSrc)) ok('D10 uses useReducedMotionState — the reduced branch waits for a resolved read, not an assumed one');
   else bad('D10 reduced-motion hook', 'the component does not use useReducedMotionState');
+}
+
+// D11 — THE HERO-ABSENT ROW (Lumen's ruling, 2026-08-27). D4 covers one way
+// a cue never fires; this covers the other, and the other one is worse. A
+// surface may adopt this copy WITHOUT adopting the bee that stages it —
+// then nobody emits a settle, `active` never flips, and under full motion
+// the line is simply absent on a build where every other frame looks
+// perfect. There is no accessibility setting to correlate it with and no
+// user complaint that names it. So the component must decide the unstaged
+// case ITSELF, before it reads anything else.
+{
+  let unstaged = null;
+  let reducedBranch = null;
+  walk(componentAst, (n) => {
+    if (n.type !== 'IfStatement') return;
+    const t = identifiersIn(n.test);
+    // Order matters: any `if` reading `active` is a candidate unstaged
+    // branch, INCLUDING one that also reads `reduced`. Classifying on
+    // `reduced` first would route that case to the reduced branch and leave
+    // the clause written for it permanently unreachable.
+    if (t.has('active')) unstaged = n;
+    else if (t.has('reduced')) reducedBranch = n;
+  });
+
+  if (!unstaged) {
+    bad('D11 hero-absent', 'no `if` decides the unstaged case from `active` alone — a call site with no staged hero strands its copy at opacity 0 under full motion');
+  } else if (identifiersIn(unstaged.test).has('reduced')) {
+    bad('D11 hero-absent', 'the unstaged branch also reads `reduced` — an unstaged surface would only be safe for Reduce Motion users');
+  } else if (reducedBranch && unstaged.start > reducedBranch.start) {
+    bad('D11 hero-absent', 'the unstaged branch is tested AFTER the reduced branch — the unstaged case must not wait on an async OS read');
+  } else {
+    ok('D11 an `if` on `active` alone decides the unstaged case, ahead of the reduced-motion branch');
+
+    // D11b — THE DOMAIN SWEEP, and the row that makes D11 more than
+    // decoration. The obvious "fix" for D11 is `if (!active) return
+    // renderFinal()`, which passes every structural check above and DELETES
+    // THE BEAT: `active={false}` — a hero that exists and has not settled
+    // yet — would render finished text instead of holding, so no call site
+    // could ever choreograph anything. Absent and not-yet-arrived are
+    // different states and the predicate has to tell them apart. Evaluated
+    // rather than pattern-matched, over the whole reachable domain.
+    // `undefined` parses as an Identifier but is a global literal, not a
+    // dependency — excluding it lets the sweep actually run on the
+    // plausible-but-holed `active === undefined` shape instead of bailing
+    // out with a message about the wrong problem.
+    const testIds = [...identifiersIn(unstaged.test)].filter((id) => id !== 'undefined');
+    if (testIds.length !== 1 || testIds[0] !== 'active') {
+      bad('D11b unstaged predicate', `the test reads {${testIds.join(', ')}} — it must be a function of \`active\` alone to be evaluated here`);
+    } else {
+      const testSrc = componentSrc.slice(unstaged.test.start, unstaged.test.end);
+      let fn = null;
+      try {
+        fn = new Function('active', `return !!(${testSrc});`);
+      } catch (e) {
+        bad('D11b unstaged predicate', `could not evaluate \`${testSrc}\`: ${e.message}`);
+      }
+      if (fn) {
+        // [value, expected unstaged?, what the value means at a call site]
+        const domain = [
+          [true, false, 'the cue has fired — run the beat'],
+          [false, false, 'a hero exists and has not settled — HOLD'],
+          [undefined, true, 'the prop was omitted — no hero will ever cue this'],
+          [null, true, "a caller's own state has not initialised (useState(null))"],
+        ];
+        const wrong = domain.filter(([v, want]) => fn(v) !== want);
+        if (wrong.length === 0) {
+          ok(`D11b unstaged predicate \`${testSrc}\` is correct on all ${domain.length} reachable values — absent renders, not-yet-settled holds`);
+        } else {
+          wrong.forEach(([v, want, meaning]) => {
+            bad('D11b unstaged predicate', `\`${testSrc}\` treats active=${String(v)} as ${want ? 'staged' : 'unstaged'} — ${meaning}`);
+          });
+        }
+      }
+    }
+
+    // D12 — BOTH unconditioned states arrive through the SAME renderer, so
+    // "the text arrived" cannot come to mean two different things. The
+    // failure this prevents is quiet: two hand-written copies of the final
+    // render drift, one of them keeps a stale prop, and only one of the two
+    // states is ever looked at on a device.
+    const returnedCall = (node) => {
+      const names = [];
+      walk(node, (n) => {
+        if (n.type === 'ReturnStatement' && n.argument && n.argument.type === 'CallExpression' && n.argument.callee.type === 'Identifier') {
+          names.push(n.argument.callee.name);
+        }
+      });
+      return names;
+    };
+    const a = returnedCall(unstaged.consequent);
+    const b = reducedBranch ? returnedCall(reducedBranch.consequent) : [];
+    if (a.length === 1 && b.length === 1 && a[0] === b[0]) {
+      ok(`D12 both unconditioned states return the same renderer, \`${a[0]}()\` — one definition of "the text arrived"`);
+    } else {
+      bad('D12 shared final renderer', `unstaged returns [${a.join(', ')}], reduced returns [${b.join(', ')}] — the two states render the finished string through different code`);
+    }
+  }
+}
+
+// D13 — the DEFAULT grain is the lossless one. Deezine picked `line` for
+// both first adopters (2026-08-27) on typographic purity, and line grain is
+// also the grain measured pixel-identical to a plain `<Text>` on device (0
+// differing pixels, both lines). Those two facts together are what make it
+// the right default rather than merely the current pick: a call site that
+// says nothing about grain should pay nothing for the silence. Word grain
+// costs up to 2 device pixels of accumulated inter-word advance along a
+// row, which is a thing to opt into.
+{
+  const m = /grain\s*=\s*GRAINS\.([A-Z]+)/.exec(componentSrc);
+  if (!m) bad('D13 default grain', 'no `grain = GRAINS.X` default found in the component signature');
+  else if (m[1] === 'LINE') ok('D13 the default grain is GRAINS.LINE — the lossless grain, so an unstated grain costs nothing');
+  else bad('D13 default grain', `the default is GRAINS.${m[1]}: an unstated grain silently costs the caller sub-pixel advance it never asked for`);
 }
 
 console.log(`\ncheck-type-choreography: ${pass} passed, ${failures.length} failed`);

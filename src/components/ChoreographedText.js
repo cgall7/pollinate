@@ -26,16 +26,37 @@ import { GRAINS, revealSchedule } from './typeChoreography';
 //    arrive, and the surrounding screen never jumps. The alternative —
 //    mounting words progressively — re-breaks the line on every arrival.
 //
-// 2. REDUCED MOTION DOES NOT WAIT FOR THE CUE. `active` is flipped by a
-//    hero's settle, and a hero whose flight is skipped under Reduce Motion
-//    may never fire it — which would strand the copy at opacity 0 forever
-//    for exactly the users least able to tolerate it. So the reduced branch
-//    below reads `reduced` ALONE and renders the finished string. This is
-//    also Lumen's commission wording taken literally ("reduced-motion
-//    branch renders final text immediately"), and it supersedes §14.1's
-//    flat-fade collapse for this component only: there is no progressive
-//    arrival left to collapse, and a fade of copy that is already committed
-//    to the screen is decoration, not accessibility.
+// 2. NO STATE EXISTS IN WHICH THE TEXT NEVER ARRIVES (Lumen's ruling,
+//    2026-08-27, DES-17's forfeit class). `active` is flipped by a hero's
+//    settle, so there are two separate ways for a cue never to fire, and
+//    only one of them is about accessibility:
+//
+//      a. THE HERO IS SKIPPED. Reduce Motion skips the flight, so its
+//         settle never happens. The reduced branch below therefore reads
+//         `reduced` ALONE and renders the finished string — get this wrong
+//         and the line sits at opacity 0 forever for exactly the users
+//         least able to tolerate it. This is also the commission's wording
+//         taken literally ("reduced-motion branch renders final text
+//         immediately"), and it supersedes §14.1's flat-fade collapse for
+//         this component only: there is no progressive arrival left to
+//         collapse, and a fade of copy already committed to the screen is
+//         decoration, not accessibility.
+//
+//      b. THERE IS NO HERO AT ALL. A surface that adopts this copy without
+//         adopting the bee that stages it has nobody to emit a settle, and
+//         under full motion that is the SAME forfeit with none of the
+//         accessibility signal to make it visible — every frame of that
+//         build looks perfect and the line is simply absent. The component
+//         cannot infer this, so the caller declares it, and THE DECLARATION
+//         IS THE DEFAULT: a cue is a boolean, and anything that is not a
+//         boolean is not a cue. `active` omitted (or undefined while a
+//         caller's own state settles) means unstaged, and unstaged renders
+//         the finished string at frame 0. The failure direction is
+//         therefore unreachable by omission — forgetting the prop costs you
+//         the choreography, never the words.
+//
+//    Both states render through ONE function, `renderFinal`, so the two
+//    cannot drift into disagreeing about what "arrived" means.
 //
 // 3. NO TIMERS, AT ALL. The commission asks for "no per-character timers
 //    surviving unmount"; the strongest form of that promise is not to own
@@ -55,9 +76,10 @@ import { GRAINS, revealSchedule } from './typeChoreography';
 //    sentence or moving focus order in the middle of a ceremony. So the
 //    segments are hidden from the tree and the sentence is announced once.
 //
-// GRAIN IS THE CALL SITE'S (Deezine's pick, per the commission), and the
-// two are not equivalent in one respect that belongs in the choice rather
-// than in this comment's small print: `line` keeps each line a single
+// GRAIN IS THE CALL SITE'S (Deezine's pick, per the commission — `line`
+// for both first adopters, 2026-08-27), and the two are not equivalent in
+// one respect that belongs in the choice rather than in this comment's
+// small print: `line` keeps each line a single
 // `<Text>`, so RN's own line-breaker and kerning are untouched. `word` has
 // to box each word to keep property 1, so wrapping becomes flex-wrap over
 // word boxes and the inter-word space is a real space rendered in the real
@@ -85,8 +107,19 @@ const styles = StyleSheet.create({
 
 export const ChoreographedText = ({
   text,
-  grain = GRAINS.WORD,
-  active = false,
+  // The default is the LOSSLESS grain, which is also the one Deezine picked
+  // for both first adopters. Line grain keeps each line a single `<Text>`,
+  // and on device it is pixel-identical to a plain `<Text>` of the same
+  // string (0 differing pixels, both lines) — so a call site that says
+  // nothing about grain pays nothing for the silence. Word grain costs up
+  // to 2 device pixels of accumulated inter-word advance along a row, which
+  // is a thing to opt into, not a thing to inherit.
+  grain = GRAINS.LINE,
+  // NO DEFAULT ON PURPOSE — see property 2b. Omitted means "no hero will
+  // ever cue this", which renders the finished string; `false` means "a
+  // hero exists and has not settled yet", which holds. Defaulting this to
+  // `false` would make the stranded state the one you get by forgetting.
+  active,
   style,
   containerStyle,
   accessibilityLabel,
@@ -142,19 +175,28 @@ export const ChoreographedText = ({
 
   const label = accessibilityLabel ?? (typeof text === 'string' ? text : undefined);
 
-  // Property 2. Read `reduced` alone — never `active` — so the copy cannot
-  // be stranded by a cue that only exists inside a motion branch. Rendered
-  // as ONE `<Text>`, which also gives this branch the app's real
-  // line-breaking for free.
-  if (resolved && reduced) {
-    return (
-      <View style={containerStyle} accessible accessibilityRole="text" accessibilityLabel={label} {...rest}>
-        <Text style={style} importantForAccessibility="no-hide-descendants">
-          {text}
-        </Text>
-      </View>
-    );
-  }
+  // The arrival of last resort, shared by both unconditioned states so that
+  // "the text arrived" means one thing. ONE `<Text>`, which also gives
+  // these branches the app's real line-breaking for free.
+  const renderFinal = () => (
+    <View style={containerStyle} accessible accessibilityRole="text" accessibilityLabel={label} {...rest}>
+      <Text style={style} importantForAccessibility="no-hide-descendants">
+        {text}
+      </Text>
+    </View>
+  );
+
+  // Property 2b — UNSTAGED. Tested before anything else and without reading
+  // `reduced`, because a cue that will never come is not an accessibility
+  // state: it is full-motion text that is simply missing. Note this is a
+  // `typeof` test rather than a truthiness test — `false` is a cue, and a
+  // held segment must stay held.
+  if (typeof active !== 'boolean') return renderFinal();
+
+  // Property 2a — REDUCED MOTION. Read `reduced` alone — never `active` —
+  // so the copy cannot be stranded by a cue that only exists inside a
+  // motion branch.
+  if (resolved && reduced) return renderFinal();
 
   return (
     <View
