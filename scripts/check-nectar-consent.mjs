@@ -66,7 +66,13 @@
 //                      migration that DEFINES the function and asserts
 //                      equality, so a DB-side re-ratification reds here
 //                      instead of silently halving the ladder. Fails closed;
-//                      the extractor is calibrated in both directions.
+//                      the extractor is calibrated in both directions. F4
+//                      covers what F1 leaves behind -- the `comment on
+//                      function` is a CATALOG write, present tense, and the
+//                      grant's own ratification record, so it must not be
+//                      older than the definition it describes. Freshness
+//                      only: F4 compares two filenames and reads no digit
+//                      out of prose.
 //
 // WHAT THIS GATE CANNOT DO. It is lexical. A nectar surface that renders no
 // string — a bare icon, an unlabelled pressable — is invisible to rule B.
@@ -1204,7 +1210,19 @@ check(
 // number lives in 20260826000006's comment PROSE ("Same 500 number as before
 // this migration"). That copy can mislead a reader; it cannot move a pixel,
 // and a lexical rule over that string would have to tell 500 apart from 2026,
-// 0.001 and an event id. Flagged here, not gated.
+// 0.001 and an event id. Its CONTENT stays flagged here, not gated.
+//
+// Lumen's ruling on it (thread b4533a52, 2026-08-27) split that sentence in
+// two, because it lives in two homes with different tenses. As migration-file
+// prose it is append-only history and cannot go stale -- a re-ratification
+// arrives as a NEW file and does not falsify 000006's sentence about its own
+// moment. But it is also a `comment on function`: a CATALOG write, present
+// tense, and the database's own documentation of the grant. Redefine the
+// grant in a later migration without re-commenting and the catalog says 500
+// over a function returning 750. F1 reds at that instant -- and goes green
+// again the moment the JS constant is repaired, a repair path that never
+// touches the comment. F4 is that residual, and it gates FRESHNESS, never
+// content: no digit is parsed out of prose anywhere in it.
 const GRANT_FN = 'nectar_starter_grant_drops';
 const GRANT_DEFINE_SRC = String.raw`create\s+(?:or\s+replace\s+)?function\s+public\.${GRANT_FN}\s*\(`;
 const GRANT_DROP_SRC = String.raw`drop\s+function\s+(?:if\s+exists\s+)?public\.${GRANT_FN}\s*\(`;
@@ -1242,8 +1260,11 @@ const grantEventIn = (rawSrc) => {
   return { kind: 'define', literal: lit ? Number(lit[1]) : null };
 };
 
+// Lexical sort == chronological, because every migration name is timestamp
+// prefixed. F4 leans on the same fact.
+const migrationFiles = (await readdir(migrationDir).catch(() => [])).sort();
 let grantSource = null;
-for (const f of (await readdir(migrationDir).catch(() => [])).sort()) {
+for (const f of migrationFiles) {
   const event = grantEventIn(await readFile(path.join(migrationDir, f), 'utf8'));
   if (event) grantSource = { file: f, event };
 }
@@ -1263,9 +1284,14 @@ check(
 // F2 CALIBRATES THE EXTRACTOR IN BOTH DIRECTIONS, because F1 is green on a
 // tree where the two sides agree and would be just as green on a regex that
 // matched nothing -- the same reason B is calibrated against a synthetic
-// corpus. Four rows assert a literal IS found (the true direction), three
-// assert one is NOT (the false direction). A fail-closed row is invisible to
-// a corpus that only exercises the safe answer.
+// corpus. A fail-closed row is invisible to a corpus that only exercises the
+// safe answer, so the corpus runs both directions: of its eight rows, four
+// assert a literal IS found and three assert one is NOT. The eighth is
+// neither and is counted as neither -- the drop row asserts that a definition
+// SUPERSEDED is not a definition read, which is a third answer, not a
+// negative one. (An earlier draft of this comment said "four... three" of an
+// eight-row corpus and left that row uncounted in either direction; Lumen
+// caught it.)
 const DEF = (n, replace = false) =>
   `create ${replace ? 'or replace ' : ''}function public.${GRANT_FN}()\n` +
   `returns bigint\nlanguage sql immutable\nas $$ select ${n}::bigint $$;\n`;
@@ -1323,6 +1349,92 @@ check(
   NECTAR_LADDER_CAP_DROPS >= NECTAR_STARTER_GRANT_DROPS * NECTAR_LADDER_RUNGS,
   true
 );
+
+// F4 GATES THE CATALOG COMMENT'S FRESHNESS, NEVER ITS CONTENT (Lumen's shape,
+// Sage's fast-follow sequencing -- thread b4533a52, 2026-08-27). The residual
+// F1 leaves behind is not a wrong number in prose, it is a `comment on
+// function` that outlives the definition it describes: redefine the grant in
+// a later migration without re-commenting, repair the JS constant, and F1
+// goes green over a catalog that still documents the old figure. That comment
+// is, by its own text, the ratification record ("still pending Colin's
+// ratification of the magnitude itself") -- so a freshness row forces the
+// record to be re-authored at exactly the moment there is something to
+// ratify.
+//
+// STRUCTURAL, so the 500-vs-2026-vs-event-id objection never arises: the row
+// compares two FILENAMES. Migration names are timestamp-prefixed and this
+// file already relies on that ordering being lexical (the `.sort()` above), so
+// `latest comment file >= latest defining file` is the whole assertion.
+//
+// A SEPARATE EXTRACTOR ON PURPOSE. Folding a `comment` event into
+// `grantEventIn` would let a re-comment supersede a definition and F1 would
+// read `literal: null` on today's tree -- the comment is the function's last
+// mention, never its last definitional word. Two questions, two readers.
+//
+// THREE BRANCHES PASS WITHOUT ASSERTING ANYTHING, each for a stated reason,
+// because a second red on one defect is noise: no definition in tree and a
+// definition later dropped are both already F1's, and an ABSENT comment
+// documents no number at all. That last one is the reason F5 exists -- an
+// extractor that matched nothing would take the absent branch and this row
+// would be green forever.
+const GRANT_COMMENT_SRC = String.raw`comment\s+on\s+function\s+public\.${GRANT_FN}\s*\(`;
+const grantCommentIn = (rawSrc) => new RegExp(GRANT_COMMENT_SRC, 'i').test(uncommented(rawSrc));
+
+let grantCommentFile = null;
+for (const f of migrationFiles) {
+  if (grantCommentIn(await readFile(path.join(migrationDir, f), 'utf8'))) grantCommentFile = f;
+}
+const commentFreshnessFailures = [];
+if (grantSource && grantSource.event.kind === 'define' && grantCommentFile) {
+  if (grantCommentFile < grantSource.file) {
+    commentFreshnessFailures.push(
+      `${grantSource.file} defines ${GRANT_FN}() but the latest \`comment on function\` for it is ` +
+        `${grantCommentFile}, which is older -- the catalog documents a superseded grant`
+    );
+  }
+}
+// The label names the DEFINING file, which is not always `grantSource.file`:
+// on a tree whose last word is a drop there is no definer, and saying
+// otherwise would be the same right-measurement-wrong-name mistake this
+// module keeps finding elsewhere.
+const grantDefineLabel = !grantSource
+  ? 'none'
+  : grantSource.event.kind === 'define'
+    ? grantSource.file
+    : `none (${grantSource.file} drops it)`;
+check(
+  `F4 the ${GRANT_FN}() catalog comment is not older than its definition ` +
+    `(define ${grantDefineLabel}, comment ${grantCommentFile || 'none'})`,
+  commentFreshnessFailures,
+  []
+);
+
+// F5 CALIBRATES F4's EXTRACTOR, and it is not optional here. F1 fails closed,
+// so a blinded extractor reds and announces itself; F4 passes closed by
+// design (an absent comment is a real, safe state), so a blinded extractor is
+// SILENT. The false direction is what this row is for.
+const GRANT_COMMENT_CALIBRATION = [
+  [
+    'a comment on the function is found',
+    `comment on function public.${GRANT_FN}() is 'PLACEHOLDER 500 drops';\n`,
+    true,
+  ],
+  [
+    'a comment split across lines is found',
+    `comment on function public.${GRANT_FN}() is\n  'PLACEHOLDER '\n  '500 drops';\n`,
+    true,
+  ],
+  ['a commented-out comment is not a comment', `-- comment on function public.${GRANT_FN}() is 'x';\n`, false],
+  ['a comment on a different function is not this one', `comment on function public.nectar_drop_microusd() is 'x';\n`, false],
+  ['a definition alone carries no comment', DEF(500), false],
+  ['a file that never names the function carries no comment', `create table public.unrelated (id uuid);\n`, false],
+];
+const grantCommentCalibrationFailures = [];
+for (const [label, sample, want] of GRANT_COMMENT_CALIBRATION) {
+  const got = grantCommentIn(sample);
+  if (got !== want) grantCommentCalibrationFailures.push(`${label} -> got ${got}, want ${want}`);
+}
+check('F5 grant-comment extractor calibration, both directions', grantCommentCalibrationFailures, []);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(
