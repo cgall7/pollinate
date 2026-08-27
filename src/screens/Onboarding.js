@@ -363,6 +363,12 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
                 swapped — the landing pair above is already the screen's
                 voice, so the sign-up account form needs no sentence of its
                 own. The sign-in pair stays; it was never on the dies-list. */}
+            {isSignUp && (
+              <View style={styles.headlineBlock}>
+                <Text style={styles.h1Center}>Start with what you were given.</Text>
+                <Text style={styles.bodyLgCenter}>One line a day. That's how it starts.</Text>
+              </View>
+            )}
             {!isSignUp && (
               <>
                 <Text style={styles.h1}>Welcome back</Text>
@@ -536,6 +542,7 @@ const styles = StyleSheet.create({
   },
   headlineBlock: {
     alignItems: 'center',
+    marginBottom: 24, // Breathing room below the headline — space before form (expanded sign-up) or buttons (collapsed)
   },
   wordmark: {
     ...theme.type.logo,
@@ -623,7 +630,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   floatingButton: {
-    marginTop: 16,
+    marginTop: 16, // Apple to Email: both primary actions, medium separation (theme.spacing.md)
   },
   appleButton: {
     width: '100%',
@@ -642,7 +649,7 @@ const styles = StyleSheet.create({
   // both live on main at 2.35:1 — reported separately, not changed here.)
   signInLink: {
     alignSelf: 'center',
-    marginTop: 18,
+    marginTop: 24, // Email to Sign in link: primary to secondary boundary (theme.spacing.lg)
   },
   signInLinkText: {
     ...theme.type.bodySm,
@@ -651,7 +658,7 @@ const styles = StyleSheet.create({
   },
   skipDemoLink: {
     alignSelf: 'center',
-    marginTop: 14,
+    marginTop: 14, // Text links grouped tightly: secondary to tertiary affordance (theme.spacing.sm adjacent)
   },
   skipDemoText: {
     ...theme.type.bodySm,
