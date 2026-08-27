@@ -475,6 +475,23 @@ async function main() {
       }
     }
 
+    // 19b. Setup for #21 below: an active contributor also writes into the
+    // volume that's about to be sealed, so the post-seal blindness check has
+    // more than one author's packaged row to prove blindness against.
+    let contributor2SealedEntryId;
+    try {
+      const { rows } = await asUser(CONTRIBUTOR2, () =>
+        client.query(
+          "insert into public.entries (user_id, content, entry_date, hive_id) values ($1, 'contributor2 pre-seal entry', current_date, $2) returning id",
+          [CONTRIBUTOR2, hiveId]
+        )
+      );
+      contributor2SealedEntryId = rows[0].id;
+      ok('setup: an active contributor writes into the volume about to be sealed');
+    } catch (e) {
+      bad('setup: an active contributor writes into the volume about to be sealed', firstLine(e));
+    }
+
     // 20. Sealing locks the SEALED VOLUME, not the hive -- this schema's own
     // model since 20260826000003/4 ("the hive never dies": sealing opens the
     // next volume, seal_hive/seal_volume never permanently locks a hive).
@@ -527,6 +544,140 @@ async function main() {
       }
     } catch (e) {
       bad("an active contributor keeps writing into the hive's new open volume after seal", firstLine(e));
+    }
+
+    // 21. Lumen's gate-completeness finding (thread b4533a52, 2026-08-27):
+    // rows 9/10 above only probe blindness PRE-seal, where the restrictive
+    // entries_select_respect_visibility policy blocks a hive-ownership-based
+    // permissive grant anyway (visibility = 'private' there) -- that's the
+    // one window where the doc's negative ("owner cannot read a
+    // contributor's entries pre-seal") is unobservable as a distinct claim,
+    // because two independent mechanisms would both block it. POST-seal,
+    // visibility flips to 'packaged' and the restrictive policy stops
+    // blocking (visibility <> 'private' is now true) -- so absence of any
+    // permissive SELECT granting hive-wide access is the ONLY thing left
+    // enforcing blindness in that window, and it was never re-probed. Owner
+    // selects the hive's entries after seal; must still see only their own
+    // packaged row, not CONTRIBUTOR2's now-also-packaged one from #19b.
+    const { rows: ownerPostSealView } = await asUser(OWNER, () =>
+      client.query('select user_id, visibility from public.entries where hive_id = $1', [hiveId])
+    );
+    if (
+      ownerPostSealView.length === 1 &&
+      ownerPostSealView[0].user_id === OWNER &&
+      ownerPostSealView[0].visibility === 'packaged'
+    ) {
+      ok('post-seal: the owner still sees only their own packaged row, not a contributor\'s');
+    } else {
+      bad(
+        'post-seal: the owner still sees only their own packaged row, not a contributor\'s',
+        `got: ${JSON.stringify(ownerPostSealView)}`
+      );
+    }
+
+    // Sanity check on #21's fixture: CONTRIBUTOR2's own pre-seal entry
+    // really did get packaged (proves the "not just still-private" half of
+    // the claim -- a blindness check against a still-private row wouldn't
+    // distinguish the restrictive policy from the missing-grant absence).
+    const { rows: contributor2SealedRow } = await asPostgres(() =>
+      client.query('select visibility from public.entries where id = $1', [contributor2SealedEntryId])
+    );
+    if (contributor2SealedRow[0]?.visibility === 'packaged') {
+      ok('post-seal: the fixture row the blindness check above depends on is actually packaged');
+    } else {
+      bad(
+        'post-seal: the fixture row the blindness check above depends on is actually packaged',
+        `got: ${JSON.stringify(contributor2SealedRow[0])}`
+      );
+    }
+
+    // 22-26: Sage's ruling, Lumen's active-only scope (thread b4533a52,
+    // 2026-08-27) -- the subject/roster guard, both directions, on a fresh
+    // hive so it doesn't entangle with the sealed fixture above.
+    const { rows: subjectHiveRows } = await asUser(OWNER, () =>
+      client.query(
+        "insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective) values ($1, 'Subject Test Kid', $2, true) returning id",
+        [OWNER, STRANGER]
+      )
+    );
+    const subjectHiveId = subjectHiveRows[0].id;
+
+    // 22. Direction 1: inviting the hive's CURRENT subject as a contributor
+    // is rejected.
+    try {
+      await asUser(OWNER, () =>
+        client.query(
+          'insert into public.hive_contributors (hive_id, profile_id, invited_by) values ($1, $2, $3)',
+          [subjectHiveId, STRANGER, OWNER]
+        )
+      );
+      bad('subject guard: cannot invite the hive\'s current subject as a contributor', 'insert succeeded');
+    } catch (e) {
+      if (e.code === '42501' || /row-level security/.test(e.message)) {
+        ok('subject guard: cannot invite the hive\'s current subject as a contributor');
+      } else {
+        bad('subject guard: cannot invite the hive\'s current subject as a contributor', `wrong error: ${firstLine(e)}`);
+      }
+    }
+
+    // 23. Sanity: inviting someone who is NOT the subject still works (the
+    // guard is scoped to the subject, not a blanket invite lock).
+    try {
+      await asUser(OWNER, () =>
+        client.query(
+          'insert into public.hive_contributors (hive_id, profile_id, invited_by) values ($1, $2, $3)',
+          [subjectHiveId, CONTRIBUTOR, OWNER]
+        )
+      );
+      ok('subject guard: inviting a non-subject contributor still succeeds');
+    } catch (e) {
+      bad('subject guard: inviting a non-subject contributor still succeeds', firstLine(e));
+    }
+
+    // 24. Direction 2: pointing subject_profile_id at a profile who is
+    // currently an ACTIVE contributor is rejected.
+    try {
+      await asUser(OWNER, () =>
+        client.query('update public.private_hives set subject_profile_id = $1 where id = $2', [
+          CONTRIBUTOR,
+          subjectHiveId,
+        ])
+      );
+      bad('subject guard: cannot repoint subject_profile_id at an active contributor', 'update succeeded');
+    } catch (e) {
+      if (/subject_profile_id cannot be an active contributor/.test(e.message)) {
+        ok('subject guard: cannot repoint subject_profile_id at an active contributor');
+      } else {
+        bad('subject guard: cannot repoint subject_profile_id at an active contributor', `wrong error: ${firstLine(e)}`);
+      }
+    }
+
+    // 25. Lumen's active-only derivation, proved rather than just asserted:
+    // once CONTRIBUTOR is REMOVED from this hive's roster, pointing
+    // subject_profile_id at them is allowed -- a removed contributor regains
+    // nothing through the widened SELECT (is_hive_contributor() filters
+    // removed_at is null), so guarding this case would enforce nothing
+    // while over-restricting a legitimate reassignment.
+    await asUser(OWNER, () =>
+      client.query(
+        'update public.hive_contributors set removed_at = now() where hive_id = $1 and profile_id = $2',
+        [subjectHiveId, CONTRIBUTOR]
+      )
+    );
+    try {
+      const result = await asUser(OWNER, () =>
+        client.query('update public.private_hives set subject_profile_id = $1 where id = $2', [
+          CONTRIBUTOR,
+          subjectHiveId,
+        ])
+      );
+      if (result.rowCount === 1) {
+        ok('subject guard: active-only scope -- a REMOVED contributor may become the subject');
+      } else {
+        bad('subject guard: active-only scope -- a REMOVED contributor may become the subject', `update matched ${result.rowCount} row(s)`);
+      }
+    } catch (e) {
+      bad('subject guard: active-only scope -- a REMOVED contributor may become the subject', firstLine(e));
     }
 
     console.log(`\ncheck-multi-writer-hives: ${pass} passed, ${failures.length} failed`);

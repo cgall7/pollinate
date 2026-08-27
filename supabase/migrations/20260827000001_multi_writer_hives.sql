@@ -75,6 +75,91 @@ create trigger hive_contributors_removed_at_immutable_trigger
   before update on public.hive_contributors
   for each row execute function public.hive_contributors_removed_at_immutable();
 
+-- Sage's finding (thread b4533a52, 2026-08-27, reproduced live against a
+-- real embedded-Postgres instance): hive_contributors_update_owner below
+-- gates on hive ownership only -- it doesn't pin which COLUMNS an UPDATE may
+-- touch, the same class of gap 20260815000004 closed for private_hives
+-- (a full-row UPDATE policy constrains which row, not which column). The
+-- guard above only blocks un-setting removed_at once non-null; it says
+-- nothing about hive_id/profile_id/invited_by/added_at, so an owner could
+-- `update hive_contributors set profile_id = <anyone> where ...` and
+-- silently retarget a roster row to a different person -- no INSERT check
+-- (is_collective, invited_by = auth.uid()), no removal record, added_at
+-- left at the original invite time. That's a way to swap who occupies a
+-- seat without ever going through the insert policy or leaving a removal
+-- trace, defeating this table's own append-only invariant (the comment
+-- above hive_contributors' create table: "never row-deleted, only ever
+-- inserted or soft-removed") and the copy doc's roster-accuracy promise.
+-- Every column except removed_at's own legal null->timestamp transition is
+-- pinned here, as a sibling trigger rather than folded into the one above --
+-- same one-invariant-per-trigger shape private_hives uses for sealed_at vs
+-- is_collective.
+create function public.hive_contributors_identity_immutable()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.hive_id is distinct from old.hive_id
+    or new.profile_id is distinct from old.profile_id
+    or new.invited_by is distinct from old.invited_by
+    or new.added_at is distinct from old.added_at then
+    raise exception 'hive_contributors: only removed_at may be updated';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger hive_contributors_identity_immutable_trigger
+  before update on public.hive_contributors
+  for each row execute function public.hive_contributors_identity_immutable();
+
+-- Sage's ruling (thread b4533a52, 2026-08-27), Lumen's active-only scope in
+-- the same thread: the roster SELECT widening above lets any active
+-- contributor read private_hives (is_hive_contributor()), so pointing
+-- subject_profile_id at one, or inviting the hive's current subject as a
+-- contributor, would show the hive's own subject their gift before it
+-- ships -- collapsing delivery. §4.2's invitation formula and the reveal
+-- moment both presuppose subject is not on the roster. Owner-initiated,
+-- not an attacker path, but a real product invariant this codebase's own
+-- convention is to enforce in the database (is_collective immutability,
+-- sealed_at guard), not trust the client.
+--
+-- Direction 2 of 2, guarded here: private_hives.subject_profile_id cannot
+-- be set/changed to a profile who is currently an ACTIVE contributor.
+-- Direction 1 (inviting the current subject) is folded into
+-- hive_contributors_insert_owner's WITH CHECK below, where that write
+-- actually happens.
+--
+-- Active-only is deliberate, not a partial guard: is_hive_contributor()
+-- already filters removed_at is null, so a REMOVED contributor regains
+-- nothing through the widened SELECT even if later named subject -- and
+-- that they once knew the hive existed is already-disclosed information no
+-- schema change can retract. Guarding removed rows too would enforce
+-- nothing while over-restricting a legitimate case (Lumen's derivation,
+-- same thread).
+create function public.private_hives_subject_not_active_contributor()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.subject_profile_id is not null
+    and new.subject_profile_id is distinct from old.subject_profile_id
+    and exists (
+      select 1 from public.hive_contributors c
+      where c.hive_id = new.id
+        and c.profile_id = new.subject_profile_id
+        and c.removed_at is null
+    ) then
+    raise exception 'private_hives: subject_profile_id cannot be an active contributor';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger private_hives_subject_not_active_contributor_trigger
+  before update on public.private_hives
+  for each row execute function public.private_hives_subject_not_active_contributor();
+
 -- Security-definer helper, same recursion-breaking shape as owns_entry()
 -- (20260809000004). Needed for private_hives_select_own below: a raw
 -- exists() there against hive_contributors, combined with hive_contributors'
@@ -156,6 +241,10 @@ create policy "hive_contributors_select"
 -- INSERT: only the owner invites, only into a hive that was created
 -- collective (C2 -- a solo hive can never gain a roster row after the
 -- fact; that would be exactly the retroactive-exposure case C2 forbids).
+-- Direction 1 of the subject/roster guard above: the hive's CURRENT
+-- subject_profile_id may not be invited as a contributor (a null subject
+-- always passes, since `<>` against null is neither true nor false and the
+-- `or` short-circuits on the is-null check first).
 create policy "hive_contributors_insert_owner"
   on public.hive_contributors for insert
   with check (
@@ -163,6 +252,7 @@ create policy "hive_contributors_insert_owner"
     and exists (
       select 1 from public.private_hives h
       where h.id = hive_id and h.owner_id = auth.uid() and h.is_collective
+        and (h.subject_profile_id is null or h.subject_profile_id <> profile_id)
     )
   );
 
