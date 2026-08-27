@@ -1,0 +1,251 @@
+import React from 'react';
+import { StyleSheet, View, Text, TextInput } from 'react-native';
+import { theme } from '../constants/theme';
+import { PressableScale } from './PressableScale';
+import { PrimaryButton } from './PrimaryButton';
+import { PillButton } from './PillButton';
+
+// ENG-63 / ENG-64's shared send surface — the controls that turn an amount
+// into a `record_zap` call, used by BOTH zap surfaces (DES-28 D2's ending
+// slot, D3's per-entry affordance). Deezine's own spec asks for that:
+// "Quick-tap modal … Same preset buttons".
+//
+// ONE COMPONENT, TWO MOUNTINGS, and the difference is forced rather than
+// stylistic. The ending block has no competing gesture, so D2 mounts this
+// inline exactly as specified. The entry card does not have that freedom:
+// it lives inside `PackageOpen`'s reveal `Pressable`, whose job is to
+// ADVANCE THE SEQUENCE on any tap. Controls drawn there would sit inside a
+// region whose every tap means "next" — so D3's mounting is an overlay
+// OUTSIDE that Pressable, which is the placement question nectar.js's D3
+// note hands to ENG-64. The panel itself does not know which it is.
+//
+// PIGMENT IS `ink` (DES-28 review §7.1/§7.2/§7.4). Deezine's spec sets
+// `accentDeep` on the CTA, the preset text and the drop icon; measured, it
+// is 2.229-2.613 against a 4.5:1 bar on every ground these can land on.
+// Hierarchy is size, weight and position — theme.js's own gold-field
+// paragraph already ruled the general case.
+//
+// SELECTION IS THE RATIFIED REGISTER, not a new one (§7.3): CreateHive's
+// `themeCard` — constant `borderWidth` in both states, transparent when
+// unselected, `ink` when selected, so selecting is a colour change and
+// never a layout shift. Deezine's `accentDeep @ 0.2` fill is the thing
+// R55 exists to stop: composited it reads dE00 9.322 from `background`
+// but 15.779 from `washSky`, i.e. a different hue per ground.
+//
+// THE PANEL SITS ON ITS OWN `surface` CARD for the same reason CreateHive's
+// mat does: the ending block's ground is `cover.base`, one of four hive
+// cover tokens, so anything drawn straight onto it has four grounds to
+// clear rather than one. Inset onto white and every pair in here is
+// measured once.
+//
+// GUARD: `nectarConsent` is a PROP, and this file re-wraps its own body in
+// it — `isUnderGuard` is a within-file ancestor walk and cannot see a guard
+// spelled in the caller (NectarConsentSheet's header, same shape). B8
+// requires the prop be fed by an identifier of the same name.
+export const NECTAR_PRESETS = [10, 50, 100];
+
+// THE MAXIMUM IS THE SERVER'S, quoted rather than re-chosen: `record_zap`
+// raises on anything outside 1..1000 drops
+// (20260826000005:336 / 20260826000006's re-issue). A client bound that
+// disagreed with it would either forbid a legal zap or promise an illegal
+// one.
+export const NECTAR_MIN_DROPS = 1;
+export const NECTAR_MAX_DROPS = 1000;
+
+export const isSendableAmount = (drops, balanceDrops) => {
+  const n = Number(drops);
+  if (!Number.isInteger(n) || n < NECTAR_MIN_DROPS || n > NECTAR_MAX_DROPS) return false;
+  // A BALANCE WE COULD NOT READ DOES NOT VETO THE SEND. `null` is unknown
+  // (NectarStore.getBalanceDrops' contract), and treating unknown as zero
+  // would disable every control on a failed read — an app that quietly
+  // refuses to work is worse than one that lets the server answer. The
+  // server's own overdraft check is authoritative either way.
+  if (balanceDrops === null || balanceDrops === undefined) return true;
+  return n <= balanceDrops;
+};
+
+export const NectarSendPanel = ({
+  nectarConsent,
+  balanceDrops,
+  selected,
+  onSelect,
+  customValue,
+  onChangeCustom,
+  sending,
+  failed,
+  onSend,
+  onCancel,
+}) => (
+  <>
+    {nectarConsent && (
+      <View style={styles.card}>
+        <Text style={styles.heading}>Send nectar</Text>
+
+        {/* DES-24 §7.3 was open: "§5.2(b) deletes the Wallet tab but does
+            not say what replaces it as the place the exact number is
+            legible." This is that place, and it is forced, not chosen —
+            `record_zap` HARD-FAILS on overdraft ("insufficient nectar (N
+            drops available, M needed)"), so a control that offers 100 drops
+            without saying you hold 40 is a control that hides its own
+            failure. The numeral lives where the number is spent. */}
+        <Text style={styles.balance}>
+          {balanceDrops === null || balanceDrops === undefined
+            ? "We couldn't check your drops."
+            : `You have ${balanceDrops} drops.`}
+        </Text>
+
+        <View style={styles.presetRow}>
+          {NECTAR_PRESETS.map((amount) => {
+            const affordable = isSendableAmount(amount, balanceDrops);
+            const isSelected = selected === amount;
+            return (
+              <PressableScale
+                key={amount}
+                onPress={() => onSelect(amount)}
+                disabled={sending || !affordable}
+                style={[styles.preset, isSelected && styles.presetSelected]}
+                pressedColor={theme.colors.pressedOnLight}
+                accessibilityLabel={`${amount} drops`}
+                accessibilityState={{ selected: isSelected, disabled: sending || !affordable }}
+              >
+                <Text style={styles.presetAmount}>{amount}</Text>
+                <Text style={styles.presetUnit}>drops</Text>
+              </PressableScale>
+            );
+          })}
+        </View>
+
+        <TextInput
+          style={styles.custom}
+          keyboardType="number-pad"
+          placeholder={`Or an amount, 1-${NECTAR_MAX_DROPS}`}
+          placeholderTextColor={theme.colors.inkSoft}
+          value={customValue}
+          onChangeText={onChangeCustom}
+          editable={!sending}
+          accessibilityLabel="Custom amount in drops"
+        />
+
+        {/* NOT `theme.colors.danger`, and this is a deliberate non-reuse:
+            that token measures 3.62-3.91 against a 4.5:1 bar at all five
+            existing bodySm sites (§23's still-open defect) and this would
+            be the sixth. `ink` at the same size says the same thing and
+            can be read. */}
+        {failed && <Text style={styles.failed}>That didn't send. Try again.</Text>}
+
+        <PrimaryButton
+          onPress={onSend}
+          loading={sending}
+          disabled={!isSendableAmount(selected, balanceDrops)}
+          containerStyle={styles.send}
+          accessibilityLabel="Send nectar"
+        >
+          Send
+        </PrimaryButton>
+        <PillButton onPress={onCancel} variant="outline" disabled={sending} style={styles.cancel} accessibilityLabel="Not now">
+          Not now
+        </PillButton>
+      </View>
+    )}
+  </>
+);
+
+const styles = StyleSheet.create({
+  card: {
+    width: '100%',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    ...theme.shadows.card,
+  },
+  heading: {
+    ...theme.type.h3,
+    color: theme.colors.ink,
+    textAlign: 'center',
+  },
+  balance: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  preset: {
+    minWidth: 70,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // CreateHive E5's SHAPE, verbatim: constant width in both states, so
+    // selecting is a colour change and never a layout change.
+    //
+    // ITS UNSELECTED COLOUR IS NOT REUSABLE HERE, and that is measured, not
+    // assumed. CreateHive can afford `transparent` because its cards carry
+    // `shadows.card` and a cover material — the card is a visible object
+    // before the border says anything. A preset chip is white type on a
+    // white panel with nothing else in it, so an invisible border means an
+    // unselected chip is not visibly a control at all. My first cut used
+    // `surfaceBorder`, which composites to 1.1788:1 on `surface` — below
+    // WCAG 1.4.11's 3:1 non-text floor, i.e. formally not a boundary.
+    //
+    // `inkSoft` clears it at 6.3074:1, and the selected state stays `ink` at
+    // 17.1274:1. That keeps the pair a STRENGTH change rather than a hue
+    // change (dE00 22.833, same ink family) — the same move DES-24 §6.4
+    // makes for the blooming ring on a honeyed cell, and the reason R55 is
+    // safe by construction here too.
+    borderWidth: 2,
+    borderColor: theme.colors.inkSoft,
+  },
+  presetSelected: {
+    // The WHOLE of the selected state, deliberately. My first cut also
+    // swapped the numeral to an ExtraBold face, which is a second channel
+    // and a worse one: a wider face changes the glyph advance, "100" is the
+    // widest label, and past `minWidth: 70` the chip itself would grow and
+    // push its siblings — reintroducing exactly the layout shift E5's
+    // constant border width was written to remove. §7.3 said reuse the
+    // ratified register, not extend it.
+    borderColor: theme.colors.ink,
+  },
+  presetAmount: {
+    ...theme.type.h3,
+    color: theme.colors.ink,
+  },
+  presetUnit: {
+    ...theme.type.bodySm,
+    fontSize: 11,
+    color: theme.colors.inkSoft,
+  },
+  custom: {
+    ...theme.type.body,
+    color: theme.colors.ink,
+    alignSelf: 'stretch',
+    textAlign: 'center',
+    // Same measurement, same reason: a text field's boundary IS the field.
+    borderWidth: 1,
+    borderColor: theme.colors.inkSoft,
+    borderRadius: theme.borderRadius.medium,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  failed: {
+    ...theme.type.bodySm,
+    color: theme.colors.ink,
+    textAlign: 'center',
+    marginTop: theme.spacing.sm,
+  },
+  send: {
+    marginTop: theme.spacing.lg,
+  },
+  cancel: {
+    marginTop: theme.spacing.sm,
+  },
+});

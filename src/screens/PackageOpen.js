@@ -7,10 +7,12 @@ import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
 import { NectarStore } from '../services/NectarStore';
 import { hasNectarConsent } from '../constants/nectar';
+import { randomUUID } from '../utils/uuid';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { NectarConsentSheet } from '../components/NectarConsentSheet';
+import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
 import {
@@ -67,6 +69,21 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   const [nectarConsentError, setNectarConsentError] = useState(false);
   const nectarConsent = hasNectarConsent(nectarConsentRow);
 
+  // ENG-63/ENG-64 — the send surfaces. ONE set of controls, two targets:
+  // the per-entry affordance sends to the entry, the ending slot sends to
+  // the hive. Only the entry one needs an open/closed bit; the ending
+  // panel is the ending.
+  const [entrySendOpen, setEntrySendOpen] = useState(false);
+  const [sendAmount, setSendAmount] = useState(null);
+  const [sendCustom, setSendCustom] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
+  const [balanceDrops, setBalanceDrops] = useState(null);
+  // The idempotency handle is minted when the ATTEMPT starts, not when the
+  // request is issued, so a retry after a lost response replays the same
+  // zap instead of recording a second one (utils/uuid's header).
+  const attemptId = useRef(null);
+
   const bloomOpacity = useRef(new Animated.Value(0)).current;
   const bloomScale = useRef(new Animated.Value(0.85)).current;
   const dateOpacity = useRef(new Animated.Value(0)).current;
@@ -120,6 +137,31 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     };
   }, []);
 
+  // ENG-65's producer half, and it is the ONE read here that cannot be
+  // authorised by a rendered guard: it must run BEFORE any nectar surface
+  // renders, so there is no guarded ancestor for it to sit under. The guard
+  // it does have is the effect's own — `nectarConsent` in the dependency
+  // list and a negated early return — which is the shape rule E3 recognises
+  // (see check-nectar-consent.mjs).
+  useEffect(() => {
+    if (!nectarConsent) return undefined;
+    let cancelled = false;
+    NectarStore.getBalanceDrops()
+      .then((drops) => {
+        if (!cancelled) setBalanceDrops(drops);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('PackageOpenScreen: failed to load nectar balance', err);
+        // Stays null — NectarStore's contract makes null UNKNOWN and 0 a
+        // read empty wallet, and the panel says the two differently.
+        setBalanceDrops(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nectarConsent]);
+
   const handleNectarAffirm = async () => {
     setNectarConsentSubmitting(true);
     setNectarConsentError(false);
@@ -132,6 +174,102 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       setNectarConsentError(true);
     } finally {
       setNectarConsentSubmitting(false);
+    }
+  };
+
+  // ENG-63/64. The amount is resolved HERE and not at the call site,
+  // because there are two ways to say it (a preset chip, the custom field)
+  // and exactly one of them may be in force — a custom entry supersedes a
+  // previously tapped chip, which is Deezine's own state machine
+  // ("Deselection: tap a different preset or custom input clears the
+  // previous selection").
+  const resolveSendAmount = () => {
+    const typed = sendCustom.trim();
+    if (typed.length > 0) return Number(typed);
+    return sendAmount;
+  };
+
+  // THE TARGET IS DERIVED, NOT STORED, and that is the fix to my own first
+  // cut. Held in state it had to be re-set by an effect every time a panel
+  // appeared and cleared on every success, and a cleared target with a
+  // still-mounted ending panel is a Send button wired to nothing. Derived,
+  // it is total by construction: the entry overlay is open, or it is not
+  // and the surface on screen is the ending, whose subject is the package.
+  // The two values are exactly `record_zap`'s `p_target_kind` domain.
+  const sendTarget =
+    entrySendOpen && step ? { kind: 'entry', id: step.id } : { kind: 'hive', id: hiveId };
+
+  const beginAttempt = () => {
+    // ONE ATTEMPT, ONE HANDLE — minted when the user starts composing a
+    // gift, not per request, so a Send tapped twice after a timeout replays
+    // ONE zap rather than recording two (utils/uuid's header).
+    attemptId.current = randomUUID();
+    setSendAmount(null);
+    setSendCustom('');
+    setSendFailed(false);
+  };
+
+  const handleOpenEntrySend = () => {
+    beginAttempt();
+    setEntrySendOpen(true);
+  };
+
+  const closeSendPanel = () => {
+    if (sending) return;
+    setEntrySendOpen(false);
+    setSendFailed(false);
+  };
+
+  const handleCloseFromEnding = () => {
+    if (sending) return;
+    navigation.goBack();
+  };
+
+  // Selecting either way clears the other, so `resolveSendAmount` is never
+  // choosing between two live answers.
+  const handleSelectPreset = (amount) => {
+    setSendCustom('');
+    setSendAmount(amount);
+  };
+
+  const handleChangeCustom = (text) => {
+    setSendAmount(null);
+    setSendCustom(text);
+  };
+
+  const handleSend = async () => {
+    const amount = resolveSendAmount();
+    if (!sendTarget.id || sending || !isSendableAmount(amount, balanceDrops)) return;
+    setSending(true);
+    setSendFailed(false);
+    try {
+      await NectarStore.recordZap({
+        zapId: attemptId.current,
+        targetKind: sendTarget.kind,
+        targetId: sendTarget.id,
+        amountDrops: amount,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // THE SENDER'S CONFIRMATION IS HERE, AND IT HAS TO BE. Deezine's spec
+      // ends the flow with "entry shows new honeyed mark" — but the honeyed
+      // cell is OWN-CELL-ONLY by construction (HoneycombGrid:199,
+      // `member.isOwn && member.honeyRung`, DES-24 §6.2's isOwn gate), so
+      // the mark that appears is on the RECIPIENT's cell in the RECIPIENT's
+      // app and the sender never sees it. The only honeyed cell a sender
+      // can see is their own, and after a zap it goes DOWN. So a success
+      // haptic, the panel standing down, and a re-read balance are the
+      // whole of the sender-side receipt — D4's cut removed the other half
+      // (the author's notification) rather than deferring it.
+      const drops = await NectarStore.getBalanceDrops();
+      setBalanceDrops(drops);
+      setEntrySendOpen(false);
+      // A second gift is a second zap, so it needs its own handle.
+      beginAttempt();
+    } catch (err) {
+      console.warn('PackageOpenScreen: record_zap failed', err);
+      setSendFailed(true);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -259,6 +397,22 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                     <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
                   </PressableScale>
                 )}
+                {/* ENG-64 — the same slot, post-consent. The door and the
+                    affordance never coexist: pre-consent the tap opens the
+                    sheet, post-consent it opens the panel, and the consent
+                    sheet has no audience once `nectarConsent` is true.
+                    Pigment is `ink` (§7.2: `accentDeep` on this card's
+                    `surface` ground is 2.613 against a 3:1 non-text bar). */}
+                {nectarConsent && (
+                  <PressableScale
+                    onPress={handleOpenEntrySend}
+                    haptic={null}
+                    containerStyle={styles.nectarDoor}
+                    accessibilityLabel="Send nectar for this memory"
+                  >
+                    <Ionicons name="water-outline" size={16} color={theme.colors.ink} />
+                  </PressableScale>
+                )}
               </Animated.View>
               <View style={styles.railTrack}>
                 <View style={[styles.railFill, { width: `${Math.round(railFill * 100)}%` }]} />
@@ -273,8 +427,63 @@ export const PackageOpenScreen = ({ navigation, route }) => {
               ? `That's everything ${pkg.senderName} sent.`
               : 'This package has nothing in it yet.'}
           </Text>
-          <PrimaryButton onPress={() => navigation.goBack()}>Close</PrimaryButton>
+          {/* ENG-63 / DES-28 D2. The slot Deezine's spec fills was carved
+              out by DES-17 when reply/react deferred to Slice 1.1 — this
+              is filling a hole, not adding a step. Pre-consent the ending
+              is EXACTLY what it is today: the sentence and a plain Close,
+              no reserved space (D2's `preConsent`, and Apple 2.3.1(a)'s
+              reason for it). The target is the HIVE, not an entry — the
+              thanks is for the package. */}
+          {nectarConsent ? (
+            <NectarSendPanel
+              nectarConsent={nectarConsent}
+              balanceDrops={balanceDrops}
+              selected={sendAmount}
+              onSelect={handleSelectPreset}
+              customValue={sendCustom}
+              onChangeCustom={handleChangeCustom}
+              sending={sending}
+              failed={sendFailed}
+              onSend={handleSend}
+              onCancel={handleCloseFromEnding}
+            />
+          ) : (
+            <PrimaryButton onPress={() => navigation.goBack()}>Close</PrimaryButton>
+          )}
         </View>
+      )}
+
+      {/* ENG-64's mounting. OUTSIDE the reveal `Pressable` on purpose:
+          every tap inside that region advances the sequence, so controls
+          drawn there would be controls inside a "next" gesture. The panel
+          is the same component the ending slot mounts inline. */}
+      {nectarConsent && (
+        // NESTED, NOT `nectarConsent && entrySendOpen && …`, and the
+        // parentheses are load-bearing rather than cosmetic: the flat form
+        // parses as `(nectarConsent && entrySendOpen) && …`, whose outer
+        // `left` is a LogicalExpression, and `isUnderGuard` recognises only
+        // an Identifier there. Its header calls that out and calls redding
+        // on it the safe direction. Written this way the guard is the
+        // outermost test and both readers — the human and the gate — see
+        // the same thing.
+        <>
+          {entrySendOpen && (
+        <View style={styles.sendOverlay}>
+          <NectarSendPanel
+            nectarConsent={nectarConsent}
+            balanceDrops={balanceDrops}
+            selected={sendAmount}
+            onSelect={handleSelectPreset}
+            customValue={sendCustom}
+            onChangeCustom={handleChangeCustom}
+            sending={sending}
+            failed={sendFailed}
+            onSend={handleSend}
+            onCancel={closeSendPanel}
+          />
+        </View>
+          )}
+        </>
       )}
 
       <NectarConsentSheet
@@ -378,6 +587,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sendOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: theme.colors.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    // Above the reveal Pressable, below nothing — the consent sheet sits at
+    // 2 and the two are mutually exclusive by `nectarConsent`.
+    zIndex: 2,
   },
   railTrack: {
     height: 4,

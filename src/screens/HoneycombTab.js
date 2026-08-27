@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -22,6 +22,8 @@ import { demoHiveShares } from '../constants/demoHive';
 import { DEMO_CONTENT } from '../constants/demoMode';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { isBlooming } from '../utils/hiveState';
+import { NectarStore } from '../services/NectarStore';
+import { hasNectarConsent, honeyRungForDrops } from '../constants/nectar';
 
 // Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
 // button and carries it up toward the grid it just joined.
@@ -248,6 +250,13 @@ const HoneycombFeed = () => {
   const [alreadySharedToday, setAlreadySharedToday] = useState(false);
   const [sharing, setSharing] = useState(false);
 
+  // ENG-65's producer half. The renderer for `honeyed` merged with ENG-65's
+  // first half; nothing set `member.honeyRung` — check-honey-fill.mjs says
+  // so in its own header. This is that path.
+  const [nectarConsentRow, setNectarConsentRow] = useState(null);
+  const [honeyRung, setHoneyRung] = useState(0);
+  const nectarConsent = hasNectarConsent(nectarConsentRow);
+
   const [addEmail, setAddEmail] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addMessage, setAddMessage] = useState(null);
@@ -255,6 +264,57 @@ const HoneycombFeed = () => {
   // email field in the best real estate on the screen. It's a once-in-a-while
   // action, so it collapses behind its own row until you want it.
   const [addOpen, setAddOpen] = useState(false);
+
+  // ONE READ ON MOUNT — `nectarConsent` only ever flips false->true within
+  // a session (no revocation path, nectar.js's table comment), so a re-check
+  // per focus is a round trip for an answer that cannot change back. Both of
+  // this call's identifiers are consent-bootstrap objects (E0a), which is
+  // why it needs no guard: they are how the flag is FOUND OUT.
+  useEffect(() => {
+    let cancelled = false;
+    NectarStore.getConsent()
+      .then((row) => {
+        if (!cancelled) setNectarConsentRow(row);
+      })
+      .catch((err) => {
+        if (!cancelled) console.warn('HoneycombTab: failed to load nectar consent', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The balance, and the ONE nectar read in this app that cannot be
+  // authorised by a rendered guard: it must complete BEFORE the honeyed cell
+  // renders, so there is no guarded JSX ancestor for it to sit under and no
+  // control it is the handler of. Its guard is the effect's own — the
+  // negated early return plus `nectarConsent` in the dependency list, which
+  // together mean the same thing a `{nectarConsent && …}` means and are what
+  // rule E3 recognises (check-nectar-consent.mjs).
+  //
+  // A FAILED READ IS NOT AN EMPTY WALLET (§23.1): `honeyRung` stays 0 and the
+  // cell shows no honeyed state, which is the same pixels as a real zero —
+  // and that is acceptable here for the reason §23.2's tier test gives, that
+  // absence changes nothing the cell ASSERTS about the user. It is not
+  // acceptable in the send panel, where the same unknown disables a control,
+  // and NectarStore.getBalanceDrops keeps the two distinguishable for that
+  // caller's sake.
+  useEffect(() => {
+    if (!nectarConsent) return undefined;
+    let cancelled = false;
+    NectarStore.getBalanceDrops()
+      .then((drops) => {
+        if (!cancelled) setHoneyRung(honeyRungForDrops(drops));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('HoneycombTab: failed to load nectar balance', err);
+        setHoneyRung(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nectarConsent]);
 
   const [shareCarryKey, setShareCarryKey] = useState(0);
   const [feedArrivalKey, setFeedArrivalKey] = useState(0);
@@ -434,6 +494,24 @@ const HoneycombFeed = () => {
   // rather than freezing at mount.
   const { todayMembers, weekSections } = partitionHive(weekFeed);
 
+  // ENG-65: the rung lands on the OWN seat and only there.
+  //
+  // It is injected here rather than inside `partitionHive` because honey is
+  // a property of the PERSON, not of the share that put them in the comb —
+  // `partitionHive` is a pure function of the feed and would have to be
+  // handed a second, unrelated input to do this. `toGridMember`'s shape
+  // stays a projection of a share.
+  //
+  // `isOwn` is the same flag HoneycombGrid's own gate reads
+  // (`member.isOwn && member.honeyRung`), so the two agree on which seat is
+  // yours by construction rather than by convention. Pre-consent `honeyRung`
+  // is 0, and 0 is not a low fill — it is no honeyed state at all, which is
+  // D1's `preConsent` ("no honeyed mark anywhere in the hive") holding
+  // without a second flag to keep in step.
+  const combMembers = honeyRung
+    ? todayMembers.map((m) => (m.isOwn ? { ...m, honeyRung } : m))
+    : todayMembers;
+
   // 8b.7 — shares and send events are two separate queries against two
   // separate tables (HoneycombStore.listFeed / listSendEvents); this is the
   // one place they become one list, newest-first by the same clock
@@ -611,7 +689,7 @@ const HoneycombFeed = () => {
         // as a place on this screen; its cells are seats, not destinations.
         <PerchAnchor id="comb" on="right" at={0.4}>
         <HoneycombGrid
-          members={todayMembers}
+          members={combMembers}
           onInvitePress={() => setAddOpen(true)}
           scrollYRef={scrollYRef}
           scrollTick={scrollTick}
