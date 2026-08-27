@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { migrateLegacyJournal } from '../services/legacyJournalMigration';
-import { PendingOnboardingWrites } from '../services/pendingOnboardingWrites';
 
 const AuthContext = createContext({ session: null, loading: true });
 
@@ -10,20 +9,15 @@ const AuthContext = createContext({ session: null, loading: true });
 // Everything that has been waiting for a session to exist, fired from the
 // one place that knows a session just started existing.
 //
-// PendingOnboardingWrites is here for a reason that is easy to lose: the
-// confirm-your-email exit of onboarding navigates away with the buffer
-// unwritten, and the session that can write it arrives LATER — after the
-// user has opened an email client, followed a link, and come back, possibly
-// into a fresh process. There is no screen still mounted to do it. So the
-// flush belongs to the session's arrival, not to the screen that collected
-// the buffer (C6, Sage 2026-08-17). The account screen calls it too, so the
-// happy path still writes before "Keep it." finishes; this is the leg that
-// catches every other way a session can appear.
-//
-// Failures are swallowed HERE and only here: this is the retry leg, it has
-// no user standing in front of it, and the buffer survives a failed flush
-// to be retried on the next session. The surfacing obligation for a failed
-// hive write lives at the account screen, which does have one.
+// PendingOnboardingWrites used to flush from here too (C6, Sage 2026-08-17):
+// One Door collected the first entry and the Who answer before an account
+// existed, so both buffered to disk and flushed on whatever session
+// appearance came next — including the confirm-your-email exit, which
+// navigates away with no screen left mounted to do it. Zero Door
+// (PLANS/ONBOARDING_ZERO_DOOR_SPEC.md) deletes that class outright: every
+// write onboarding used to make now happens post-auth, in the screen that
+// owns it (Today's first save, CreateHive), so there is nothing pre-auth
+// left to flush. Deleted with no successor, not migrated.
 const onSessionAvailable = (nextSession) => {
   // The one-time orphaned-journal recovery (thread ba3783a7) needs a
   // signed-in user before EntryStore's reads/writes will do anything but
@@ -39,7 +33,6 @@ const onSessionAvailable = (nextSession) => {
   // on that internal guarantee — the same standard check-entry-writes
   // holds every other EntryStore-adjacent call site to.
   migrateLegacyJournal(nextSession.user.id, nextSession.user.created_at).catch(() => {});
-  PendingOnboardingWrites.flush().catch(() => {});
 };
 
 export const AuthProvider = ({ children }) => {

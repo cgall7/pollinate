@@ -7,8 +7,8 @@
 // src/constants/legalCopy.js holds four FILL values — legal entity, contact
 // address, hosting region, effective date — and every one is `null`. So the
 // Privacy Policy and Terms render with placeholders ("[our legal name — to
-// be named before launch]"), `LEGAL_COPY_READY` is false, and SignUpStep
-// deliberately renders NO consent checkbox: requiring someone to tick "I
+// be named before launch]"), `LEGAL_COPY_READY` is false, and the Account
+// Gate deliberately renders NO consent checkbox: requiring someone to tick "I
 // agree" against a document that still reads as a draft is worse than
 // having no checkbox at all. The links stay reachable so the gap is
 // visible. That reasoning is written at Onboarding.js's `isSignUp &&` block

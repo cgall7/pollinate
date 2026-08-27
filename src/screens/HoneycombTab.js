@@ -719,9 +719,9 @@ const HoneycombFeed = () => {
 
 // Shown instead of the feed when there's no session — demo-skip, or a
 // backgrounded/foregrounded resume that landed here before signup. Points
-// back to onboarding's SignUpStep rather than putting a second full
-// create-account form behind the honeycomb tab (Colin + Sage ruling,
-// 2026-08-09: account creation lives in onboarding only).
+// back to the Account Gate rather than putting a second full create-account
+// form behind the honeycomb tab (Colin + Sage ruling, 2026-08-09: account
+// creation lives at the gate only).
 const HoneycombEmptyState = () => {
   const navigation = useNavigation();
 
@@ -729,7 +729,7 @@ const HoneycombEmptyState = () => {
     <View style={[styles.container, styles.gateContainer]}>
       <Text style={styles.gateDisplay}>Your hive is waiting.</Text>
       <Text style={styles.gateBody}>Finish setting up your account to open it — takes less than a minute.</Text>
-      <PrimaryButton onPress={() => navigation.getParent()?.navigate('Onboarding', { startAt: 'signup' })}>
+      <PrimaryButton onPress={() => navigation.getParent()?.navigate('Onboarding')}>
         Finish signup
       </PrimaryButton>
       <PressableScale

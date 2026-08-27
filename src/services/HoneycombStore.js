@@ -47,6 +47,38 @@ export const HoneycombStore = {
     return data;
   },
 
+  // Apple sends `fullName` ONLY on the first authorization a user ever
+  // grants this app (PLANS/ONBOARDING_ZERO_DOOR_SPEC.md §5) — a reinstall or
+  // a second sign-in gets null, forever. `handle_new_user` (
+  // supabase/migrations/20260808000001_honeycombs_core_schema.sql) already
+  // inserts the profile row with `display_name` defaulted to 'New user' when
+  // `raw_user_meta_data` carries none, which is exactly this path (Apple's
+  // token doesn't populate it the way email signUp's `options.data` does).
+  // Persisting `fullName` here, same tick as the auth call, is what turns
+  // that placeholder into the real name instead of shipping it downstream.
+  async signInWithApple(identityToken, fullName) {
+    const client = requireSupabase();
+    const { data, error } = await client.auth.signInWithIdToken({ provider: 'apple', token: identityToken });
+    if (error) throw error;
+    if (fullName && data.user) {
+      // Not fatal to the sign-in itself — the caller still has a session —
+      // but it means 'New user' rides downstream. Warn, don't throw.
+      await this.updateDisplayName(data.user.id, fullName).catch((err) =>
+        console.warn('Failed to persist Apple full name', err)
+      );
+    }
+    return data;
+  },
+
+  // Shared by the Apple path above and the inline name-prompt fallback
+  // (Onboarding.js) for the reinstall case, where Apple hands back no name
+  // at all — one write path, so `display_name` is never set two ways.
+  async updateDisplayName(userId, displayName) {
+    const client = requireSupabase();
+    const { error } = await client.from('profiles').update({ display_name: displayName }).eq('id', userId);
+    if (error) throw error;
+  },
+
   async signOut() {
     const client = requireSupabase();
     const { error } = await client.auth.signOut();

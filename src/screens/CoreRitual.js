@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { getDailyPrompt } from '../constants/prompts';
 import { EntryStore } from '../services/EntryStore';
@@ -23,6 +24,35 @@ import { CelebrationBadge } from '../components/CelebrationBadge';
 import { CelebrationRays } from '../components/CelebrationRays';
 import { PaperPicker } from '../components/PaperPicker';
 import { DEMO_CONTENT } from '../constants/demoMode';
+import {
+  requestPermissionAndEnable,
+  reconcile as reconcileDailyNudge,
+  toISODateLocal,
+} from '../services/dailyNudge';
+import {
+  NUDGE_TITLE,
+  NUDGE_BODY,
+  NUDGE_ASK_LABEL,
+  NUDGE_ASK_READY,
+  NUDGE_GRANTED_LINE,
+  NUDGE_DECLINED_LINE,
+} from '../constants/nudgeCopy';
+
+// PLANS/ONBOARDING_ZERO_DOOR_SPEC.md §3: "Celebration + notification ask ->
+// The first-ever real save inside the app (Today/CoreRitual save path)."
+// Onboarding's old CelebrationStep is deleted outright, not disabled — but
+// the ask itself has exactly one caller it has ever had
+// (check-daily-nudge.mjs row 2c), so deleting that caller with no successor
+// is a removal of the daily-nudge feature, not a onboarding cleanup. This IS
+// the successor: the same fuse (`requestPermissionAndEnable`, reached from a
+// JSX press prop, never a mount effect — §2's invariant travels with it),
+// now hung on the unlock overlay every save already plays, gated to the one
+// save that actually satisfies "never ask before the user has something it
+// protects": the first one this device has ever made.
+const NUDGE_ASK = 'ask';
+const NUDGE_BUSY = 'busy';
+const NUDGE_GRANTED = 'granted';
+const NUDGE_OFF = 'off';
 
 // --- COMPONENT: LockScreen ---
 export const LockScreen = ({ onOpen }) => {
@@ -97,6 +127,15 @@ export const InputScreen = ({ onUnlock }) => {
   const [unlocking, setUnlocking] = useState(false);
   const formAnim = useRef(new Animated.Value(1)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  // Resolved by the same getFirstEntryDate() read the prompt-seniority
+  // effect below already makes: `null` means zero entries exist yet, so
+  // THIS save (if it lands) is the first one this device has ever made.
+  // Defaults false on the catch path deliberately — under-triggering the
+  // ask costs nothing this device will notice; over-triggering it on a
+  // returning user's ordinary save would be the real defect.
+  const [isFirstEntry, setIsFirstEntry] = useState(false);
+  const [awaitingContinue, setAwaitingContinue] = useState(false);
+  const [nudge, setNudge] = useState(NUDGE_ASK);
 
   // The first three days get the belief prompts (FIRST_DAYS_PROMPTS) before
   // the day-of-year rotation takes over, so the argument onboarding used to
@@ -116,6 +155,7 @@ export const InputScreen = ({ onUnlock }) => {
     EntryStore.getFirstEntryDate()
       .then((firstISO) => {
         if (cancelled) return;
+        setIsFirstEntry(!firstISO);
         let seniority = null;
         if (firstISO) {
           const [y, m, d] = firstISO.split('-').map(Number);
@@ -138,6 +178,58 @@ export const InputScreen = ({ onUnlock }) => {
       cancelled = true;
     };
   }, []);
+
+  const resetAfterFailedSave = () => {
+    Alert.alert("Couldn't save", "Your entry didn't save — try again.");
+    Animated.parallel([
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(formAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setUnlocking(false);
+      setAwaitingContinue(false);
+    });
+  };
+
+  // The ordinary path's own fuse call: bare, JSX-reached (this function IS
+  // the onPress body), never a mount effect. Kept separate from
+  // handleAskForNudge below only by WHEN it can be reached — the state
+  // machine (awaitingContinue) is what stops it firing on every save, not a
+  // fresh invariant.
+  const handleAskForNudge = async () => {
+    setNudge(NUDGE_BUSY);
+    let result;
+    try {
+      result = await requestPermissionAndEnable();
+    } catch {
+      setNudge(NUDGE_ASK);
+      return;
+    }
+    if (!result.granted) {
+      setNudge(NUDGE_OFF);
+      return;
+    }
+    setNudge(NUDGE_GRANTED);
+    // At this beat the user has written exactly today and nothing else
+    // (it's their first entry, full stop), so that one day-key IS
+    // writtenDaysISO — no read needed, same reasoning as the beat this
+    // replaces (formerly Onboarding.js's CelebrationStep).
+    try {
+      const now = new Date();
+      await reconcileDailyNudge({
+        writtenDaysISO: [toISODateLocal(now)],
+        now,
+        content: { title: NUDGE_TITLE, body: NUDGE_BODY },
+      });
+    } catch {
+      // App.js's next foreground re-arm covers this.
+    }
+  };
+
+  // The tap that actually leaves the overlay — "Continue" is never gated on
+  // the ask above, in any of its states, same as the beat this replaces.
+  const proceed = () => {
+    Promise.resolve(onUnlock(text, paper)).catch(resetAfterFailedSave);
+  };
 
   const handleSave = () => {
     if (!text.trim() || unlocking) return;
@@ -162,6 +254,16 @@ export const InputScreen = ({ onUnlock }) => {
         duration: 200,
         useNativeDriver: true,
       }).start(() => {
+        // First entry ever, with a ratified ask to show: hold the overlay
+        // open on a real tap instead of the ordinary timed auto-advance —
+        // this is the one save that has "something to protect" and nowhere
+        // else in the app asks before it. Every other day's save (and a
+        // first save while the ask copy is still unratified, NUDGE_ASK_READY
+        // false) keeps the exact unchanged timed behaviour below.
+        if (isFirstEntry && NUDGE_ASK_READY) {
+          setAwaitingContinue(true);
+          return;
+        }
         setTimeout(() => {
           // Bumble caught this (thread 19e90cf8, 2026-08-13): the signed-in
           // caller's onUnlock (App.js) now does a real EntryStore.saveEntry
@@ -170,21 +272,7 @@ export const InputScreen = ({ onUnlock }) => {
           // forever with unlocking stuck true and no way to retry.
           // Promise.resolve wraps the demo-mode caller too (Onboarding.js's
           // LockDemoStep.onSave is synchronous), so this is safe either way.
-          Promise.resolve(onUnlock(text, paper)).catch(() => {
-            Alert.alert("Couldn't save", "Your entry didn't save — try again.");
-            Animated.parallel([
-              Animated.timing(overlayOpacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-              }),
-              Animated.timing(formAnim, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-              }),
-            ]).start(() => setUnlocking(false));
-          });
+          Promise.resolve(onUnlock(text, paper)).catch(resetAfterFailedSave);
         }, 1400);
       });
     });
@@ -198,13 +286,48 @@ export const InputScreen = ({ onUnlock }) => {
       {unlocking && (
         <Animated.View
           style={[styles.unlockOverlay, { opacity: overlayOpacity }]}
-          pointerEvents="none"
+          pointerEvents={awaitingContinue ? 'auto' : 'none'}
         >
           <View style={styles.badgeStage}>
             <CelebrationRays />
             <CelebrationBadge />
           </View>
           <Text style={styles.unlockingText}>Your day is open. Enjoy it.</Text>
+          {awaitingContinue && (
+            <>
+              {(nudge === NUDGE_ASK || nudge === NUDGE_BUSY) && (
+                <PressableScale
+                  onPress={handleAskForNudge}
+                  disabled={nudge === NUDGE_BUSY}
+                  containerStyle={styles.nudgeSlot}
+                  style={styles.nudgeChip}
+                  accessibilityLabel={NUDGE_ASK_LABEL}
+                >
+                  <Ionicons name="notifications-outline" size={15} color={theme.colors.ink} />
+                  <Text style={styles.nudgeChipText}>{NUDGE_ASK_LABEL}</Text>
+                </PressableScale>
+              )}
+              {/* Both settled states drop the chip's edge and fill on purpose
+                  — the ask has been answered, so each is a status now, not a
+                  tap target (Onboarding.js's old CelebrationStep, verbatim
+                  reasoning). */}
+              {nudge === NUDGE_GRANTED && (
+                <View style={[styles.nudgeSlot, styles.nudgeSettled]}>
+                  <Ionicons name="checkmark" size={15} color={theme.colors.inkSoft} />
+                  <Text style={styles.nudgeSettledText}>{NUDGE_GRANTED_LINE}</Text>
+                </View>
+              )}
+              {nudge === NUDGE_OFF && (
+                <View style={[styles.nudgeSlot, styles.nudgeSettled]}>
+                  <Ionicons name="notifications-off-outline" size={15} color={theme.colors.inkSoft} />
+                  <Text style={styles.nudgeSettledText}>{NUDGE_DECLINED_LINE}</Text>
+                </View>
+              )}
+              <PrimaryButton onPress={proceed} style={styles.overlayContinueButton}>
+                Continue
+              </PrimaryButton>
+            </>
+          )}
         </Animated.View>
       )}
 
@@ -342,5 +465,41 @@ const styles = StyleSheet.create({
     ...theme.type.h3,
     color: theme.colors.ink,
     textAlign: 'center',
+  },
+  // Ported from Onboarding.js's old CelebrationStep, unchanged: this overlay
+  // sits on the same washYellow (theme.colors.unlockOverlay's backgroundColor
+  // above), so the same measured pair applies — accentDeep fails 4.5:1 here,
+  // ink/inkSoft are the legal pair.
+  nudgeSlot: {
+    alignSelf: 'center',
+    marginTop: 22,
+  },
+  nudgeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+    borderRadius: theme.borderRadius.full,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  nudgeChipText: {
+    ...theme.type.bodySm,
+    color: theme.colors.ink,
+  },
+  nudgeSettled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 11,
+  },
+  nudgeSettledText: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+  },
+  overlayContinueButton: {
+    marginTop: 24,
   },
 });

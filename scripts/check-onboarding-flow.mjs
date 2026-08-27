@@ -1,55 +1,31 @@
-// Gate for One Door — the onboarding rebuild (PLANS/ONBOARDING_ONE_DOOR_SPEC.md,
-// Lumen 2026-08-17, amended the same day).
+// Gate for Zero Door — the onboarding rebuild
+// (PLANS/ONBOARDING_ZERO_DOOR_SPEC.md, Lumen 2026-08-26, superseding
+// ONBOARDING_ONE_DOOR_SPEC.md 2026-08-17, which this gate used to be named
+// for).
 //
 //   npm run check:onboarding-flow
 //
-// WHY THIS EXISTS
+// WHY THIS EXISTS, AGAIN. One Door's version of this gate asserted C6 (no
+// exit of AccountStep may drop the pre-auth write buffer) and the symmetric-
+// failure contract for a buffered hive write — both real properties of
+// machinery that Zero Door deletes outright, not migrates: PendingOnboarding
+// Writes, the three-exit flush invariant, and the `hiveFailed` recovery beat
+// have no successor because post-auth every write has a session, and the
+// class of failure they existed to catch has no members left. AN INVARIANT
+// IS INDEXED TO ITS IMPLEMENTATION — a green C6 row over deleted machinery
+// is a lie, so those rows retire in the same commit that deletes the code
+// they were watching, not later. Section D (the prompt composition contract)
+// is untouched by any of this and survives unchanged below.
 //
-// One Door collapsed nine screens and two forks into five beats, and added
-// the app's first writer for Private Hives. Three of the properties it turns
-// on cannot be seen by any existing gate, and two of them are the kind that
-// fail silently — nobody watches a buffer not being written.
-//
-//   C6 (Sage, 2026-08-17). `AccountStep.handleSubmit` has three exits and,
-//   before this change, only two of them flushed the buffered first entry.
-//   The third — signUp returns no session, the confirm-your-email screen,
-//   `onNext` straight to `finish()` — navigated away with the write never
-//   performed, and the session-effect flush could not rescue it because it
-//   is gated on still being ON the account step. That path is DORMANT, and
-//   the thing keeping it dormant is not in this repository: production has
-//   `mailer_autoconfirm: true`, a dashboard toggle, no diff, one person.
-//   Turning email confirmation on before a public TestFlight arms it.
-//
-//   So a gate here cannot test the confirm-sent path's behaviour — the
-//   condition that reaches it is unreachable from this tree. It asserts the
-//   STRUCTURE that makes the path survivable instead.
-//
-// THE INVARIANT IS "NO EXIT MAY DROP THE BUFFER", NOT "EVERY EXIT MUST
-// WRITE IT". That distinction is the whole design. The confirm-sent exit
-// deliberately does not write: there is no session, which is the entire
-// reason it exists. What makes it safe is that the buffer is DURABLE at
-// COLLECTION time and the flush is fired by the SESSION'S ARRIVAL, from
-// AuthContext, in whatever process is running when the user follows the
-// link. So the three structural facts, each asserted separately:
-//
-//   (a) both collection sites write through to the durable store;
-//   (b) the durable store actually reaches AsyncStorage from both;
-//   (c) a flush fires from the session's arrival, outside the screen.
-//
-// Break any one and the confirm-sent path silently drops an answer again.
-//
-// WHY THE SPARK REGISTER IS IN HERE. B1–B3 moved into the prompt deck, and
-// a spark is never rendered alone — CoreRitual composes it into
-// `I am grateful for ${spark}.` So a spark that leads with a capital or a
-// preposition lands as broken grammar the user has to repair. Measured over
-// the deck before this change: 60/60 lowercase, 0/60 leading preposition —
-// an invariant the deck already held and nothing enforced. The twelve new
-// sparks arrived violating it 12/12, which is why it is enforced now.
-// check-copy-rules cannot see this: it asks whether a word is forbidden,
-// not whether a fragment composes.
+// WHAT REPLACES C6/C7. Zero Door collapses five beats into one screen, so
+// the property worth watching is no longer "does a buffer survive an exit"
+// but "did the beats actually leave, or just get hidden behind a flag."
+// Enumerated the same way C6 was — off the source, by structural shape, not
+// by a maintained list of names.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { parse } from '@babel/parser';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -105,217 +81,219 @@ const bodyOfBinding = (tree, name) => {
   return found;
 };
 
-// `Obj.method(` anywhere inside a subtree.
-const callsMember = (subtree, objectName, propertyName) => {
+// `Obj.method(` or `this.method(` anywhere inside a subtree.
+const callsMember = (subtree, objectMatcher, propertyName) => {
   let found = false;
   walk(subtree, (node) => {
     if (node.type !== 'CallExpression') return;
     const callee = node.callee;
     if (callee?.type !== 'MemberExpression') return;
-    if (callee.object?.type !== 'Identifier' || callee.object.name !== objectName) return;
+    if (!objectMatcher(callee.object)) return;
     if (callee.property?.type !== 'Identifier' || callee.property.name !== propertyName) return;
     found = true;
   });
   return found;
 };
+const isIdentifierNamed = (name) => (node) => node?.type === 'Identifier' && node.name === name;
+const isThis = (node) => node?.type === 'ThisExpression';
+
+// Identifier occurrences, walked over the AST rather than grepped raw text —
+// this file's own comments narrate what got deleted (by name), which a text
+// regex cannot tell apart from a live binding (the exact false-positive
+// class check-onboarding-flow's own D section already guards against for
+// spark strings: an occupied word is not evidence of the thing itself).
+const identifierCount = (tree, name) => {
+  let count = 0;
+  walk(tree.program, (node) => {
+    if (node.type === 'Identifier' && node.name === name) count += 1;
+  });
+  return count;
+};
 
 const onboardingSrc = await read('src/screens/Onboarding.js');
 const onboarding = await ast('src/screens/Onboarding.js');
-const pending = await ast('src/services/pendingOnboardingWrites.js');
-const auth = await ast('src/contexts/AuthContext.js');
+const coreRitualSrc = await read('src/screens/CoreRitual.js');
+const authAst = await ast('src/contexts/AuthContext.js');
 
-console.log('\n── A. one flow, five beats, nothing orphaned ──');
+console.log('\n── A. the beats actually left, not just a flag ──');
 
-// The step constants are ENUMERATED off the source, never typed here: a
-// gate that hardcodes the beats it expects passes by being blind to a beat
-// that was added or removed.
-const stepConsts = [];
-walk(onboarding.program, (node) => {
-  if (node.type !== 'VariableDeclarator') return;
-  if (node.id?.type !== 'Identifier' || !/^STEP_[A-Z]+$/.test(node.id.name)) return;
-  if (node.init?.type !== 'NumericLiteral') return;
-  stepConsts.push({ name: node.id.name, value: node.init.value });
-});
-
-check('walker control: Onboarding.js declares at least one STEP_ constant', stepConsts.length > 0, true);
-check(
-  'the STEP_ constants are a contiguous run from 0 (a gap is a beat that cannot be reached by next())',
-  stepConsts.map((s) => s.value).sort((a, b) => a - b),
-  stepConsts.map((_, i) => i)
-);
-
-// Every declared beat must appear as a case in the controller's switch, or
-// be the one the default arm serves. Otherwise a constant is a beat the
-// flow declares and never renders.
-const switchTests = [];
-let defaultArms = 0;
-walk(onboarding.program, (node) => {
-  if (node.type !== 'SwitchStatement') return;
-  for (const c of node.cases) {
-    if (!c.test) defaultArms += 1;
-    else if (c.test.type === 'Identifier') switchTests.push(c.test.name);
-  }
-});
-const declared = stepConsts.map((s) => s.name);
-const unrendered = declared.filter((n) => !switchTests.includes(n));
-check(
-  'walker control: the controller has exactly one switch with a default arm',
-  defaultArms,
-  1
-);
-check(
-  'every declared STEP_ constant is either a case in the controller switch or the single one left to default',
-  unrendered.length <= 1,
-  true
-);
-
-// The forks are gone, and stay gone. Named for what they were: a flow
-// letter and the module that persisted the choice.
+// The forks are gone, and stay gone — same check One Door's gate ran,
+// unchanged: named for what they were, a flow letter and the module that
+// persisted the choice.
 check(
   'Onboarding.js imports no onboarding-flow persistence module (the forks are deleted, not disabled)',
   /from '\.\.\/services\/devSettings'/.test(onboardingSrc),
   false
 );
-const flowIdentifiers = [];
+
+// Zero Door has no beats to enumerate, which is the point — a STEP_
+// constant or a beat-controller switch reappearing means someone is
+// rebuilding the thing this spec deleted, one beat at a time.
+const stepConsts = [];
+let switchCount = 0;
 walk(onboarding.program, (node) => {
-  if (node.type === 'Identifier' && /^(flow|initialFlow|isBeliefStep|BELIEF_START)$/.test(node.name)) {
-    flowIdentifiers.push(node.name);
-  }
+  if (node.type === 'SwitchStatement') switchCount += 1;
+  if (node.type !== 'VariableDeclarator') return;
+  if (node.id?.type !== 'Identifier' || !/^STEP_[A-Z]+$/.test(node.id.name)) return;
+  if (node.init?.type !== 'NumericLiteral') return;
+  stepConsts.push(node.id.name);
 });
-check('Onboarding.js carries no flow-fork bindings', [...new Set(flowIdentifiers)], []);
+check('Onboarding.js declares no STEP_ constant (one screen, no beats to index)', stepConsts, []);
+check('Onboarding.js contains no beat-controller switch statement', switchCount, 0);
 
-console.log('\n── B. C6: no exit of AccountStep may drop the buffer ──');
+// The three deleted beats stay deleted — enumerated by the exact bindings
+// One Door declared them under, so a recut that reintroduces one of these
+// under its old name is caught even if nothing routes to it yet.
+const deletedBeatNames = ['FirstEntryStep', 'CelebrationStep', 'WhoStep'];
+const reintroduced = [];
+walk(onboarding.program, (node) => {
+  if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') return;
+  if (deletedBeatNames.includes(node.id.name)) reintroduced.push(node.id.name);
+});
+check('none of the three deleted beats (First Entry, Celebration, Who) are declared in Onboarding.js', reintroduced, []);
 
-// (a) Both collection sites write through to the durable store. Resolved
-// by BINDING NAME through the handler the JSX passes, not by grepping the
-// file for the store's name — a file-level mention proves nothing about
-// which handler does the writing.
-for (const [handler, method] of [
-  ['handleSaveEntry', 'stashEntry'],
-  ['handleAnswerWho', 'stashHive'],
-]) {
-  const body = bodyOfBinding(onboarding, handler);
-  if (!body) {
-    bad(
-      `${handler} resolves to a function in Onboarding.js`,
-      'binding not found or not a function — renamed? A row that cannot resolve its subject is a FAIL, not a pass'
-    );
-  } else {
-    ok(`${handler} resolves to a function in Onboarding.js`);
-    check(
-      `${handler} calls PendingOnboardingWrites.${method} (the answer is durable at collection time)`,
-      callsMember(body, 'PendingOnboardingWrites', method),
-      true
-    );
-  }
-}
+// PendingOnboardingWrites: deleted with no successor (§3), same standard as
+// the devSettings check above — module gone, not just unimported.
+check(
+  'src/services/pendingOnboardingWrites.js no longer exists (deleted, not disabled)',
+  existsSync(path.join(ROOT, 'src/services/pendingOnboardingWrites.js')),
+  false
+);
+check(
+  'Onboarding.js references no PendingOnboardingWrites binding',
+  identifierCount(onboarding, 'PendingOnboardingWrites') > 0,
+  false
+);
+check(
+  'AuthContext.js no longer flushes a pre-auth buffer (nothing pre-auth is left to flush)',
+  identifierCount(authAst, 'PendingOnboardingWrites') > 0,
+  false
+);
+check(
+  'Onboarding.js carries no hiveFailed state (the beat it belonged to is deleted)',
+  identifierCount(onboarding, 'hiveFailed') > 0,
+  false
+);
 
-// (b) The store reaches disk. Both stashers funnel through `write`, so the
-// chain is asserted link by link — each link's subject is the name the
-// PREVIOUS link resolved, never a typed string.
-const persistBody = bodyOfBinding(pending, 'persist');
-const writeBody = bodyOfBinding(pending, 'write');
-check('pendingOnboardingWrites declares a persist helper', !!persistBody, true);
-check('pendingOnboardingWrites declares a write helper', !!writeBody, true);
-if (persistBody && writeBody) {
+console.log('\n── B. no-session renders the Gate and only the Gate; session drops straight through ──');
+
+// The session-arrival effect is what makes "session -> MainTabs with zero
+// interstitial routes" true: resolved by walking every useEffect body for
+// one that both reads `session` and calls `finish`, rather than assuming
+// there is exactly one useEffect in the file.
+let sessionEffectFinishes = false;
+walk(onboarding.program, (node) => {
+  if (node.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'useEffect') return;
+  const callback = node.arguments[0];
+  if (!callback) return;
+  let readsSession = false;
+  let callsFinish = false;
+  walk(callback, (n) => {
+    if (n.type === 'Identifier' && n.name === 'session') readsSession = true;
+    if (n.type === 'CallExpression' && n.callee?.type === 'Identifier' && n.callee.name === 'finish') callsFinish = true;
+  });
+  if (readsSession && callsFinish) sessionEffectFinishes = true;
+});
+check(
+  'an effect that reads `session` calls `finish` (a session anywhere in this screen\'s life leads straight to Main)',
+  sessionEffectFinishes,
+  true
+);
+
+// No route name from the deleted flow survives as a navigation target —
+// this screen's only `navigation.navigate` calls are the Legal modal links.
+// BOTH call node types: `navigation?.navigate(...)` parses as
+// OptionalCallExpression (the `?.` on the member access propagates through
+// the whole chain, including the call) — matching only CallExpression here
+// is the same node-role gap this file's own C section (One Door's version)
+// hit on `outcome?.hiveFailed` parsing as OptionalMemberExpression.
+const navigateTargets = [];
+walk(onboarding.program, (node) => {
+  if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
+  const callee = node.callee;
+  const isNavigate =
+    (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
+    callee.property?.type === 'Identifier' &&
+    callee.property.name === 'navigate';
+  if (!isNavigate) return;
+  const arg = node.arguments[0];
+  if (arg?.type === 'StringLiteral') navigateTargets.push(arg.value);
+});
+check(
+  'every navigation.navigate target Onboarding.js calls out to is Legal (no beat-shaped interstitial route survives)',
+  [...new Set(navigateTargets)],
+  ['Legal']
+);
+
+console.log('\n── C. the Apple path persists a non-null name on first auth ──');
+
+const honeycombStoreAst = await ast('src/services/HoneycombStore.js');
+let signInWithAppleBody = null;
+let updateDisplayNameBody = null;
+walk(honeycombStoreAst.program, (node) => {
+  if (node.type !== 'ObjectMethod' || node.key?.type !== 'Identifier') return;
+  if (node.key.name === 'signInWithApple') signInWithAppleBody = node.body;
+  if (node.key.name === 'updateDisplayName') updateDisplayNameBody = node.body;
+});
+check('HoneycombStore declares signInWithApple', !!signInWithAppleBody, true);
+check('HoneycombStore declares updateDisplayName', !!updateDisplayNameBody, true);
+if (signInWithAppleBody) {
   check(
-    'persist calls AsyncStorage.setItem (the buffer survives the process, which is the whole fix)',
-    callsMember(persistBody, 'AsyncStorage', 'setItem'),
+    'signInWithApple persists the name via updateDisplayName (mock: a truthy fullName reaches the write, not just the auth call)',
+    callsMember(signInWithAppleBody, isThis, 'updateDisplayName'),
     true
   );
-  let writeCallsPersist = false;
-  walk(writeBody, (node) => {
-    if (node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'persist') {
-      writeCallsPersist = true;
+}
+if (updateDisplayNameBody) {
+  // `client.from('profiles').update({ display_name })` is a builder chain —
+  // `.update(`'s own receiver is the CallExpression `client.from('profiles')`,
+  // not a bare identifier, so this resolves the shape by what `.update(` is
+  // CALLED WITH (an object literal keyed `display_name`) rather than by what
+  // it is called ON, which is the part a query builder is free to reshape.
+  let updatesDisplayName = false;
+  walk(updateDisplayNameBody, (node) => {
+    if (node.type !== 'CallExpression') return;
+    if (node.callee?.type !== 'MemberExpression' || node.callee.property?.name !== 'update') return;
+    const arg = node.arguments[0];
+    if (arg?.type !== 'ObjectExpression') return;
+    if (arg.properties.some((p) => p.key?.type === 'Identifier' && p.key.name === 'display_name')) {
+      updatesDisplayName = true;
     }
   });
-  check('write reaches persist', writeCallsPersist, true);
+  check(
+    "updateDisplayName's .update( call is keyed on display_name (walked from the binding, not grepped for the column name)",
+    updatesDisplayName,
+    true
+  );
 }
-for (const stasher of ['stashEntry', 'stashHive']) {
-  let body = null;
-  walk(pending.program, (node) => {
-    if (node.type !== 'ObjectMethod' && node.type !== 'ObjectProperty') return;
-    if (node.key?.type !== 'Identifier' || node.key.name !== stasher) return;
-    body = node.type === 'ObjectMethod' ? node.body : node.value?.body;
-  });
-  if (!body) {
-    bad(`${stasher} resolves to a method on the store`, 'not found — renamed or reshaped');
-  } else {
-    let callsWrite = false;
-    walk(body, (node) => {
-      if (node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'write') {
-        callsWrite = true;
-      }
-    });
-    check(`${stasher} reaches write (and therefore disk)`, callsWrite, true);
-  }
-}
-
-// (c) The flush fires from the session's arrival, OUTSIDE the screen that
-// collected the buffer. This is the leg that catches the confirm-sent exit:
-// by the time that session exists, Onboarding is unmounted.
-let authFlushSites = 0;
-walk(auth.program, (node) => {
-  if (node.type === 'CallExpression') {
-    const c = node.callee;
-    if (
-      c?.type === 'MemberExpression' &&
-      c.object?.type === 'Identifier' &&
-      c.object.name === 'PendingOnboardingWrites' &&
-      c.property?.type === 'Identifier' &&
-      c.property.name === 'flush'
-    ) {
-      authFlushSites += 1;
-    }
-  }
-});
+// The inline name-prompt fallback for a reinstall (Apple hands back no
+// name) is a gate row, not a comment (§5) — Onboarding.js must reach the
+// same shared write, not grow a second copy of it.
 check(
-  'AuthContext flushes the pending writes when a session appears (the only leg that can reach the confirm-sent exit)',
-  authFlushSites > 0,
+  'Onboarding.js reaches HoneycombStore.updateDisplayName for the no-fullName fallback (one write path, not two)',
+  callsMember(onboarding.program, isIdentifierNamed('HoneycombStore'), 'updateDisplayName'),
   true
 );
 
-// And the screen must not hold a private second copy that shadows it.
-const componentRefs = [];
-walk(onboarding.program, (node) => {
-  if (node.type !== 'VariableDeclarator') return;
-  if (node.id?.type !== 'Identifier' || !/pending/i.test(node.id.name)) return;
-  if (node.init?.type === 'CallExpression' && node.init.callee?.name === 'useRef') {
-    componentRefs.push(node.id.name);
-  }
-});
-check(
-  'Onboarding.js holds no useRef buffer of its own (a ref cannot survive the unmount the confirm-sent exit causes)',
-  componentRefs,
-  []
-);
+console.log('\n── D. the notification ask left with Celebration, and did not just disappear ──');
 
-console.log('\n── C. the two failures are not symmetric ──');
-
-// flush() must report the two outcomes SEPARATELY, and the account screen
-// must consume the hive half. A single boolean would collapse "rewrite it
-// tomorrow" and "the name you gave is gone" into one word.
-const pendingSrc = await read('src/services/pendingOnboardingWrites.js');
-for (const key of ['entryFailed', 'hiveFailed']) {
-  check(`flush()'s result carries ${key}`, new RegExp(`\\b${key}\\b`).test(pendingSrc), true);
-}
-// BOTH member-access node types. The first draft asked only for
-// `MemberExpression` and went red on correct code: the call site reads
-// `outcome?.hiveFailed`, which Babel parses as `OptionalMemberExpression` —
-// a different node type in the same role. Matching a role by one of its
-// node types is the same error as matching it by one of its names.
-let readsHiveFailed = false;
-walk(onboarding.program, (node) => {
-  if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') return;
-  if (node.property?.type === 'Identifier' && node.property.name === 'hiveFailed') readsHiveFailed = true;
-});
+// This is the row check-daily-nudge.mjs's row 2c exists to catch from the
+// other side: "half B's Celebration ask is the only caller this function
+// has ever had, so its absence is a removal of the feature, not a not-yet."
+// Onboarding.js must not be that caller anymore, AND something must be.
+check('Onboarding.js calls no requestPermissionAndEnable (the ask is not onboarding\'s job anymore)', /requestPermissionAndEnable/.test(onboardingSrc), false);
+check('Onboarding.js references no NUDGE_ASK_READY / NUDGE_ASK_LABEL (the sentinel-gated ask moved out with it)', /NUDGE_ASK_(READY|LABEL)/.test(onboardingSrc), false);
 check(
-  'Onboarding.js reads .hiveFailed off the flush result (a failed hive write reaches a screen, not just a console)',
-  readsHiveFailed,
+  'CoreRitual.js is the ask\'s new home (PLANS/ONBOARDING_ZERO_DOOR_SPEC.md §3 — the first-ever real save, not a screen of its own)',
+  /requestPermissionAndEnable/.test(coreRitualSrc) && /NUDGE_ASK_READY/.test(coreRitualSrc),
   true
 );
+// check-daily-nudge.mjs's rows 2c/3/11a/11b own the DEEP shape of that call
+// site (JSX-reached, never a mount effect, gated on the ratified flag) —
+// this row only asserts the relocation happened, not its full correctness,
+// so the two gates don't duplicate each other's job.
 
-console.log('\n── D. the belief copy landed, and composes ──');
+console.log("\n── E. the belief copy landed, and composes ──");
 
 // prompts.js is dependency-free, so this is the real module, sampled over
 // its domain — not a regex over its source.
@@ -346,10 +324,11 @@ check(
   []
 );
 
-// THE COMPOSITION CONTRACT. A spark is set into `I am grateful for ${spark}.`
-// at CoreRitual.js and `I'm grateful for ${spark}.` in Onboarding.js, so it
-// must be a lowercase noun phrase. Enumerated over BOTH decks — a rule that
-// only covered the new deck would have missed the deck it was derived from.
+// THE COMPOSITION CONTRACT. A spark is set into a "I am grateful for
+// ${spark}." / "I'm grateful for ${spark}." sentence wherever the register
+// is consumed (CoreRitual.js and SparkChips today), so it must be a
+// lowercase noun phrase. Enumerated over BOTH decks — a rule that only
+// covered the new deck would have missed the deck it was derived from.
 const allSparks = [...DAILY_PROMPTS, ...FIRST_DAYS_PROMPTS].flatMap((p) => p.sparks ?? []);
 check('walker control: the decks contribute sparks', allSparks.length > 0, true);
 check(
@@ -364,12 +343,10 @@ check(
 );
 // A repeated chip reads as a rendering bug, not as a second suggestion —
 // and the row a user sees is four chips wide, so a duplicate inside one deck
-// is visible in a single glance. The decks are duplicate-free today and that
-// state was held by nothing: the first recut of B2 proposed a spark already
-// sitting in the same array, and it survived on a reviewer's eyes. Enumerated
-// globally rather than per-deck, because day 1 and day 40 are two screens the
-// same user sees, and the assertion reports the STRINGS, not a count, so the
-// failure names the chip instead of the arithmetic.
+// is visible in a single glance. Enumerated globally rather than per-deck,
+// because day 1 and day 40 are two screens the same user sees, and the
+// assertion reports the STRINGS, not a count, so the failure names the chip
+// instead of the arithmetic.
 const sparkCounts = new Map();
 for (const s of allSparks) sparkCounts.set(s, (sparkCounts.get(s) ?? 0) + 1);
 check(
@@ -383,7 +360,7 @@ check(
   []
 );
 
-console.log('\n── D2. hive prompt ladders inherit the spark contract, and the selector is pure (ENG-44/45/45.4) ──');
+console.log('\n── E2. hive prompt ladders inherit the spark contract, and the selector is pure (ENG-44/45/45.4) ──');
 
 // hivePrompts.js is the Project 16 prompt engine (spec §16.2-16.3). Its
 // ladders start empty — COPY-1 (Lumen) has not landed yet — so most of
@@ -521,38 +498,6 @@ check(
   true
 );
 HIVE_PROMPT_LADDERS.friend.new = originalFriendNew;
-
-console.log('\n── E. the progress map claims the length the flow has ──');
-
-// A progress map is a claim about how much is left. Six cells over a
-// five-beat flow says "five more to go" on the first screen of a flow with
-// four, and draws two cells nothing can ever fill.
-const mapAst = await ast('src/components/HoneycombJourneyMap.js');
-let stageOrder = null;
-let stageLabels = null;
-walk(mapAst.program, (node) => {
-  if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') return;
-  if (node.init?.type !== 'ArrayExpression') return;
-  const values = node.init.elements.map((e) => (e?.type === 'StringLiteral' ? e.value : null));
-  if (values.some((v) => v === null)) return;
-  if (node.id.name === 'STAGE_ORDER') stageOrder = values;
-  if (node.id.name === 'STAGE_LABELS') stageLabels = values;
-});
-check('walker control: STAGE_ORDER resolves to a literal array of strings', Array.isArray(stageOrder), true);
-if (stageOrder) {
-  check('STAGE_ORDER has one cell per declared beat', stageOrder.length, stepConsts.length);
-  check('STAGE_LABELS pairs one-to-one with STAGE_ORDER', stageLabels?.length ?? -1, stageOrder.length);
-
-  // Every stage a step actually asks for must exist in the map, or that
-  // step silently renders cell 0 as current (indexOf -> -1 -> clamped to 0).
-  const requestedStages = [...onboardingSrc.matchAll(/stage="([a-z]+)"/g)].map((m) => m[1]);
-  check('walker control: Onboarding.js requests at least one stage', requestedStages.length > 0, true);
-  check(
-    'every stage Onboarding.js requests exists in STAGE_ORDER (an unknown stage silently lights cell 0)',
-    [...new Set(requestedStages)].filter((s) => !stageOrder.includes(s)),
-    []
-  );
-}
 
 console.log(`\ncheck-onboarding-flow: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {

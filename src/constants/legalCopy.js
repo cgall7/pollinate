@@ -142,9 +142,9 @@ const HOSTING_REGION = filled('HOSTING_REGION');
 
 // True only once every value above is really set. Gate the signup consent
 // checkbox on this: requiring someone to affirmatively agree to a document that
-// is still marked draft is worse than having no checkbox at all. See
-// Onboarding's SignUpStep, which is where the import has to happen for this to
-// be a mechanism rather than a convention.
+// is still marked draft is worse than having no checkbox at all. See the
+// Account Gate in Onboarding.js, which is where the import has to happen for
+// this to be a mechanism rather than a convention.
 export const LEGAL_COPY_READY = Object.values(FILL).every((entry) => isPublished(entry.value));
 
 export const LEGAL_LAST_UPDATED = filled('EFFECTIVE_DATE');

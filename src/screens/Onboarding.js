@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TextInput,
+  TouchableOpacity,
   Animated,
   ScrollView,
   KeyboardAvoidingView,
@@ -11,138 +12,100 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { theme } from '../constants/theme';
 import { PressableScale } from '../components/PressableScale';
-import { BackButton } from '../components/BackButton';
 import { StaggeredItem } from '../components/StaggeredItem';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { GlowOrb } from '../components/GlowOrb';
-import { HoneycombJourneyMap } from '../components/HoneycombJourneyMap';
-import { CelebrationBadge } from '../components/CelebrationBadge';
-import { CelebrationRays } from '../components/CelebrationRays';
-import { IdeasAccordion } from '../components/IdeasAccordion';
 import { FlyingBee } from '../components/FlyingBee';
 import { DEMO_CONTENT, DEMO_LOGIN_EMAIL, DEMO_LOGIN_PASSWORD } from '../constants/demoMode';
 import { OnboardingState } from '../services/onboardingState';
 import { HoneycombStore } from '../services/HoneycombStore';
-import { PendingOnboardingWrites } from '../services/pendingOnboardingWrites';
-import { getDailyPrompt } from '../constants/prompts';
-import { tagEntry } from '../utils/themeTagger';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  requestPermissionAndEnable,
-  reconcile as reconcileDailyNudge,
-  toISODateLocal,
-} from '../services/dailyNudge';
-import {
-  NUDGE_TITLE,
-  NUDGE_BODY,
-  NUDGE_ASK_LABEL,
-  NUDGE_ASK_READY,
-  NUDGE_GRANTED_LINE,
-  NUDGE_DECLINED_LINE,
-} from '../constants/nudgeCopy';
 
-// ONE DOOR — five beats, no forks (PLANS/ONBOARDING_ONE_DOOR_SPEC.md,
-// Lumen 2026-08-17, amended the same day for the Who beat).
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
+// ZERO DOOR — one screen, no beats (PLANS/ONBOARDING_ZERO_DOOR_SPEC.md,
+// Lumen 2026-08-26, superseding ONBOARDING_ONE_DOOR_SPEC.md 2026-08-17).
 //
-// What used to be here: a Welcome screen, a demo-only Flow B/C picker, three
-// belief screens, a Name step, a Moment step, and two different entry steps
-// depending on which fork you were on — nine screens on the default path.
-// Flows B and C are deleted as forks. The Landing is now the same face as
-// the daily gate, so day 0 teaches day 30.
+// One Door's premise was write-before-account: it collected a first entry
+// and a "who is this for" answer before a session existed, buffered both to
+// disk (PendingOnboardingWrites), and flushed them once the account showed
+// up — machinery that existed only because those writes happened first.
+// Zero Door reverses the order instead of building a faster buffer: account
+// first, so nothing is ever collected before there is a session to write it
+// with. That deletes the buffer, its three-exit flush invariant (C6,
+// Sage 2026-08-17), and the `hiveFailed` recovery beat outright — not
+// migrated, deleted, because post-auth every write has a session and the
+// class of failure they existed to catch has no members left.
 //
-// The cuts are transmutations, not deletions, and each one is written down
-// where it went:
-//   - the belief screens B1–B3 -> src/constants/prompts.js, as the first
-//     three days' prompts (FIRST_DAYS_PROMPTS). The argument arrives one
-//     line a day, which is the product's own thesis applied to its pitch.
-//   - the Moment step -> waits for notifications to exist, then returns at
-//     the Celebration beat as a real permission ask (§27.2: never describe
-//     a capability that doesn't exist).
-//   - the Lock demo -> promoted. The Landing IS the gate now, so the
-//     preview became the thing it was previewing.
-//   - the Name step -> AccountStep already collects a name at "Keep it."
-const STEP_LANDING = 0;
-const STEP_ENTRY = 1;
-const STEP_CELEBRATION = 2;
-const STEP_WHO = 3;
-const STEP_ACCOUNT = 4;
-
-// --- Shared shell: wash background + honeycomb journey map + animated step transitions ---
-const StepShell = ({ step, stage, wash, onBack, showMap = true, children }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(16)).current;
-
-  useEffect(() => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(16);
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 420, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 60, useNativeDriver: true }),
-    ]).start();
-  }, [step]);
-
-  return (
-    <View style={[styles.container, { backgroundColor: wash }]}>
-      <View style={styles.topBar}>
-        {onBack ? (
-          <BackButton onPress={onBack} />
-        ) : (
-          <View style={styles.backSpacer} />
-        )}
-        {showMap && <HoneycombJourneyMap stage={stage} />}
-      </View>
-
-      <Animated.View style={[styles.stepBody, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-        {children}
-      </Animated.View>
-    </View>
-  );
-};
-
-// §13.3: the bee flies an inward spiral arc and settles at the wordmark's
-// center once per app open — a flight-path preset on the shared FlyingBee
-// engine, not a second bee. `hasArcedThisLaunch` is a module-level flag
-// (not React state) on purpose: DEMO_MODE's foreground-resume reset
-// (App.js) repeatedly unmounts/remounts this screen back to Welcome, and
-// §13.3 says "fires once per app open, never loops" — a per-component
-// state flag would reset on every one of those remounts and re-fire the
-// arc each time. This flag only resets on a genuine cold launch (new JS
-// context), which is the boundary §13.3 actually means by "app open."
+// Every beat One Door had still has a home, just not here:
+//   Landing + Account  -> merged into this one screen, below.
+//   First Entry        -> Today's quiet page (shipped 08-19) is already the
+//                          daily invitation; FIRST_DAYS_PROMPTS[0] reaches
+//                          the user there via the same deck, unchanged.
+//   Celebration + ask   -> the first-ever real save inside the app
+//                          (CoreRitual.js's InputScreen), which already
+//                          plays a celebration overlay for every save. The
+//                          notification ask (`NUDGE_ASK_*`) now hangs there
+//                          too, gated on that save being the user's first.
+//   Who ("who is this   -> CreateHive (V2 §16.1 already collects subject
+//     year for")            name + relationship there). The onboarding
+//                          Private-Hive writer is deleted outright.
+//
+// Two affordances on this screen, no third: Continue with Apple (primary),
+// Continue with email (secondary, expands inline — never a second screen).
+// A quiet way back in for someone who already has an account sits under
+// both. The demo skip stays DEMO_CONTENT-gated, below everything.
 let hasArcedThisLaunch = false;
 
-// --- Beat 0: the Landing — the only door ---
-//
-// This screen is not an introduction to the app; it IS the app's front face,
-// permanently. Sign-out lands here, every cold launch before completion
-// opens here, and its composition is the daily gate's composition
-// (CoreRitual's LockScreen: glow, wordmark, one line, one button). Day 0
-// teaches day 30 — which is why the Lock demo could be deleted rather than
-// replaced. There is nothing left to preview.
-//
-// Two affordances, no third: Begin (write), and a quiet way back in for
-// someone who already has an account. The demo skip stays DEMO_CONTENT-gated
-// and below both.
-const LandingStep = ({
-  step,
-  onNext,
-  onSignIn,
-  onSkipDemo,
-  onContinueAsDemo,
-  demoLoginBusy,
-  demoLoginError,
-  splashHidden,
-}) => {
+export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) => {
+  const { session } = useAuth();
   const { width } = useWindowDimensions();
-  // Starting the arc on mount used to spend its whole flight behind the
-  // still-visible splash (§13.3 follow-up, Pixel/Sage 2026-08-12: "once per
-  // app open" means once VISIBLY, and an arc spent behind the splash is
-  // zero arcs). Gate on the splash-hide signal from App.js instead — by the
-  // time a foreground-resume remount gets here, splash is long gone and
-  // splashHidden is already true, so this fires immediately, same as today.
-  const [showArc, setShowArc] = useState(false);
+  // Seeded, not corrected by an effect: Honeycomb's empty state and the auth
+  // deep links land directly in the expanded form, in the right mode, and
+  // doing that in the initialiser means the collapsed buttons never render
+  // for a frame first.
+  const [expanded, setExpanded] = useState(startAt === 'signin');
+  const [mode, setMode] = useState(startAt === 'signin' ? 'signin' : 'signup');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [confirmSent, setConfirmSent] = useState(false);
+  const [demoLoginBusy, setDemoLoginBusy] = useState(false);
+  const [demoLoginError, setDemoLoginError] = useState(null);
+  const isSignUp = mode === 'signup';
+  const canSubmit = email.trim() && password.length >= 6 && (!isSignUp || name.trim()) && !busy;
 
+  // §5 — Apple sends `fullName` only on the very first authorization this
+  // device ever grants. A reinstall or a second sign-in gets null forever,
+  // so that case gets one inline name prompt right here rather than let
+  // `handle_new_user`'s 'New user' default ride downstream unfixed.
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const [appleNamePrompt, setAppleNamePrompt] = useState(false);
+  const [appleUserId, setAppleUserId] = useState(null);
+  const [appleName, setAppleName] = useState('');
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
+
+  // §13.3: the bee flies an inward spiral arc and settles at the wordmark's
+  // center once per app open — a flight-path preset on the shared FlyingBee
+  // engine, not a second bee. `hasArcedThisLaunch` is a module-level flag
+  // (not React state) on purpose: DEMO_MODE's foreground-resume reset
+  // (App.js) repeatedly unmounts/remounts this screen, and §13.3 says
+  // "fires once per app open, never loops" — a per-component state flag
+  // would reset on every one of those remounts and re-fire the arc each
+  // time. This flag only resets on a genuine cold launch (new JS context),
+  // which is the boundary §13.3 actually means by "app open." Gated on the
+  // splash-hide signal from App.js rather than mount, so the flight is
+  // never spent behind the still-visible splash (§13.3 follow-up,
+  // Pixel/Sage 2026-08-12).
+  const [showArc, setShowArc] = useState(false);
   useEffect(() => {
     if (splashHidden && !hasArcedThisLaunch) {
       hasArcedThisLaunch = true;
@@ -150,435 +113,52 @@ const LandingStep = ({
     }
   }, [splashHidden]);
 
-  return (
-    <StepShell step={step} stage="welcome" wash={theme.colors.washYellow}>
-      {/* THE GATE'S OWN LIGHT, not a smaller cousin of it. First attempt
-          reused the belief screens' ArrivingLight — a 180pt orb absolutely
-          positioned at left:-68/top:-68 of whatever contained it. On the
-          Landing that container is the centred content column, so it
-          rendered as a yellow blob in the top-left corner: a style that
-          only ever made sense inside the layout it was written for.
-          CoreRitual's LockScreen runs `size={width * 1.6}` at `top:
-          -width * 0.35`, which reads as light across the whole screen
-          rather than as a pale shape; if this is the same face as the
-          gate, it wears the gate's exact treatment. ArrivingLight had no
-          other consumer once the belief screens went, and is deleted. */}
-      <GlowOrb size={width * 1.6} breathe intensity={0.55} style={{ top: -width * 0.35 }} />
-      <View style={styles.centerFill}>
-        <View style={styles.wordmarkArcAnchor}>
-          <Text style={styles.wordmark}>Pollinate</Text>
-          {showArc && (
-            <FlyingBee
-              preset="loginArc"
-              size={22}
-              style={styles.wordmarkArcBee}
-              onSettle={() => setShowArc(false)}
-            />
-          )}
-        </View>
-        {/* Cascade timing comes from the shared module, never a local
-            literal. Deezine's composition asked for absolute delays of
-            300/500/700/900/1100/1300ms — a 1.3s entrance. §14.1's cascade
-            is STAGGER_MS=50 per item (and a 700ms total budget above ~14
-            items), so these four land in 150ms, not 1300. A named cascade
-            fixes the shape; it is not a timing system to type numbers
-            into (§12.5.1b). */}
-        <StaggeredItem index={0}>
-          <Text style={styles.h1Center}>Start with what you were given.</Text>
-        </StaggeredItem>
-        {/* Was "That's the whole thing." R15 wrote it to promise low friction
-            and it did that well, but it also asserted the product ends at the
-            journal — which is the exact claim The Ruling reverses ("the
-            journal is the foundation the social network grows on"). It is the
-            standalone-journal promise, on our first screen, in our own voice.
-            "That's how it starts" keeps the one-line-a-day promise verbatim
-            and flips terminal to foundational. Nothing unbuilt is named. */}
-        <StaggeredItem index={1}>
-          <Text style={styles.bodyLgCenter}>One line a day. That's how it starts.</Text>
-        </StaggeredItem>
-      </View>
-      <StaggeredItem index={2}>
-        <PrimaryButton onPress={onNext}>Begin</PrimaryButton>
-      </StaggeredItem>
-      {/* The returning half of the door. Onboarding was reachable at the
-          account step by deep link (`startAt`) and from Honeycomb's empty
-          state, but never from the app's own first screen — a returning user
-          on a new phone had to walk the whole flow to reach a sign-in form.
-          Quiet, not competing: a text link under the primary. */}
-      <StaggeredItem index={3}>
-        <PressableScale onPress={onSignIn} style={styles.signInLink} haptic={null}>
-          <Text style={styles.signInLinkText}>Already have a hive? Sign in</Text>
-        </PressableScale>
-      </StaggeredItem>
-      {/* Pixel's WP-10(c) finding (thread 37fb8ef6): this rendered
-          unconditionally, shipping to every tester's first screen.
-          DEMO_CONTENT, not __DEV__ — a pitch build Colin demos from has
-          __DEV__ false but DEMO_MODE still true. */}
-      {DEMO_CONTENT && (
-        <PressableScale onPress={onSkipDemo} style={styles.skipDemoLink}>
-          <Text style={styles.skipDemoText}>Skip to the logged-in view (demo)</Text>
-        </PressableScale>
-      )}
-      {/* Colin's one-tap pitch login (thread 83a020e9, 2026-08-26): a real
-          session against a pre-built demo account, not the no-session skip
-          above — every screen behind it loads real data. Only renders when
-          the credentials are actually configured (DEMO_LOGIN_EMAIL is a
-          gitignored .env value, never committed), so a build without them
-          shows nothing here rather than a button that always fails. */}
-      {DEMO_CONTENT && (DEMO_LOGIN_EMAIL && (
-        <>
-          <PressableScale onPress={onContinueAsDemo} style={styles.skipDemoLink} disabled={demoLoginBusy}>
-            <Text style={styles.skipDemoText}>{demoLoginBusy ? 'Signing in…' : 'Continue as demo'}</Text>
-          </PressableScale>
-          {demoLoginError && <Text style={styles.demoLoginErrorText}>{demoLoginError}</Text>}
-        </>
-      ))}
-    </StepShell>
-  );
-};
-
-// --- Beat 1: the first entry — the activation moment. Everything funnels
-// --- here, and it is now ONE TAP from the door. ---
-//
-// The headline is the day-0 prompt from the shared deck, not a string of its
-// own. That is what makes B1's transmutation real rather than notional: the
-// first belief screen ("The morning showed up without you.") became day 0 of
-// FIRST_DAYS_PROMPTS, and day 0 is this screen — the entry that starts the
-// count is written here, so if this screen kept its own private copy of the
-// question, day 0 of the deck would be a prompt nobody could ever be shown.
-// One source, one question.
-//
-// The greeting-by-name is gone with the Name step: the name is collected two
-// beats later at "Keep it.", so there is nothing to greet with here.
-//
-// The placeholder carries the whole thesis into the one field that matters
-// most. The Ideas accordion keeps its own approved stem ("I'm grateful
-// for…", GRATITUDE_IDEAS_ACCORDION_COPY.md) — its sparks are written as
-// noun phrases for that stem and don't read grammatically under this one.
-// The two never collide on screen: the placeholder is only visible while
-// the field is empty.
-const FirstEntryStep = ({ step, onNext, onBack, onSave }) => {
-  const [text, setText] = useState('');
-  const canSave = !!text.trim();
-
-  const handleSave = () => {
-    if (!canSave) return;
-    onSave(text.trim());
-    onNext();
+  // App.js's onDone is `navigation.replace('Main')`, which must not run
+  // twice — this screen can reach it both by its own submit and by the
+  // already-signed-in effect below firing on the same session change.
+  const finishedRef = useRef(false);
+  const finish = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    // Fire-and-forget: the flag only matters on the NEXT cold launch, so
+    // navigation doesn't wait on the write.
+    OnboardingState.markComplete().catch(() => {});
+    onDone();
   };
 
-  return (
-    <StepShell step={step} stage="entry" wash={theme.colors.washYellow} onBack={onBack}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.fillBetween}>
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={styles.h1}>{getDailyPrompt(new Date(), 0).question}</Text>
-          <View style={styles.inputCard}>
-            <TextInput
-              style={styles.entryInput}
-              placeholder="Today I was given…"
-              placeholderTextColor={theme.colors.inkSoft}
-              multiline
-              value={text}
-              onChangeText={setText}
-              // Matches CoreRitual's entry input and entries_content_length.
-              // Local-only when written, so the failure would surface much
-              // later at Share rather than here.
-              maxLength={10000}
-              autoFocus
-            />
-          </View>
-          <IdeasAccordion onPick={(spark) => setText(`I'm grateful for ${spark}.`)} />
-        </ScrollView>
-        <PrimaryButton onPress={handleSave} disabled={!canSave} style={styles.floatingButton}>
-          Save
-        </PrimaryButton>
-      </KeyboardAvoidingView>
-    </StepShell>
-  );
-};
-
-// --- Celebration — always the first-ever-save treatment (the entry step's
-// --- save IS the first-ever save), never the bare badge. "given" closes the
-// --- loop back to the Welcome line. ---
-//
-// THE DAILY NUDGE ASK LIVES IN THIS BEAT, UNDER "Tomorrow it's two."
-// (`PLANS/DAILY_NUDGE_SPEC.md` §2's placement corollary, Lumen). The body
-// already makes the promise; the notification is the MECHANISM of that
-// sentence, so the ask reads as the payoff of a line just read rather than
-// as an interruption. Reading order protects the celebration: badge ->
-// "That's one." -> body all land before the ask exists.
-//
-// AFFIRMATIVE-ONLY — there is no "No thanks". The in-app decline is walking
-// past it: tapping "Keep it" without touching the ask. Nothing is recorded,
-// so §2's corollary keeps its full value and a later re-ask stays open.
-// The Who beat carries a decline link because it owns its screen and has no
-// other exit; this beat's "Keep it" is already an unblocked exit, which is
-// why a second control here would be a guilt button. (That is Sage's reason,
-// taken over the §30.10.4 citation I first reached for — §30.10.4 rules on
-// the WEIGHT of a decline control, not on whether one exists, so it cannot
-// be cited for having none.)
-//
-// "Keep it" is never gated on the ask, in any state.
-const NUDGE_ASK = 'ask';
-const NUDGE_BUSY = 'busy';
-const NUDGE_GRANTED = 'granted';
-const NUDGE_OFF = 'off';
-
-const CelebrationStep = ({ step, onNext }) => {
-  const [nudge, setNudge] = useState(NUDGE_ASK);
-
-  // §2, THE FUSE — this is the "yes" handler, and the only caller of
-  // `requestPermissionAndEnable` anywhere in the app. It is reached from a
-  // JSX press prop and from nowhere else: not a mount effect, not module
-  // scope, so the OS dialog cannot fire before an in-app yes.
-  // `scripts/check-daily-nudge.mjs` row 2c asserts that shape by walking
-  // from the call site out to the prop, rather than by finding the name.
-  const handleAskForNudge = async () => {
-    setNudge(NUDGE_BUSY);
-    let result;
-    try {
-      result = await requestPermissionAndEnable();
-    } catch {
-      // A throw is not an OS decline. Nothing was granted and nothing was
-      // armed, so the label still describes exactly what the control would
-      // do — returning it to the ask is the honest state, and the only one
-      // that does not strand the user with a promise nobody made.
-      setNudge(NUDGE_ASK);
-      return;
-    }
-    if (!result.granted) {
-      // An OS decline is terminal (§2: this function does not retry), so the
-      // control cannot persist — a button still offering what the OS just
-      // refused is a lie in button form. It settles into a resting state
-      // rather than vanishing (Lumen, 36f84721, correcting an earlier
-      // ruling of their own): the user tapped yes, an in-app act of trust,
-      // and the OS said no. A control that disappears out from under that
-      // tap swallows the only feedback the sequence will ever get — and
-      // until §7's settings row exists there is no other surface in the
-      // product that mentions this switch at all. The resting state also
-      // holds the slot that row will later explain.
-      setNudge(NUDGE_OFF);
-      return;
-    }
-    setNudge(NUDGE_GRANTED);
-
-    // ARM THE PROMISE HERE, and deliberately NOT via App.js's
-    // `rearmDailyNudge`. Two independent reasons, either one sufficient:
-    //
-    //   1. `requestPermissionAndEnable` sets the enabled flag and returns —
-    //      it never reconciles (`disable()` does; the enable path does not,
-    //      an asymmetry that sat unnamed in the module until Sage measured
-    //      it). App.js's foreground reconcile already ran at launch, BEFORE
-    //      that flag existed, and the next background->active transition may
-    //      not arrive before tomorrow 20:00. A user who taps yes, finishes
-    //      onboarding and pockets the phone would get no nudge on night one
-    //      — exactly the cohort the feature exists for.
-    //   2. `rearmDailyNudge` sources its written days from `EntryStore`,
-    //      whose `requireUserId` throws "Not signed in", and there IS no
-    //      session at this beat — STEP_ACCOUNT is two beats away, which is
-    //      the same reason the entry itself is buffered through
-    //      `PendingOnboardingWrites`. App.js's catch would swallow that
-    //      silently and night one would break with nothing reported.
-    //
-    // No read is needed anyway: at this beat the user has written exactly
-    // today and nothing else, so that one day-key IS `writtenDaysISO`.
-    // `buildWindow` drops today and schedules from tomorrow — which is what
-    // the label promised.
-    try {
-      const now = new Date();
-      await reconcileDailyNudge({
-        writtenDaysISO: [toISODateLocal(now)],
-        now,
-        content: { title: NUDGE_TITLE, body: NUDGE_BODY },
-      });
-    } catch {
-      // Permission is granted and the flag is set, so App.js's next
-      // foreground re-arm covers this. The settled line stays honest.
-    }
-  };
-
-  return (
-    <StepShell step={step} stage="saved" wash={theme.colors.washYellow}>
-      <View style={styles.centerFill}>
-        <View style={styles.badgeStage}>
-          <CelebrationRays />
-          <CelebrationBadge />
-        </View>
-        <Text style={styles.h1Center}>That's one.</Text>
-        <Text style={styles.bodyLgCenter}>
-          Tomorrow it's two. Do that for a while and you'll have a record of everything you were given.
-        </Text>
-        {NUDGE_ASK_READY && (nudge === NUDGE_ASK || nudge === NUDGE_BUSY) && (
-          <PressableScale
-            onPress={handleAskForNudge}
-            disabled={nudge === NUDGE_BUSY}
-            containerStyle={styles.nudgeSlot}
-            style={styles.nudgeChip}
-            accessibilityLabel={NUDGE_ASK_LABEL}
-          >
-            <Ionicons name="notifications-outline" size={15} color={theme.colors.ink} />
-            <Text style={styles.nudgeChipText}>{NUDGE_ASK_LABEL}</Text>
-          </PressableScale>
-        )}
-        {/* Both settled states drop the chip's edge and fill on purpose:
-            the ask has been answered, so each is a status now, not a tap
-            target, and nothing about either should still read as pressable.
-            They occupy the ask's own slot so the beat's height never jumps
-            under the answer. */}
-        {nudge === NUDGE_GRANTED && (
-          <View style={[styles.nudgeSlot, styles.nudgeSettled]}>
-            <Ionicons name="checkmark" size={15} color={theme.colors.inkSoft} />
-            <Text style={styles.nudgeSettledText}>{NUDGE_GRANTED_LINE}</Text>
-          </View>
-        )}
-        {nudge === NUDGE_OFF && (
-          <View style={[styles.nudgeSlot, styles.nudgeSettled]}>
-            <Ionicons name="notifications-off-outline" size={15} color={theme.colors.inkSoft} />
-            <Text style={styles.nudgeSettledText}>{NUDGE_DECLINED_LINE}</Text>
-          </View>
-        )}
-      </View>
-      <PrimaryButton onPress={onNext}>Keep it</PrimaryButton>
-    </StepShell>
-  );
-};
-
-// --- Beat 3: Who — the hero's first client code ---
-//
-// Private Hives is the product's hero and had a complete server side (six
-// migrations, live in production) with zero client code. This beat is the
-// first writer: against today's schema a hive IS `owner_id + subject_name`,
-// so one answered question is the complete creation act (§30.9.3).
-//
-// It sits between Celebration's "Keep it" CTA and the account screen's
-// "Keep it." h1 — the slot the flow already left empty (§30.8.3). It runs
-// UNCONDITIONALLY rather than firing on a "this entry was about a person"
-// classifier: asking wrongly costs one tap on a decline link, not asking
-// costs the activation event invisibly, and the classifier that exists
-// (themeTagger) fires on the WORD for a relationship, not the presence of a
-// person — 53.8% recall over the app's own 81 suggested first lines, and
-// blind to "Mateo" (R100). A beat that unconditional may not ASSERT what a
-// conditional one could ("That was about someone" is false for rain on the
-// roof), so it asks, and the tap is the answer.
-//
-// COPY. Every string on this beat is ratified (Deezine, 2026-08-17). Three of
-// them started as deviations from the posted design and were ratified as
-// written; the reasons stay here, because a ratified string with a lost reason
-// is the one a later pass reverts by accident:
-//
-//   placeholder  "A name" — the design said "A name, a thought, or leave it
-//     blank". `subject_name` is a label for a person; a hive named after a
-//     thought renders as one everywhere it is ever shown, and "leave it
-//     blank" invites an empty write on a `not null` column when the decline
-//     link already covers exactly that.
-//
-//   CTA  "That's who" — the design said "Keep it", which is the Celebration
-//     CTA one screen back AND the account h1 one screen forward, both frozen
-//     R15 copy. Three "keep it"s in a row makes the middle one look like the
-//     same act repeated; the account IS the act of keeping, and this beat is
-//     inside it, not another copy of it.
-//
-//   helper line  CUT — it read "Optional — write for someone, or keep it for
-//     yourself", which both spends "keep it" a fourth time and describes
-//     keeping-for-yourself as a mode the app does not have. The decline link
-//     is the optionality signal; a sentence explaining that a visible skip
-//     link is a skip link is explanation, and §30.5 says onboarding's job is
-//     activation.
-//
-// The beat does NOT say or imply the entry goes into the hive, because it
-// does not (R102, §30.7): the entry stays in the personal journal, the hive
-// is created empty, and filing entries into it is C7.
-const WhoStep = ({ step, subjectName, onChangeSubjectName, onNext, onDecline }) => (
-  <StepShell step={step} stage="who" wash={theme.colors.washYellow}>
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.fillBetween}>
-      <View style={styles.topContent}>
-        <Text style={styles.h1}>Who's this year for?</Text>
-        <View style={styles.inputCard}>
-          <TextInput
-            style={styles.nameInput}
-            placeholder="A name"
-            placeholderTextColor={theme.colors.inkSoft}
-            value={subjectName}
-            onChangeText={onChangeSubjectName}
-            autoCapitalize="words"
-            returnKeyType="done"
-            onSubmitEditing={subjectName.trim() ? onNext : undefined}
-            // `subject_name` is plain `text` with no length constraint, so
-            // unlike the 100 on the account name this mirrors no database
-            // limit — it is hygiene on a field that will be rendered inside
-            // sentences ("<name>'s hive") on surfaces that don't exist yet.
-            maxLength={100}
-            autoFocus
-          />
-        </View>
-      </View>
-      <View style={styles.whoActions}>
-        <PrimaryButton onPress={onNext} disabled={!subjectName.trim()} style={styles.floatingButton}>
-          That's who
-        </PrimaryButton>
-        {/* Always live, never disabled: this is what keeps the beat
-            non-blocking. There is no state of this screen in which the only
-            way forward is to answer. */}
-        <PressableScale onPress={onDecline} style={styles.declineLink} haptic={null}>
-          <Text style={styles.declineLinkText}>Not this time</Text>
-        </PressableScale>
-      </View>
-    </KeyboardAvoidingView>
-  </StepShell>
-);
-
-// --- Account — the ask, now after the payoff instead of in front of it.
-// --- Mirrors HoneycombAuth's create/sign-in toggle so returning testers on
-// --- the same device aren't stuck re-registering. No skip: since P0-2
-// --- (thread 19e90cf8) every EntryStore read/write requires a session, so
-// --- exiting here used to cost one entry and now costs the whole app —
-// --- TodayTab has no catch around its awaits, so a signed-out Main spins
-// --- forever (Pixel, thread 19e90cf8). "Keep it" one screen back is the
-// --- persistence promise; this step has to be the one that makes it true. ---
-const AccountStep = ({
-  step,
-  name,
-  email,
-  password,
-  onChangeName,
-  onChangeEmail,
-  onChangePassword,
-  onNext,
-  onBeforeFinish,
-  initialMode = 'signup',
-  navigation,
-}) => {
-  const [mode, setMode] = useState(initialMode);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [confirmSent, setConfirmSent] = useState(false);
-  const [hiveFailed, setHiveFailed] = useState(false);
-  const isSignUp = mode === 'signup';
-  const canSubmit = email.trim() && password.length >= 6 && (!isSignUp || name.trim()) && !busy;
-
-  // Both authenticated exits run through here, so the buffered writes and
-  // their outcome are handled in exactly one place.
-  //
-  // A FAILED HIVE WRITE MUST SURFACE, and this is the only screen with a
-  // user standing in front of it (C6, Lumen 2026-08-17). The two buffered
-  // writes are NOT symmetric: a lost entry can be rewritten tomorrow and
-  // Today's "Write today's entry" is that invitation, so its failure is
-  // swallowed by design. A user who named who the year is for and was told
-  // it was kept has no recovery and no surface that would ever show the
-  // absence — Private Hives has no reader in the app yet. So the hive's
-  // failure gets a beat of its own rather than a console.warn.
-  const completeAfterAuth = async () => {
-    const outcome = await onBeforeFinish?.();
-    if (outcome?.hiveFailed) {
-      setHiveFailed(true);
-      return;
-    }
-    onNext();
-  };
+  // Demo mode resets to this screen on every foreground resume — if this
+  // device already has a real session (signed up on a previous pass), or a
+  // sign-in/sign-up just landed one, there is nothing left to ask for.
+  // Straight into the app. Held off while the Apple name prompt is up: that
+  // prompt has its own session already and must not be raced to `finish()`
+  // out from under the one write it exists to make.
+  useEffect(() => {
+    if (session && !appleNamePrompt) finish();
+  }, [session, appleNamePrompt]);
 
   const attemptSignIn = async () => {
     await HoneycombStore.signIn(email.trim(), password);
-    await completeAfterAuth();
+    finish();
+  };
+
+  // Colin's one-tap pitch login (thread 83a020e9, 2026-08-26). Unlike the
+  // DEMO_CONTENT skip link below, this creates a REAL session before
+  // finishing — every screen behind it loads the demo account's real data
+  // instead of hitting "not signed in." Guards a double-tap and surfaces a
+  // failure inline instead of leaving the button looking dead, the two
+  // things the skip link never had to handle since it can't fail.
+  const handleContinueAsDemo = async () => {
+    if (demoLoginBusy) return;
+    setDemoLoginBusy(true);
+    setDemoLoginError(null);
+    try {
+      await HoneycombStore.signIn(DEMO_LOGIN_EMAIL, DEMO_LOGIN_PASSWORD);
+      finish();
+    } catch (err) {
+      console.warn('Onboarding: demo login failed', err);
+      setDemoLoginError("Couldn't sign in to the demo account. Check your connection and try again.");
+      setDemoLoginBusy(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -589,15 +169,12 @@ const AccountStep = ({
       if (isSignUp) {
         const result = await HoneycombStore.signUp(email.trim(), password, name.trim());
         if (result.session) {
-          await completeAfterAuth();
+          finish();
         } else {
-          // The third exit. It does NOT flush — there is no session, which
-          // is the entire reason it exists — and it no longer needs to: the
-          // buffer is on disk (PendingOnboardingWrites), and the session
-          // that arrives after the user follows the confirmation link fires
-          // the flush from AuthContext, in whatever process happens to be
-          // running by then. The invariant this satisfies is "no exit may
-          // DROP the buffer", not "every exit must write it" (C6).
+          // No session yet (email confirmation required — a dashboard
+          // toggle, `mailer_autoconfirm`, outside this repo). The confirm
+          // screen below survives Zero Door: it no longer guards a pre-auth
+          // buffer (there is none), it's just the honest state.
           setConfirmSent(true);
         }
       } else {
@@ -627,10 +204,8 @@ const AccountStep = ({
       // Sage's correction to §4 (thread 14492cf2): a flat "Something went
       // wrong" here deletes the one piece of information — wrong password —
       // that makes this screen fixable. `err.code` is GoTrue's stable
-      // contract (checked against the installed @supabase/auth-js — the
-      // wire body's `error_code` is normalized to `.code` on the thrown
-      // error), same shape as the `err?.code === '23505'` classification in
-      // HoneycombTab.js:354. Unmatched codes still fall through to the
+      // contract, same shape as the `err?.code === '23505'` classification
+      // in HoneycombTab.js:354. Unmatched codes still fall through to the
       // authored generic line — the rail's prose never reaches the user.
       if (err.code === 'invalid_credentials') {
         setError("That email and password don't match.");
@@ -644,29 +219,91 @@ const AccountStep = ({
     }
   };
 
-  if (hiveFailed) {
+  const handleAppleSignIn = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('Apple returned no identity token');
+      const fullName = credential.fullName?.givenName
+        ? [credential.fullName.givenName, credential.fullName.familyName].filter(Boolean).join(' ')
+        : null;
+      const data = await HoneycombStore.signInWithApple(credential.identityToken, fullName);
+      if (!fullName) {
+        setAppleUserId(data.user?.id ?? null);
+        setAppleNamePrompt(true);
+        return;
+      }
+      finish();
+    } catch (err) {
+      // The user backing out of the system sheet is not an error state.
+      if (err.code === 'ERR_REQUEST_CANCELED') return;
+      console.warn('Apple sign-in failed', err);
+      setError('Apple sign-in failed — try again, or continue with email.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitAppleName = async () => {
+    const trimmed = appleName.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    if (appleUserId) {
+      // Best-effort, same standard as an entry-write retry elsewhere in this
+      // app: the session already exists, so a failed write here is a
+      // "New user" the account screen (Settings) can fix later, not a lost
+      // record with no other copy anywhere.
+      await HoneycombStore.updateDisplayName(appleUserId, trimmed).catch((err) =>
+        console.warn('Failed to persist Apple sign-in name', err)
+      );
+    }
+    setBusy(false);
+    finish();
+  };
+
+  if (session && !appleNamePrompt) return null;
+
+  if (appleNamePrompt) {
     return (
-      <StepShell step={step} stage="account" wash={theme.colors.washYellow} showMap={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.container, { backgroundColor: theme.colors.washYellow }]}
+      >
         <View style={styles.centerFill}>
-          <Text style={styles.h1Center}>Your account is ready.</Text>
-          {/* Says only what is true. It does not claim the entry is safe
-              (that write has its own outcome and its own recovery), and the
-              retry it promises is a real mechanism, not a reassurance: the
-              answer is still buffered on disk and AuthContext flushes it
-              on every session that appears, including the next cold
-              launch. */}
-          <Text style={styles.bodyLgCenter}>
-            We couldn't save who this year is for — we'll try again next time you open Pollinate.
-          </Text>
+          <Text style={styles.h1Center}>What should we call you?</Text>
+          <Text style={styles.bodyLgCenter}>Apple didn't share a name this time — one line and you're in.</Text>
+          <View style={styles.inputCard}>
+            <TextInput
+              style={styles.nameInput}
+              placeholder="Your name"
+              placeholderTextColor={theme.colors.inkSoft}
+              value={appleName}
+              onChangeText={setAppleName}
+              autoCapitalize="words"
+              returnKeyType="done"
+              onSubmitEditing={appleName.trim() ? submitAppleName : undefined}
+              editable={!busy}
+              maxLength={100}
+              autoFocus
+            />
+          </View>
         </View>
-        <PrimaryButton onPress={onNext}>Continue</PrimaryButton>
-      </StepShell>
+        <PrimaryButton onPress={submitAppleName} disabled={!appleName.trim() || busy} style={styles.floatingButton}>
+          {busy ? 'Saving…' : 'Keep going'}
+        </PrimaryButton>
+      </KeyboardAvoidingView>
     );
   }
 
   if (confirmSent) {
     return (
-      <StepShell step={step} stage="account" wash={theme.colors.washYellow} showMap={false}>
+      <View style={[styles.container, { backgroundColor: theme.colors.washYellow }]}>
         <View style={styles.centerFill}>
           <Text style={styles.h1Center}>Check your email</Text>
           <Text style={styles.bodyLgCenter}>
@@ -674,295 +311,219 @@ const AccountStep = ({
             sharing to the hive.
           </Text>
         </View>
-        <PrimaryButton onPress={onNext}>Continue</PrimaryButton>
-      </StepShell>
+        <PrimaryButton onPress={finish} style={styles.floatingButton}>
+          Continue
+        </PrimaryButton>
+      </View>
     );
   }
 
   return (
-    <StepShell step={step} stage="account" wash={theme.colors.washYellow} showMap={false}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.fillBetween}>
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={styles.h1}>{isSignUp ? 'Keep it.' : 'Welcome back'}</Text>
-          <Text style={styles.bodySm}>
-            {isSignUp
-              ? 'Make an account so your entries follow you — and so your hive can see the ones you choose to share.'
-              : 'Sign in to pick up where you left off.'}
-          </Text>
-          <View style={styles.inputCard}>
-            {isSignUp && (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={[styles.container, { backgroundColor: theme.colors.washYellow }]}
+    >
+      {/* THE GATE'S OWN LIGHT, not a smaller cousin of it — see CoreRitual's
+          LockScreen, the same face this screen now permanently wears.
+          `size={width * 1.6}` at `top: -width * 0.35` is that screen's own
+          treatment, verbatim (Onboarding's old LandingStep, unchanged). */}
+      <GlowOrb size={width * 1.6} breathe intensity={0.55} style={{ top: -width * 0.35 }} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {expanded && (
+          <TouchableOpacity onPress={() => setExpanded(false)} hitSlop={HIT_SLOP} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={theme.colors.ink} />
+          </TouchableOpacity>
+        )}
+        <View style={styles.wordmarkArcAnchor}>
+          <Text style={styles.wordmark}>Pollinate</Text>
+          {showArc && (
+            <FlyingBee preset="loginArc" size={22} style={styles.wordmarkArcBee} onSettle={() => setShowArc(false)} />
+          )}
+        </View>
+        {!expanded && (
+          <View style={styles.headlineBlock}>
+            {/* Cascade timing comes from the shared module, never a local
+                literal (§12.5.1b). */}
+            <StaggeredItem index={0}>
+              <Text style={styles.h1Center}>Start with what you were given.</Text>
+            </StaggeredItem>
+            <StaggeredItem index={1}>
+              <Text style={styles.bodyLgCenter}>One line a day. That's how it starts.</Text>
+            </StaggeredItem>
+          </View>
+        )}
+        {expanded && (
+          <>
+            <Text style={styles.h1}>{isSignUp ? 'Keep it.' : 'Welcome back'}</Text>
+            <Text style={styles.bodySm}>
+              {isSignUp
+                ? 'Make an account so your entries follow you — and so your hive can see the ones you choose to share.'
+                : 'Sign in to pick up where you left off.'}
+            </Text>
+            <View style={styles.inputCard}>
+              {isSignUp && (
+                <TextInput
+                  style={styles.nameInput}
+                  placeholder="Your name"
+                  placeholderTextColor={theme.colors.inkSoft}
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                  editable={!busy}
+                  maxLength={100}
+                />
+              )}
+              {isSignUp && <View style={styles.inputDivider} />}
               <TextInput
                 style={styles.nameInput}
-                placeholder="Your name"
+                placeholder="Email"
                 placeholderTextColor={theme.colors.inkSoft}
-                value={name}
-                onChangeText={onChangeName}
-                autoCapitalize="words"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
                 returnKeyType="next"
                 editable={!busy}
-                maxLength={100}
               />
-            )}
-            {isSignUp && <View style={styles.inputDivider} />}
-            <TextInput
-              style={styles.nameInput}
-              placeholder="Email"
-              placeholderTextColor={theme.colors.inkSoft}
-              value={email}
-              onChangeText={onChangeEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              returnKeyType="next"
-              editable={!busy}
-            />
-            <View style={styles.inputDivider} />
-            <TextInput
-              style={styles.nameInput}
-              placeholder="Password (6+ characters)"
-              placeholderTextColor={theme.colors.inkSoft}
-              value={password}
-              onChangeText={onChangePassword}
-              secureTextEntry
-              returnKeyType="done"
-              editable={!busy}
-            />
-          </View>
-          {isSignUp && (
-            // No consent checkbox yet. The copy in legalCopy.js is now a real
-            // draft, but four values in it are still unfilled, so it renders
-            // "[the publisher of this app]" and is not publishable — and
-            // requiring agreement to an unpublished document is worse than no
-            // checkbox at all. Links stay reachable so the gap is visible.
-            //
-            // To re-add: import { LEGAL_COPY_READY } from '../constants/legalCopy'
-            // and render the checkbox only when it is true. Gate on that symbol,
-            // not on a judgement that the copy "looks done" — it is derived from
-            // the unfilled values themselves, so it cannot drift out of sync.
-            // `canSubmit` must not require `agreedToTerms` while it is false.
-            <Text style={styles.consentText}>
-              <Text style={styles.consentLink} onPress={() => navigation?.navigate('Legal', { tab: 'privacy' })}>
-                Privacy Policy
-              </Text>{' '}
-              and{' '}
-              <Text style={styles.consentLink} onPress={() => navigation?.navigate('Legal', { tab: 'terms' })}>
-                Terms of Service
+              <View style={styles.inputDivider} />
+              <TextInput
+                style={styles.nameInput}
+                placeholder="Password (6+ characters)"
+                placeholderTextColor={theme.colors.inkSoft}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                returnKeyType="done"
+                editable={!busy}
+              />
+            </View>
+            {isSignUp && (
+              // No consent checkbox yet. The copy in legalCopy.js is now a real
+              // draft, but four values in it are still unfilled, so it renders
+              // "[the publisher of this app]" and is not publishable — and
+              // requiring agreement to an unpublished document is worse than no
+              // checkbox at all. Links stay reachable so the gap is visible.
+              //
+              // To re-add: import { LEGAL_COPY_READY } from '../constants/legalCopy'
+              // and render the checkbox only when it is true. Gate on that symbol,
+              // not on a judgement that the copy "looks done" — it is derived from
+              // the unfilled values themselves, so it cannot drift out of sync.
+              // `canSubmit` must not require `agreedToTerms` while it is false.
+              // This screen has two signup doors, Apple and email — a checkbox
+              // gated only here covers email and silently misses Apple. Name
+              // both doors when this lands, not just the email form.
+              <Text style={styles.consentText}>
+                <Text style={styles.consentLink} onPress={() => navigation?.navigate('Legal', { tab: 'privacy' })}>
+                  Privacy Policy
+                </Text>{' '}
+                and{' '}
+                <Text style={styles.consentLink} onPress={() => navigation?.navigate('Legal', { tab: 'terms' })}>
+                  Terms of Service
+                </Text>
               </Text>
-            </Text>
+            )}
+            {error && <Text style={styles.signUpError}>{error}</Text>}
+            <PressableScale onPress={() => setMode(isSignUp ? 'signin' : 'signup')} haptic={null}>
+              <Text style={styles.switchModeText}>
+                {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
+              </Text>
+            </PressableScale>
+          </>
+        )}
+      </ScrollView>
+      {!expanded ? (
+        <>
+          {/* Apple's HIG button treatment — their shape, their label. The
+              wash can hold a black button; it doesn't get restyled (§5). */}
+          {appleAvailable && (
+            <StaggeredItem index={2}>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={theme.borderRadius.medium}
+                style={styles.appleButton}
+                onPress={handleAppleSignIn}
+              />
+            </StaggeredItem>
           )}
-          {error && <Text style={styles.signUpError}>{error}</Text>}
-          <PressableScale onPress={() => setMode(isSignUp ? 'signin' : 'signup')} haptic={null}>
-            <Text style={styles.switchModeText}>
-              {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
-            </Text>
-          </PressableScale>
-        </ScrollView>
+          <StaggeredItem index={3}>
+            <PrimaryButton onPress={() => setExpanded(true)} style={appleAvailable ? styles.floatingButton : undefined}>
+              Continue with email
+            </PrimaryButton>
+          </StaggeredItem>
+          {/* The returning half of the door — reachable from here, from the
+              Honeycomb empty state, and from the `startAt` deep link. */}
+          <StaggeredItem index={4}>
+            <PressableScale
+              onPress={() => {
+                setMode('signin');
+                setExpanded(true);
+              }}
+              style={styles.signInLink}
+              haptic={null}
+            >
+              <Text style={styles.signInLinkText}>Already have a hive? Sign in</Text>
+            </PressableScale>
+          </StaggeredItem>
+          {/* Pixel's WP-10(c) finding (thread 37fb8ef6): this rendered
+              unconditionally, shipping to every tester's first screen.
+              DEMO_CONTENT, not __DEV__ — a pitch build Colin demos from has
+              __DEV__ false but DEMO_MODE still true. */}
+          {DEMO_CONTENT && (
+            <PressableScale onPress={finish} style={styles.skipDemoLink}>
+              <Text style={styles.skipDemoText}>Skip to the logged-in view (demo)</Text>
+            </PressableScale>
+          )}
+          {/* Colin's one-tap pitch login (thread 83a020e9, 2026-08-26): a real
+              session against a pre-built demo account, not the no-session skip
+              above — every screen behind it loads real data. Only renders when
+              the credentials are actually configured (DEMO_LOGIN_EMAIL is a
+              gitignored .env value, never committed), so a build without them
+              shows nothing here rather than a button that always fails. */}
+          {DEMO_CONTENT && (DEMO_LOGIN_EMAIL && (
+            <>
+              <PressableScale onPress={handleContinueAsDemo} style={styles.skipDemoLink} disabled={demoLoginBusy}>
+                <Text style={styles.skipDemoText}>{demoLoginBusy ? 'Signing in…' : 'Continue as demo'}</Text>
+              </PressableScale>
+              {demoLoginError && <Text style={styles.demoLoginErrorText}>{demoLoginError}</Text>}
+            </>
+          ))}
+        </>
+      ) : (
         <PrimaryButton onPress={handleSubmit} disabled={!canSubmit} style={styles.floatingButton}>
           {busy ? (isSignUp ? 'Creating account…' : 'Signing in…') : isSignUp ? 'Create account' : 'Sign in'}
         </PrimaryButton>
-      </KeyboardAvoidingView>
-    </StepShell>
+      )}
+    </KeyboardAvoidingView>
   );
 };
 
-// --- Controller: one flow, five beats, no forks ---
-//
-// Landing -> Write -> Celebration -> Who -> Keep it. There is no flow state,
-// no offset arithmetic and no async resolve before the first render — the
-// step index IS the beat, and `startAt` seeds it synchronously rather than
-// jumping the user forward one frame after mount.
-export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) => {
-  const { session } = useAuth();
-  // Seeded, not corrected by an effect: Honeycomb's empty state ("Finish
-  // signup" / "Sign in") and the auth deep links land directly on the
-  // account beat, and doing that in the initialiser means the Landing never
-  // renders for a frame first.
-  const jumpToAccount = startAt === 'signup' || startAt === 'signin';
-  const [step, setStep] = useState(jumpToAccount ? STEP_ACCOUNT : STEP_LANDING);
-  const [accountMode, setAccountMode] = useState(startAt === 'signin' ? 'signin' : 'signup');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [subjectName, setSubjectName] = useState('');
-  const [demoLoginBusy, setDemoLoginBusy] = useState(false);
-  const [demoLoginError, setDemoLoginError] = useState(null);
-
-  // Both pre-auth answers buffer, because neither can be written when it is
-  // collected: STEP_ENTRY and STEP_WHO both happen before STEP_ACCOUNT, and
-  // EntryStore.saveEntry (P0-2) and private_hives.owner_id both require a
-  // session (Sage, thread 19e90cf8: unawaited and uncaught, the entry every
-  // fresh install writes was being silently discarded under the celebration
-  // screen).
-  //
-  // The buffer moved OUT of this component and onto disk
-  // (services/pendingOnboardingWrites.js). It had to: the confirm-your-email
-  // exit of AccountStep navigates away and unmounts this screen while the
-  // session that can perform the write is still an email link away — a ref
-  // cannot survive that, and neither can a memoised promise held in one
-  // (C6, Sage 2026-08-17). The single-flight property that fixed the
-  // original flush race moved with it, into that module.
-  const handleSaveEntry = (text) => {
-    PendingOnboardingWrites.stashEntry({ text, theme: tagEntry(text) });
-  };
-  // The decline writes nothing and buffers nothing — an unanswered question
-  // is not an empty answer.
-  const handleAnswerWho = () => {
-    const answer = subjectName.trim();
-    if (answer) PendingOnboardingWrites.stashHive({ subjectName: answer });
-    next();
-  };
-  const flushPendingWrites = () => PendingOnboardingWrites.flush();
-
-  // Colin's one-tap pitch login (thread 83a020e9, 2026-08-26). Unlike
-  // onSkipDemo (below), this creates a REAL session before finishing — every
-  // screen behind it loads the demo account's real data instead of hitting
-  // "not signed in." Guards a double-tap and surfaces a failure inline
-  // instead of leaving the button looking dead, the two things onSkipDemo
-  // never had to handle since it can't fail.
-  const handleContinueAsDemo = async () => {
-    if (demoLoginBusy) return;
-    setDemoLoginBusy(true);
-    setDemoLoginError(null);
-    try {
-      await HoneycombStore.signIn(DEMO_LOGIN_EMAIL, DEMO_LOGIN_PASSWORD);
-      finish();
-    } catch (err) {
-      console.warn('Onboarding: demo login failed', err);
-      setDemoLoginError("Couldn't sign in to the demo account. Check your connection and try again.");
-      setDemoLoginBusy(false);
-    }
-  };
-
-  // App.js's onDone is `navigation.replace('Main')`, which must not run
-  // twice — the account step can reach it both by its own onNext and by the
-  // already-signed-in effect below firing on the same session change.
-  const finishedRef = useRef(false);
-  const finish = () => {
-    if (finishedRef.current) return;
-    finishedRef.current = true;
-    // Fire-and-forget: the flag only matters on the NEXT cold launch, so
-    // navigation doesn't wait on the write. Swallowing a failed write is
-    // deliberate — "see the flow again" is already the designed fallback,
-    // and an unhandled rejection here would LogBox over the finish beat.
-    OnboardingState.markComplete().catch(() => {});
-    onDone();
-  };
-
-  const next = () => setStep((s) => s + 1);
-  const back = () => setStep((s) => Math.max(0, s - 1));
-
-  // Demo mode resets to onboarding on every foreground resume — if this
-  // device already has a real session (signed up on a previous pass), the
-  // account step has nothing left to ask for. Straight into the app.
-  // Still routes through the flush: a resume that revisits STEP_ENTRY with
-  // a session already present buffers into the same store, and this path
-  // skips AccountStep entirely — the only flush site it would otherwise
-  // have gone through.
-  useEffect(() => {
-    if (session && step === STEP_ACCOUNT) {
-      flushPendingWrites().then(finish);
-    }
-  }, [session, step]);
-
-  let body;
-  switch (step) {
-    case STEP_LANDING:
-      body = (
-        <LandingStep
-          step={step}
-          onNext={next}
-          onSignIn={() => {
-            setAccountMode('signin');
-            setStep(STEP_ACCOUNT);
-          }}
-          onSkipDemo={finish}
-          onContinueAsDemo={handleContinueAsDemo}
-          demoLoginBusy={demoLoginBusy}
-          demoLoginError={demoLoginError}
-          splashHidden={splashHidden}
-        />
-      );
-      break;
-    case STEP_ENTRY:
-      body = <FirstEntryStep step={step} onNext={next} onBack={back} onSave={handleSaveEntry} />;
-      break;
-    case STEP_CELEBRATION:
-      body = <CelebrationStep step={step} onNext={next} />;
-      break;
-    case STEP_WHO:
-      body = (
-        <WhoStep
-          step={step}
-          subjectName={subjectName}
-          onChangeSubjectName={setSubjectName}
-          onNext={handleAnswerWho}
-          onDecline={next}
-        />
-      );
-      break;
-    default:
-      // Already signed in (demo-mode resume) — the effect above finishes
-      // the flow; render nothing rather than flash the account form.
-      body = session ? null : (
-        <AccountStep
-          step={step}
-          name={name}
-          email={email}
-          password={password}
-          onChangeName={setName}
-          onChangeEmail={setEmail}
-          onChangePassword={setPassword}
-          onNext={finish}
-          onBeforeFinish={flushPendingWrites}
-          initialMode={accountMode}
-          navigation={navigation}
-        />
-      );
-  }
-
-  return <View style={styles.flowRoot}>{body}</View>;
-};
-
 const styles = StyleSheet.create({
-  flowRoot: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: theme.spacing.lg,
   },
-  // Centered on the 44pt icon circle that opens `topContent` (circle center
-  // sits at 22,22 in that box, so a 180pt orb offsets by 22 - 90 = -68 on
-  // both axes). Absolute + pointerEvents none: it never affects layout, and
-  // the spill past the screen edge is intentional — light falling in, not a
-  // shape sitting on the wash.
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 32,
+  backButton: {
+    marginBottom: 16,
   },
-  backSpacer: {
-    // Matches `BackButton`'s 40pt circle so the row beside it (the journey
-    // map) doesn't shift depending on whether a back button is present.
-    width: 40,
-  },
-  stepBody: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  fillBetween: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  topContent: {
-    gap: 8,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   centerFill: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headlineBlock: {
+    alignItems: 'center',
   },
   wordmark: {
     ...theme.type.logo,
@@ -975,22 +536,15 @@ const styles = StyleSheet.create({
   wordmarkArcAnchor: {
     width: 220,
     height: 100,
+    alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
   },
   wordmarkArcBee: {
-    // Belt-and-braces only. FlyingBee's own `fill` style is
-    // `StyleSheet.absoluteFill`, which already carries `position:
-    // 'absolute'`, so this sets a property to the value it already has.
-    //
-    // Kept, but corrected, because the old wording here was wrong about
-    // exactly the thing that matters: it said the style prop is what makes
-    // "fill" mean "fill the anchor." It isn't. An absolutely-positioned
-    // view fills its *parent*, so the box the bee's fractional path
-    // resolves against is set by `wordmarkArcAnchor` above — 220×100 — and
-    // nothing a caller writes here changes it. (It also named
-    // `absoluteFillObject`, the API that does not exist in RN 0.86.2 and
-    // made this bee invisible until d0def1c.)
+    // Belt-and-braces only — FlyingBee's own `fill` style already carries
+    // `position: 'absolute'`. An absolutely-positioned view fills its
+    // *parent*, so the box the bee's fractional path resolves against is
+    // `wordmarkArcAnchor` above (220x100), not this style.
     position: 'absolute',
   },
   h1: {
@@ -1056,26 +610,15 @@ const styles = StyleSheet.create({
     color: theme.colors.accentDeep,
     textAlign: 'center',
   },
-  entryInput: {
-    fontFamily: theme.fonts.body,
-    fontSize: 19,
-    color: theme.colors.ink,
-    minHeight: 120,
-    textAlignVertical: 'top',
-  },
-  badgeStage: {
-    width: 96,
-    height: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
   floatingButton: {
     marginTop: 16,
   },
-  // The Landing's returning-user link and the Who beat's decline are the
-  // same object: a quiet text affordance sitting under a primary button,
-  // carrying the alternative to the loud path. Same metrics, same ink.
+  appleButton: {
+    width: '100%',
+    height: 52,
+  },
+  // The Landing's returning-user link is a quiet text affordance sitting
+  // under a primary button, carrying the alternative to the loud path.
   //
   // inkSoft, and MEASURED rather than reasoned. The obvious choice was
   // accentDeep — it is the app's link colour and reads as tappable — but on
@@ -1090,55 +633,6 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   signInLinkText: {
-    ...theme.type.bodySm,
-    color: theme.colors.inkSoft,
-    textAlign: 'center',
-  },
-  whoActions: {
-    marginTop: 8,
-  },
-  // The nudge ask (§2's placement corollary). Quieter than the ink pill,
-  // louder than a decline link — it is the affirmative, and a control that
-  // looked like `declineLinkText` would read as the opposite of what it
-  // does. The chip geometry is `SparkChips`' existing quiet-affirmative
-  // control, not a new shape. Colour is forced: this beat's wash is
-  // `washYellow`, where `accentDeep` measures 2.35:1 and fails 4.5:1 at
-  // every size this text can be — `ink` (15.39:1) and `inkSoft` (5.67:1)
-  // are the legal pair.
-  nudgeSlot: {
-    alignSelf: 'center',
-    marginTop: 22,
-  },
-  nudgeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  nudgeChipText: {
-    ...theme.type.bodySm,
-    color: theme.colors.ink,
-  },
-  nudgeSettled: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingVertical: 11,
-  },
-  nudgeSettledText: {
-    ...theme.type.bodySm,
-    color: theme.colors.inkSoft,
-  },
-  declineLink: {
-    alignSelf: 'center',
-    marginTop: 18,
-  },
-  declineLinkText: {
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     textAlign: 'center',
