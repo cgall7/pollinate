@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { EntryStore } from '../services/EntryStore';
 import { HiveStore } from '../services/HiveStore';
@@ -14,8 +15,28 @@ import { FileToHive } from '../components/FileToHive';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
+import { Avatar } from '../components/Avatar';
+import { PressableScale } from '../components/PressableScale';
 import { currentStreak, nextMilestone } from '../utils/dateRanges';
 import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
+
+// ENG-61 — a "whose is it" card, the shape `ReceivedPackagesScreen`'s
+// `PackageRow` already established for the same problem (a hive on screen
+// that is not yours), not `HiveCard`'s cover-art shape (which has no room
+// for an owner attribution line and every field it does show — cover theme,
+// memory count — belongs to a hive you own).
+const ContributingHiveRow = ({ hive, onPress }) => (
+  <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
+    <Avatar name={hive.ownerName} size={40} />
+    <View style={styles.contributingRowText}>
+      <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
+      <Text style={styles.contributingRowSubject} numberOfLines={1}>
+        From {hive.ownerName}
+      </Text>
+    </View>
+    <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
+  </PressableScale>
+);
 
 const greeting = (date) => {
   const hour = date.getHours();
@@ -47,6 +68,14 @@ export const TodayTab = ({ navigation }) => {
   const perches = usePerchSet();
   const [hives, setHives] = useState([]);
   const [hivesError, setHivesError] = useState(false);
+  // Hives this user writes in but does not own (ENG-61) — a separate list
+  // from `hives` above on purpose, same reasoning as that shelf's own
+  // comment: a read failure here must not blank the "PRIVATE HIVES" shelf
+  // or vice versa, and the two shelves render from genuinely different
+  // queries (`listHives` is owner-only; `listContributingHives` is the
+  // inverse).
+  const [contributingHives, setContributingHives] = useState([]);
+  const [contributingHivesError, setContributingHivesError] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -116,6 +145,23 @@ export const TodayTab = ({ navigation }) => {
           console.warn('TodayTab: failed to load hives', err);
           setHivesError(true);
           setHives([]);
+        }
+      })();
+      // Independent try/catch, not folded into the block above — a failed
+      // contributing-hives read must not blank the owner's own shelf (or
+      // vice versa), same reasoning as this effect's own comment for why it
+      // is split from the journal fetch.
+      (async () => {
+        try {
+          const list = await HiveStore.listContributingHives();
+          if (cancelled) return;
+          setContributingHivesError(false);
+          setContributingHives(list);
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('TodayTab: failed to load contributing hives', err);
+          setContributingHivesError(true);
+          setContributingHives([]);
         }
       })();
       return () => {
@@ -280,6 +326,29 @@ export const TodayTab = ({ navigation }) => {
           </View>
           </PerchAnchor>
         </StaggeredItem>
+
+        {/* "Writing with others" shelf (ENG-61) — only rendered when
+            non-empty, same door-less treatment `FileToHive` above gets for
+            an empty/failed read: there is no evergreen local action this
+            shelf could show in its place (unlike the private-hives shelf's
+            "start a hive" door card), so a zero-row state and a failed read
+            both simply withhold the shelf rather than asserting either one. */}
+        {contributingHives.length > 0 && (
+          <StaggeredItem index={3}>
+            <PerchAnchor id="contributing-hive-shelf" on="left" at={0.5}>
+              <View style={styles.hiveShelf}>
+                <Text style={styles.shelfLabel}>WRITING WITH OTHERS</Text>
+                {contributingHives.map((hive) => (
+                  <ContributingHiveRow
+                    key={hive.id}
+                    hive={hive}
+                    onPress={() => navigation.getParent()?.navigate('ContributingHive', { hiveId: hive.id })}
+                  />
+                ))}
+              </View>
+            </PerchAnchor>
+          </StaggeredItem>
+        )}
       </ScrollView>
       </PerchField>
     </View>
@@ -369,5 +438,29 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     marginTop: 12,
+  },
+  contributingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+    padding: 16,
+    marginBottom: 12,
+    ...theme.shadows.card,
+  },
+  contributingRowText: {
+    flex: 1,
+  },
+  contributingRowName: {
+    ...theme.type.bodyLg,
+    color: theme.colors.ink,
+  },
+  contributingRowSubject: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    marginTop: 2,
   },
 });

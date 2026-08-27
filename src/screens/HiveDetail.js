@@ -23,6 +23,28 @@ const longDate = (isoDate) => {
   });
 };
 
+const joinNames = (names) => {
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+};
+
+// §4.3 "presence, not count" (POLLINATE_MULTIWRITER_COPY_VOCAB.md) — the
+// roster's whole job is naming who's writing, never how much any one of
+// them has written. Named up to three (the owner reading this screen is
+// implicitly "you" in "writing with X" — the sentence never re-names them);
+// past that it falls back to the ratified numeric form ("Four of you are
+// writing"), +1 for the owner themselves since the sentence addresses the
+// whole writing group, not just the invited half of it. DES-21/OPEN-3
+// reserves the roster's final visual treatment (avatar cluster vs. names)
+// for Deezine — this is a reasonable default, not a ruling.
+const rosterLabel = (contributors) => {
+  if (contributors.length === 0) return "You're the only one writing so far.";
+  const names = contributors.map((c) => c.name);
+  if (names.length <= 3) return `Writing with ${joinNames(names)}.`;
+  return `${contributors.length + 1} of you are writing.`;
+};
+
 // 8b.3 — entry list for one hive (Design Language §3), plus the seal/send
 // entry points (§5-6, thread b57ad406 2026-08-19 — the gap found after
 // 8b.2-8b.7 shipped with no way to trigger any of it). No edit-in-place
@@ -34,6 +56,11 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState(false);
   const [hive, setHive] = useState(null);
   const [entries, setEntries] = useState([]);
+  // Roster presence — only fetched for a hive `getHive` marks
+  // `isCollective` (20260827000001), so a solo hive's screen pays for zero
+  // extra round trips. GUIDES/POLLINATE_MULTIWRITER_COPY_VOCAB.md §4.3:
+  // "presence, not count" — this list exists to render who, never a tally.
+  const [contributors, setContributors] = useState([]);
   // §11 "Send only works for connected friends" — the subject may be a
   // registered profile who has since unfriended, or was never one to begin
   // with. Only fetched when it could matter (sealed, has a subject, not
@@ -54,6 +81,25 @@ export const HiveDetailScreen = ({ navigation, route }) => {
           setError(false);
           setHive(hiveData);
           setEntries(entryList);
+
+          if (hiveData?.isCollective) {
+            try {
+              const roster = await HiveStore.getHiveContributors(hiveId);
+              if (cancelled) return;
+              setContributors(roster);
+            } catch (err) {
+              // The roster row is additive chrome on top of an otherwise
+              // working screen — a failed roster read must not blank the
+              // entry list or the seal/send affordances above it, so it is
+              // swallowed here rather than routed into the screen's one
+              // `error` flag (which would hide everything else too).
+              if (cancelled) return;
+              console.warn('HiveDetailScreen: failed to load contributors', err);
+              setContributors([]);
+            }
+          } else {
+            setContributors([]);
+          }
 
           if (hiveData?.sealedAt && hiveData?.subjectProfileId && !hiveData?.sentAt) {
             const connections = await HoneycombStore.listConnections();
@@ -104,6 +150,29 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         <Text style={[styles.bannerName, { color: cover.textColor }]}>{hive.subjectName}</Text>
         <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
       </View>
+
+      {hive.isCollective && (
+        <View style={styles.memoryLaneContainer}>
+          <View style={styles.rosterRow}>
+            <View style={styles.rosterText}>
+              <Ionicons name="people" size={16} color={theme.colors.accentDeep} />
+              {/* §4.3 — "presence, not count": names when they fit, a
+                  presence sentence with a number when they don't ("Four of
+                  you are writing" is explicitly ratified). Never a bare
+                  count-only badge, and never a per-writer tally. */}
+              <Text style={styles.rosterLabel} numberOfLines={1}>
+                {rosterLabel(contributors)}
+              </Text>
+            </View>
+            <PressableScale
+              onPress={() => navigation.navigate('InviteContributor', { hiveId, subjectName: hive.subjectName })}
+              accessibilityLabel="Invite a writer"
+            >
+              <Text style={styles.rosterInvite}>+ Invite a writer</Text>
+            </PressableScale>
+          </View>
+        </View>
+      )}
 
       {entries.length > 0 && (
         <PressableScale
@@ -262,6 +331,35 @@ const styles = StyleSheet.create({
   memoryLaneText: {
     ...theme.type.bodySm,
     color: theme.colors.ink,
+    fontFamily: theme.fonts.bodySemiBold,
+  },
+  rosterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+    marginBottom: 12,
+  },
+  rosterText: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+    marginRight: 12,
+  },
+  rosterLabel: {
+    ...theme.type.bodySm,
+    color: theme.colors.ink,
+    flexShrink: 1,
+  },
+  rosterInvite: {
+    ...theme.type.bodySm,
+    color: theme.colors.accentDeep,
     fontFamily: theme.fonts.bodySemiBold,
   },
   list: {

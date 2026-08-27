@@ -21,6 +21,8 @@ import { HiveDetailScreen } from './src/screens/HiveDetail';
 import { ComposeHiveEntryScreen } from './src/screens/ComposeHiveEntry';
 import { SealHiveScreen } from './src/screens/SealHive';
 import { SendHiveScreen } from './src/screens/SendHive';
+import { InviteContributor } from './src/screens/InviteContributor';
+import { ContributingHiveScreen } from './src/screens/ContributingHive';
 import { MemoryLaneScreen } from './src/screens/MemoryLane';
 import { ReceivedPackagesScreen } from './src/screens/ReceivedPackages';
 import { PackageOpenScreen } from './src/screens/PackageOpen';
@@ -254,6 +256,17 @@ export default function App() {
             <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
             <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
             <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
+            {/* ENG-61 — Multi-Writer Hives' invite half (20260827000001).
+                InviteContributor is a plain push, same reasoning as its
+                hive siblings here: reached from CreateHive right after a
+                "Me and others" hive is created, and from HiveDetail's
+                "+ Invite a writer" row anytime after. ContributingHive is a
+                contributor's own writing surface, the non-owner counterpart
+                to HiveDetail — also a plain push, opened from TodayTab's
+                "WRITING WITH OTHERS" shelf via the same getParent() pattern
+                its "PRIVATE HIVES" shelf already uses. */}
+            <Stack.Screen name="InviteContributor" component={InviteContributor} />
+            <Stack.Screen name="ContributingHive" component={ContributingHiveScreen} />
             {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
                 found: the 8b.2-8b.7 arc was live at the data layer with no
                 button anywhere to trigger it). Design Language §5-6, condensed
