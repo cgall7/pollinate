@@ -527,6 +527,115 @@ else bad('D0 calibration', 'the walker reported an absent identifier');
   }
 }
 
+// D2b — THE SEAM ROW (Lumen, 2026-08-27, MB-P1 ratification). D2 above
+// asserts that a `delay` EXISTS. That is not the property the cascade
+// depends on. Mutate `delay: delays[index]` to `delay: delays[0]` and D2
+// stays green, every pure-schedule row (B1-B5) stays green because the
+// schedule itself is untouched, and every word arrives simultaneously at
+// 16ms: the beat is gone and the whole suite agrees it is fine.
+//
+// This is the seam between the two halves of this rig — the schedule is
+// swept exhaustively as a pure function, the render is read structurally,
+// and NOTHING was checking that the swept numbers reach the read springs.
+// A gate made of two sound halves can have a hole exactly at their join.
+//
+// So this row asserts the WIRING: each spring's delay is a computed read
+// of the schedule's own `delays` array, indexed by the binding the
+// enclosing `.map()` introduces for the segment's position. That is the
+// only shape in which delay VARIES with the segment.
+//
+// Fails closed. If a spring cannot be located inside a `.map()` callback
+// that binds an index, the row cannot tell whether the delay varies, and
+// cannot-tell is a FAIL — a refactor that moves the spring somewhere this
+// row cannot read must red the row rather than silently pass it.
+{
+  // The array must be the one destructured off the schedule, not any local
+  // called `delays`: the row is about the SWEPT numbers arriving, so it has
+  // to name the binding that carries them.
+  const scheduleArrays = new Set();
+  walk(componentAst, (n) => {
+    if (n.type !== 'VariableDeclarator' || n.id.type !== 'ObjectPattern') return;
+    if (n.init?.type !== 'Identifier' || n.init.name !== 'schedule') return;
+    for (const prop of n.id.properties) {
+      if (prop.type === 'ObjectProperty' && prop.value.type === 'Identifier') {
+        scheduleArrays.add(prop.value.name);
+      }
+    }
+  });
+
+  // Pair each spring with the index binding of the nearest enclosing map
+  // callback. Recorded per-spring so a spring outside any such callback
+  // stays unpaired and fails below.
+  const indexFor = new Map();
+  walk(componentAst, (n) => {
+    if (n.type !== 'CallExpression') return;
+    if (n.callee.type !== 'MemberExpression' || n.callee.property.name !== 'map') return;
+    const cb = n.arguments[0];
+    if (cb?.type !== 'ArrowFunctionExpression' && cb?.type !== 'FunctionExpression') return;
+    const idxParam = cb.params?.[1];
+    if (idxParam?.type !== 'Identifier') return;
+    walk(cb.body, (m) => {
+      if (
+        m.type === 'CallExpression' &&
+        m.callee.type === 'MemberExpression' &&
+        m.callee.object.name === 'Animated' &&
+        m.callee.property.name === 'spring'
+      ) indexFor.set(m, idxParam.name);
+    });
+  });
+
+  const springs = [];
+  walk(componentAst, (n) => {
+    if (
+      n.type === 'CallExpression' &&
+      n.callee.type === 'MemberExpression' &&
+      n.callee.object.name === 'Animated' &&
+      n.callee.property.name === 'spring'
+    ) springs.push(n);
+  });
+
+  if (scheduleArrays.size === 0) {
+    bad('D2b schedule binding', 'no array is destructured from `schedule` — cannot tell which binding carries the swept delays');
+  } else if (springs.length === 0) {
+    bad('D2b spring', 'no Animated.spring call found — nothing for the schedule to reach');
+  } else {
+    let bads = 0;
+    for (const call of springs) {
+      const config = call.arguments[1];
+      const props = config?.type === 'ObjectExpression' ? config.properties : [];
+      const delayProp = props.find((p) => p.type === 'ObjectProperty' && p.key.name === 'delay');
+      if (!delayProp) continue; // D2 owns the existence claim.
+
+      const idxName = indexFor.get(call);
+      if (!idxName) {
+        bads += 1;
+        bad('D2b index binding', 'an Animated.spring is not inside a .map() callback binding an index — cannot tell whether its delay varies per segment');
+        continue;
+      }
+      const v = delayProp.value;
+      if (v.type !== 'MemberExpression' || !v.computed) {
+        bads += 1;
+        bad('D2b delay wiring', `delay is \`${v.type}\`, not a computed read of the schedule's delays — every segment would start together`);
+        continue;
+      }
+      if (v.object.type !== 'Identifier' || !scheduleArrays.has(v.object.name)) {
+        bads += 1;
+        bad('D2b delay source', `delay reads \`${v.object.name ?? v.object.type}\`, which is not destructured from the schedule — the swept delays are not what reaches the spring`);
+        continue;
+      }
+      if (v.property.type !== 'Identifier' || v.property.name !== idxName) {
+        const got = v.property.type === 'Identifier' ? v.property.name : JSON.stringify(v.property.value);
+        bads += 1;
+        bad('D2b delay index', `delay is indexed by ${got}, not by the map's index binding \`${idxName}\` — the cascade would not vary with the segment`);
+        continue;
+      }
+    }
+    if (!bads) {
+      ok(`D2b ${springs.length} spring delay(s) read the schedule's [${[...scheduleArrays].join(', ')}] at the map's index binding (the swept schedule reaches the beat)`);
+    }
+  }
+}
+
 // D3 — the effect cleans up. An unmount inside the cascade must stop the
 // group rather than leave native springs driving values nobody reads. The
 // shape asserted is a `useEffect` whose returned arrow calls `.stop()` —
