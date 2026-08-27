@@ -9,6 +9,7 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "check:demo-hive": "node scripts/check-demo-hive.mjs",
+    "check:type-choreography": "node scripts/check-type-choreography.mjs",
     "check:seeds-rls": "node scripts/check-seeds-rls.mjs",
     "check:seeds-contract": "node scripts/check-seeds-contract.mjs",
     "check:plant-seed": "node scripts/check-plant-seed.mjs",
