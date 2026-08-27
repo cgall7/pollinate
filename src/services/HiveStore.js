@@ -63,7 +63,18 @@ export const HiveStore = {
   // No entry is filed into the hive here — the Who beat (Onboarding.js)
   // creates the hive with a bare name and no theme/cadence choice, so both
   // params default rather than require a call-site update there.
-  async createHive(subjectName, { coverTheme = DEFAULT_COVER_THEME, reviewCadence = DEFAULT_REVIEW_CADENCE } = {}) {
+  //
+  // `isCollective` defaults to false — the unmarked, existing path (a solo
+  // hive) stays the default for every caller that doesn't opt in. It is
+  // written once, here, because 20260827000001's trigger makes
+  // `is_collective` immutable in both directions the instant the row exists
+  // — there is no follow-up call that could set it later. Returned as
+  // `isCollective` on the created row so CreateHive's flow can decide,
+  // without a second read, whether to route into InviteContributor.
+  async createHive(
+    subjectName,
+    { coverTheme = DEFAULT_COVER_THEME, reviewCadence = DEFAULT_REVIEW_CADENCE, isCollective = false } = {}
+  ) {
     const client = requireSupabase();
     const ownerId = await requireUserId(client);
     const name = subjectName.trim();
@@ -75,11 +86,17 @@ export const HiveStore = {
 
     const { data, error } = await client
       .from('private_hives')
-      .insert({ owner_id: ownerId, subject_name: name, cover_theme: coverTheme, review_cadence: reviewCadence })
-      .select('id, subject_name, cover_theme, review_cadence, sealed_at, created_at')
+      .insert({
+        owner_id: ownerId,
+        subject_name: name,
+        cover_theme: coverTheme,
+        review_cadence: reviewCadence,
+        is_collective: isCollective,
+      })
+      .select('id, subject_name, cover_theme, review_cadence, sealed_at, created_at, is_collective')
       .single();
     if (error) throw error;
-    return data;
+    return { ...data, isCollective: data.is_collective };
   },
 
   // Every hive the signed-in user owns, most recently created first, each
@@ -125,12 +142,24 @@ export const HiveStore = {
   // Carries subject_profile_id + sent_at (beyond what listHives needs) —
   // HiveDetailScreen's seal/send footer (Design Language §5-6) has to
   // derive "has a subject" and "already sent" from this single fetch.
+  //
+  // `is_collective` rides along too (20260827000001) — HiveDetailScreen
+  // needs it to decide whether the roster row and the "+ Invite a writer"
+  // affordance render at all. Owner-only, same as every other field here:
+  // `.eq('owner_id', ownerId)` is defense in depth over
+  // `private_hives_select_own`, which the same migration widened to also
+  // admit an active contributor — a contributor calling this method gets
+  // null, not someone else's row, because the owner filter still applies
+  // client-side. Contributors read the hive through `getContributingHive`
+  // below instead, which is the intentionally different (non-owner) shape.
   async getHive(hiveId) {
     const client = requireSupabase();
     const ownerId = await requireUserId(client);
     const { data, error } = await client
       .from('private_hives')
-      .select('id, subject_name, subject_profile_id, cover_theme, review_cadence, sealed_at, sent_at, created_at')
+      .select(
+        'id, subject_name, subject_profile_id, cover_theme, review_cadence, sealed_at, sent_at, created_at, is_collective'
+      )
       .eq('owner_id', ownerId)
       .eq('id', hiveId)
       .maybeSingle();
@@ -145,6 +174,7 @@ export const HiveStore = {
       sealedAt: data.sealed_at,
       sentAt: data.sent_at,
       createdAt: data.created_at,
+      isCollective: data.is_collective,
     };
   },
 
@@ -214,6 +244,54 @@ export const HiveStore = {
     return toHiveEntry(data);
   },
 
+  // Invite one connection onto the roster (POLLINATE_MULTIWRITER_COPY_VOCAB
+  // §4.2). `hive_contributors_insert_owner` (20260827000001) is the actual
+  // gate — owner only, only into an `is_collective` hive, and rejects
+  // `profileId` if it is the hive's current `subject_profile_id` — so this
+  // call does not re-check any of that client-side and does not swallow the
+  // 42501 that comes back if it's ever wrong, same posture as
+  // `addHiveEntry`'s sealed-hive refusal above. InviteContributor.js still
+  // excludes the subject from its candidate list before this is ever
+  // called — the copy doc's own ruling: "the invite picker excludes the
+  // subject client-side; the DB guard is the backstop," not the reverse.
+  async inviteContributor(hiveId, profileId) {
+    const client = requireSupabase();
+    const ownerId = await requireUserId(client);
+    const { error } = await client
+      .from('hive_contributors')
+      .insert({ hive_id: hiveId, profile_id: profileId, invited_by: ownerId });
+    if (error) throw error;
+  },
+
+  // The roster, active members only (`removed_at is null`) — both the
+  // owner's HiveDetail roster row and a contributor's own writing screen
+  // read this, so it is written generically rather than assuming an owner
+  // caller. `hive_contributors_select` (20260827000001) already scopes this
+  // to the owner or an active contributor; a stranger gets zero rows back
+  // rather than an error, same shape as every other RLS-backed list here.
+  //
+  // Profile names batch-joined, 'Someone' fallback — a contributor is not
+  // necessarily connected to every other contributor on the same hive
+  // (this table's roster is a hive-scoped graph, not the honeycomb
+  // connection graph), so `profiles_select_connections` can drop a row
+  // silently the same way `listReceivedPackages` below already documents.
+  async getHiveContributors(hiveId) {
+    const client = requireSupabase();
+    const { data: rows, error } = await client
+      .from('hive_contributors')
+      .select('profile_id')
+      .eq('hive_id', hiveId)
+      .is('removed_at', null);
+    if (error) throw error;
+    if (!rows || rows.length === 0) return [];
+
+    const profileIds = [...new Set(rows.map((r) => r.profile_id))];
+    const { data: profiles } = await client.from('profiles').select('id, display_name').in('id', profileIds);
+    const names = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
+
+    return rows.map((r) => ({ profileId: r.profile_id, name: names.get(r.profile_id) || 'Someone' }));
+  },
+
   // DES-16 §1a(b) — which of the user's hives already hold a copy of the
   // entry dated `entryDateKey`, so the file-to-hive picker can tag a row
   // FILED instead of letting a second tap write a duplicate into a keepsake
@@ -234,6 +312,85 @@ export const HiveStore = {
       .not('hive_id', 'is', null);
     if (error) throw error;
     return new Set((data ?? []).map((row) => row.hive_id));
+  },
+
+  // Hives the signed-in user is an ACTIVE contributor on, not an owner of —
+  // TodayTab's "WRITING WITH OTHERS" shelf. Modeled on `listReceivedPackages`
+  // below, not on `listHives` above: this is the same shape of problem (read
+  // someone else's hive, batch-join their name, 'Someone' fallback), not the
+  // owner's shape. The `hive_contributors!inner(...)` embed is what makes
+  // this a contributor query instead of a `private_hives_select_own`-owner
+  // query returning nothing — an inner join means a hive with no matching
+  // roster row for this user is dropped by Postgres before RLS is even
+  // asked, rather than relying on RLS alone to filter rows this user can
+  // technically also see as owner of a DIFFERENT hive.
+  //
+  // No `entryCount` — unlike `listHives`, a contributor has no visibility
+  // into anyone else's entries and only reads their own here too (entries
+  // SELECT is unwidened, per the migration's OPEN-1 note), so a per-hive
+  // count of "your own entries in a hive you don't own" isn't the number
+  // this shelf should be answering anyway. `ownerName` instead — the "whose
+  // is it" fact this list needs that `listHives` never did.
+  async listContributingHives() {
+    const client = requireSupabase();
+    const contributorId = await requireUserId(client);
+    const { data: hives, error } = await client
+      .from('private_hives')
+      .select('id, owner_id, subject_name, cover_theme, sealed_at, hive_contributors!inner(profile_id, removed_at)')
+      .eq('hive_contributors.profile_id', contributorId)
+      .is('hive_contributors.removed_at', null)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!hives || hives.length === 0) return [];
+
+    // Same batched-join, 'Someone'-fallback convention as
+    // `listReceivedPackages` — the owner may not be a honeycomb connection
+    // of every contributor they invite.
+    const ownerIds = [...new Set(hives.map((h) => h.owner_id))];
+    const { data: owners } = await client.from('profiles').select('id, display_name').in('id', ownerIds);
+    const ownerNames = new Map((owners ?? []).map((p) => [p.id, p.display_name]));
+
+    return hives.map((h) => ({
+      id: h.id,
+      subjectName: h.subject_name,
+      coverTheme: h.cover_theme,
+      sealedAt: h.sealed_at,
+      ownerName: ownerNames.get(h.owner_id) || 'Someone',
+    }));
+  },
+
+  // One contributing hive's header facts, for ContributingHive.js — same
+  // inner-join-as-active-contributor shape as `listContributingHives`
+  // above, single row. `.maybeSingle()` because the caller could be a
+  // removed contributor following a stale link, or the join could just miss
+  // (hive deleted, roster row never existed) — both are "not available to
+  // you right now," not an error.
+  async getContributingHive(hiveId) {
+    const client = requireSupabase();
+    const contributorId = await requireUserId(client);
+    const { data: hive, error } = await client
+      .from('private_hives')
+      .select('id, owner_id, subject_name, cover_theme, sealed_at, hive_contributors!inner(profile_id, removed_at)')
+      .eq('id', hiveId)
+      .eq('hive_contributors.profile_id', contributorId)
+      .is('hive_contributors.removed_at', null)
+      .maybeSingle();
+    if (error) throw error;
+    if (!hive) return null;
+
+    const { data: owner } = await client
+      .from('profiles')
+      .select('display_name')
+      .eq('id', hive.owner_id)
+      .maybeSingle();
+
+    return {
+      id: hive.id,
+      subjectName: hive.subject_name,
+      coverTheme: hive.cover_theme,
+      sealedAt: hive.sealed_at,
+      ownerName: owner?.display_name || 'Someone',
+    };
   },
 
   // 8b.6 — the recipient's side of the send act (`docs/strategy/

@@ -1,0 +1,290 @@
+import React, { useCallback, useState } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator, FlatList } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../constants/theme';
+import { HiveStore } from '../services/HiveStore';
+import { hiveCoverTheme } from '../constants/hiveThemes';
+import { useAuth } from '../contexts/AuthContext';
+import { PressableScale } from '../components/PressableScale';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { BackButton } from '../components/BackButton';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
+
+const longDate = (isoDate) => {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+const joinNames = (names) => {
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+};
+
+// Same presence-not-count rule and the same reasonable-default judgement as
+// HiveDetail.js's `rosterLabel` — kept as a sibling copy rather than a
+// shared import because the two screens count differently in a way that
+// isn't just the owner's "+1": `getHiveContributors` returns every ACTIVE
+// contributor for the hive, and on THIS screen the caller is themselves one
+// of those rows (unlike HiveDetail, whose caller is the owner, who is never
+// a `hive_contributors` row for their own hive). Naming yourself in
+// "Writing with X, Y, and yourself" would be a real defect, not a style
+// choice, so `selfId` filters the caller out before the roster is named —
+// and the owner is folded in by name instead, since (unlike HiveDetail) the
+// owner never appears in `contributors` here either.
+const rosterLabel = (ownerName, contributors, selfId) => {
+  const others = [ownerName, ...contributors.filter((c) => c.profileId !== selfId).map((c) => c.name)];
+  if (others.length <= 3) return `Writing with ${joinNames(others)}.`;
+  // +1 for the caller themselves, who `others` deliberately excludes above.
+  return `${others.length + 1} of you are writing.`;
+};
+
+// ENG-61 — a contributor's own writing surface. Mirrors HiveDetail.js's
+// entry-list shape (same PaperBlock entry cards, same "+ Add Entry" footer
+// into the already-generic ComposeHiveEntry.js) with the owner-only half
+// removed outright rather than disabled: no Memory Lane (8b.4 is the
+// owner's bloom moment), no Seal/Send footer — POLLINATE_MULTIWRITER_COPY_
+// VOCAB.md §4.4: "For writers, the seal control is absent, not disabled —
+// we never render authority someone doesn't have." Backed by
+// `getContributingHive`/`getHiveContributors`, the contributor-scoped reads,
+// never `getHive`/HiveDetail's owner-scoped ones.
+export const ContributingHiveScreen = ({ navigation, route }) => {
+  const { hiveId } = route.params;
+  const { session } = useAuth();
+  const selfId = session?.user?.id ?? null;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [hive, setHive] = useState(null);
+  const [entries, setEntries] = useState([]);
+  const [contributors, setContributors] = useState([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const [hiveData, entryList] = await Promise.all([
+            HiveStore.getContributingHive(hiveId),
+            HiveStore.getHiveEntries(hiveId),
+          ]);
+          if (cancelled) return;
+          setError(false);
+          setHive(hiveData);
+          setEntries(entryList);
+
+          try {
+            const roster = await HiveStore.getHiveContributors(hiveId);
+            if (cancelled) return;
+            setContributors(roster);
+          } catch (err) {
+            // Same posture as HiveDetail.js's own roster fetch — additive
+            // chrome, not load-bearing for the rest of the screen.
+            if (cancelled) return;
+            console.warn('ContributingHiveScreen: failed to load contributors', err);
+            setContributors([]);
+          }
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('ContributingHiveScreen: failed to load hive', err);
+          setError(true);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [hiveId])
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator color={theme.colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (error || !hive) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <BackButton onPress={() => navigation.goBack()} style={styles.backButtonFloating} />
+        <Text style={styles.emptyTitle}>We couldn't reach this hive.</Text>
+        <Text style={styles.emptyBody}>Check your connection and try again.</Text>
+      </View>
+    );
+  }
+
+  const cover = hiveCoverTheme(hive.coverTheme);
+  const memoryLabel = entries.length === 1 ? '1 memory' : `${entries.length} memories`;
+
+  return (
+    <View style={styles.container}>
+      <View style={[styles.banner, { backgroundColor: cover.base }]}>
+        <BackButton onPress={() => navigation.goBack()} variant="glass" color={cover.textColor} style={styles.backButton} />
+        <Text style={[styles.bannerName, { color: cover.textColor }]}>{hive.subjectName}</Text>
+        {/* ReceivedPackagesScreen's "A hive for {subjectName}" attribution
+            pattern, adapted the other direction — this screen's subject is
+            already the banner's own name, so what's missing is whose it is,
+            not what it's for. */}
+        <Text style={[styles.bannerAttribution, { color: cover.textColor }]}>
+          A hive for {hive.subjectName}, from {hive.ownerName}
+        </Text>
+        <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
+      </View>
+
+      <View style={styles.rosterContainer}>
+        <View style={styles.rosterRow}>
+          <Ionicons name="people" size={16} color={theme.colors.accentDeep} />
+          <Text style={styles.rosterLabel} numberOfLines={1}>
+            {rosterLabel(hive.ownerName, contributors, selfId)}
+          </Text>
+        </View>
+      </View>
+
+      <FlatList
+        data={entries}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyList}>
+            <Text style={styles.emptyTitle}>No memories yet.</Text>
+            <Text style={styles.emptyBody}>Add the first one whenever you're ready.</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <View style={styles.entryCard}>
+            <Text style={styles.entryDate}>{longDate(item.date)}</Text>
+            <PaperBlock paper={item.paper}>
+              <Text style={[styles.entryText, { color: paperInk(item.paper) }]} numberOfLines={4}>
+                {item.text}
+              </Text>
+            </PaperBlock>
+          </View>
+        )}
+      />
+
+      {hive.sealedAt ? (
+        <View style={styles.footer}>
+          <Text style={styles.sealedNote}>This hive is sealed — entries are read-only.</Text>
+        </View>
+      ) : (
+        <View style={styles.footer}>
+          <PrimaryButton
+            onPress={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
+          >
+            + Add Entry
+          </PrimaryButton>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  banner: {
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  backButton: {
+    marginBottom: 16,
+  },
+  backButtonFloating: {
+    position: 'absolute',
+    top: 60,
+    left: 24,
+  },
+  bannerName: {
+    ...theme.type.h1,
+  },
+  bannerAttribution: {
+    ...theme.type.bodySm,
+    marginTop: 4,
+  },
+  bannerCount: {
+    ...theme.type.bodySm,
+    marginTop: 4,
+  },
+  rosterContainer: {
+    marginHorizontal: 24,
+    marginTop: 16,
+  },
+  rosterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+  },
+  rosterLabel: {
+    ...theme.type.bodySm,
+    color: theme.colors.ink,
+    flexShrink: 1,
+  },
+  list: {
+    padding: 24,
+    paddingBottom: 120,
+  },
+  emptyList: {
+    alignItems: 'center',
+    paddingTop: 48,
+  },
+  emptyTitle: {
+    ...theme.type.h2,
+    color: theme.colors.ink,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyBody: {
+    ...theme.type.body,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+  },
+  entryCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+  },
+  entryDate: {
+    ...theme.type.label,
+    color: theme.colors.inkSoft,
+    marginBottom: 8,
+  },
+  entryText: {
+    ...theme.type.body,
+    color: theme.colors.ink,
+  },
+  footer: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    bottom: 32,
+  },
+  sealedNote: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+  },
+});

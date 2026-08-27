@@ -45,9 +45,22 @@ const SelectedCheck = () => {
 // here would be a third and silently break every getParent() call below it.
 const STEPS = ['who', 'cover', 'cadence', 'entry'];
 
+// GUIDES/POLLINATE_MULTIWRITER_COPY_VOCAB.md §4.1 (C2) — the choice sits on
+// the same beat as the subject's name ("Choice framing (CreateHive, after
+// subject)"), not a step of its own, and it defaults to `false`: a solo hive
+// is the unmarked path, and `is_collective` is immutable in both directions
+// the instant the row exists (20260827000001's trigger), so there is no
+// "decide later" — the default has to be the one that never regrets being
+// silently chosen.
+const WRITER_OPTIONS = [
+  { value: false, label: 'Just me' },
+  { value: true, label: 'Me and others' },
+];
+
 export const CreateHiveFlow = ({ navigation }) => {
   const [stepIndex, setStepIndex] = useState(0);
   const [subjectName, setSubjectName] = useState('');
+  const [isCollective, setIsCollective] = useState(false);
   const [coverTheme, setCoverTheme] = useState(HIVE_COVER_THEMES[0].id);
   const [reviewCadence, setReviewCadence] = useState('yearly');
   const [entryText, setEntryText] = useState('');
@@ -80,7 +93,7 @@ export const CreateHiveFlow = ({ navigation }) => {
     setSaving(true);
     setSaveError(false);
     try {
-      const hive = await HiveStore.createHive(subjectName, { coverTheme, reviewCadence });
+      const hive = await HiveStore.createHive(subjectName, { coverTheme, reviewCadence, isCollective });
       const body = withEntry ? entryText.trim() : '';
       if (body) {
         await HiveStore.addHiveEntry(hive.id, new Date(), body, tagEntry(body));
@@ -88,7 +101,16 @@ export const CreateHiveFlow = ({ navigation }) => {
       // E12 — land inside the hive you just made, not on Today. Deezine is
       // scoring the arrival ceremony separately; this is just the
       // navigation it will land on top of.
-      navigation.navigate('HiveDetail', { hiveId: hive.id });
+      //
+      // §4.1 — "You can invite more writers anytime," so this is an offer,
+      // not a gate: a together-hive detours through InviteContributor first
+      // (Skip for now lands on HiveDetail exactly the same as a solo hive
+      // does), a solo hive goes straight there unchanged.
+      if (hive.isCollective) {
+        navigation.navigate('InviteContributor', { hiveId: hive.id, subjectName: subjectName.trim() });
+      } else {
+        navigation.navigate('HiveDetail', { hiveId: hive.id });
+      }
     } catch (err) {
       console.warn('CreateHiveFlow: failed to create hive', err);
       setSaveError(true);
@@ -130,6 +152,34 @@ export const CreateHiveFlow = ({ navigation }) => {
           <Text style={styles.helpText}>
             You'll be the only one who sees this hive unless you choose to send it later.
           </Text>
+
+          {/* §4.1's choice: "Who's writing?" — reuses the cadence step's
+              exclusive-choice radio row rather than inventing a Switch, per
+              this screen's own reuse convention below. */}
+          <Text style={styles.sectionLabel}>Who's writing?</Text>
+          {WRITER_OPTIONS.map((option) => {
+            const selected = option.value === isCollective;
+            return (
+              <PressableScale
+                key={option.label}
+                onPress={() => setIsCollective(option.value)}
+                style={[styles.cadenceCard, selected && styles.cadenceCardSelected]}
+                accessibilityLabel={`${option.label}${selected ? ', selected' : ''}`}
+                accessibilityState={{ selected }}
+              >
+                <View style={[styles.radio, selected && styles.radioSelected]} />
+                <View style={styles.cadenceText}>
+                  <Text style={styles.cadenceTitle}>{option.label}</Text>
+                </View>
+              </PressableScale>
+            );
+          })}
+          {/* C2 — permanent both directions, so this line sits under the
+              choice regardless of which option is selected (Lumen's ruling:
+              "the risk direction is solo-then-regret," so the solo side
+              carries the same warning as the together side, not a lesser
+              one). */}
+          <Text style={styles.helpText}>This can't be changed later.</Text>
         </View>
       )}
 
@@ -298,6 +348,12 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     marginTop: 16,
+  },
+  sectionLabel: {
+    ...theme.type.label,
+    color: theme.colors.inkSoft,
+    marginTop: 28,
+    marginBottom: 12,
   },
   footer: {
     paddingHorizontal: 24,
