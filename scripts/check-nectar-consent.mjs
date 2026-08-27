@@ -52,7 +52,11 @@
 //                      arm — 60 of 61 store calls on this tree take exactly
 //                      that shape. So E asks whether the CONTROL wired to the
 //                      call's enclosing handler is rendered under a guard,
-//                      and treats the call as inheriting that authority.
+//                      and treats the call as inheriting that authority —
+//                      ONLY IF THAT CONTROL IS THE HANDLER'S SOLE CALLER
+//                      (the exclusivity clause, added 2026-08-26 after the
+//                      first cut greened an unguarded `useEffect` mount
+//                      fetch whose handler also had a guarded button).
 //                      Two objects — `nectar_consents`, `consent_to_nectar` —
 //                      are exempted by property, not by call site: they are
 //                      how consent is itself established or read, and gating
@@ -711,45 +715,145 @@ const findQueryCalls = (ast) => {
 //       convention B6 already uses for a binding shape the census can't
 //       classify: a named handler this walk cannot connect to any rendered
 //       control is not evidence of safety, it is evidence of nothing.
-const findEnclosingHandlerName = (ancestors) => {
-  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
-    const { node } = ancestors[i];
-    if (
-      node.type === 'VariableDeclarator' &&
-      node.id.type === 'Identifier' &&
-      node.init &&
-      (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')
-    ) {
-      return node.id.name;
-    }
-    if (node.type === 'FunctionDeclaration' && node.id) return node.id.name;
+const isFunctionish = (t) =>
+  t === 'ArrowFunctionExpression' || t === 'FunctionExpression' || t === 'FunctionDeclaration';
+
+// WHICH DECLARATIONS ARE HANDLERS. `const handleX = () => {…}`,
+// `function handleX() {…}` — and `const handleX = useCallback(() => {…}, deps)`,
+// added 2026-08-26. The third is not a nicety. `useCallback(…)` is a
+// CallExpression, so a resolver that only accepts a function-expression init
+// walks straight PAST the declarator and returns the enclosing COMPONENT's
+// name, whose JSX wiring is (correctly) nothing — so a correctly guarded
+// handler read as cannot-tell, red on the one idiom this codebase reaches
+// for most. E1a counts the declarations of that shape in the tree and runs
+// the resolver on every one of them, so the fix is measured on the real
+// corpus rather than only on a probe I wrote to pass.
+const HOOK_HANDLER_WRAPPERS = new Set(['useCallback']);
+const declaredHandlerName = (node) => {
+  if (node.type === 'FunctionDeclaration' && node.id) return node.id.name;
+  if (node.type !== 'VariableDeclarator' || node.id.type !== 'Identifier' || !node.init) return null;
+  const { init } = node;
+  if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') return node.id.name;
+  if (
+    init.type === 'CallExpression' &&
+    init.callee.type === 'Identifier' &&
+    HOOK_HANDLER_WRAPPERS.has(init.callee.name) &&
+    init.arguments[0] &&
+    isFunctionish(init.arguments[0].type)
+  ) {
+    return node.id.name;
   }
   return null;
 };
-const findHandlerWiring = (ast, handlerName) => {
-  const wiring = [];
-  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
-    if (
-      node.type === 'JSXAttribute' &&
-      node.value?.type === 'JSXExpressionContainer' &&
-      node.value.expression.type === 'Identifier' &&
-      node.value.expression.name === handlerName
-    ) {
-      wiring.push({ node, ancestors });
-    }
-  });
-  return wiring;
+const findEnclosingHandlerName = (ancestors) => {
+  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+    const name = declaredHandlerName(ancestors[i].node);
+    if (name) return name;
+  }
+  return null;
 };
-// Returns 'guarded', 'unguarded', or 'cannot-tell' (a named handler with no
-// traceable wiring in its own file — see the header note on the cross-file
-// limit this shares with `isUnderGuard`).
+
+// EXCLUSIVITY (the §12.7a clause that was missing, 2026-08-26). A handler
+// inherits its control's authority only if that control is its ONLY caller.
+// Without the clause the gate greens its own worst case:
+//
+//   const loadBalance = async () => { await client.from('nectar_zaps')… };
+//   useEffect(() => { loadBalance(); }, []);
+//   return nectarConsent && <Pressable onPress={loadBalance} />;
+//
+// Every JSX attribute wiring `loadBalance` is guarded, so wiring-only
+// authority passes it — while the effect fires the ask on mount regardless
+// of consent, which is the one event rule E exists to catch. Worse, drop the
+// control and the same leak reds: the remediation gradient pointed at wiring
+// a guarded button, i.e. at shipping the leak.
+//
+// So every reference to the handler name IN ITS OWN FILE is classified, and
+// anything that is not the declaration, the JSX wiring, or a hook dependency
+// list means the caller set is not knowable from here — `other-callers`,
+// which fails, like cannot-tell, in the safe direction.
+//
+// The dependency-list exemption is a property of the position, not a
+// convenience: an element of the array literal argument of a `use*` hook is
+// an equality input React compares, never a call. `const fns = [handleX]`
+// is NOT that position and stays an escape. An `export` of the handler is an
+// escape too — an exported name's callers are by definition not all in this
+// file, which is the same same-file limit B6-B9 name, surfaced instead of
+// assumed away.
+const HOOK_CALL_RE = /^use[A-Z]/;
+// Is THIS declaration exported — not, as a first cut of this had it, is it
+// nested anywhere inside an exported component. Every handler in this app is
+// declared inside `export default function Screen()`, so the ancestry-wide
+// version classified every declaration as an escape and red every probe,
+// including the single-caller one it exists to pass. The frame that decides
+// it is the one directly above the declaration's own STATEMENT.
+const isExportedDeclaration = (ancestors, declKind) => {
+  const stmtIdx = declKind === 'FunctionDeclaration' ? ancestors.length - 1 : ancestors.length - 2;
+  const above = ancestors[stmtIdx - 1];
+  return Boolean(
+    above &&
+      (above.node.type === 'ExportNamedDeclaration' || above.node.type === 'ExportDefaultDeclaration')
+  );
+};
+const classifyReference = (ancestors) => {
+  const p = ancestors[ancestors.length - 1];
+  const gp = ancestors[ancestors.length - 2];
+  if (!p) return 'other';
+  // Positions where the identifier is a KEY or a member name — a different
+  // binding that merely spells the same, not a reference to this handler.
+  if (p.node.type === 'MemberExpression' && p.key === 'property' && !p.node.computed) return 'not-a-reference';
+  if (p.node.type === 'ObjectProperty' && p.key === 'key' && !p.node.computed) return 'not-a-reference';
+  if (
+    (p.node.type === 'VariableDeclarator' || p.node.type === 'FunctionDeclaration') &&
+    p.key === 'id'
+  ) {
+    return isExportedDeclaration(ancestors, p.node.type) ? 'other' : 'declaration';
+  }
+  if (
+    p.node.type === 'JSXExpressionContainer' &&
+    p.key === 'expression' &&
+    gp?.node.type === 'JSXAttribute' &&
+    gp.key === 'value'
+  ) {
+    return 'jsx-wiring';
+  }
+  if (
+    p.node.type === 'ArrayExpression' &&
+    p.key === 'elements' &&
+    gp?.node.type === 'CallExpression' &&
+    gp.key === 'arguments' &&
+    gp.node.callee.type === 'Identifier' &&
+    HOOK_CALL_RE.test(gp.node.callee.name)
+  ) {
+    return 'dep-list';
+  }
+  return 'other';
+};
+const findHandlerReferences = (ast, handlerName) => {
+  const refs = [];
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (node.type !== 'Identifier' || node.name !== handlerName) return;
+    const kind = classifyReference(ancestors);
+    if (kind === 'not-a-reference') return;
+    refs.push({ node, ancestors, kind });
+  });
+  return refs;
+};
+const findHandlerWiring = (ast, handlerName) =>
+  findHandlerReferences(ast, handlerName).filter((r) => r.kind === 'jsx-wiring');
+// Returns 'guarded', or one of three failing verdicts, ordered so the printed
+// one is the most actionable: 'unguarded' (a wiring site sits outside the
+// guard), 'other-callers' (wiring is guarded but the handler escapes to a
+// caller this walk cannot see), 'cannot-tell' (no traceable wiring at all —
+// see the header note on the cross-file limit shared with `isUnderGuard`).
 const callAuthority = (hit, ast) => {
   if (GUARDS.some((g) => isUnderGuard(hit.ancestors, g))) return 'guarded';
   const handlerName = findEnclosingHandlerName(hit.ancestors);
   if (!handlerName) return 'cannot-tell';
-  const wiring = findHandlerWiring(ast, handlerName);
+  const refs = findHandlerReferences(ast, handlerName);
+  const wiring = refs.filter((r) => r.kind === 'jsx-wiring');
   if (wiring.length === 0) return 'cannot-tell';
-  return wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g))) ? 'guarded' : 'unguarded';
+  if (!wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g)))) return 'unguarded';
+  return refs.some((r) => r.kind === 'other') ? 'other-callers' : 'guarded';
 };
 
 // E1 CALIBRATION, same reason as B3: zero non-bootstrap call sites in this
@@ -799,6 +903,62 @@ const QUERY_CALIBRATION = [
     `client.rpc('consent_to_nectar', {});`,
     'exempt',
   ],
+  // EXCLUSIVITY probes. The first is the defect this clause exists for: the
+  // gate greened it while reddening the same leak with the control REMOVED,
+  // so its remediation gradient pointed at wiring a guarded button.
+  [
+    'guarded control, but the handler is ALSO called bare on mount — not its only caller',
+    `function Comp() {
+       const loadBalance = async () => { await client.from('nectar_zaps').select('amount_microusd'); };
+       useEffect(() => { loadBalance(); }, []);
+       return nectarConsent && <Button onPress={loadBalance} />;
+     }`,
+    false,
+  ],
+  [
+    'guarded control, handler also passed as a plain argument — escapes the walk',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       setTimeout(handleSend, 1000);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  [
+    'guarded control, handler EXPORTED — its callers are not all in this file',
+    `export const handleSend = async () => { await client.rpc('record_zap', {}); };
+     function Comp() {
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  [
+    'guarded control, handler referenced only in a hook dependency list — still exclusive',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       useEffect(() => {}, [handleSend]);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    true,
+  ],
+  // useCallback probes, both directions — the shape that read as cannot-tell
+  // before `declaredHandlerName` learned it.
+  [
+    'useCallback handler wired to a guarded control',
+    `function Comp() {
+       const handleSend = useCallback(async () => { await client.rpc('record_zap', {}); }, []);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    true,
+  ],
+  [
+    'useCallback handler wired to an UNguarded control',
+    `function Comp() {
+       const handleSend = useCallback(async () => { await client.rpc('record_zap', {}); }, []);
+       return <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
 ];
 const calibrationFailures = [];
 for (const [label, src, want] of QUERY_CALIBRATION) {
@@ -811,6 +971,57 @@ for (const [label, src, want] of QUERY_CALIBRATION) {
   if (got !== want) calibrationFailures.push(`${label} — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 }
 check('E1 query-reserve calibration: guard, render-authority, cannot-tell, and carve-out probes all verify as expected', calibrationFailures, []);
+
+// E1a THE useCallback RESOLVER, MEASURED ON THIS TREE'S OWN DECLARATIONS
+// rather than only on the two probes above. A calibration probe proves the
+// resolver handles the shape I wrote; this row proves it handles the shape
+// the app actually writes, which is the population a future money identifier
+// will be declared in. For every `const x = useCallback(fn, deps)` in the
+// enumerated universe, take the calls that sit DIRECTLY in fn's body (their
+// innermost enclosing function is fn, so a nested arrow's calls belong to the
+// arrow, not to x) and check the resolver names x — not, as it did before,
+// the enclosing component, whose JSX wiring is nothing.
+const useCallbackHandlers = [];
+const resolvedCalls = [];
+for (const { rel, ast } of parsed) {
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.init &&
+      node.init.type === 'CallExpression' &&
+      node.init.callee.type === 'Identifier' &&
+      HOOK_HANDLER_WRAPPERS.has(node.init.callee.name) &&
+      node.init.arguments[0] &&
+      isFunctionish(node.init.arguments[0].type)
+    ) {
+      useCallbackHandlers.push({ rel, name: node.id.name, fn: node.init.arguments[0] });
+    }
+    if (node.type !== 'CallExpression') return;
+    let fn = null;
+    for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+      if (isFunctionish(ancestors[i].node.type)) {
+        fn = ancestors[i].node;
+        break;
+      }
+    }
+    if (fn) resolvedCalls.push({ fn, name: findEnclosingHandlerName(ancestors) });
+  });
+}
+const misresolved = [];
+let resolverCovered = 0;
+for (const h of useCallbackHandlers) {
+  const inBody = resolvedCalls.filter((c) => c.fn === h.fn);
+  if (inBody.length === 0) continue;
+  resolverCovered += 1;
+  const wrong = [...new Set(inBody.filter((c) => c.name !== h.name).map((c) => String(c.name)))];
+  if (wrong.length) misresolved.push(`${h.rel} ${h.name} -> ${wrong.join(', ')}`);
+}
+check(
+  `E1a every useCallback-declared handler resolves to its own name (${useCallbackHandlers.length} declared, ${resolverCovered} with a call in the body)`,
+  [misresolved, resolverCovered > 0],
+  [[], true]
+);
 
 // E2 THE REAL QUESTION, over the same source universe A1 already enumerated.
 // Bootstrap objects are excluded from the population this check judges —
