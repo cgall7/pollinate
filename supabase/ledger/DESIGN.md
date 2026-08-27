@@ -34,27 +34,66 @@ movement of value is a balanced double-entry transaction, and the properties we
 care about — no overdrafts, no double-credits, no money invented by a webhook —
 are enforced by database constraints rather than by application discipline.
 
-## 2. Unit of account: integer micro-USD
+## 2. Unit of account: integer sats (OVERRIDDEN from micro-USD, 2026-08-26)
 
-`bigint`, 1e-6 USD. `$1.00 = 1000000`. Never a float, never `numeric`, never sats.
+> **OVERRIDE, not a correction.** Colin ratified a full override of this
+> section's original choice — CEO thread, event `4b3258dc`, routed by Sage
+> (channel `b57ad406`, thread `f10c9a4a`, 2026-08-26) — because the real rail
+> this is headed for is Spark, a self-custodial BTC-native path where a
+> USD-quoted invoice never made sense to begin with. Landed as
+> `../migrations/20260826000006_nectar_sats_override.sql`: every
+> `*_microusd` column renamed to `*_sats` in place (no rescale — this schema
+> had shipped no real balances, so a rename is honest), `nectar_drop_microusd()`
+> dropped (1 drop = 1 sat, exact, no conversion left to hold), starter grant
+> unchanged in magnitude (500) with its meaning updated in its own comment.
+> The reasoning below is preserved, not deleted — it was correct when written
+> and stays correct as the tradeoff Colin is now knowingly accepting: **a
+> sats-denominated balance no longer drifts in sats terms while sitting
+> still, but it now drifts in USD terms while sitting still.** That drift is
+> out of scope for this pass — DES-28 has no dollar-equivalent display, and
+> `nectar.js`'s word reserve still only ever surfaces "drops".
+>
+> **One structural consequence worth flagging, not just a rename:** this
+> override flips which leg of §9's FX question carries the risk. Pre-override,
+> holding `strike_btc` was the exposed leg (a volatile asset against a
+> fixed-USD liability). Post-override, our liabilities ARE sats — if a paid
+> invoice lands as BTC, there is no conversion left to drift; the schema's own
+> unit already matches the asset. The exposure moves to `strike_cash`
+> instead: USD fiat held against a sats-denominated liability now needs
+> marking the other way (USD → sats) to catch a shortfall. §9 has not been
+> rewritten for this — the mechanism (`fx_mark`/`fx_reserve`/`ledger_solvency()`)
+> still detects *an* asset write-down either way, but which leg to actually
+> mark, and how, is an open question this migration does not answer.
 
-- **Why USD, not sats:** the product promises dollars (PRD §5, "the crypto is
-  invisible"), and per Fizz's spike Strike invoices are USD-quoted natively. The
-  unit of account should be the unit we owe people in. Storing sats and
-  converting for display would make every user's balance silently depend on the
-  BTC price at read time — the balance would visibly drift while sitting still.
-- **Why micro-, not cents:** the minimum tip is ~$0.10 (PRD §3.4). A 1% fee on a
-  $0.10 tip is 0.1¢ — unrepresentable in cents, so fee math would round to zero
-  or round the user's money away. Micro-USD gives 4 decimal places of headroom
-  below a cent. `bigint` max is ~$9.2 trillion; not a constraint.
-- **Why integers at all:** floats cannot represent money, and `numeric` invites
-  rounding that silently breaks the sum-zero invariant. With integers, any
-  rounding decision is *forced to be explicit* — a remainder has to be posted
-  somewhere or the transaction won't commit.
+`bigint`, integer satoshis. Never a float, never `numeric`, never a
+USD-denominated column anywhere in this schema.
+
+- **Why sats, not USD (as of the override):** see the box above — Colin's call,
+  full override, driven by the eventual self-custodial BTC rail.
+- **Why USD, not sats (the original call, superseded but not wrong at the
+  time):** the product promised dollars (PRD §5, "the crypto is invisible"),
+  and per Fizz's spike Strike invoices are USD-quoted natively. Storing sats
+  and converting for display would make every user's balance silently depend
+  on the BTC price at read time — the balance would visibly drift while
+  sitting still. This is still true; it is the accepted tradeoff now, not a
+  refuted claim.
+- **Why micro-, not cents (moot post-override):** the minimum tip is ~$0.10
+  (PRD §3.4). A 1% fee on a $0.10 tip is 0.1¢ — unrepresentable in cents, so
+  fee math would round to zero or round the user's money away. Micro-USD gave
+  4 decimal places of headroom below a cent. Sats have no sub-unit at all —
+  they're already the smallest denomination — so this rationale has no
+  referent anymore; kept here as the historical reason micro- was chosen over
+  cents, not as live guidance.
+- **Why integers at all (still true):** floats cannot represent money, and
+  `numeric` invites rounding that silently breaks the sum-zero invariant. With
+  integers, any rounding decision is *forced to be explicit* — a remainder has
+  to be posted somewhere or the transaction won't commit. Sats being already
+  integral removes the rounding problem entirely rather than just bounding it.
 
 ## 3. Sign convention
 
-`amount_microusd > 0` is a debit, `< 0` is a credit, and every transaction's
+`amount_sats > 0` is a debit, `< 0` is a credit (`amount_microusd` before the
+2026-08-26 sats override, §2), and every transaction's
 postings sum to exactly zero. Assets therefore carry positive balances,
 liabilities negative. A user's spendable nectar is a liability to them, so it is
 stored negative; the `user_nectar_balances` view flips the sign so nothing
@@ -192,6 +231,14 @@ calling Strike is our idempotency key for the payout.
 
 **Flagging this as an open question, not a finding — I have not verified it and
 neither spike answers it.**
+
+**Updated by the 2026-08-26 sats override (§2): this section's framing below is
+pre-override and names the wrong leg.** Liabilities are sats now, not
+USD — if a paid invoice lands as BTC, our sats-denominated liability and the
+sats we hold no longer diverge on a price move, so `strike_btc` is no longer
+the exposed side. `strike_cash` is: USD fiat held against a sats-denominated
+liability is the leg that now needs a BTC-price mark to catch a shortfall.
+Not re-litigated here — left as the open question this override created.
 
 Per Fizz's spike, a Strike business account holds one balance that is *both* cash
 and BTC, and our invoices are USD-quoted but paid in BTC. What I could not

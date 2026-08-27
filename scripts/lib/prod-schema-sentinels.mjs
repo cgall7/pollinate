@@ -102,6 +102,10 @@ export const SENTINELS = {
     },
     expect: '42501',
   },
+  // Column renames + function/view drop-recreate, RLS-locked tables anon
+  // never had access to either side of the rename; no anon-visible surface
+  // changes shape. Same posture as other pure-rename migrations above.
+  '20260826000006_nectar_sats_override': { kind: 'order', reason: 'column renames + trigger/function/view drop-recreate; no anon-visible surface' },
   // Same shape as 20260813000006_entries_theme_column — a plain nullable
   // text column, no RLS change (sealed-hive immutability already covers it).
   '20260826000007_entries_paper': { kind: 'column', table: 'entries', column: 'paper' },
