@@ -740,16 +740,186 @@ const findHandlerWiring = (ast, handlerName) => {
   });
   return wiring;
 };
+// ---------------------------------------------------------------------------
+// (3) AND (4) — ADDED 2026-08-27 BY ENG-63/64/65, WHICH IS THE FIRST CODE
+// THIS RULE EVER JUDGED. E2 shipped with a caveat stated up front: "gate-only,
+// defect LATENT — E2 finds 0 non-bootstrap reserved call sites on main today,
+// the fix is entirely PROSPECTIVE; its value is being correct before D2 writes
+// the first one." D2 is written. Both of its reserved calls came back
+// `cannot-tell`, and the reason is structural rather than incidental:
+//
+//   BOTH AUTHORITY SHAPES ABOVE ARE RENDER-SHAPED AND WITHIN-FILE, AND EVERY
+//   QUERY THIS APP MAKES LIVES IN src/services/*Store.js, WHERE NEITHER SHAPE
+//   CAN EXIST.
+//
+// A store method has no JSX in its file to be wired to and no guarded
+// expression to sit under, so arms (1) and (2) can only ever answer
+// cannot-tell about it. Measured, not reasoned: `record_zap` and
+// `user_nectar_balances` in NectarStore.js both did. That means the rule's
+// SATISFIABLE SET WAS EMPTY for the architecture it governs — the offered
+// fix inherited a burden it had not been measured against.
+//
+// TWO FIXES REJECTED FIRST, both of which would have made the gate quieter
+// and worse:
+//
+//   - Add the two identifiers to the consent-bootstrap carve-out. E0a's
+//     membership is a PROPERTY ("part of how consent is established or
+//     read"), and these are post-consent by definition. Adding them turns a
+//     property into a list, which is the exact door NECTAR_CONSENT_SHEET_GUARD
+//     was written to avoid.
+//   - Exempt `src/services/`. That exempts the one directory where a leak
+//     would actually live.
+//
+// So authority PROPAGATES instead — the same argument arm (2) already makes
+// about a handler and the controls that call it, one file boundary further
+// out, and with the same universal quantifier and the same failure direction:
+//
+//   (3) STORE PROPAGATION. A reserved call inside a method of an exported
+//       object (`export const NectarStore = { async recordZap() {…} }`)
+//       inherits authority iff EVERY reference to `NectarStore.recordZap`
+//       anywhere in the enumerated universe is itself authorised. Zero
+//       references is CANNOT-TELL, exactly as zero wirings is — an uncalled
+//       store method carrying a reserved query is evidence of nothing.
+//
+//   (4) EFFECT AUTHORITY. Arm (3) is not enough on its own, because one real
+//       caller cannot be render-guarded at all: the honey ladder's balance
+//       read must COMPLETE BEFORE the honeyed cell renders, so it has no
+//       guarded JSX ancestor and is nobody's handler. Its guard is the
+//       effect's own — `if (!nectarConsent) return` as the first statement,
+//       and `nectarConsent` in the dependency array. BOTH are required and
+//       neither alone would do: the early return without the dep is a check
+//       that never re-runs when the flag flips, and the dep without the
+//       early return is a re-run with no check. Requiring the pair is what
+//       makes this an authority shape rather than a hole shaped like one.
+//
+// This is deliberately NOT a general "an early return guards a block" rule.
+// isUnderGuard's own header refuses that shape, and rightly — an early return
+// anywhere in a body says nothing about a call below it. What is recognised
+// here is narrower and checkable: the FIRST statement of a hook callback whose
+// dependency list names the same flag.
+const EFFECT_HOOK_RE = /^use[A-Z]/;
+const returnsImmediately = (stmt) => {
+  if (!stmt) return false;
+  if (stmt.type === 'ReturnStatement') return true;
+  return (
+    stmt.type === 'BlockStatement' &&
+    stmt.body.length === 1 &&
+    stmt.body[0].type === 'ReturnStatement'
+  );
+};
+const isUnderEffectGuard = (ancestors, flagName) =>
+  ancestors.some(({ node }) => {
+    if (node.type !== 'CallExpression') return false;
+    if (node.callee.type !== 'Identifier' || !EFFECT_HOOK_RE.test(node.callee.name)) return false;
+    const deps = node.arguments[1];
+    const named =
+      deps &&
+      deps.type === 'ArrayExpression' &&
+      deps.elements.some((e) => e && e.type === 'Identifier' && e.name === flagName);
+    if (!named) return false;
+    const cb = node.arguments[0];
+    if (!cb || (cb.type !== 'ArrowFunctionExpression' && cb.type !== 'FunctionExpression')) return false;
+    if (cb.body.type !== 'BlockStatement') return false;
+    const first = cb.body.body[0];
+    return Boolean(
+      first &&
+        first.type === 'IfStatement' &&
+        first.test.type === 'UnaryExpression' &&
+        first.test.operator === '!' &&
+        first.test.argument.type === 'Identifier' &&
+        first.test.argument.name === flagName &&
+        returnsImmediately(first.consequent)
+    );
+  });
+
+// The exported-object method a reserved call sits in, as `Binding.method`, or
+// null. Both halves are required: the method key gives the name a caller
+// writes, and the exported binding gives the object it writes it on.
+const findEnclosingStoreMethod = (ancestors) => {
+  let method = null;
+  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+    const { node } = ancestors[i];
+    if (!method) {
+      if (node.type === 'ObjectMethod' && node.key.type === 'Identifier') {
+        method = node.key.name;
+        continue;
+      }
+      if (
+        node.type === 'ObjectProperty' &&
+        node.key.type === 'Identifier' &&
+        node.value &&
+        (node.value.type === 'ArrowFunctionExpression' || node.value.type === 'FunctionExpression')
+      ) {
+        method = node.key.name;
+        continue;
+      }
+    }
+    if (
+      method &&
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.init &&
+      node.init.type === 'ObjectExpression'
+    ) {
+      return { binding: node.id.name, method };
+    }
+  }
+  return null;
+};
+
+// Every `Binding.method` reference across the enumerated universe, with the
+// ancestry and ast each one needs to be judged by callAuthority itself.
+const findStoreMethodCallers = (universe, binding, method) => {
+  const callers = [];
+  for (const { rel, ast } of universe) {
+    walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+      if (
+        node.type === 'MemberExpression' &&
+        node.object.type === 'Identifier' &&
+        node.object.name === binding &&
+        node.property.type === 'Identifier' &&
+        node.property.name === method
+      ) {
+        callers.push({ rel, line: node.loc?.start.line, ancestors, ast });
+      }
+    });
+  }
+  return callers;
+};
+
 // Returns 'guarded', 'unguarded', or 'cannot-tell' (a named handler with no
 // traceable wiring in its own file — see the header note on the cross-file
 // limit this shares with `isUnderGuard`).
-const callAuthority = (hit, ast) => {
+//
+// `universe` is optional and only arm (3) uses it; passing nothing keeps the
+// original three-arm behaviour, which is what the arm-(1)/(2) calibration
+// probes rely on to stay a test of arms (1) and (2).
+const callAuthority = (hit, ast, universe = null, depth = 0) => {
   if (GUARDS.some((g) => isUnderGuard(hit.ancestors, g))) return 'guarded';
+  if (GUARDS.some((g) => isUnderEffectGuard(hit.ancestors, g))) return 'guarded';
   const handlerName = findEnclosingHandlerName(hit.ancestors);
-  if (!handlerName) return 'cannot-tell';
-  const wiring = findHandlerWiring(ast, handlerName);
-  if (wiring.length === 0) return 'cannot-tell';
-  return wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g))) ? 'guarded' : 'unguarded';
+  if (handlerName) {
+    const wiring = findHandlerWiring(ast, handlerName);
+    if (wiring.length > 0) {
+      return wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g)))
+        ? 'guarded'
+        : 'unguarded';
+    }
+  }
+  // Arm (3). `depth` stops a store method that calls another store method on
+  // the same object from recursing forever; one hop is all this tree has and
+  // a second hop is a shape to re-argue, not to allow silently.
+  if (universe && depth === 0) {
+    const store = findEnclosingStoreMethod(hit.ancestors);
+    if (store) {
+      const callers = findStoreMethodCallers(universe, store.binding, store.method);
+      if (callers.length === 0) return 'cannot-tell';
+      return callers.every((c) => callAuthority(c, c.ast, universe, depth + 1) === 'guarded')
+        ? 'guarded'
+        : 'unguarded';
+    }
+  }
+  return 'cannot-tell';
 };
 
 // E1 CALIBRATION, same reason as B3: zero non-bootstrap call sites in this
@@ -824,12 +994,169 @@ for (const { rel, ast } of parsed) {
     }
   }
 }
-const unguardedQueries = queryHits.filter((h) => callAuthority(h, h.ast) !== 'guarded');
+const unguardedQueries = queryHits.filter((h) => callAuthority(h, h.ast, parsed) !== 'guarded');
 check(
   `E2 every non-bootstrap query naming a reserved nectar identifier is authorised by a rendered guard (${GUARDS.join(' | ')})`,
-  unguardedQueries.map((h) => `${h.rel}:${h.line} ${h.name} [${callAuthority(h, h.ast)}]`),
+  unguardedQueries.map((h) => `${h.rel}:${h.line} ${h.name} [${callAuthority(h, h.ast, parsed)}]`),
   []
 );
+
+
+// E3 CALIBRATION FOR THE TWO NEW ARMS, and it is not optional for the same
+// reason E1 and B3 are not: this tree has exactly two store-hosted reserved
+// calls, both of which now read `guarded`, so a broken arm and a correct one
+// produce the identical suite output. Each probe has a known answer and at
+// least one of each polarity per arm.
+//
+// Arm (3) needs a MULTI-FILE universe, so these probes are pairs: a store
+// file holding the reserved call and a caller file holding the reference.
+const mini = (rel, src) => ({ rel, ast: parse(src, { sourceType: 'module', plugins: ['jsx'] }) });
+const STORE_SRC = `export const Store = { async pull() { return client.from('nectar_zaps').select('x'); } };`;
+const authorityOfStoreCall = (universe) => {
+  const store = universe.find((f) => f.rel.endsWith('Store.js'));
+  const hit = findQueryCalls(store.ast).find((h) => QUERY_RESERVE.has(h.name));
+  return callAuthority(hit, store.ast, universe);
+};
+const ARM_CALIBRATION = [
+  [
+    'arm 4: effect with BOTH the negated early return and the dep — guarded',
+    () => {
+      const f = mini('src/screens/A.js', `function C(){ useEffect(() => { if (!nectarConsent) return; client.from('nectar_zaps').select('x'); }, [nectarConsent]); }`);
+      const hit = findQueryCalls(f.ast).find((h) => QUERY_RESERVE.has(h.name));
+      return callAuthority(hit, f.ast, [f]);
+    },
+    'guarded',
+  ],
+  [
+    'arm 4: dep present, early return MISSING — not guarded',
+    () => {
+      const f = mini('src/screens/A.js', `function C(){ useEffect(() => { client.from('nectar_zaps').select('x'); }, [nectarConsent]); }`);
+      const hit = findQueryCalls(f.ast).find((h) => QUERY_RESERVE.has(h.name));
+      return callAuthority(hit, f.ast, [f]);
+    },
+    'cannot-tell',
+  ],
+  [
+    'arm 4: early return present, dep MISSING — not guarded',
+    () => {
+      const f = mini('src/screens/A.js', `function C(){ useEffect(() => { if (!nectarConsent) return; client.from('nectar_zaps').select('x'); }, []); }`);
+      const hit = findQueryCalls(f.ast).find((h) => QUERY_RESERVE.has(h.name));
+      return callAuthority(hit, f.ast, [f]);
+    },
+    'cannot-tell',
+  ],
+  [
+    'arm 4: the early return is not the FIRST statement — not guarded',
+    () => {
+      const f = mini('src/screens/A.js', `function C(){ useEffect(() => { let c = false; if (!nectarConsent) return; client.from('nectar_zaps').select('x'); }, [nectarConsent]); }`);
+      const hit = findQueryCalls(f.ast).find((h) => QUERY_RESERVE.has(h.name));
+      return callAuthority(hit, f.ast, [f]);
+    },
+    'cannot-tell',
+  ],
+  [
+    'arm 3: store method with one guarded caller — guarded',
+    () =>
+      authorityOfStoreCall([
+        mini('src/services/Store.js', STORE_SRC),
+        mini('src/screens/A.js', `function C(){ const handleGo = () => Store.pull(); return nectarConsent && <B onPress={handleGo} />; }`),
+      ]),
+    'guarded',
+  ],
+  [
+    'arm 3: one guarded caller and one UNGUARDED caller — unguarded (every, not some)',
+    () =>
+      authorityOfStoreCall([
+        mini('src/services/Store.js', STORE_SRC),
+        mini('src/screens/A.js', `function C(){ const handleGo = () => Store.pull(); return nectarConsent && <B onPress={handleGo} />; }`),
+        mini('src/screens/B.js', `function D(){ const handleGo = () => Store.pull(); return <B onPress={handleGo} />; }`),
+      ]),
+    'unguarded',
+  ],
+  [
+    'arm 3: store method with NO callers anywhere — cannot-tell, never green',
+    () => authorityOfStoreCall([mini('src/services/Store.js', STORE_SRC)]),
+    'cannot-tell',
+  ],
+  [
+    'arm 3: a caller that is itself an unguarded store method does not launder authority',
+    () =>
+      authorityOfStoreCall([
+        mini('src/services/Store.js', STORE_SRC),
+        mini('src/services/Other.js', `export const Other = { async wrap() { return Store.pull(); } };`),
+      ]),
+    'unguarded',
+  ],
+  [
+    // THE PROBE THAT MAKES THE DEPTH CAP A CLAIM INSTEAD OF A COMMENT. The
+    // four mutations above all red E3; changing `depth === 0` to `depth <= 1`
+    // redded NOTHING, because the probe above resolves to `unguarded` either
+    // way (its wrapper has no callers at all). So the cap was untested, and
+    // an untested constant in a gate is decoration.
+    //
+    // Stated plainly rather than dressed up: THIS ROW ASSERTS THE GATE REDS
+    // CODE THAT IS PROBABLY FINE. A store method wrapping another store
+    // method, reached from a guarded control, is safe in fact. It is refused
+    // because one hop is what this tree has, and isUnderGuard's own header
+    // sets the convention — extend the recogniser when a legitimate shape
+    // appears, against the comment, rather than pre-approving shapes nothing
+    // uses. If a second hop ever lands, this row is the thing to re-argue.
+    'arm 3: authority does NOT propagate two hops, even when the outer caller is guarded',
+    () =>
+      authorityOfStoreCall([
+        mini('src/services/Store.js', STORE_SRC),
+        mini('src/services/Other.js', `export const Other = { async wrap() { return Store.pull(); } };`),
+        mini('src/screens/A.js', `function C(){ const handleGo = () => Other.wrap(); return nectarConsent && <B onPress={handleGo} />; }`),
+      ]),
+    'unguarded',
+  ],
+  [
+    'arm 3: a method on a NON-exported plain object still resolves by its binding',
+    () =>
+      authorityOfStoreCall([
+        mini('src/services/Store.js', STORE_SRC),
+        mini('src/screens/A.js', `function C(){ return nectarConsent && <B onPress={() => Store.pull()} />; }`),
+      ]),
+    'guarded',
+  ],
+];
+const armFailures = [];
+for (const [label, run, want] of ARM_CALIBRATION) {
+  let got;
+  try {
+    got = run();
+  } catch (err) {
+    got = `threw: ${err.message}`;
+  }
+  if (got !== want) armFailures.push(`${label} -> got ${got}, want ${want}`);
+}
+check('E3 store-propagation and effect-authority calibration (arms 3 and 4)', armFailures, []);
+
+// E3a THE RESOLVER CONTROL, and it exists because of E1a's lesson on this
+// same file: a resolver that quietly stops resolving turns a real check into
+// a vacuous one. Here the failure would be subtler than E1a's — if
+// `findEnclosingStoreMethod` returned null, arm (3) would never run and E2
+// would go RED, which is safe. The hazard is the other end: the reserved
+// calls migrating OUT of a store into some shape arm (3) never sees, leaving
+// E2 green on arms (1)/(2) alone and this whole extension dead code nobody
+// notices. So the tree's own store-hosted calls are counted and named.
+const storeHosted = queryHits
+  .map((h) => ({ h, store: findEnclosingStoreMethod(h.ancestors) }))
+  .filter((x) => x.store);
+// STATED AS A CONTRACT, NOT AS POSITIONS. An earlier draft of this row
+// listed `NectarStore.getBalanceDrops x3` with file:line — which reds on any
+// edit that moves a line and teaches whoever hits it to re-baseline the
+// number rather than read the rule. Coordinate tables are stale cargo; what
+// this row is actually about is that arm 3 resolved and found callers.
+check('E3a arm 3 is live on this tree: at least one reserved query is store-hosted', storeHosted.length > 0, true);
+check(
+  'E3a every store-hosted reserved call resolves to a Binding.method with at least one caller',
+  storeHosted
+    .filter(({ store }) => findStoreMethodCallers(parsed, store.binding, store.method).length === 0)
+    .map(({ h, store }) => `${h.rel}:${h.line} ${h.name} -> ${store.binding}.${store.method} has no callers`),
+  []
+);
+
 
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(

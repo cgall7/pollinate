@@ -272,3 +272,102 @@ export const NECTAR_CONSENT_FIELD = 'consented_at';
 // established or read belongs in this set, and there are exactly two of
 // those in this schema today (nectar_ledger.sql + nectar_sim_service.sql).
 export const NECTAR_CONSENT_BOOTSTRAP_OBJECTS = ['nectar_consents', 'consent_to_nectar'];
+
+// ============================================================================
+// THE HONEY LADDER'S INPUT — DES-24 §7 open inputs 1 and 2, ruled here
+// because ENG-65's second half cannot be built without them. The renderer
+// merged (HoneycombGrid's HoneyFill, `member.honeyRung`); NOTHING PRODUCES
+// THE RUNG. check-honey-fill.mjs says so in its own header: "no path sets
+// `member.honeyRung` today, and this gate does not invent one."
+//
+// ---------------------------------------------------------------------------
+// RULING 1 — THE LADDER READS THE AVAILABLE BALANCE, NOT LIFETIME RECEIVED.
+//
+// The two candidate quantities disagree in the source documents, so this is
+// a decision and not a lookup. Spec §5.2(b): "received nectar visibly FILLS
+// your hexagon cell." POLLINATE_V2_ASSIGNMENTS.md:117 (ENG-65): "balance
+// derived from the ledger."
+//
+// Lifetime-received loses, and DES-24's OWN §5 is the argument against it:
+// "an invented maximum is an invented GOAL, which turns a comb into a
+// scoreboard." A lifetime total only ever rises. Against any fixed ceiling
+// it saturates permanently — every long-tenured user pinned at the top rung,
+// the register dead for exactly the people who used the product most — and
+// a quantity that only rises toward a ceiling is the definition of a
+// progress bar, which §5 also forbids the cell to be. The available balance
+// FALLS when you give, which is the one behaviour that makes the ladder a
+// state rather than a score.
+//
+// And giving is the product. A ladder that could not go down would mean the
+// cell is a record of what you have been given and never of what you passed
+// on — the exact asymmetry R15's "most of your life is made of things you
+// were given" register was written against.
+//
+// ---------------------------------------------------------------------------
+// RULING 2 — THE CAP IS STILL A PLACEHOLDER, BUT IT IS NO LONGER FREE.
+//
+// DES-24 §7.2: the cap "wants the drop distribution from the ledger, and 19a
+// is what produces it. Until it exists, any value is a placeholder and must
+// not be described as a target." That stands — 19a has produced no usage yet,
+// so there is no distribution to read.
+//
+// What HAS arrived since is a hard lower bound the spec could not have known,
+// and it is the starter grant. `consent_to_nectar()` mints
+// `nectar_starter_grant_drops()` = 500 drops at the moment of consent
+// (20260826000006's re-issued comment: "500 sats… granted once, at first
+// consent, never again"). Under Ruling 1 that grant is in the balance. So:
+//
+//   IF cap <= grant, THEN a user who has consented and received NOTHING
+//   shows a FULL cell, and every gift after that is invisible.
+//
+// That is not a mistuned cosmetic — it is the §23.1 class ("empty is a
+// positive claim") wearing a ladder: the cell would assert a filled vessel
+// out of an accounting artifact nobody gave anyone. It also inverts the
+// first thing a new user ever does with nectar, because from a full cell the
+// only available motion is downward.
+//
+// So the cap carries a DERIVED CONSTRAINT even while its value stays a
+// placeholder: the grant must land on the LOWEST VISIBLE RUNG. At four
+// visible rungs that is cap >= 4 x grant, and the placeholder below is that
+// bound at equality — written as the bound rather than as a number, so that
+// re-ratifying the grant re-derives it instead of silently breaking it.
+//
+// Equality is safe here and would not have been under the function's first
+// draft; see honeyRungForDrops below for why that changed.
+//
+// NOT A TARGET, and the renderer is what keeps that honest: DES-24 §5 —
+// "never labelled, never captioned '4 of 5', never given progress
+// semantics." Nothing renders this number. It is a divisor.
+export const NECTAR_STARTER_GRANT_DROPS = 500;
+
+// Four visible rungs plus absent — HoneycombGrid gates on
+// `Boolean(member.isOwn && member.honeyRung)`, so rung 0 is not a low fill,
+// it is NO HONEYED STATE AT ALL. That is the correct reading of an empty
+// vessel and it is why the ladder is 0..4 rather than a percentage.
+export const NECTAR_LADDER_RUNGS = 4;
+
+// PLACEHOLDER (DES-24 §7.2), bounded by Ruling 2 above rather than chosen.
+export const NECTAR_LADDER_CAP_DROPS = NECTAR_STARTER_GRANT_DROPS * NECTAR_LADDER_RUNGS;
+
+// Balance (drops) -> rung 0..NECTAR_LADDER_RUNGS.
+//
+// RUNG 0 MEANS EMPTY, NOT "BELOW THE FIRST RUNG" — and that is a correction
+// to my own first cut of this function, caught before it landed. Written as
+// a plain `floor(drops / cap * rungs)`, the grant sits at EXACTLY 0.25 of
+// the cap, which is precisely the lower edge of rung 1. One drop spent — the
+// smallest gift the presets offer is ten — and the cell goes dark. That is
+// R65/R66's zero-headroom failure in a new costume: a value placed on a
+// boundary is a cliff edge, not a register, and here the cliff fires on the
+// first generous thing a new user ever does.
+//
+// So the vessel reading is taken literally: a vessel with honey in it is not
+// an empty vessel. Any positive balance renders at least the lowest visible
+// rung, and the cell goes dark only at zero. That removes the cliff by
+// construction rather than by tuning the cap away from it — the same shape
+// as preferring a failing ground to a thin margin.
+export const honeyRungForDrops = (drops) => {
+  const n = Number(drops);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const scaled = Math.floor((n / NECTAR_LADDER_CAP_DROPS) * NECTAR_LADDER_RUNGS);
+  return Math.max(1, Math.min(NECTAR_LADDER_RUNGS, scaled));
+};
