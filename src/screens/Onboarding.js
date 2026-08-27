@@ -358,12 +358,17 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
         )}
         {expanded && (
           <>
-            <Text style={styles.h1}>{isSignUp ? 'Keep it.' : 'Welcome back'}</Text>
-            <Text style={styles.bodySm}>
-              {isSignUp
-                ? 'Make an account so your entries follow you — and so your hive can see the ones you choose to share.'
-                : 'Sign in to pick up where you left off.'}
-            </Text>
+            {/* §2's copy-that-dies list (Lumen, 2026-08-27, rider on R-ZD-1):
+                'Keep it.' + the justifying sentence are deleted, not
+                swapped — the landing pair above is already the screen's
+                voice, so the sign-up account form needs no sentence of its
+                own. The sign-in pair stays; it was never on the dies-list. */}
+            {!isSignUp && (
+              <>
+                <Text style={styles.h1}>Welcome back</Text>
+                <Text style={styles.bodySm}>Sign in to pick up where you left off.</Text>
+              </>
+            )}
             <View style={styles.inputCard}>
               {isSignUp && (
                 <TextInput
@@ -513,9 +518,16 @@ const styles = StyleSheet.create({
   backButton: {
     marginBottom: 16,
   },
+  // R-ZD-1 (Lumen, 2026-08-27): the wordmark is top-anchored, one design
+  // constant for both states, never a function of form content — a
+  // centred column reads its own position off the total height of
+  // everything below it, which moved the brand mark on the expand, on a
+  // mode switch (a sign-in/sign-up link that is not a navigation), and on
+  // a validation error mounting inline. `container`'s existing paddingTop
+  // is that one constant; anchoring is the absence of justifyContent here,
+  // not a second value to keep in sync with it.
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
   },
   centerFill: {
     flex: 1,
