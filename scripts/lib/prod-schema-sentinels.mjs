@@ -109,4 +109,11 @@ export const SENTINELS = {
   // Same shape as 20260813000006_entries_theme_column — a plain nullable
   // text column, no RLS change (sealed-hive immutability already covers it).
   '20260826000007_entries_paper': { kind: 'column', table: 'entries', column: 'paper' },
+  // Same shape as 20260817000002_private_hives_cover_and_cadence — owner-only
+  // RLS on private_hives, no anon grant beyond table-level SELECT, so a real
+  // column resolves 200 with zero rows. is_collective is this migration's
+  // one column add; hive_contributors/is_hive_contributor/the entries policy
+  // widening all ride the same version-order guarantee as everything else
+  // below a 'column'-kind row.
+  '20260827000001_multi_writer_hives': { kind: 'column', table: 'private_hives', column: 'is_collective' },
 };
