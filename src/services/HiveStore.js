@@ -292,6 +292,25 @@ export const HiveStore = {
     return rows.map((r) => ({ profileId: r.profile_id, name: names.get(r.profile_id) || 'Someone' }));
   },
 
+  // Every profile_id that has ever occupied a roster row on this hive,
+  // active or removed. Distinct from `getHiveContributors` above: this is
+  // an exclusion set for the invite picker, not a display roster, so it
+  // does not filter `removed_at is null` and does not join profile names.
+  // `hive_contributors`'s PK is `(hive_id, profile_id)` and
+  // `hive_contributors_removed_at_immutable_trigger` (20260827000001) means
+  // a removed row can never be re-inserted -- excluding it here isn't just
+  // tidiness, an invite attempt against a removed profile_id is a
+  // guaranteed 23505.
+  async getHiveContributorProfileIds(hiveId) {
+    const client = requireSupabase();
+    const { data: rows, error } = await client
+      .from('hive_contributors')
+      .select('profile_id')
+      .eq('hive_id', hiveId);
+    if (error) throw error;
+    return (rows ?? []).map((r) => r.profile_id);
+  },
+
   // DES-16 §1a(b) — which of the user's hives already hold a copy of the
   // entry dated `entryDateKey`, so the file-to-hive picker can tag a row
   // FILED instead of letting a second tap write a duplicate into a keepsake

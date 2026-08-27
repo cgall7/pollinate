@@ -56,6 +56,11 @@ export const InviteContributor = ({ navigation, route }) => {
   // resolves here; a null subjectProfileId (the common case — most hive
   // subjects have no account) just excludes nothing.
   const [subjectProfileId, setSubjectProfileId] = useState(null);
+  // Every profile_id already on this hive's roster, active or removed
+  // (HiveStore.getHiveContributorProfileIds) -- a removed contributor can
+  // never be re-invited (the migration's PK + its removed_at-immutable
+  // trigger), so this excludes both the same way subjectProfileId does.
+  const [rosterProfileIds, setRosterProfileIds] = useState(() => new Set());
   const [readState, setReadState] = useState(LOAD_STATES.LOADING);
   const [selected, setSelected] = useState(() => new Set());
   const [inviting, setInviting] = useState(false);
@@ -66,11 +71,16 @@ export const InviteContributor = ({ navigation, route }) => {
     useCallback(() => {
       let cancelled = false;
       setReadState(LOAD_STATES.LOADING);
-      Promise.all([HoneycombStore.listConnections(), HiveStore.getHive(hiveId)])
-        .then(([list, hive]) => {
+      Promise.all([
+        HoneycombStore.listConnections(),
+        HiveStore.getHive(hiveId),
+        HiveStore.getHiveContributorProfileIds(hiveId),
+      ])
+        .then(([list, hive, rosterIds]) => {
           if (cancelled) return;
           setConnections(list);
           setSubjectProfileId(hive?.subjectProfileId ?? null);
+          setRosterProfileIds(new Set(rosterIds));
           setReadState(LOAD_STATES.READY);
         })
         .catch((err) => {
@@ -87,10 +97,12 @@ export const InviteContributor = ({ navigation, route }) => {
   // Direction 1 of the subject/roster guard (20260827000001's own comment:
   // "the invite picker excludes the subject client-side; the DB guard is
   // the backstop"). Filtered here rather than trusting the insert to reject
-  // it later, so the subject never even appears as a selectable row.
+  // it later, so the subject never even appears as a selectable row. Also
+  // excludes anyone already on the roster (active or removed) via
+  // rosterProfileIds -- same reasoning, a different guaranteed-rejection.
   const candidates = useMemo(
-    () => connections.filter((c) => c.id !== subjectProfileId),
-    [connections, subjectProfileId]
+    () => connections.filter((c) => c.id !== subjectProfileId && !rosterProfileIds.has(c.id)),
+    [connections, subjectProfileId, rosterProfileIds]
   );
 
   const listView = resolveListView(readState, candidates.length);
@@ -111,21 +123,27 @@ export const InviteContributor = ({ navigation, route }) => {
     if (inviting || selected.size === 0) return;
     setInviting(true);
     setInviteError(false);
-    try {
-      // Sequential, not Promise.all — a partial failure (e.g. one insert
-      // hits the subject guard some other client-side check missed) should
-      // leave the successful invites written rather than racing several
-      // writes against the same roster and reporting one combined error
-      // nobody can attribute to a person.
-      for (const profileId of selected) {
+    // Sequential, not Promise.all — a partial failure (e.g. one insert hits
+    // the subject guard some other client-side check missed) should leave
+    // the successful invites written rather than racing several writes
+    // against the same roster and reporting one combined error nobody can
+    // attribute to a person. Per-invite try/catch, not one around the whole
+    // loop — a failure partway through must not skip everyone queued after
+    // it; each remaining profileId still gets its own attempt.
+    let failed = false;
+    for (const profileId of selected) {
+      try {
         await HiveStore.inviteContributor(hiveId, profileId);
+      } catch (err) {
+        console.warn('InviteContributor: failed to invite', profileId, err);
+        failed = true;
       }
-      goToHive();
-    } catch (err) {
-      console.warn('InviteContributor: failed to invite', err);
+    }
+    setInviting(false);
+    if (failed) {
       setInviteError(true);
-    } finally {
-      setInviting(false);
+    } else {
+      goToHive();
     }
   };
 
