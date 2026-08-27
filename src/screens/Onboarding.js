@@ -20,6 +20,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { GlowOrb } from '../components/GlowOrb';
 import { FlyingBee } from '../components/FlyingBee';
 import { DEMO_CONTENT, DEMO_LOGIN_EMAIL, DEMO_LOGIN_PASSWORD } from '../constants/demoMode';
+import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
 import { OnboardingState } from '../services/onboardingState';
 import { HoneycombStore } from '../services/HoneycombStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -105,6 +106,66 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
   // splash-hide signal from App.js rather than mount, so the flight is
   // never spent behind the still-visible splash (§13.3 follow-up,
   // Pixel/Sage 2026-08-12).
+  // ZERO DOOR §2/§7 — THE INLINE EXPANSION (Pixel, motion tail).
+  //
+  // "Continue with email" expands *inline on the same screen, never a second
+  // screen" (§2.4). A hard boolean swap reads as a navigation the spec just
+  // deleted: the eye cannot tell a block that replaced another in one frame
+  // from a screen that pushed over it. One spring gives the swap a direction,
+  // which is what makes it legible as an expansion rather than a push.
+  //
+  // ONE spring, and it is a SHARED curve, not a local literal (§12.5.1b: a
+  // named curve fixes SHAPE, not duration — `SPRINGS` is not a timing
+  // system). `reveal` is the existing name for a non-numeric entrance, which
+  // is exactly what this is; nothing new is added to the module for it.
+  //
+  // Only the ARRIVING form is animated, and only inwards. The return
+  // direction needs no counterpart here because collapsing REMOUNTS the
+  // landing block, whose `StaggeredItem` cascade is itself an entrance — so
+  // both directions already play one, from one spring plus machinery that
+  // was on the screen before I touched it. Animating the form outwards would
+  // mean holding it mounted while it fades, which leaves a focused TextInput
+  // and a raised keyboard attached to a view the user can no longer see.
+  //
+  // NOT placed on any ancestor of `wordmarkArcAnchor`. That is a structural
+  // constraint, not a preference: FlyingBee's `readOrigin` reads the shadow
+  // tree, which a `useNativeDriver` transform never reaches (FlyingBee.js
+  // :365-372, measured 18 samples of y=0 while a native view slid 200pt), so
+  // a native transform above the arc's mount would lie to the bee about
+  // where its own box is. The form block is a SIBLING of the anchor.
+  const reduced = useReducedMotion();
+  const expandAnim = useRef(new Animated.Value(startAt === 'signin' ? 1 : 0)).current;
+  useEffect(() => {
+    if (!expanded) {
+      // Rewound on collapse so the next expansion plays from the start.
+      // Safe against a live animation: an AnimatedValue holds exactly one
+      // `_animation` and `setValue` stops the incumbent (AnimatedValue.js
+      // :197-201), so this cannot leave two drivers racing.
+      expandAnim.setValue(0);
+      return undefined;
+    }
+    if (reduced) {
+      // R16: reduced motion keeps the fade and drops the travel — it is not
+      // "no entrance". The translate is held at 0 in the style below.
+      Animated.timing(expandAnim, {
+        toValue: 1,
+        duration: DURATIONS.reducedMotionFade,
+        useNativeDriver: true,
+      }).start();
+      return () => expandAnim.stopAnimation();
+    }
+    Animated.spring(expandAnim, {
+      toValue: 1,
+      ...SPRINGS.reveal,
+      useNativeDriver: true,
+    }).start();
+    // Stop at unmount: this screen is remounted on every DEMO_MODE
+    // foreground resume, and a native animation left running writes to a
+    // value nobody reads (StaggeredItem.js:82-86, same reasoning).
+    return () => expandAnim.stopAnimation();
+  }, [expanded, reduced]);
+
+
   const [showArc, setShowArc] = useState(false);
   useEffect(() => {
     if (splashHidden && !hasArcedThisLaunch) {
@@ -357,7 +418,21 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
           </View>
         )}
         {expanded && (
-          <>
+          <Animated.View
+            style={[
+              styles.expandedForm,
+              {
+                opacity: expandAnim,
+                transform: [
+                  {
+                    translateY: reduced
+                      ? 0
+                      : expandAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.h1}>{isSignUp ? 'Keep it.' : 'Welcome back'}</Text>
             <Text style={styles.bodySm}>
               {isSignUp
@@ -433,7 +508,7 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
                 {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
               </Text>
             </PressableScale>
-          </>
+          </Animated.View>
         )}
       </ScrollView>
       {!expanded ? (
@@ -509,6 +584,13 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: theme.spacing.lg,
+  },
+  // The expansion wrapper replaces a bare fragment, so it must add no layout
+  // of its own — the children kept their own margins. `alignSelf: stretch`
+  // restores the full-width sizing the fragment's children had as direct
+  // flex children of the scroll content.
+  expandedForm: {
+    alignSelf: 'stretch',
   },
   backButton: {
     marginBottom: 16,

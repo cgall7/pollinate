@@ -23,6 +23,7 @@ import { WelcomeBee } from '../components/WelcomeBee';
 import { CelebrationBadge } from '../components/CelebrationBadge';
 import { CelebrationRays } from '../components/CelebrationRays';
 import { PaperPicker } from '../components/PaperPicker';
+import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
 import { DEMO_CONTENT } from '../constants/demoMode';
 import {
   requestPermissionAndEnable,
@@ -135,6 +136,54 @@ export const InputScreen = ({ onUnlock }) => {
   // returning user's ordinary save would be the real defect.
   const [isFirstEntry, setIsFirstEntry] = useState(false);
   const [awaitingContinue, setAwaitingContinue] = useState(false);
+
+  // ZERO DOOR §3 — THE RELOCATED CELEBRATION'S FIRST-SAVE TREATMENT
+  // (Pixel, motion tail).
+  //
+  // The celebration moved out of onboarding and onto the first real save
+  // (spec §3's transmutation row). On that one save the overlay stops being
+  // a 1400ms flash and becomes a surface that WAITS for a tap — and the
+  // things that make it wait (the notification chip, the Continue button)
+  // were arriving in a single frame, hard-cut, on top of a badge that had
+  // just landed on a spring. The mismatch is the tell: the badge is treated
+  // as an event and the ask as a fact that was always there, when the ask is
+  // the newer of the two.
+  //
+  // So the ask gets ONE entrance, on the same shared curve family the badge
+  // uses (§12.5.1b — the curve is named in the module, the duration is not
+  // mine to invent). `reveal` is the existing non-numeric-entrance name.
+  //
+  // Deliberately NOT staggered across the chip and the button. A cascade
+  // here would say they are a list; they are one offer and its dismissal,
+  // arriving together. One value drives both.
+  //
+  // Only the FIRST save reaches this — every other day's save keeps the
+  // unchanged timed auto-advance and never mounts the block, so this cannot
+  // add a frame to the ordinary path.
+  const reduced = useReducedMotion();
+  const askAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!awaitingContinue) {
+      askAnim.setValue(0);
+      return undefined;
+    }
+    if (reduced) {
+      // R16: reduced motion keeps the fade, drops the travel — not "no
+      // entrance". The translate is held at 0 in the style below.
+      Animated.timing(askAnim, {
+        toValue: 1,
+        duration: DURATIONS.reducedMotionFade,
+        useNativeDriver: true,
+      }).start();
+      return () => askAnim.stopAnimation();
+    }
+    Animated.spring(askAnim, {
+      toValue: 1,
+      ...SPRINGS.reveal,
+      useNativeDriver: true,
+    }).start();
+    return () => askAnim.stopAnimation();
+  }, [awaitingContinue, reduced]);
   const [nudge, setNudge] = useState(NUDGE_ASK);
 
   // The first three days get the belief prompts (FIRST_DAYS_PROMPTS) before
@@ -294,7 +343,21 @@ export const InputScreen = ({ onUnlock }) => {
           </View>
           <Text style={styles.unlockingText}>Your day is open. Enjoy it.</Text>
           {awaitingContinue && (
-            <>
+            <Animated.View
+              style={[
+                styles.askReveal,
+                {
+                  opacity: askAnim,
+                  transform: [
+                    {
+                      translateY: reduced
+                        ? 0
+                        : askAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                    },
+                  ],
+                },
+              ]}
+            >
               {(nudge === NUDGE_ASK || nudge === NUDGE_BUSY) && (
                 <PressableScale
                   onPress={handleAskForNudge}
@@ -326,7 +389,7 @@ export const InputScreen = ({ onUnlock }) => {
               <PrimaryButton onPress={proceed} style={styles.overlayContinueButton}>
                 Continue
               </PrimaryButton>
-            </>
+            </Animated.View>
           )}
         </Animated.View>
       )}
@@ -470,6 +533,15 @@ const styles = StyleSheet.create({
   // sits on the same washYellow (theme.colors.unlockOverlay's backgroundColor
   // above), so the same measured pair applies — accentDeep fails 4.5:1 here,
   // ink/inkSoft are the legal pair.
+  // The reveal wrapper replaced a bare fragment whose children were DIRECT
+  // children of `unlockOverlay` and inherited its `alignItems: 'center'`.
+  // A wrapper interposes a new cross-axis context, so that centring has to
+  // be restated here or the chip and the button left-align against each
+  // other inside a shrink-wrapped box. The wrapper adds nothing else — no
+  // margin, no padding — because the children still carry their own.
+  askReveal: {
+    alignItems: 'center',
+  },
   nudgeSlot: {
     alignSelf: 'center',
     marginTop: 22,
