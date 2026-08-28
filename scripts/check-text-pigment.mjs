@@ -64,6 +64,25 @@ const BANNED = {
 };
 const LARGE_TEXT_FLOOR = 3;
 
+// KEYED ON THE PIGMENT'S VALUE, NOT ITS NAME. R127's constraint was "never a
+// token name — a blacklist goes green the moment someone writes `#FF7A00`", and
+// the hole is wider than a raw literal: `linkAmber: '#FF7A00'` is a NEW name for
+// the same light, and a name-keyed row would pass it. Hex-keying closes the
+// literal, the alias and the rename in one move.
+//
+// R127 also asked for the resolved (text, ground) PAIR. That half I did not
+// build, and the reason is R127's own strengthening: it ruled `accentDeep` is
+// never text *unqualified*, and closed the one arithmetic exception —
+// `paperEvening` at 5.0027 — by ruling rather than by measurement. A pair-keyed
+// row would go GREEN on exactly that pair, because 5.0027 clears 3:1. Keying on
+// the pigment enforces the ruling as ruled; keying on the pair would quietly
+// reopen the door the ruling closed. Raised in-thread rather than decided here.
+const BANNED_HEX = new Map();
+for (const name of Object.keys(BANNED)) {
+  const hex = TOKENS.get(name);
+  if (hex) BANNED_HEX.set(hex.toUpperCase(), name);
+}
+
 // ── the residue: known-live defects, each owed to somebody ──────────────────
 // This list may only SHRINK. T4 reds on any entry that is no longer a defect,
 // so a fix cannot leave its cover behind — an allowlist nobody has to revisit
@@ -123,6 +142,17 @@ for (const [name, expected] of Object.entries(BANNED)) {
   }
   ok(`T1 ${name} ${hex} clears ${LARGE_TEXT_FLOOR}:1 on ${actual.length}/${TOKENS.size} tokens ` +
     `(${actual.join(', ')}) and every one of them is DARK — no light ground in the system admits it as text`);
+  // An alias is a second name for a banned light. Named here rather than left to
+  // T3, because T3 would report it as an unexplained defect at a call site while
+  // the actual event was someone minting a synonym in theme.js.
+  const aliases = [...TOKENS.entries()].filter(([k, v]) => k !== name && v.toUpperCase() === hex.toUpperCase());
+  if (aliases.length) {
+    bad(`T1 ${name} has no alias`, `\`${aliases.map(([k]) => k).join('`, `')}\` hold the same hex ${hex} as ` +
+      `\`${name}\`. A second name for a banned pigment is how a struck licence comes back — the rows below key ` +
+      `on the VALUE so the alias is caught anyway, but the alias itself wants deleting, not documenting.`);
+  } else {
+    ok(`T1 ${name} has no alias — no other token in theme.js holds ${hex}`);
+  }
 }
 
 // ── the extractor ───────────────────────────────────────────────────────────
@@ -166,10 +196,23 @@ for (const file of files) {
     const text = code.slice(node.value.start, node.value.end).replace(/\s+/g, ' ');
     const rel = path.relative(ROOT, file);
     const at = { file: rel, line: node.loc.start.line, expr: text };
+    // A resolved site carries the HEXES it can paint, not just the names — the
+    // names are for the message, the hexes are what the rows decide on.
+    const push = (names, via, hexes) => {
+      const resolved = hexes ?? names.map((n) => TOKENS.get(n));
+      if (resolved.some((h) => !h)) {
+        unresolved.push(`${rel}:${node.loc.start.line} — \`color: ${text}\` names ${names.join('|')}, ` +
+          `which is not a plain hex literal in theme.js, so its legibility cannot be measured`);
+        return;
+      }
+      sites.push({ ...at, tokens: names, hexes: resolved.map((h) => h.toUpperCase()), via });
+    };
     const direct = text.match(/^theme\.colors\.(\w+)$/);
-    if (direct) sites.push({ ...at, tokens: [direct[1]], via: 'direct' });
-    else if (COVER_TEXT.test(text)) sites.push({ ...at, tokens: coverTextTokens, via: 'cover.textColor' });
-    else if (PAPER_INK.test(text)) sites.push({ ...at, tokens: paperInkTokens, via: 'paperInk()' });
+    const literal = text.match(/^'(#[0-9A-Fa-f]{6})'$/);
+    if (direct) push([direct[1]], 'direct');
+    else if (literal) push([literal[1]], 'raw hex literal', [literal[1]]);
+    else if (COVER_TEXT.test(text)) push(coverTextTokens, 'cover.textColor');
+    else if (PAPER_INK.test(text)) push(paperInkTokens, 'paperInk()');
     else unresolved.push(`${rel}:${node.loc.start.line} — \`color: ${text}\` resolves to no token this gate can name`);
   });
 }
@@ -192,7 +235,7 @@ if (unresolved.length) {
 // Calibration: the extractor must still be able to SEE a banned pigment. If the
 // residue ever empties this row keeps its meaning by pointing at the exemption,
 // which is the same shape of hit and is not going away.
-const canSeeBanned = sites.filter((s) => s.tokens.some((t) => t in BANNED));
+const canSeeBanned = sites.filter((s) => s.hexes.some((h) => BANNED_HEX.has(h)));
 if (canSeeBanned.length === 0) {
   bad('T2 the probe can see a banned pigment',
     'zero sites resolved to `accent` or `accentDeep` anywhere — including the two ratified decorative ones, ' +
@@ -222,7 +265,7 @@ const stale = [];
 for (const entry of [...RESIDUE, ...DECORATIVE]) {
   const site = sites.find((s) => s.file === entry.file && s.line === entry.line);
   if (!site) stale.push(`${entry.file}:${entry.line} (${entry.what}) is listed but no \`color:\` sits there any more`);
-  else if (!site.tokens.includes(entry.token)) stale.push(`${entry.file}:${entry.line} (${entry.what}) is listed as \`${entry.token}\` but now resolves to \`${site.tokens.join('|')}\``);
+  else if (!site.hexes.includes((TOKENS.get(entry.token) ?? '').toUpperCase())) stale.push(`${entry.file}:${entry.line} (${entry.what}) is listed as \`${entry.token}\` but now paints \`${site.tokens.join('|')}\``);
 }
 if (stale.length) {
   bad('T4 the residue shrinks',
