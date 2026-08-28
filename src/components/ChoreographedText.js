@@ -105,6 +105,27 @@ const styles = StyleSheet.create({
   rowBreak: { width: '100%', height: 0 },
 });
 
+// The schedule the component runs, exported so a CALLER can chain off it.
+//
+// P2's beat requires "acknowledgment precedes numbers IN TIME, not just in
+// layout" (PRESENCE_PASS_REGISTER, lane P2), so the arithmetic that follows a
+// choreographed line has to know when that line is legible. It cannot compute
+// that itself without reproducing the two-pass derivation below, and a
+// SECOND COPY OF A DERIVATION IS THE DEFECT — it agrees today and diverges the
+// first time either pass moves. So there is one function and two readers.
+//
+// It lives here rather than in `typeChoreography.js` because the step comes
+// from `staggerDelay`, and `motion.js` imports React — `typeChoreography` is
+// gate-importable precisely because it takes the step as an argument.
+//
+// Two passes: the step depends on the FINAL segment count, and that count
+// depends on the collapse ceiling, which only `revealSchedule` knows. Cheap —
+// both passes are string work over one line of copy.
+export const choreographedSchedule = (text, grain = GRAINS.LINE) => {
+  const count = revealSchedule(text, { grain }).segments.length;
+  return revealSchedule(text, { grain, stepMs: staggerDelay(1, count) });
+};
+
 export const ChoreographedText = ({
   text,
   // The default is the LOSSLESS grain, which is also the one Deezine picked
@@ -134,14 +155,11 @@ export const ChoreographedText = ({
   // returns `index * step`, so index 1 returns the step itself. Derived
   // rather than re-stated, so this cascade divides §14.1's budget exactly
   // the way every other cascade in the app does and cannot drift from it.
-  const schedule = useMemo(() => {
-    // Two passes on purpose: the step depends on the FINAL segment count,
-    // and that count depends on the collapse ceiling, which only
-    // `revealSchedule` knows. Cheap — both passes are string work over one
-    // line of copy, memoised on `text`/`grain`.
-    const count = revealSchedule(text, { grain }).segments.length;
-    return revealSchedule(text, { grain, stepMs: staggerDelay(1, count) });
-  }, [text, grain]);
+  // The same function a caller chains off — see `choreographedSchedule`.
+  // Memoised on `text`/`grain`; the derivation itself lives above so that
+  // this component and whatever follows it can never disagree about when
+  // this beat ends.
+  const schedule = useMemo(() => choreographedSchedule(text, grain), [text, grain]);
 
   const { segments, delays } = schedule;
 

@@ -200,12 +200,70 @@ export const FlyingBee = ({
   // Ref so a new callback identity never restarts an in-progress flight.
   const onSettleRef = useRef(onSettle);
   onSettleRef.current = onSettle;
+  // §32.2 / P1a — `onSettle` used to be the PRESET's callback and nothing
+  // else: it fired at the end of a preset flight and, when that flight was
+  // suppressed, immediately. On the RESIDENT path it could not fire at all,
+  // because a resident does not arrive — `start()` seeds him at home and
+  // `rest()` hands him a plan with `durationMs: null`, which is the absence
+  // of an animation rather than a zero-length one, so there is no completion
+  // callback anywhere for the settle to hang off.
+  //
+  // That was invisible while the only consumer was Welcome's `loginArc`. It
+  // stops being invisible the moment a resident stages copy: MB-P1 renders
+  // nothing until `active` turns true, so a boolean `active` wired to an
+  // `onSettle` that never fires is a permanently blank line — DES-17's
+  // forfeit class, on the screen the app opens to. `ChoreographedText`'s own
+  // header names this hazard; the primitive cannot close it, because a
+  // component with no concept of a hero cannot know the hero never landed.
+  //
+  // So the resident announces his settle too, and `onSettle` now means what
+  // its name always claimed on BOTH paths: the bee is at rest where he
+  // belongs. Fired once per mount — Lane P3 gives the greeting one arrival
+  // and explicitly no re-trigger on scroll, focus, or return, and `start()`
+  // is retried until the anchor measures, so "once" has to be structural
+  // rather than a property of how many times the retry happened to run.
+  const residentSettledRef = useRef(false);
   const onPollinateEndRef = useRef(onPollinateEnd);
   onPollinateEndRef.current = onPollinateEnd;
 
   const presetDef = preset ? PRESETS[preset] : null;
   const track = plan ?? presetDef?.track ?? null;
+  // TWO SUPPRESSIONS, BECAUSE REDUCE MOTION HAS NOTHING TO TAKE FROM A
+  // RESIDENCE (Pixel, 2026-08-28, P1a — and this was a live defect before it
+  // was a staging requirement).
+  //
+  // `reduced || !active` used to gate everything, including WHERE THE BEE IS.
+  // A suppressed resident rendered at `styles.parkedAnchor` — bottom-right,
+  // 16pt off both edges — no matter which anchors his screen had declared. So
+  // Reduce Motion did not stop the bee moving, it MOVED him, out of the
+  // residence the screen named and into a corner. At 44pt that read as a
+  // quirk; P1a stages a 132pt hero at the greeting and a light behind it, and
+  // under Reduce Motion the hero would have been in the opposite corner with
+  // the stage light shining on nobody.
+  //
+  // The distinction the old flag could not make is the doctrine's own: State 1
+  // is a POSITION, not an animation. `buildRestPlan` returns `durationMs:
+  // null` — "the absence of an animation, not a zero-length one" — so a
+  // resident at home costs zero drivers. There is nothing in it for Reduce
+  // Motion to remove. What Reduce Motion removes is the errands, the trail,
+  // the preset arcs and the wing; what it must not remove is the address.
+  //
+  //   flightSuppressed   errands, trail, pollen, preset arcs — anything that
+  //                      MOVES. Reduce Motion or an inactive host.
+  //   residentSuppressed where he LIVES. Only an inactive host: `!active` is
+  //                      "stand aside" (a text field took focus), and standing
+  //                      aside is the one case the corner pose is FOR.
+  //
+  // A screen with no `home` is untouched by this: it is `sequenceHalted` and
+  // renders nothing at all, which is the doctrine's default and not a fallback
+  // — so no screen loses a bee to this change. What changes is that Today's
+  // and Honeycomb's Reduce Motion bee now stands where his screen said,
+  // frozen, instead of in the corner.
   const flightSuppressed = reduced || !active;
+  const residentSuppressed = !active;
+  // One expression, read in two places (the drive effect and the render), so
+  // the two can never disagree about which bee is suppressed.
+  const suppressed = presetDef ? flightSuppressed : residentSuppressed;
   const easing = plan ? plan.easing : PRESET_EASING;
   const durationMs = plan ? plan.durationMs : presetDef ? presetDef.duration : 0;
 
@@ -222,11 +280,16 @@ export const FlyingBee = ({
   const sequenced = !presetDef;
   const canSequence = sequenced && homeKey !== null;
   // Everything that makes a bee visible or animated is off when this is true.
-  // Note it is NOT folded into `flightSuppressed`: suppressed means "parked" —
-  // a small still bee in the corner, which is the right answer
-  // for Reduce Motion and for a text field taking focus. Halted means "not
-  // here at all", which is the ratified answer for the week feed and the error
-  // arm. Collapsing the two would have shipped a parked bee onto both.
+  // Note it is NOT folded into the suppressions above: suppressed means
+  // "parked" — a small still bee in the corner, which is the right answer for
+  // a text field taking focus. Halted means "not here at all", which is the
+  // ratified answer for the week feed and the error arm. Collapsing the two
+  // would have shipped a parked bee onto both.
+  //
+  // This paragraph used to read "the right answer for Reduce Motion and for a
+  // text field taking focus". It is not the right answer for Reduce Motion and
+  // never was — see the two suppressions above; the corner is now reachable
+  // only from `!active`.
   //
   // **A screen with anchors but no `home` is halted, and that is the doctrine
   // rather than an oversight.** Anchors that are not home are errand LANDING
@@ -563,6 +626,15 @@ export const FlyingBee = ({
     if (!home) return false;
     posRef.current = { x: home.x, y: home.y };
     rest(home);
+    // The resident's settle. It is announced HERE rather than from `rest()`
+    // because `rest()` is also where a flight ends, and a bee that has just
+    // flown an errand has already settled once — firing there would make the
+    // "once" a lie the first time anything moves. This is the one moment the
+    // bee goes from nowhere to home.
+    if (!residentSettledRef.current) {
+      residentSettledRef.current = true;
+      onSettleRef.current?.();
+    }
     return true;
   };
 
@@ -633,7 +705,7 @@ export const FlyingBee = ({
   // an interrupt (a tap, a screen state change, an unmount) stops exactly one
   // thing and cannot leave a queued beat behind it.
   useEffect(() => {
-    if (!layout || flightSuppressed || sequenceHalted) {
+    if (!layout || suppressed || sequenceHalted) {
       loopRef.current?.stop();
       return undefined;
     }
@@ -708,7 +780,7 @@ export const FlyingBee = ({
       });
     }
     return () => loopRef.current?.stop();
-  }, [layout, flightSuppressed, sequenceHalted, preset, plan]);
+  }, [layout, suppressed, sequenceHalted, preset, plan]);
 
   // §32.2 — arrive and leave at the descent's own pace. Driving `presence`
   // rather than unmounting keeps the fade honest in both directions: a screen
@@ -717,11 +789,13 @@ export const FlyingBee = ({
   useEffect(() => {
     Animated.timing(presence, {
       toValue: sequenceHalted ? 0 : 1,
-      duration: PRESENCE_FADE_MS,
+      // A fade is a motion. Under Reduce Motion the resident is simply there —
+      // the same `0` this would have crossed, arrived at without crossing it.
+      duration: reduced ? 0 : PRESENCE_FADE_MS,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [sequenceHalted]);
+  }, [sequenceHalted, reduced]);
 
   // A suppressed preset flight settles instantly — the host is waiting on
   // onSettle to move on, and there is no parked pose for an entrance.
@@ -795,7 +869,7 @@ export const FlyingBee = ({
   //   parked, motion  Breath — the same 2-degree wing the resident wears,
   //                   because a bee parked over a text field is a resident
   //                   who has been asked to stand aside, not a different bee.
-  if (flightSuppressed) {
+  if (suppressed) {
     if (presetDef || sequenceHalted) return null;
     return (
       <View style={[styles.parkedAnchor, style]} pointerEvents="none">
@@ -878,7 +952,12 @@ export const FlyingBee = ({
           <MascotBee
             size={size}
             flutter={plan ? plan.flutter !== false : true}
-            breath={plan?.kind === 'rest'}
+            // `&& !reduced` is what the parked pose used to carry (`breath={!reduced}`)
+            // and it has to come with the bee to his home: a resting bee under
+            // Reduce Motion is the doctrine's §State-2 "complete freeze at rest
+            // pose", and 2 degrees on a 4.2s clock is still a motion someone
+            // asked the OS to stop.
+            breath={plan?.kind === 'rest' && !reduced}
           />
         </Animated.View>
       )}

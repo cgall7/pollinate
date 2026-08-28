@@ -3913,6 +3913,247 @@ for (const [file, { anchors }] of perchSets) {
   }
 }
 
+
+console.log('\nL. Reduce Motion moves nothing, including the bee');
+
+// P1a, 2026-08-28. `flightSuppressed = reduced || !active` gated WHERE THE BEE
+// IS as well as whether he moves, so a Reduce Motion user got a bee in the
+// bottom-right corner instead of the residence their screen declared. That is
+// not a suppressed motion, it is a relocation — and it is the one thing Reduce
+// Motion must not do, because State 1 is a POSITION (`durationMs: null`, zero
+// drivers) and there is no motion in it to suppress. Under P1a it stops being
+// a quirk: the stage light comes up on the greeting and the hero is in the
+// opposite corner.
+//
+// THE ROWS EVALUATE THE GUARDS, THEY DO NOT READ THEM. The first draft of this
+// section asked which identifiers a guard's expansion contained, and it went
+// red on correct code: the live guard is `presetDef ? flightSuppressed :
+// residentSuppressed`, whose expansion contains `reduced` on a branch a
+// resident never takes. Membership in an expansion is not reachability — so
+// each row below reconstructs the guard's own source together with the
+// declarations it depends on, binds the case it is about, and RUNS it. That
+// makes the rows immune to spelling and to how the ternary is factored, and it
+// is the only form in which "the resident branch does not see Reduce Motion"
+// is actually the claim being checked.
+{
+  const visitNode = (node, fn) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach((n) => visitNode(n, fn)); return; }
+    if (typeof node.type === 'string') fn(node);
+    for (const k of Object.keys(node)) {
+      if (k === 'loc' || k === 'leadingComments' || k === 'trailingComments' || k === 'comments') continue;
+      if (node.type === 'MemberExpression' && k === 'property' && !node.computed) continue;
+      if (node.type === 'ObjectProperty' && k === 'key' && !node.computed) continue;
+      visitNode(node[k], fn);
+    }
+  };
+
+  const declOf = (tree) => {
+    const m = new Map();
+    visitNode(tree, (n) => {
+      if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init) m.set(n.id.name, n);
+    });
+    return m;
+  };
+
+  // Transitive identifier closure, stopping at the names the caller BINDS. A
+  // bound name is a leaf on purpose: `presetDef`'s own initialiser reaches
+  // `PRESETS` and the whole track builder, none of which a guard's truth value
+  // depends on once you have said which case you are asking about.
+  const dependsOn = (node, decls, bound) => {
+    const seen = new Set(bound);
+    const order = [];
+    const walk = (n, depth) => {
+      if (depth > 8) return;
+      const names = [];
+      visitNode(n, (x) => { if (x.type === 'Identifier') names.push(x.name); });
+      for (const nm of names) {
+        if (seen.has(nm)) continue;
+        seen.add(nm);
+        const d = decls.get(nm);
+        if (d) { walk(d.init, depth + 1); order.push(nm); }
+      }
+    };
+    walk(node, 0);
+    return order;
+  };
+
+  // Rebuild the guard as runnable JS: its dependencies in source order, then
+  // the guard's own expression, with the case bound as parameters.
+  const evalGuard = (src, testNode, decls, bindings) => {
+    const names = dependsOn(testNode, decls, new Set(Object.keys(bindings)));
+    const needed = names
+      .map((nm) => decls.get(nm))
+      .sort((a, b) => a.start - b.start)
+      .map((d) => `const ${d.id.name} = ${src.slice(d.init.start, d.init.end)};`);
+    const body = `${needed.join('\n')}\nreturn (${src.slice(testNode.start, testNode.end)});`;
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(...Object.keys(bindings), body);
+    return fn(...Object.values(bindings));
+  };
+
+  // The branch that draws the corner pose, found by the STYLE IT DRAWS rather
+  // than by a variable name.
+  const parkedGuard = (tree) => {
+    let found = null;
+    visitNode(tree, (n) => {
+      if (found || n.type !== 'IfStatement') return;
+      let draws = false;
+      visitNode(n.consequent, (x) => {
+        if (
+          x.type === 'MemberExpression' &&
+          x.object.type === 'Identifier' && x.object.name === 'styles' &&
+          x.property.type === 'Identifier' && x.property.name === 'parkedAnchor'
+        ) draws = true;
+      });
+      if (draws) found = n;
+    });
+    return found;
+  };
+
+  // The effect that OPENS the sequence — `start()` is where a resident is
+  // seated at his anchor, so its stop-guard decides whether he is seated at all.
+  const guardOfEffectContaining = (tree, marker, consequentMarker) => {
+    let effect = null;
+    visitNode(tree, (n) => {
+      if (effect) return;
+      if (n.type !== 'CallExpression' || n.callee.type !== 'Identifier' || n.callee.name !== 'useEffect') return;
+      let hit = false;
+      visitNode(n.arguments[0], (x) => { if (x.type === 'Identifier' && x.name === marker) hit = true; });
+      if (hit) effect = n;
+    });
+    if (!effect) return null;
+    let guard = null;
+    visitNode(effect.arguments[0]?.body, (n) => {
+      if (guard || n.type !== 'IfStatement') return;
+      if (!consequentMarker) { guard = n; return; }
+      let hit = false;
+      visitNode(n.consequent, (x) => { if (x.type === 'Identifier' && x.name === consequentMarker) hit = true; });
+      if (hit) guard = n;
+    });
+    return guard;
+  };
+
+  // The two cases every row below is stated in. `RM` is the one the fix is
+  // about; `ASIDE` is the case the corner pose actually exists for, and it is
+  // here so a row can distinguish "unreachable from Reduce Motion" from
+  // "unreachable", which are very different repairs.
+  const RM = { presetDef: null, reduced: true, active: true, layout: { width: 393, height: 852 }, sequenceHalted: false, plan: null };
+  const ASIDE = { ...RM, reduced: false, active: false };
+  const PRESET_RM = { ...RM, presetDef: { duration: 900 } };
+
+  const run = (src, tree) => {
+    const decls = declOf(tree);
+    const parked = parkedGuard(tree);
+    const drive = guardOfEffectContaining(tree, 'start', 'loopRef');
+    const trail = guardOfEffectContaining(tree, 'trailTimerRef', null);
+    if (!parked || !drive || !trail) return { missing: { parked: !parked, drive: !drive, trail: !trail } };
+    return {
+      parkedUnderRM: evalGuard(src, parked.test, decls, RM),
+      parkedWhenAside: evalGuard(src, parked.test, decls, ASIDE),
+      driveStoppedUnderRM: evalGuard(src, drive.test, decls, RM),
+      driveStoppedForPresetUnderRM: evalGuard(src, drive.test, decls, PRESET_RM),
+      trailStoppedUnderRM: evalGuard(src, trail.test, decls, RM),
+    };
+  };
+
+  let live;
+  try {
+    live = run(flyingBeeSource, flyingBeeAst);
+  } catch (err) {
+    live = { error: err.message };
+  }
+
+  if (live.error || live.missing) {
+    const why = live.error
+      ? `the guards would not evaluate: ${live.error}`
+      : `could not locate ${Object.entries(live.missing).filter(([, v]) => v).map(([k]) => k).join(', ')}`;
+    bad('L1-L3 the residence survives Reduce Motion', `${why}. Fails closed: an unreadable guard is not a passing one.`);
+  } else {
+    // L1 — the corner pose is unreachable from Reduce Motion, and still
+    // reachable from the thing it is for.
+    if (live.parkedUnderRM) {
+      bad(
+        'L1 Reduce Motion does not relocate the resident',
+        'with `reduced` true and the host active, the branch that draws `styles.parkedAnchor` is TAKEN. ' +
+          'Reduce Motion would move the bee out of the residence his screen declared and into the ' +
+          "bottom-right corner — and P1a's stage light would come up on nobody.",
+      );
+    } else if (!live.parkedWhenAside) {
+      bad(
+        'L1 Reduce Motion does not relocate the resident',
+        'the corner pose is unreachable from Reduce Motion, but it is also unreachable from `active: false` — ' +
+          'so it is unreachable, not fixed. "Stand aside" is the case the pose exists for; if that is ' +
+          'genuinely gone, delete the pose rather than leaving a branch nothing can enter.',
+      );
+    } else {
+      ok('L1 the corner pose is entered by `active: false` and NOT by Reduce Motion — Reduce Motion stops the bee moving, it does not move him');
+    }
+
+    // L2 — and the effect that SEATS him runs, so `onSettle` fires and
+    // anything cued by it arrives.
+    if (live.driveStoppedUnderRM) {
+      bad(
+        'L2 the resident is seated under Reduce Motion',
+        'the effect that calls `start()` is stopped when `reduced` is true, so the resident is never ' +
+          'placed at his anchor, `onSettle` never fires, and every consumer cued by it (the MB-D1 bloom, ' +
+          "a choreographed greeting) is dead for Reduce Motion users — DES-17's forfeit class.",
+      );
+    } else if (!live.driveStoppedForPresetUnderRM) {
+      bad(
+        'L2 the resident is seated under Reduce Motion',
+        'the resident is seated, but a PRESET arc is no longer stopped under Reduce Motion either — ' +
+          'that is an entrance flight playing for someone who asked the OS to stop them.',
+      );
+    } else {
+      ok('L2 under Reduce Motion the resident is seated (`start()` runs, `onSettle` fires) and preset arcs are still stopped');
+    }
+
+    // L3 — CONTROL. Without it, deleting `reduced` from the file passes L1 and
+    // L2 identically, which is the opposite defect.
+    if (!live.trailStoppedUnderRM) {
+      bad(
+        'L3 Reduce Motion still suppresses the motions',
+        'the trail effect runs under Reduce Motion. The split was supposed to take Reduce Motion off the ' +
+          'ADDRESS, not off the motions — and without this row, a file with `reduced` simply deleted ' +
+          'passes L1 and L2.',
+      );
+    } else {
+      ok('L3 control: the trail is still stopped under Reduce Motion — the split removed Reduce Motion from the address, not from the motions');
+    }
+  }
+
+  // L4 — CALIBRATION, red direction. A green L1/L2 proves the evaluator ran.
+  // It does not prove the evaluator can SEE the defect, so put the defect back
+  // into a copy of the source and require both findings to flip.
+  {
+    const mutated = flyingBeeSource.replace(
+      /const residentSuppressed = !active;/,
+      'const residentSuppressed = reduced || !active;',
+    );
+    if (mutated === flyingBeeSource) {
+      bad(
+        'L4 the rows can see the defect they exist to catch',
+        'the mutation matched nothing, so this calibration ran against an unmodified source. The ' +
+          'residency binding is spelled differently now — re-point the mutation at the live declaration; ' +
+          'an uncalibrated L1 announces nothing.',
+      );
+    } else {
+      let m;
+      try { m = run(mutated, parseJs(mutated)); } catch (err) { m = { error: err.message }; }
+      if (!m.error && !m.missing && m.parkedUnderRM && m.driveStoppedUnderRM) {
+        ok('L4 calibration: the pre-fix source (Reduce Motion back in the residency binding) turns L1 AND L2 red — the rows discriminate, they do not merely run');
+      } else {
+        bad(
+          'L4 the rows can see the defect they exist to catch',
+          'the pre-fix source still reads clean at L1/L2, so a green L1 on the real file means nothing. ' +
+            `(parkedUnderRM=${m.parkedUnderRM}, driveStoppedUnderRM=${m.driveStoppedUnderRM}${m.error ? `, error: ${m.error}` : ''})`,
+        );
+      }
+    }
+  }
+}
+
 console.log(`\ncheck-bee-attitude: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   failures.forEach((f) => console.log(`  - ${f}`));

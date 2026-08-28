@@ -43,9 +43,13 @@
 //      "You"). A gate silently dropped in a future edit is the one failure
 //      mode none of the above numeric checks can see.
 //   7. Source-level: the honey fill renders before `seeded` and before
-//      `BloomRing` in `FilledCell`, and `BloomRing` receives `honeyed=`.
-//      §6.4's ruling is contingent on this exact draw order — the ring
-//      drawn first is a different, unmeasured picture.
+//      `BloomRing` in `FilledCell`, and `BloomRing` receives a
+//      `honeyGround=` naming BOTH accent-family grounds. §6.4's ruling is
+//      contingent on this exact draw order — the ring drawn first is a
+//      different, unmeasured picture. MB-D2b (2026-08-28) added the second
+//      ground: a selected cell's held `accent` fill sits under all six
+//      marks, where `inkSoft` floors at 2.8399:1. That one is reachable
+//      today and `honeyed` still is not, so the row asserts the union.
 //
 // WHAT THIS GATE DOES NOT ASSERT: the mapping from a real drop balance to a
 // rung (0-4). DES-24 §7 names that its own open item — it wants 19a's drop
@@ -172,7 +176,24 @@ if (gateMatch) {
 const honeyIdx = gridSrc.indexOf('<HoneyFill');
 const seededIdx = gridSrc.indexOf('member.seeded &&');
 const bloomRingIdx = gridSrc.indexOf('<BloomRing');
-const bloomRingHoneyedPropMatch = /<BloomRing[^>]*honeyed=\{honeyed\}/.exec(gridSrc);
+// The prop was `honeyed={honeyed}` until MB-D2b (2026-08-28) gave the same
+// ink/inkSoft defect a second ground: a cell holding the selection's opaque
+// `accent` fill puts that fill under all six marks, where `inkSoft` at the
+// ring's breathe floor measures 2.8399:1 — the same bar, the same mechanism,
+// and unlike `honeyed` it is reachable today.
+//
+// The row does NOT pin the second flag's NAME. What it asserts is the
+// invariant: **whatever condition draws an accent-family body under the ring
+// must also appear in the ring's ground condition.** So it reads the flag
+// `<SelectionFill>` actually renders under, out of the same file, and
+// requires it. Pinning the literal `selected` would have gone red on the
+// correct build the moment the fill moved onto its own `held` flag for the
+// release beat — a gate reporting a defect that is really a rename.
+const bloomRingPropMatch = /<BloomRing[^>]*honeyGround=\{([^}]*)\}/.exec(gridSrc);
+const bloomRingGroundInputs = bloomRingPropMatch
+  ? bloomRingPropMatch[1].split('||').map((t) => t.trim())
+  : [];
+const selectionFillFlag = /\{(\w+) && <SelectionFill/.exec(gridSrc)?.[1] ?? null;
 
 if (honeyIdx > -1 && seededIdx > -1 && honeyIdx < seededIdx) {
   ok('honey fill renders before the seeded seal in FilledCell');
@@ -184,10 +205,25 @@ if (honeyIdx > -1 && bloomRingIdx > -1 && honeyIdx < bloomRingIdx) {
 } else {
   bad('draw order (honey before BloomRing)', `honey at index ${honeyIdx}, BloomRing at index ${bloomRingIdx} — expected honey first`);
 }
-if (bloomRingHoneyedPropMatch) {
-  ok('BloomRing receives honeyed={honeyed} — the ink/inkSoft swap is wired');
+if (!selectionFillFlag) {
+  bad('BloomRing honeyGround prop', 'could not find the flag <SelectionFill> renders under in FilledCell — the ring-ground invariant cannot be checked, which is not the same as it holding');
+} else if (bloomRingGroundInputs.includes('honeyed') && bloomRingGroundInputs.includes(selectionFillFlag)) {
+  ok(`BloomRing receives honeyGround={${bloomRingGroundInputs.join(' || ')}} — both accent-family grounds are in the condition: §6.4 row 10's honey, and the flag <SelectionFill> itself renders under (\`${selectionFillFlag}\`)`);
+} else if (bloomRingPropMatch) {
+  bad('BloomRing honeyGround prop', `FilledCell passes honeyGround={${bloomRingGroundInputs.join(' || ')}} — expected \`honeyed\` (§6.4 row 10) and \`${selectionFillFlag}\`, the flag that draws the selection fill under the same marks (2.8399:1 at the ring's floor)`);
 } else {
-  bad('BloomRing honeyed prop', 'FilledCell no longer passes honeyed={honeyed} to <BloomRing> — the §6.4 row 10 fix may be disconnected');
+  bad('BloomRing honeyGround prop', 'FilledCell no longer passes honeyGround={...} to <BloomRing> — the §6.4 row 10 fix may be disconnected');
+}
+
+// The second ground's own contrast pair, measured here rather than quoted
+// from MB-D2b's message — same instrument as check 5, different ground.
+const selectionBody = theme.colors.accent;
+const inkFloorOnSelection = contrastRatio(over(ringInkAtFloor, selectionBody), selectionBody);
+const inkSoftFloorOnSelection = contrastRatio(over(ringInkSoftAtFloor, selectionBody), selectionBody);
+if (inkFloorOnSelection >= 3.0 && inkSoftFloorOnSelection < 3.0) {
+  ok(`BloomRing over the held selection fill: ink ${inkFloorOnSelection.toFixed(4)}:1 clears 3:1, inkSoft ${inkSoftFloorOnSelection.toFixed(4)}:1 does not — the same swap, on the ground MB-D2b added`);
+} else {
+  bad('BloomRing selection floor', `ink ${inkFloorOnSelection.toFixed(4)}:1 / inkSoft ${inkSoftFloorOnSelection.toFixed(4)}:1 over \`accent\` — expected ink to clear 3:1 and inkSoft to fail it; if inkSoft now clears, the \`selected\` half of the honeyGround condition should be re-ruled, not silently kept`);
 }
 
 console.log(`\ncheck-honey-fill: ${pass} passed, ${failures.length} failed`);

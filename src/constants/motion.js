@@ -84,37 +84,97 @@ export const DURATIONS = {
   reducedMotionFade: 200,
 };
 
-// Cascade delay between staggered children (list items, tapestry cells,
-// theme card reveals) — §14.1 "40-60ms cascade."
-// Honey drip register (Lumen, luxury pass 2026-08-20) — the hex-tap
-// centerpiece's timing, and its own law: honey never springs. A spring is
-// elastic; honey is viscous and inelastic — it swells, it necks, it
-// pinches, it falls under gravity, it pools. Eased timings and an
-// accelerating gravity curve only. Banned from `SPRINGS` on purpose: if
-// you're reaching for a spring here, what you're building is water.
+// Honey register (Lumen, luxury pass 2026-08-20; rescored by LP-R21, Colin
+// 2026-08-26, and MB-D2b, Deezine 2026-08-27) — the hex-tap centrepiece's
+// timing, and its own law: honey never springs. A spring is elastic; honey
+// is viscous and inelastic. Eased timings only. Banned from `SPRINGS` on
+// purpose: if you're reaching for a spring here, what you're building is
+// water.
 //
-// Total ~3.1s played straight through — deliberately long. Honey is
-// allowed to outlast the tap that triggered it.
+// WHAT USED TO BE HERE. `swell`/`neck`/`fall`/`pool` (700/380/900/1100)
+// scored a bead that gathered at the cell, necked, fell and pooled on the
+// ground below — ~3.1s played straight through. LP-R21 retired all four
+// beats wholesale on the owner's direction ("the honeydrip is awful … it
+// should just trip on to that one tile and keep the illuminated honey
+// colour"): the drip pointed the eye AWAY from the person just chosen,
+// during the exact window the reveal card was arriving. Their durations and
+// easings retire WITH them — guardrail 5 — because a number that outlives
+// the beat it was scored for is how a retired treatment finds a new home
+// (guardrail 3's own R50 argument, one file over).
+//
+// `swell`'s 700 had one surviving consumer after the bead went: the glow's
+// bloom -> rest crossfade, which Beat 3 had scored to span the bead's
+// formation. It retires too rather than being re-pointed — MB-D2b's hold is
+// a STILL SCREEN ("frame capture during hold is a still screen"), and a
+// 700ms crossfade under a 250ms fill leaves the light still moving 450ms
+// after the cell has settled. The light now settles WITH the fill; see
+// `HexTapOverlay`/`HoneycombGrid` for the one expression that says so.
 export const HONEY = {
-  swell: 700, // bead gathers at origin — HONEY_EASING.swell
-  neck: 380, // the column thins. THE signature moment — Deezine's storyboard
-  // scores its shape (bead position, minimum neck width, drip count); this
-  // module owns only the duration until that lands.
-  fall: 900, // release — HONEY_EASING.fall. Accelerating. No overshoot, no settle.
-  pool: 1100, // spread + fade at rest — HONEY_EASING.pool
+  // MB-D2b: the fill arrives radially from the cell centre and holds. One
+  // number, because the hold is STATE, not animation — nothing here scores
+  // the held part, and nothing should.
+  fill: 250,
 };
 
 // Per-phase easings for `HONEY`, kept alongside the durations so a caller
 // never has to guess which curve goes with which number.
 export const HONEY_EASING = {
-  swell: Easing.out(Easing.quad),
-  // `neck` has no ratified easing yet — same reason its geometry is
-  // TBD above. Do not default this to something that looks finished;
-  // an unscored phase should read as unscored.
-  fall: Easing.in(Easing.quad),
-  pool: Easing.out(Easing.cubic),
+  // MB-D2b names "easeInOut" without choosing an order. Quad, because this
+  // module's material family already was: the retired `swell`/`fall` curves
+  // were `Easing.out(Easing.quad)` and `Easing.in(Easing.quad)`, and the
+  // cubics in the hex-tap score all belong to the LIGHT (glow rise, camera
+  // dive), not to the honey. One material, one curve family. Cubic also
+  // costs visible time this beat does not have: it holds under 10% of the
+  // cell's radius for 73.1ms of the 250, against quad's 55.9ms, on a beat
+  // that already starts 260ms after the finger.
+  fill: Easing.inOut(Easing.quad),
 };
 
+// Stage light (MB-D1, Deezine 2026-08-27; Lumen ratified with amendments
+// 2026-08-28) — the one-shot bloom that announces a ceremony hero before it
+// performs. Two consumers, ever: the P2 celebration card and the P3 greeting
+// bee (Lumen, 2026-08-28 — the open-moment/volume-slider application is
+// struck, not deferred).
+//
+// ONE PAIR, NOT TWO. The score gives 200/150 at the seal and 250/300 at the
+// greeting. Its own acceptance line asks for "the same bloom grammar used at
+// seal and greeting," and two objects lighting at two speeds is two
+// vocabularies wearing one name — so the slower entrance wins (a stage light
+// that snaps on is a flash, and the greeting is the quieter moment) and the
+// longer fade wins (the bloom is the last thing to leave). Deezine or Lumen
+// overrule either by moving one number here, which is the point of it being
+// here.
+//
+// That quote is the amended text. It read "at seal, open, greeting" when this
+// constant was first written; Lumen struck the open moment the same day and
+// the acceptance line lost a third of its list. The ARGUMENT was untouched by
+// that — two speeds for two objects is the same problem as two speeds for
+// three — but the words it quotes moved, and a justification comment is a
+// dependency like any other. No gate guards this: the score is a workspace
+// document, outside the repo CI ever checks out, so a row asserting the quote
+// would resolve absent-and-green rather than absent-and-red. Re-read the doc,
+// don't trust this sentence.
+//
+// NOT A SPRING, on purpose, and not an exception to the luxury pass: light
+// has no mass, so it cannot overshoot. `SPRINGS.reveal` peaks at 1.1746 —
+// on an opacity that clips invisibly, but on the bloom's SCALE it is a pump,
+// which is an ambient gesture on a component ruled one-shot-never-ambient.
+// Eased timings, per the score's own "Animation timing" section.
+export const BLOOM = {
+  entrance: 250,
+  fade: 300,
+  // Scale the bloom grows through on entrance (score: "scale ramps
+  // 0.85 -> 1.0"). Light expanding, never a card landing.
+  entranceScale: 0.85,
+};
+
+export const BLOOM_EASING = {
+  entrance: Easing.out(Easing.cubic),
+  fade: Easing.in(Easing.cubic),
+};
+
+// Cascade delay between staggered children (list items, tapestry cells,
+// theme card reveals) — §14.1 "40-60ms cascade."
 export const STAGGER_MS = 50;
 
 // §14.1 amendment (R24, Pixel). §14.1's per-item step is calibrated for a

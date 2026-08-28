@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Animated, StyleSheet, Pressable, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import Svg, { Polygon, Path, Line, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
+import Svg, { Polygon, Path, Line, Circle, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
 import { theme } from '../constants/theme';
 import {
   BLOOM_RING_INSET,
@@ -13,7 +13,7 @@ import { hexTintFor } from './Avatar';
 import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_RUNGS, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
 import { useSvgId } from '../utils/svgId';
 import { DURATIONS, HONEY, HONEY_EASING, PRESS, STAGGER_MS, useReducedMotion } from '../constants/motion';
-import { drip as dripHaptics } from '../constants/haptics';
+import { hexTap as hexTapHaptics } from '../constants/haptics';
 import { HexTapOverlay } from './HexTapOverlay';
 import {
   buildCombLayout,
@@ -24,10 +24,13 @@ import {
   shouldAbortPollination,
 } from './combLattice';
 
-// Lane D — the hex-tap honey drip's beat boundaries in ms from contact.
-// `HONEY` only names swell/neck/fall/pool (Beats 3-6); contact and ignition
-// (Beats 1-2) aren't bead motion, so they're not in that module — named here
+// Lane D — the hex tap's beat boundaries in ms from contact. `HONEY` names
+// only the fill; contact and ignition (Beats 1-2) belong to the FINGER and
+// the LIGHT, not to the honey, so they're not in that module — named here
 // instead of left as bare literals scattered through the timeline below.
+// `CONTACT_MS` is also the last beat of `hexTap.contact()`'s haptic
+// sequence; the two are one number wearing two hats, and moving either
+// without the other desynchronises the touch from the picture.
 const CONTACT_MS = 180;
 const IGNITION_MS = 80;
 
@@ -37,6 +40,7 @@ const IGNITION_MS = 80;
 export { personKey };
 
 const AnimatedG = Animated.createAnimatedComponent(G);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ONE ring around one centre. A hex spiral only closes at 1, 7, 19 — at any
 // other count the outer ring is part-built and the whole cluster hangs off
@@ -110,12 +114,25 @@ const BLOOM_BREATHE_MS = 2400;
 //
 // DES-24 §6.4 row 10 (device-measured): on a honeyed cell, three of the six
 // edge marks sit inside the honey body, where `inkSoft` floors at 2.609
-// against the 3.0 bar for 2022ms of every 4800ms breathe. `honeyed` swaps
+// against the 3.0 bar for 2022ms of every 4800ms breathe. The ground swaps
 // the mark colour to `ink` (5.644 at the same floor) — a strength change,
 // not a hue change (LCh: `ink`/`inkSoft` are h 90.94°/91.44°, half a degree
 // apart). Requires the honey body drawn first — see draw order in
 // `FilledCell` below (§6.4: "the blooming ring is drawn after the honey body").
-const BloomRing = ({ size, reduced, honeyed }) => {
+//
+// The prop is `honeyGround`, not `honeyed`, because MB-D2b gave the same
+// defect a SECOND ground and this one is reachable today. A selected cell
+// holds an opaque `accent` fill under all six marks (not three), and
+// `inkSoft` at the ring's own `BLOOM_FLOOR_OPACITY` measures **2.8399:1**
+// there — under the same 3:1 bar, by the same mechanism, on a pair
+// (`blooming` + `selected`) that has a live producer on both sides
+// (`HoneycombTab.js:378` sets `blooming` off `last_note_received_at`; any
+// tap sets `selected`). `honeyed` is still latent — nothing writes
+// `honeyRung` — so naming the prop after it would have named the case that
+// CANNOT happen while missing the one that can. `ink` measures 6.0937 at
+// the same floor. The condition is "is my ground an accent-family fill",
+// and it now has two writers.
+const BloomRing = ({ size, reduced, honeyGround }) => {
   const pulse = useRef(new Animated.Value(1)).current;
   const marks = useMemo(() => hexEdgeMarks(size, BLOOM_RING_INSET, BLOOM_MARK_EDGE_FRACTION), [size]);
 
@@ -143,7 +160,7 @@ const BloomRing = ({ size, reduced, honeyed }) => {
           y1={y1}
           x2={x2}
           y2={y2}
-          stroke={honeyed ? theme.colors.ink : theme.colors.inkSoft}
+          stroke={honeyGround ? theme.colors.ink : theme.colors.inkSoft}
           strokeWidth={BLOOM_MARK_STROKE_WIDTH}
           strokeLinecap="round"
         />
@@ -187,7 +204,50 @@ const HoneyFill = ({ size, rung }) => {
   );
 };
 
-const FilledCell = ({ member, size, selected, reduced }) => {
+// MB-D2b / LP-R21 — the held honey. Colin's direction was "it should just
+// trip on to that one tile and keep the illuminated honey colour," and this
+// is the whole of it: one circle, growing from the cell's own centre,
+// clipped to the cell's own hexagon, holding at full for as long as the cell
+// is open. `progress` is the caller's single 0->1 radial value (MB-D2b:
+// "Fill is a single radial progress value (0->1)"), so there is nothing here
+// to fall out of step with itself.
+//
+// PURE RADIAL, and the geometry is why the beat reads as settling rather
+// than as stopping. `hexPoints` puts the vertices at `size` from the centre,
+// so the circle covers the cell exactly at `r === size` — but it reaches the
+// six EDGE MIDPOINTS at the apothem, 0.8660 x size, where it already covers
+// **90.7%** of the hexagon's area. Under `HONEY_EASING.fill` that lands at
+// 185.3ms of the 250, and the last 64.7ms is honey creeping into six
+// corners. Nothing scores that; it falls out of a circle filling a hexagon.
+//
+// FLAT — no meniscus, no level line (LP-R21 guardrail 1). The level register
+// is DES-24's `HoneyFill` above, and it is own-cell-only for a reason: a
+// level on a tapped NEIGHBOUR broadcasts an amount that does not exist. The
+// two never argue, because this one is opaque and is drawn over that one:
+// while a cell is open, selection is the only register its fill carries, and
+// the amount returns intact the moment it closes. (Unreachable today either
+// way — nothing writes `honeyRung`.)
+//
+// `accent`, and no `accentDeep` edge. MB-D2b offers the edge as optional and
+// it is declined: the cell already HAS an edge in the selected state — Beat
+// 1's solid `ink` 2.5pt stroke, which measures 11.8021:1 against this fill.
+// An `accentDeep` line inside it would be a second boundary 2.5pt in from
+// the strongest one, at 1.8008:1 — the weaker of two edges on one shape, and
+// the one carrying no information. `accentBurst` is declined for the same
+// class of reason: MB-D2b allows it "at arrival only," but Beat 2 already
+// spends `accentBurst` as the ignition bloom 250ms earlier, and two flashes
+// of one token inside one gesture is two events where the user made one.
+const SelectionFill = ({ size, progress, clipId }) => (
+  <AnimatedCircle
+    cx={size}
+    cy={size}
+    r={progress.interpolate({ inputRange: [0, 1], outputRange: [0, size] })}
+    fill={theme.colors.accent}
+    clipPath={`url(#${clipId})`}
+  />
+);
+
+const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => {
   const clipId = useSvgId('hivecell');
   const points = useMemo(() => hexPoints(size), [size]);
   const sealPath = useMemo(() => hexSealPath(size), [size]);
@@ -234,11 +294,16 @@ const FilledCell = ({ member, size, selected, reduced }) => {
             blooming ring's ink-vs-inkSoft ruling measures the ring drawn
             OVER the honey body — the other order is a different picture). */}
         {honeyed && <HoneyFill size={size} rung={member.honeyRung} />}
+        {/* Selection's held honey enters above the amount register and below
+            the seal/ring/stroke — the same slot, and the same reason: §6.4
+            measured the ring drawn OVER the honey body, and both of this
+            cell's honeys are bodies. */}
+        {held && <SelectionFill size={size} progress={fillProgress} clipId={clipId} />}
         {/* Seeded: knocked out to whatever's already painted above (the
             avatar/tint), not a second colour — R51's register rule. Drawn
             in this same Svg so the hole shows that fill, not a blank gap. */}
         {member.seeded && <Path d={sealPath} fill={theme.colors.ink} fillRule="evenodd" />}
-        {member.blooming && <BloomRing size={size} reduced={reduced} honeyed={honeyed} />}
+        {member.blooming && <BloomRing size={size} reduced={reduced} honeyGround={honeyed || held} />}
         {/* Beat 1 (Lane D): surface -> ink on tap, width held constant at
             2.5pt — "no width change, the luxury is restraint here." Width
             used to jump 2 -> 2.5 with the colour; that's the one part of
@@ -286,7 +351,7 @@ const EmptyCell = ({ size }) => {
   );
 };
 
-const HexCell = ({ member, size, x, y, delay, selected, reduced, pressDepth }) => {
+const HexCell = ({ member, size, x, y, delay, selected, held, reduced, pressDepth, fillProgress }) => {
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -321,7 +386,7 @@ const HexCell = ({ member, size, x, y, delay, selected, reduced, pressDepth }) =
       ]}
     >
       {member ? (
-        <FilledCell member={member} size={size} selected={selected} reduced={reduced} />
+        <FilledCell member={member} size={size} selected={selected} held={held} reduced={reduced} fillProgress={fillProgress} />
       ) : (
         <EmptyCell size={size} />
       )}
@@ -361,23 +426,40 @@ export const HoneycombGrid = ({
   // who you tapped, `selected` goes null and the card closes instead of
   // hanging there quoting someone with no cell.
   const [selectedId, setSelectedId] = useState(null);
+  // LP-R19's named cost, built. `setSelectedId` cannot drive everything: the
+  // cell's stroke must answer the finger AT ONCE, and the outgoing seat must
+  // keep its card, its fill and its light for the length of the release, or
+  // the old card spends 80ms dying with the new person's name on it.
+  //
+  // LP-R19 called the second piece `cardId`; it is `heldId` here because it
+  // ended up owning three things, not one — the card's content, the held
+  // fill, and the scrim's centre. All three are "what the room is still
+  // showing," and they have to move on the same frame or the release comes
+  // apart into three.
+  const [heldId, setHeldId] = useState(null);
   const selected = selectedId === null ? null : members.find((m) => personKey(m) === selectedId) ?? null;
+  const held = heldId === null ? null : members.find((m) => personKey(m) === heldId) ?? null;
   const reduced = useReducedMotion();
   const cameraProgress = useRef(new Animated.Value(0)).current;
   const revealProgress = useRef(new Animated.Value(0)).current;
 
-  // Lane D — the honey drip's own animated values. `revealProgress` and
-  // `cameraProgress` already exist and are reused (ruling 3(b)); everything
-  // below is new, one value per beat that needs its own progress or opacity.
+  // Lane D — the hex tap's own animated values. `revealProgress` and
+  // `cameraProgress` already exist and are reused (ruling 3(b)).
+  //
+  // FOUR OF THESE LEFT WITH LP-R21. `beadProgress`, `neckProgress`,
+  // `fallProgress` and `poolProgress` drove Beats 3-6 and retired with them
+  // (guardrail 5). `glowRestOpacity` and `honeyDecay` went too, and neither
+  // was a casualty of the same cut: the rest glow would have become a static
+  // `accentBurst` wash under a hold that never ends (see `HexTapOverlay`),
+  // and `honeyDecay` was Beat 6's decay ramp, whose job the release beat
+  // does with `revealProgress` itself — one envelope for the scrim and the
+  // card, which is what makes "scrim and fill release together" structural.
   const pressDepth = useRef(new Animated.Value(1)).current;
   const glowBloomOpacity = useRef(new Animated.Value(0)).current;
-  const glowRestOpacity = useRef(new Animated.Value(0)).current;
-  const honeyDecay = useRef(new Animated.Value(1)).current;
-  const beadProgress = useRef(new Animated.Value(0)).current;
-  const neckProgress = useRef(new Animated.Value(0)).current;
-  const fallProgress = useRef(new Animated.Value(0)).current;
-  const poolProgress = useRef(new Animated.Value(0)).current;
-  const pinchTimeoutRef = useRef(null);
+  // MB-D2b's single radial progress. `useNativeDriver: false` everywhere it
+  // is driven — it interpolates into an SVG `r` attribute, which is a prop,
+  // not a transform.
+  const fillProgress = useRef(new Animated.Value(0)).current;
   // Ruling 3(a): the scrim's centre is cluster-space + the cluster's own
   // origin in container space, measured once via `onLayout` rather than
   // assumed — `stage` has no padding and is `container`'s first child, so
@@ -386,10 +468,6 @@ export const HoneycombGrid = ({
   const [clusterOrigin, setClusterOrigin] = useState(null);
   const [tapCentre, setTapCentre] = useState(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => () => {
-    if (pinchTimeoutRef.current) clearTimeout(pinchTimeoutRef.current);
-  }, []);
 
   useEffect(() => {
     Animated.timing(cameraProgress, {
@@ -413,7 +491,8 @@ export const HoneycombGrid = ({
   // on its own, asserting a selection the user never made twice.
   useEffect(() => {
     if (selectedId !== null && selected === null) setSelectedId(null);
-  }, [selectedId, selected]);
+    if (heldId !== null && held === null) setHeldId(null);
+  }, [selectedId, selected, heldId, held]);
 
   // §28.9 — the flight in the air, from the comb's side: which person it was
   // aimed at, and where the aim point sat in cluster space when the tap
@@ -422,8 +501,57 @@ export const HoneycombGrid = ({
   const pollinationKeyRef = useRef(0);
   const readScrollY = () => scrollYRef?.current ?? 0;
 
+  // LP-R19's release beat, built here rather than deferred, because LP-R21
+  // is what makes it load-bearing. Beat 6 used to take the room down on a
+  // timer 3.34s after the tap, so a cell-to-cell tap after that landed on a
+  // dark page and the teleport was invisible. The hold has no timer: the
+  // scrim is up for the whole selected state now, so EVERY supersede would
+  // jump the light from one cell to another at full strength. Retiring the
+  // pool turned an occasional cut into an unconditional one.
+  //
+  // "Light takes as long to let go as it took to catch" — the release is
+  // `IGNITION_MS`, and because 80 < 180 the whole of it fits inside the
+  // contact window the score already leaves empty. The incoming tap is not
+  // delayed by a millisecond; the window that used to be spent in darkness
+  // is spent letting go instead.
+  const releaseHeld = (onDone) => {
+    if (heldId === null) {
+      // Nothing to let go of. The fill still has to start from empty: a
+      // previous selection can end without a release when its member stops
+      // resolving (the effect above drops `heldId`), which would otherwise
+      // leave this value parked at 1 and render the next tapped cell full
+      // before its beat begins.
+      fillProgress.setValue(0);
+      onDone();
+      return;
+    }
+    Animated.parallel([
+      // One envelope for the card and the scrim — they ARE the same value.
+      Animated.timing(revealProgress, {
+        toValue: 0,
+        duration: IGNITION_MS,
+        easing: Easing.in(Easing.cubic), // the mirror of its Easing.out entry
+        useNativeDriver: true,
+      }),
+      // "Scrim and fill release together" (LP-R21) — a second driver, but on
+      // the same window and the same curve, because the fill cannot ride
+      // `revealProgress`: that one is native-driven and this one paints an
+      // SVG `r`.
+      Animated.timing(fillProgress, {
+        toValue: 0,
+        duration: IGNITION_MS,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      // A third tap arriving mid-release takes both values over, and RN
+      // reports this callback `finished: false`. Swapping anyway would hand
+      // the room to a person the user has already tapped past.
+      if (finished) onDone();
+    });
+  };
+
   const handleSelect = (member, tap) => {
-    revealProgress.setValue(0);
     setSelectedId(personKey(member));
     // §28.1 — the CELL answers at t=0. The stroke was already here; the
     // haptic is new, and it is what makes the acknowledgement independent of
@@ -431,45 +559,69 @@ export const HoneycombGrid = ({
     // haptic and the card, which is why §28.6 owes accessibility nothing
     // extra: a user who never perceives the flight loses nothing.
     if (reduced) {
-      // Reduced Motion collapses the whole honey score to the cell + card
-      // (§28.6's rule, extended here) — no scrim, no glow, no bead. The
-      // acceptance bar's "instant pool" variant is still open; this is the
-      // conservative reading (skip the drip rather than fake an instant one)
-      // until that's reviewed on-device.
+      // Reduced Motion keeps the cell + card and drops the room (§28.6's
+      // rule, extended here) — no scrim, no glow. But the FILL is not motion
+      // to be skipped, it is the selected state's appearance, so it arrives
+      // at its final value with no sweep: LP-R21's acceptance line
+      // ("Reduced-motion: fill appears at final value, no sweep") retires
+      // the "instant pool variant is still open" note that used to sit here.
+      // A held state is not an animation, and refusing to draw it is how a
+      // Reduce Motion user ends up with a selection they cannot see.
+      //
+      // The scrim's own Reduce Motion behaviour is UNCHANGED and remains
+      // unscored: `tapCentre` stays null, so `HexTapOverlay` renders
+      // nothing. The fill alone carries selection here, at ΔE00 19.2493 from
+      // the weaker of the two member tints — 2.7x the whole range §21.2
+      // struck `register` for.
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      fillProgress.setValue(1);
+      revealProgress.setValue(0);
+      setHeldId(personKey(member));
+      Animated.timing(revealProgress, {
+        toValue: 1,
+        duration: DURATIONS.reducedMotionFade,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start();
     } else {
-      const cell = layout.cells.find((c) => c.member && personKey(c.member) === personKey(member));
-      setTapCentre(cell ? cellCentre(cell, cellSize) : null);
-      startHoneyDrip();
+      // The beat clock starts NOW, at the tap — the release runs inside its
+      // first 80ms rather than in front of it, so Beat 2 still ignites at
+      // 180 exactly as it did before this beat existed (LP-R19).
+      startHexTap();
+      releaseHeld(() => {
+        const cell = layout.cells.find((c) => c.member && personKey(c.member) === personKey(member));
+        setTapCentre(cell ? cellCentre(cell, cellSize) : null);
+        setHeldId(personKey(member));
+        revealProgress.setValue(0);
+        Animated.timing(revealProgress, {
+          toValue: 1,
+          duration: DURATIONS.revealGlide,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
     }
-    Animated.timing(revealProgress, {
-      toValue: 1,
-      duration: reduced ? DURATIONS.reducedMotionFade : DURATIONS.revealGlide,
-      easing: reduced ? Easing.linear : Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
     requestPollination(member, tap);
   };
 
-  // Lane D — the honey drip's own haptic + motion score, run fresh on every
-  // tap. Beat 1's stroke/press-depth are on the cell itself (`HexCell`
-  // below); this schedules everything the SVG overlay reads.
-  const startHoneyDrip = () => {
-    if (pinchTimeoutRef.current) clearTimeout(pinchTimeoutRef.current);
-
-    dripHaptics.swell();
-    pinchTimeoutRef.current = setTimeout(() => {
-      dripHaptics.pinch();
-    }, CONTACT_MS + IGNITION_MS + HONEY.swell + HONEY.neck);
+  // Lane D — the hex tap's haptic + motion score, run fresh on every tap.
+  // Beat 1's stroke/press-depth are on the cell itself (`HexCell` below);
+  // this schedules the room (`HexTapOverlay`) and the fill.
+  //
+  // THE WHOLE TIMELINE, and it now ends: contact 0-180 (press + haptic),
+  // ignition 180-260 (the bloom rises), fill 180-430, then HOLD. Beats 3-6
+  // used to carry it to 3340ms and then take the room down with them; there
+  // is nothing after 430 any more, which is the point — LP-R21's hold is
+  // state, and the acceptance bar is a still frame.
+  const startHexTap = () => {
+    hexTapHaptics.contact();
 
     pressDepth.setValue(1);
-    honeyDecay.setValue(1);
     glowBloomOpacity.setValue(0);
-    glowRestOpacity.setValue(0);
-    beadProgress.setValue(0);
-    neckProgress.setValue(0);
-    fallProgress.setValue(0);
-    poolProgress.setValue(0);
+    // `fillProgress` is deliberately NOT zeroed here. Snapping it to 0 at
+    // t=0 would cut the outgoing cell's honey out in one frame, which is the
+    // exact defect the release beat exists to remove — `releaseHeld` owns
+    // this value's way down, in both of its branches.
 
     // Beat 1 — press depression, ease-in-out across the contact window.
     Animated.sequence([
@@ -487,7 +639,15 @@ export const HoneycombGrid = ({
       }),
     ]).start();
 
-    // Beat 2 — glow ignites, then crossfades bloom -> rest across Beat 3.
+    // Beat 2 — the bloom ignites, then goes out ON THE FRAME THE FILL LANDS.
+    //
+    // It used to crossfade into a rest level over `HONEY.swell` (700ms), a
+    // duration Beat 3 scored for the bead's formation. Both the rest level
+    // and that duration retired: the decay window is written as the offset
+    // between the two things it has to end with, `HONEY.fill - IGNITION_MS`,
+    // so the light and the honey settle on ONE frame (430ms) no matter which
+    // of the three numbers moves. Typing 170 here would be the same number
+    // today and a stale one the first time `HONEY.fill` is retuned.
     Animated.sequence([
       Animated.delay(CONTACT_MS),
       Animated.timing(glowBloomOpacity, {
@@ -498,73 +658,27 @@ export const HoneycombGrid = ({
       }),
       Animated.timing(glowBloomOpacity, {
         toValue: 0,
-        duration: HONEY.swell,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-    Animated.sequence([
-      Animated.delay(CONTACT_MS + IGNITION_MS),
-      Animated.timing(glowRestOpacity, {
-        toValue: 1,
-        duration: HONEY.swell,
+        duration: HONEY.fill - IGNITION_MS,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
 
-    // Beat 3 — swell.
+    // MB-D2b — the fill, triggered at contact-complete, which is the score's
+    // own word and is also the frame `hexTap.contact()`'s closing Medium
+    // lands on: the finger's last confirmation and the honey's first frame
+    // are the same instant. It does not wait for the ignition to finish —
+    // the light rises across the fill's first 80ms rather than ahead of it,
+    // which is what "the fill performs within that light" describes.
+    //
+    // `useNativeDriver: false`: this interpolates into an SVG `r`.
     Animated.sequence([
-      Animated.delay(CONTACT_MS + IGNITION_MS),
-      Animated.timing(beadProgress, {
+      Animated.delay(CONTACT_MS),
+      Animated.timing(fillProgress, {
         toValue: 1,
-        duration: HONEY.swell,
-        easing: HONEY_EASING.swell,
+        duration: HONEY.fill,
+        easing: HONEY_EASING.fill,
         useNativeDriver: false,
-      }),
-    ]).start();
-
-    // Beat 4 — neck.
-    Animated.sequence([
-      Animated.delay(CONTACT_MS + IGNITION_MS + HONEY.swell),
-      Animated.timing(neckProgress, {
-        toValue: 1,
-        duration: HONEY.neck,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: false,
-      }),
-    ]).start();
-
-    // Beat 5 — fall.
-    Animated.sequence([
-      Animated.delay(CONTACT_MS + IGNITION_MS + HONEY.swell + HONEY.neck),
-      Animated.timing(fallProgress, {
-        toValue: 1,
-        duration: HONEY.fall,
-        easing: HONEY_EASING.fall,
-        useNativeDriver: false,
-      }),
-    ]).start();
-
-    // Beat 6 — pool, with the room's dim/glow releasing on the same window
-    // (§5's open decay question — ruled here: the room goes dark exactly as
-    // the light that was dimming it goes out, one envelope not two).
-    Animated.sequence([
-      Animated.delay(CONTACT_MS + IGNITION_MS + HONEY.swell + HONEY.neck + HONEY.fall),
-      Animated.timing(poolProgress, {
-        toValue: 1,
-        duration: HONEY.pool,
-        easing: HONEY_EASING.pool,
-        useNativeDriver: false,
-      }),
-    ]).start();
-    Animated.sequence([
-      Animated.delay(CONTACT_MS + IGNITION_MS + HONEY.swell + HONEY.neck + HONEY.fall),
-      Animated.timing(honeyDecay, {
-        toValue: 0,
-        duration: HONEY.pool,
-        easing: HONEY_EASING.pool,
-        useNativeDriver: true,
       }),
     ]).start();
   };
@@ -660,8 +774,10 @@ export const HoneycombGrid = ({
               y={y}
               delay={index * STAGGER_MS}
               selected={!!member && selectedId !== null && personKey(member) === selectedId}
+              held={!!member && heldId !== null && personKey(member) === heldId}
               reduced={reduced}
               pressDepth={pressDepth}
+              fillProgress={fillProgress}
             />
           ))}
           <Pressable
@@ -687,16 +803,15 @@ export const HoneycombGrid = ({
         cellSize={cellSize}
         cameraProgress={cameraProgress}
         revealProgress={revealProgress}
-        honeyDecay={honeyDecay}
         glowBloomOpacity={glowBloomOpacity}
-        glowRestOpacity={glowRestOpacity}
-        beadProgress={beadProgress}
-        neckProgress={neckProgress}
-        fallProgress={fallProgress}
-        poolProgress={poolProgress}
       />
 
-      {selected && (
+      {/* The card reads `held`, not `selected` — LP-R19's named cost. On a
+          cell-to-cell tap `selectedId` moves at t=0 so the new cell's stroke
+          answers the finger, and if the card read the same value it would
+          spend the whole 80ms release easing out with the INCOMING person's
+          name and quote on it. */}
+      {held && (
         <Animated.View
           style={[
             styles.revealCard,
@@ -710,8 +825,8 @@ export const HoneycombGrid = ({
             },
           ]}
         >
-          <Text style={styles.revealName}>{selected.isOwn ? 'You' : selected.name}</Text>
-          <Text style={styles.revealQuote}>"{selected.gratitude}"</Text>
+          <Text style={styles.revealName}>{held.isOwn ? 'You' : held.name}</Text>
+          <Text style={styles.revealQuote}>"{held.gratitude}"</Text>
         </Animated.View>
       )}
     </View>

@@ -1,13 +1,12 @@
 import React from 'react';
 import { Animated, StyleSheet } from 'react-native';
-import Svg, { Defs, RadialGradient, Stop, Rect, Circle, Ellipse } from 'react-native-svg';
+import Svg, { Defs, RadialGradient, Stop, Rect, Circle } from 'react-native-svg';
 import { theme } from '../constants/theme';
 import { ringStepFor } from './combLattice';
 import { useSvgId } from '../utils/svgId';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
 // react-native-svg's gradient `<Stop>` extraction (`extractGradient.ts`)
 // takes `stopColor`'s RGB channels via `processColor` and then MASKS OUT
@@ -25,35 +24,36 @@ const stopFor = (rgbaToken) => {
   return { rgb: `rgb(${m[1]}, ${m[2]}, ${m[3]})`, alpha: parseFloat(m[4]) };
 };
 
-// Sub-1pt at rest, ~10pt diameter at swell's peak — the spec's "8-12pt
-// sphere." The drip is 60% of that, per Beat 4's "one drip only, ~60% of
-// the main bead's size at peak."
-const BEAD_PEAK_R = 5;
-const DRIP_PEAK_R = BEAD_PEAK_R * 0.6;
-// How far the drip separates before Fall takes over, and how far Fall
-// carries it. Falls "toward the reveal card below" per the spec, but the
-// card isn't at a fixed offset from every cell — this is a local distance
-// under the cell, not a literal card-anchored landing point. Open item for
-// the on-device pass: does this read as landing on the card, or just near it.
-const NECK_SEPARATION = BEAD_PEAK_R * 1.3;
-const FALL_DISTANCE_FACTOR = 1.6; // × cellSize
-
 /**
- * Lane D — the hex-tap honey drip's whole visual score (Beats 1-6;
- * Beat 7's reveal-card motion is Bumble's). One `<Svg>`, container-level,
- * sitting between the stage and the reveal card (ruling 4:
- * GUIDES/HEX_TAP_SPEC_LUXURY_PASS.md) so the card lands inside the dimmed
- * region instead of beside it.
+ * Lane D — the hex-tap's ROOM: the dim, its punch-out, and the ignition
+ * bloom. One `<Svg>`, container-level, sitting between the stage and the
+ * reveal card (ruling 4: GUIDES/HEX_TAP_SPEC_LUXURY_PASS.md) so the card
+ * lands inside the dimmed region instead of beside it.
  *
  * Geometry is a single point — `center` (cluster-space, converted to
  * container space by the caller via the cluster's own `onLayout` origin,
- * ruling 3) — and everything here (dim's punch-out, glow, bead, drip, pool)
- * is centred on it, so none of them can drift apart from one another.
+ * ruling 3) — and both the punch-out and the bloom are centred on it, so
+ * they cannot drift apart from one another.
  *
- * Bead/neck/drip shape is a first build against `HONEY`'s durations and
- * easings, not a final pass — `motion.js`'s own comment on `HONEY.neck`
- * says the exact geometry is Deezine's storyboard to score. This is what
- * that duration looks like rendered, for review.
+ * WHAT LEFT, AND WHY THE FILE IS NOW ONLY LIGHT. Beats 3-6 (the bead, its
+ * neck, the fall, the pool) retired wholesale under LP-R21; their four
+ * drivers and the `honeyPool` token went with them. The honey did not move
+ * to a new place in this file — it moved to a DIFFERENT FILE, into the cell
+ * itself (`HoneycombGrid`'s `SelectionFill`), because LP-R21's whole ruling
+ * is that the honey never leaves the cell. This overlay owns everything
+ * OUTSIDE the cell; nothing it draws is honey any more.
+ *
+ * The bloom is also the only glow left. Beat 2's rest level (`accentBurst`
+ * @ 0.18) was scored to "continue at rest level for the fall + pool stages"
+ * — stages that no longer exist — and holding it for the whole selected
+ * state instead would make `accentBurst` a static wash on the page, which
+ * its own token text forbids in as many words ("Motion only … never a
+ * static fill, text, or background"): measured ΔE00 6.4364 against the
+ * dimmed page, well clear of a JND, so that is a real wash and not a
+ * technicality. What holds the cell lit is the PUNCH-OUT — the tapped cell
+ * simply is not dimmed, ΔE00 16.8633 / ΔL* +18.7240 against its own
+ * neighbours on washYellow (25.7166 / +18.8619 on washSky). LP-R21's own
+ * words: "illumination outside the cell, held honey inside it."
  */
 export const HexTapOverlay = ({
   width,
@@ -62,17 +62,10 @@ export const HexTapOverlay = ({
   cellSize,
   cameraProgress,
   revealProgress,
-  honeyDecay,
   glowBloomOpacity,
-  glowRestOpacity,
-  beadProgress,
-  neckProgress,
-  fallProgress,
-  poolProgress,
 }) => {
   const dimId = useSvgId('hexScrimDim');
   const bloomId = useSvgId('hexScrimBloom');
-  const restId = useSvgId('hexScrimRest');
 
   if (!center || !width || !height) return null;
 
@@ -90,16 +83,14 @@ export const HexTapOverlay = ({
 
   // R5 (First-Build Review, BLOCKING): `shadowRadius` is a blur spread
   // measured outward from a view's EDGE; an SVG `RadialGradient`'s `r` is a
-  // total extent measured from a CENTRE. Used directly, `bloom` (24pt) and
-  // `rest` (12pt) both land inside the punch-out's transparent radius
-  // (`cellSize` = 44pt) — the glow can only ever paint on ground the scrim
-  // already left undimmed, which is why it measured cooler than neutral
-  // on-device instead of reading as light. Converting the frame means the
-  // blur begins at the punch-out's own edge, not at `center`.
+  // total extent measured from a CENTRE. Used directly, `bloom` (24pt)
+  // lands inside the punch-out's transparent radius (`cellSize` = 44pt) —
+  // the glow can only ever paint on ground the scrim already left undimmed,
+  // which is why it measured cooler than neutral on-device instead of
+  // reading as light. Converting the frame means the blur begins at the
+  // punch-out's own edge, not at `center`.
   const bloom = theme.shadows.glow(theme.colors.accentBurst, 'bloom');
-  const rest = theme.shadows.glow(theme.colors.accentBurst, 'rest');
   const bloomR = cellSize + bloom.shadowRadius; // 44 + 24 = 68pt
-  const restR = cellSize + rest.shadowRadius; // 44 + 12 = 56pt
   // R10 (R5/R7 Build Review, BLOCKING): converting `r` alone kept the
   // gradient's shape a point-emitter cone peaking at `center` — a View
   // shadow is a blurred COPY OF THE SHAPE, full strength across the whole
@@ -108,47 +99,21 @@ export const HexTapOverlay = ({
   // `shadowRadius` band falls to 0. Same conversion, one more stop — the
   // function crossed the frame this time, not just the scalar.
   const bloomPlateauStop = cellSize / bloomR; // 44 / 68 = 0.64706
-  const restPlateauStop = cellSize / restR; // 44 / 56 = 0.78571
   const dim = stopFor(theme.colors.spotlightDim);
 
   // Ruling 3(b): the scrim is exactly as transparent as its geometry is
   // wrong during the camera dive, and hits full strength once the transform
   // lands identity. Wrapping the whole overlay in `cameraProgress` extends
-  // that guard to the glow and the bead/drip/pool too — they're drawn in
-  // the same container-space point, so they carry the same risk.
-  const dimOpacity = Animated.multiply(revealProgress, honeyDecay);
-  const bloomOpacity = glowBloomOpacity;
-  const restOpacity = Animated.multiply(glowRestOpacity, honeyDecay);
-
-  // Swell grows the bead 0.5 -> peak and holds at peak once Beat 3 ends;
-  // neck then subtracts a shrink delta on top of that held value (0 until
-  // Beat 4 starts, so the two compose with no seam between them) — one
-  // circle's radius, not two animations racing each other for the same prop.
-  const beadGrowR = beadProgress.interpolate({ inputRange: [0, 1], outputRange: [0.5, BEAD_PEAK_R] });
-  const neckShrinkDelta = neckProgress.interpolate({ inputRange: [0, 1], outputRange: [0, -(BEAD_PEAK_R * 0.25)] });
-  const mainBeadR = Animated.add(beadGrowR, neckShrinkDelta);
-  const mainBeadOpacity = fallProgress.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, 0, 0] });
-
-  const dripR = neckProgress.interpolate({ inputRange: [0, 1], outputRange: [0, DRIP_PEAK_R] });
-  const dripSeparationY = neckProgress.interpolate({ inputRange: [0, 1], outputRange: [0, NECK_SEPARATION] });
-  const fallDistance = cellSize * FALL_DISTANCE_FACTOR;
-  const dripFallDelta = fallProgress.interpolate({ inputRange: [0, 1], outputRange: [0, fallDistance - NECK_SEPARATION] });
-  const dripY = Animated.add(dripSeparationY, dripFallDelta);
-  const dripOpacity = Animated.multiply(
-    fallProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] }),
-    poolProgress.interpolate({ inputRange: [0, 0.15, 1], outputRange: [1, 0, 0] })
-  );
-
-  // Pool: starts as a bead, flattens and spreads (rx grows, ry shrinks) over
-  // the whole pool duration; opacity crossfades in from the drip over the
-  // first 15% and holds until the fade in the last 600ms of 1100ms (§ Beat 6).
-  const HOLD_FRACTION = 1 - 600 / 1100;
-  const poolRx = poolProgress.interpolate({ inputRange: [0, 1], outputRange: [DRIP_PEAK_R, DRIP_PEAK_R * 2.4] });
-  const poolRy = poolProgress.interpolate({ inputRange: [0, 1], outputRange: [DRIP_PEAK_R, DRIP_PEAK_R * 0.55] });
-  const poolOpacity = poolProgress.interpolate({
-    inputRange: [0, 0.15, HOLD_FRACTION, 1],
-    outputRange: [0, 1, 1, 0],
-  });
+  // that guard to the bloom too — it is drawn at the same container-space
+  // point and carries the same risk.
+  //
+  // ONE ENVELOPE, NOT TWO. This used to be `multiply(revealProgress,
+  // honeyDecay)`, where `honeyDecay` was Beat 6's own decay ramp. Beat 6
+  // retired, and rather than re-point its driver at the release, the value
+  // went with it: `revealProgress` already rises with the card and now
+  // falls with it too, so "scrim and fill release together" (LP-R21) is a
+  // property of there being one driver, not of two being kept in step.
+  const dimOpacity = revealProgress;
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { opacity: cameraProgress }]} pointerEvents="none">
@@ -159,56 +124,22 @@ export const HexTapOverlay = ({
             <Stop offset={fullStop} stopColor={dim.rgb} stopOpacity={dim.alpha} />
             <Stop offset={1} stopColor={dim.rgb} stopOpacity="0" />
           </RadialGradient>
-          {/* Glow opacity reads straight off `shadows.glow()` so a
+          {/* Bloom opacity reads straight off `shadows.glow()` so a
               View-shadow retune moves this for free; radius is the SAME
-              level converted into the gradient's frame (`bloomR`/`restR`
-              above), never `shadowRadius` directly — see R5. Middle stop
-              (`bloomPlateauStop`/`restPlateauStop`) restates the View
-              shadow's flat interior before the blur band falls off — see
-              R10; the cone-vs-plateau distinction is the whole fix. */}
+              level converted into the gradient's frame (`bloomR` above),
+              never `shadowRadius` directly — see R5. Middle stop
+              (`bloomPlateauStop`) restates the View shadow's flat interior
+              before the blur band falls off — see R10; the cone-vs-plateau
+              distinction is the whole fix. */}
           <RadialGradient id={bloomId} cx={center.x} cy={center.y} r={bloomR} gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={theme.colors.accentBurst} stopOpacity={bloom.shadowOpacity} />
             <Stop offset={bloomPlateauStop} stopColor={theme.colors.accentBurst} stopOpacity={bloom.shadowOpacity} />
             <Stop offset="1" stopColor={theme.colors.accentBurst} stopOpacity="0" />
           </RadialGradient>
-          <RadialGradient id={restId} cx={center.x} cy={center.y} r={restR} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={theme.colors.accentBurst} stopOpacity={rest.shadowOpacity} />
-            <Stop offset={restPlateauStop} stopColor={theme.colors.accentBurst} stopOpacity={rest.shadowOpacity} />
-            <Stop offset="1" stopColor={theme.colors.accentBurst} stopOpacity="0" />
-          </RadialGradient>
         </Defs>
 
         <AnimatedRect x={0} y={0} width={width} height={height} fill={`url(#${dimId})`} opacity={dimOpacity} />
-        <AnimatedCircle cx={center.x} cy={center.y} r={bloomR} fill={`url(#${bloomId})`} opacity={bloomOpacity} />
-        <AnimatedCircle cx={center.x} cy={center.y} r={restR} fill={`url(#${restId})`} opacity={restOpacity} />
-
-        {/* Beat 3 (swell) — main bead, gathers and grows from the centroid. */}
-        <AnimatedCircle
-          cx={center.x}
-          cy={center.y}
-          r={mainBeadR}
-          fill={theme.colors.accent}
-          opacity={mainBeadOpacity}
-        />
-
-        {/* Beat 4-5 (neck + fall) — the drip: forms, separates, falls straight down. */}
-        <AnimatedCircle
-          cx={center.x}
-          cy={Animated.add(center.y, dripY)}
-          r={dripR}
-          fill={theme.colors.accentDeep}
-          opacity={dripOpacity}
-        />
-
-        {/* Beat 6 (pool) — lands, flattens, fades over its last 600ms. */}
-        <AnimatedEllipse
-          cx={center.x}
-          cy={center.y + fallDistance}
-          rx={poolRx}
-          ry={poolRy}
-          fill={theme.colors.honeyPool}
-          opacity={poolOpacity}
-        />
+        <AnimatedCircle cx={center.x} cy={center.y} r={bloomR} fill={`url(#${bloomId})`} opacity={glowBloomOpacity} />
       </Svg>
     </Animated.View>
   );
