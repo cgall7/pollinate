@@ -429,6 +429,94 @@ if (TOKENS.washYellow && TOKENS.background) {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// G. the settle that cues the stage exists on the path the stage is on
+//
+// MB-D1's bloom and MB-P1's copy are both cued by a hero's settle. `FlyingBee`
+// has exactly one settle callback, `onSettle`, and until P1a it fired ONLY on
+// the preset path — at the end of a preset flight, and immediately when that
+// flight was suppressed. A RESIDENT bee (no `preset`, anchors from
+// `usePerchSet`) reaches home through `start()` and then rests on a plan whose
+// `durationMs` is null, which is the ABSENCE of an animation rather than a
+// zero-length one: there is no completion callback for a settle to hang off,
+// so `onSettle` could not fire at all.
+//
+// That is invisible in every way a reviewer normally looks. The prop exists,
+// the name reads correctly, the wiring type-checks, and the failure is a
+// permanently blank line on the screen the app opens to — DES-17's forfeit
+// class. `ChoreographedText`'s reduced branch does NOT rescue it: that branch
+// reads `reduced` alone, so a Reduce-Motion user is fine and a full-motion
+// user is the one who loses the words.
+//
+// The row asserts the POSITIVE property — the resident path announces its
+// settle — rather than blocklisting the shape that used to be wrong.
+{
+  const src = await readFile(path.join(SRC, 'components', 'FlyingBee.js'), 'utf8');
+  const tree = ast(src);
+
+  // G1 — `start()` (the one moment a resident goes from nowhere to home)
+  // reaches `onSettleRef`. Resolved as containment in the function that
+  // declares it, never as a line number.
+  let startFn = null;
+  visit(tree, (n) => {
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'start' && n.init) startFn = n.init;
+  });
+  if (!startFn) {
+    bad('G1 resident settle', 'could not find `start` in FlyingBee.js — the extractor is blind, not the code clean');
+  } else {
+    let firesSettle = false;
+    let guarded = false;
+    visit(startFn, (n) => {
+      if (n.type === 'MemberExpression' && n.object?.name === 'onSettleRef' && n.property?.name === 'current') firesSettle = true;
+      if (n.type === 'MemberExpression' && n.object?.name === 'residentSettledRef' && n.property?.name === 'current') guarded = true;
+    });
+    if (firesSettle && guarded) ok('G1 the resident path announces its settle, once — `start()` reaches onSettleRef behind a once-guard');
+    else if (firesSettle) bad('G1 resident settle', '`start()` fires onSettle but with no once-guard — `start()` is retried until the anchor measures, and Lane P3 gives the greeting ONE arrival');
+    else bad('G1 resident settle', '`start()` does not reach onSettleRef — a resident hero cannot cue MB-D1 bloom or MB-P1 copy, and a boolean `active` wired to it is a permanently blank line');
+  }
+
+  // G2 — calibration. The extractor must be able to say NO. Strip the fire
+  // out of a copy of the source and confirm G1's finder goes red on it,
+  // otherwise a green G1 proves only that the walker ran.
+  const stripped = src.replace(/if \(!residentSettledRef\.current\) \{[\s\S]*?\n    \}/, '');
+  if (stripped === src) {
+    bad('G2 calibration', 'could not produce a mutated copy — G1 is unverified in the red direction');
+  } else {
+    let strippedStartFn = null;
+    visit(ast(stripped), (n) => {
+      if (n.type === 'VariableDeclarator' && n.id?.name === 'start' && n.init) strippedStartFn = n.init;
+    });
+    let stillFires = false;
+    visit(strippedStartFn, (n) => {
+      if (n.type === 'MemberExpression' && n.object?.name === 'onSettleRef' && n.property?.name === 'current') stillFires = true;
+    });
+    if (!stillFires) ok('G2 the G1 extractor is calibrated in the red direction — removing the fire makes it fail');
+    else bad('G2 calibration', 'G1 still passes on a source with the resident fire removed — the row cannot detect the defect it exists for');
+  }
+
+  // G3 — the preset path keeps its own settle. The resident fire is an
+  // ADDITION; if it ever became a replacement, Welcome's `loginArc` would
+  // hang on a callback that never arrives and the wordmark arc would never
+  // hand back. Two distinct fire sites is the property.
+  let fireSites = 0;
+  visit(tree, (n) => {
+    if (n.type === 'OptionalCallExpression' || n.type === 'CallExpression') {
+      const c = n.callee;
+      // `onSettleRef.current?.()` — the callee is the MemberExpression
+      // `onSettleRef.current`, so the identifier sits at `callee.object`,
+      // one level up from where a chained `a.b.c()` would put it. Getting
+      // this wrong is why the row is written to fail closed: it read 0 fire
+      // sites on a file with three, and said so, rather than greening.
+      if (c?.type === 'OptionalMemberExpression' || c?.type === 'MemberExpression') {
+        if (c.object?.name === 'onSettleRef' && c.property?.name === 'current') fireSites += 1;
+      }
+    }
+  });
+  if (fireSites >= 3) ok(`G3 ${fireSites} onSettle fire sites — the resident's is an addition, the preset path (flight end + suppressed) keeps both of its own`);
+  else bad('G3 preset settle', `${fireSites} onSettle fire site(s), expected at least 3 (preset flight end, preset suppressed, resident home) — a replacement rather than an addition hangs Welcome's loginArc`);
+}
+
 console.log(`\ncheck-stage-light: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   failures.forEach((f) => console.log(`  - ${f}`));

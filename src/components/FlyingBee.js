@@ -200,6 +200,29 @@ export const FlyingBee = ({
   // Ref so a new callback identity never restarts an in-progress flight.
   const onSettleRef = useRef(onSettle);
   onSettleRef.current = onSettle;
+  // §32.2 / P1a — `onSettle` used to be the PRESET's callback and nothing
+  // else: it fired at the end of a preset flight and, when that flight was
+  // suppressed, immediately. On the RESIDENT path it could not fire at all,
+  // because a resident does not arrive — `start()` seeds him at home and
+  // `rest()` hands him a plan with `durationMs: null`, which is the absence
+  // of an animation rather than a zero-length one, so there is no completion
+  // callback anywhere for the settle to hang off.
+  //
+  // That was invisible while the only consumer was Welcome's `loginArc`. It
+  // stops being invisible the moment a resident stages copy: MB-P1 renders
+  // nothing until `active` turns true, so a boolean `active` wired to an
+  // `onSettle` that never fires is a permanently blank line — DES-17's
+  // forfeit class, on the screen the app opens to. `ChoreographedText`'s own
+  // header names this hazard; the primitive cannot close it, because a
+  // component with no concept of a hero cannot know the hero never landed.
+  //
+  // So the resident announces his settle too, and `onSettle` now means what
+  // its name always claimed on BOTH paths: the bee is at rest where he
+  // belongs. Fired once per mount — Lane P3 gives the greeting one arrival
+  // and explicitly no re-trigger on scroll, focus, or return, and `start()`
+  // is retried until the anchor measures, so "once" has to be structural
+  // rather than a property of how many times the retry happened to run.
+  const residentSettledRef = useRef(false);
   const onPollinateEndRef = useRef(onPollinateEnd);
   onPollinateEndRef.current = onPollinateEnd;
 
@@ -563,6 +586,15 @@ export const FlyingBee = ({
     if (!home) return false;
     posRef.current = { x: home.x, y: home.y };
     rest(home);
+    // The resident's settle. It is announced HERE rather than from `rest()`
+    // because `rest()` is also where a flight ends, and a bee that has just
+    // flown an errand has already settled once — firing there would make the
+    // "once" a lie the first time anything moves. This is the one moment the
+    // bee goes from nowhere to home.
+    if (!residentSettledRef.current) {
+      residentSettledRef.current = true;
+      onSettleRef.current?.();
+    }
     return true;
   };
 
