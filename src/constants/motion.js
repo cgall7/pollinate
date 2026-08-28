@@ -115,6 +115,49 @@ export const HONEY_EASING = {
   pool: Easing.out(Easing.cubic),
 };
 
+// Stage light (MB-D1, Deezine 2026-08-27; Lumen ratified with amendments
+// 2026-08-28) — the one-shot bloom that announces a ceremony hero before it
+// performs. Two consumers, ever: the P2 celebration card and the P3 greeting
+// bee (Lumen, 2026-08-28 — the open-moment/volume-slider application is
+// struck, not deferred).
+//
+// ONE PAIR, NOT TWO. The score gives 200/150 at the seal and 250/300 at the
+// greeting. Its own acceptance line asks for "the same bloom grammar used at
+// seal and greeting," and two objects lighting at two speeds is two
+// vocabularies wearing one name — so the slower entrance wins (a stage light
+// that snaps on is a flash, and the greeting is the quieter moment) and the
+// longer fade wins (the bloom is the last thing to leave). Deezine or Lumen
+// overrule either by moving one number here, which is the point of it being
+// here.
+//
+// That quote is the amended text. It read "at seal, open, greeting" when this
+// constant was first written; Lumen struck the open moment the same day and
+// the acceptance line lost a third of its list. The ARGUMENT was untouched by
+// that — two speeds for two objects is the same problem as two speeds for
+// three — but the words it quotes moved, and a justification comment is a
+// dependency like any other. No gate guards this: the score is a workspace
+// document, outside the repo CI ever checks out, so a row asserting the quote
+// would resolve absent-and-green rather than absent-and-red. Re-read the doc,
+// don't trust this sentence.
+//
+// NOT A SPRING, on purpose, and not an exception to the luxury pass: light
+// has no mass, so it cannot overshoot. `SPRINGS.reveal` peaks at 1.1746 —
+// on an opacity that clips invisibly, but on the bloom's SCALE it is a pump,
+// which is an ambient gesture on a component ruled one-shot-never-ambient.
+// Eased timings, per the score's own "Animation timing" section.
+export const BLOOM = {
+  entrance: 250,
+  fade: 300,
+  // Scale the bloom grows through on entrance (score: "scale ramps
+  // 0.85 -> 1.0"). Light expanding, never a card landing.
+  entranceScale: 0.85,
+};
+
+export const BLOOM_EASING = {
+  entrance: Easing.out(Easing.cubic),
+  fade: Easing.in(Easing.cubic),
+};
+
 export const STAGGER_MS = 50;
 
 // §14.1 amendment (R24, Pixel). §14.1's per-item step is calibrated for a
