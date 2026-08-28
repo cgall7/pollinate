@@ -45,7 +45,15 @@ const pigment = {
 
   // Accents — Sunbeam v1 (GUIDES/GRATITUDE_DESIGN_SYSTEM_V1.md §1). Zero green anywhere.
   accent: '#FFD200', // Marigold — THE one accent. Active states, celebration badge, key highlights.
-  accentDeep: '#FF7A00', // Warm amber — hero numerals, emphasis on cream (replaces `gold`).
+  // Warm amber. FILL, STROKE, GLYPH AND GRADIENT STOP — never text, on any
+  // ground, at any size (§35/R127). It clears 3:1 as text against exactly two
+  // colours in this file, the ink family and `paperEvening`, and both are dark;
+  // no light ground in the system admits it. The roles this comment used to
+  // name — "hero numerals, emphasis on cream" — were a licence: they were the
+  // third and last place the app authorised amber lettering, and they outlived
+  // four separate strikes at four call sites because nobody was striking THIS.
+  // Warmth on a numeral is this token BEHIND the ink, as fill. Replaces `gold`.
+  accentDeep: '#FF7A00',
   accentBurst: '#FFEA00', // Hottest yellow on the board. Motion only — bursts, pops, bee trail. Never a static fill, text, or background.
   // Golden Honey — the adaptive icon's locked gold (§13.1), and the KEEPSAKE
   // REGISTER: the field a finished, kept thing stands on. Today that is the
