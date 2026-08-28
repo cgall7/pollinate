@@ -1042,7 +1042,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   consentLink: {
-    color: theme.colors.accentDeep,
+    // inkSoft, not accentDeep — a link on a light ground (R127.1), same fix
+    // as signInLink below. Was 2.3482:1 on washYellow.
+    color: theme.colors.inkSoft,
     fontFamily: theme.fonts.bodySemiBold,
   },
   signUpError: {
@@ -1053,7 +1055,9 @@ const styles = StyleSheet.create({
   },
   switchModeText: {
     ...theme.type.bodySm,
-    color: theme.colors.accentDeep,
+    // inkSoft, not accentDeep — a link on a light ground (R127.1), same fix
+    // as signInLink below. Was 2.3482:1 on washYellow.
+    color: theme.colors.inkSoft,
     textAlign: 'center',
   },
   entryInput: {

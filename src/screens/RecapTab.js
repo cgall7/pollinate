@@ -430,7 +430,9 @@ const styles = StyleSheet.create({
   statValue: {
     ...theme.type.h1,
     fontSize: 34,
-    color: theme.colors.accentDeep,
+    // ink, not accentDeep — a hero numeral is text, and accentDeep is never
+    // text on any ground (§35/R127). Was 2.3482:1 on washYellow, under 3:1.
+    color: theme.colors.ink,
   },
   statLabel: {
     ...theme.type.label,

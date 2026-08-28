@@ -32,28 +32,28 @@ const DEMO_SLIDES = [
     subtitle: "Preview",
     value: "312",
     label: "Moments of reflection",
-    color: theme.colors.accent
+    glow: theme.colors.accent
   },
   {
     title: "Your North Star",
     subtitle: "Top Theme",
     value: "Family",
     label: "The heart of your year",
-    color: theme.colors.accentDeep
+    glow: theme.colors.accentDeep
   },
   {
     title: "Pure Consistency",
     subtitle: "Longest Streak",
     value: "42 Days",
     label: "Unstoppable positivity",
-    color: theme.colors.accentDeep
+    glow: theme.colors.accentDeep
   },
   {
     title: "A Random Memory",
     subtitle: "October 12th",
     value: '"The way the sunlight hit the trees during my morning walk."',
     label: "A spark of joy",
-    color: theme.colors.accent
+    glow: theme.colors.accent
   }
 ];
 
@@ -69,28 +69,28 @@ const buildSlidesFromEntries = (entries, year) => {
       subtitle: String(year),
       value: String(entries.length),
       label: "Moments of reflection",
-      color: theme.colors.accent
+      glow: theme.colors.accent
     },
     {
       title: "Your North Star",
       subtitle: "Top Theme",
       value: insight.theme,
       label: "The heart of your year",
-      color: theme.colors.accentDeep
+      glow: theme.colors.accentDeep
     },
     {
       title: "Pure Consistency",
       subtitle: "Longest Streak",
       value: `${streak} Day${streak === 1 ? '' : 's'}`,
       label: "Unstoppable positivity",
-      color: theme.colors.accentDeep
+      glow: theme.colors.accentDeep
     },
     {
       title: "A Random Memory",
       subtitle: new Date(memory.date).toLocaleDateString('default', { month: 'long', day: 'numeric' }),
       value: `"${memory.text}"`,
       label: "A spark of joy",
-      color: theme.colors.accent
+      glow: theme.colors.accent
     }
   ];
 };
@@ -218,7 +218,7 @@ export const PollinateWrapped = ({ onComplete }) => {
       <View style={styles.slideContent}>
         {/* The beat's own light, keyed to its accent — replaces the flat
             whole-screen tint that used to sit over the cream. */}
-        <GlowOrb size={340} color={slide.color} intensity={0.5} style={styles.slideGlow} />
+        <GlowOrb size={340} color={slide.glow} intensity={0.5} style={styles.slideGlow} />
 
         <Animated.View style={{ opacity: beat, transform: [{ translateY: rise }] }}>
           <Text style={styles.subtitle}>{slide.subtitle}</Text>
@@ -228,7 +228,7 @@ export const PollinateWrapped = ({ onComplete }) => {
             <AnimatedStat
               key={currentSlide}
               value={slide.value}
-              style={[styles.value, { color: slide.color }]}
+              style={styles.value}
             />
             <Text style={styles.label}>{slide.label}</Text>
           </View>
@@ -333,8 +333,23 @@ const styles = StyleSheet.create({
     width: '100%',
     ...theme.shadows.card,
   },
+  // `ink`, baked in rather than passed — R15 made this exact call for the Year
+  // Card's numeral ("no `numeralColor` prop — bake ink in, so the keepsake frame
+  // cannot be built unreadable") and this is the same frame one screen earlier.
+  //
+  // What shipped before was `slide.color`, i.e. the beat's LIGHT spent as its
+  // TEXT. One key served two roles and was named after neither, so every value
+  // on the screen rendered under the large-text floor: the count at 1.3040:1 and
+  // the user's own entry at 1.2710:1 (`accent` on washSky), the theme word and
+  // the streak at 2.3482:1 (`accentDeep` on washYellow), against a 3:1 bar. Ink
+  // on the same two washes is 15.3897 / 15.0009.
+  //
+  // The hue did not go anywhere — `slide.glow` still carries it, to the one
+  // consumer §2 allows it to have. The renaming is the fix's durable half: a key
+  // called `color` invites exactly the re-spend that caused this.
   value: {
     ...theme.type.display,
+    color: theme.colors.ink,
     textAlign: 'center',
     marginBottom: 10,
   },

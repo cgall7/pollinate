@@ -359,7 +359,9 @@ const styles = StyleSheet.create({
   },
   rosterInvite: {
     ...theme.type.bodySm,
-    color: theme.colors.accentDeep,
+    // inkSoft, not accentDeep — a link on a light ground (R127.1): the
+    // affordance is weight and position, never hue. Was 2.6133:1 on surface.
+    color: theme.colors.inkSoft,
     fontFamily: theme.fonts.bodySemiBold,
   },
   list: {
