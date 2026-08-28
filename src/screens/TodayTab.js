@@ -275,12 +275,16 @@ export const TodayTab = ({ navigation }) => {
 
   return (
     <View ref={stageRef} collapsable={false} style={styles.container}>
-      {/* MB-D1's stage light, and it is mounted BEFORE the bee on
-          purpose: `styles.orb` carries no `zIndex` and `FlyingBee`'s fill
-          carries 5, so the paint order is bloom -> scroll content -> bee. The
-          light is behind the words it stages and behind the hero standing in
-          it, which is the score's "bloom layers behind the object" and its
-          "gold never a ground" in the same fact.
+      {/* MB-D1's stage light, and it is mounted FIRST on purpose — ahead of
+          every sibling, not merely ahead of the bee. Nothing on this screen
+          carries a `zIndex`, so what paints under what is child order alone;
+          `FlyingBee`'s own fill carries 5, which lifts the hero above the
+          content wherever HE is mounted and therefore says nothing about
+          where the light goes. Paint order is bloom -> scroll content -> bee.
+          The light is behind the words it stages and behind the hero standing
+          in it, which is the score's "bloom layers behind the object" and its
+          "gold never a ground" in the same fact. `check-stage-light` H8
+          asserts the slot, not the pair.
 
           It does not scroll, and neither does the bee — the resident is seated
           once and stays in window space while the page moves under him. An

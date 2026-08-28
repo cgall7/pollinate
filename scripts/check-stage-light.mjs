@@ -847,19 +847,94 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
     // the object" and §29.1's "gold never a ground" are the same fact here —
     // a bloom painted over the greeting is a gold field with words under it.
     // Paint order is source order plus zIndex, so both have to be read.
+    //
+    // AMENDED 2026-08-28 (Lumen's ride-along, ratifying item 1). The first
+    // draft's ok-message claimed the three-layer order — bloom -> content ->
+    // bee — and checked ONE pair of it, orb-before-bee. The bee is mounted
+    // BEFORE the content and rides above it on `zIndex: 5`, so moving the bee
+    // to the end of the container is a legal, harmless-looking edit that then
+    // leaves the orb free to sit between the content and the bee: green row,
+    // light painted over every card. That inversion is exactly what the
+    // Evening-paper hazard's occlusion discharge depends on never happening —
+    // opaque card grounds occlude the bloom only while they paint after it.
+    //
+    // The claim is asserted STRUCTURALLY rather than against the content's
+    // name. A first draft of this amendment read "the first <ScrollView>", and
+    // mutation M3 — renaming the outer scroller — left the row GREEN by
+    // silently falling through to the hive shelf's inner horizontal one, which
+    // sits deep inside the content and after the orb by construction. Same
+    // lesson as E1 one lane over: a lookalike further down the file answers a
+    // positional query, and the answer is wrong without being empty. So the
+    // container is found as the innermost element holding BOTH the orb and the
+    // bee, and the assertion is on the orb's own child slot: first, ahead of
+    // every sibling, whatever any of them are called.
     {
       const orbZ = /orb:\s*\{[^}]*zIndex/.test(componentSrc);
       const flyingSrc = await readFile(path.join(SRC, 'components', 'FlyingBee.js'), 'utf8');
       const flyZ = /fill:\s*\{[^}]*zIndex:\s*(\d+)/.exec(flyingSrc);
-      const orbFirst = orb.start < bee.start;
+      // Every zIndex this screen declares — from the AST, so the justification
+      // comment above the orb (which says the word twice) is not a hit, and so
+      // an INLINE `style={{ zIndex }}` on the orb itself IS one. `orbZ` reads
+      // only GlowOrb's own stylesheet and would miss that.
+      const screenZ = [];
+      visit(todayAst, (n) => {
+        if (n.type !== 'ObjectProperty') return;
+        if ((n.key.name ?? n.key.value) !== 'zIndex') return;
+        screenZ.push(todaySrc.slice(n.value.start, n.value.end));
+      });
+      // The innermost element that mounts both — i.e. the stack whose source
+      // order decides this. No name is read.
+      const container = (() => {
+        let found = null;
+        visit(todayAst, (n) => {
+          if (n.type !== 'JSXElement') return;
+          if (n.start > Math.min(orb.start, bee.start)) return;
+          if (n.end < Math.max(orb.end, bee.end)) return;
+          if (!found || n.start > found.start) found = n;
+        });
+        return found;
+      })();
+      const kids = (container?.children ?? []).filter(
+        (c) => c.type === 'JSXElement' || c.type === 'JSXFragment' ||
+          (c.type === 'JSXExpressionContainer' && c.expression.type !== 'JSXEmptyExpression'),
+      );
+      const slotOf = (node) => kids.findIndex((c) => c.start <= node.start && c.end >= node.start);
+      const orbSlot = slotOf(orb);
+      const beeSlot = slotOf(bee);
       if (orbZ) {
         bad('H8 the light is behind', 'GlowOrb\'s own style now carries a `zIndex`, so paint order is no longer decided at the call site — re-read this row against whatever it is.');
+      } else if (screenZ.length) {
+        bad(
+          'H8 the light is behind',
+          `TodayTab now declares a zIndex of its own (${screenZ.join(', ')}). The three-layer order this row ` +
+            'asserts is decided by source order plus FlyingBee\'s 5 and nothing else; a lift declared here moves ' +
+            'the decision outside what these two facts can see. Re-read the row against whatever it is for.',
+        );
       } else if (!flyZ) {
         bad('H8 the light is behind', 'could not read FlyingBee\'s fill zIndex, so "the bee is above the light" is unverified.');
-      } else if (!orbFirst) {
-        bad('H8 the light is behind', 'the <GlowOrb> is mounted after the <FlyingBee> in source order; with no zIndex of its own it would paint over the hero it is lighting.');
+      } else if (!container || orbSlot < 0 || beeSlot < 0) {
+        bad(
+          'H8 the light is behind',
+          `could not locate the stack that mounts both (container=${!!container}, orb slot=${orbSlot}, bee slot=${beeSlot}), ` +
+            'so nothing below is decidable. Fails closed — a row that cannot find the layers cannot report their order.',
+        );
+      } else if (orbSlot !== 0) {
+        bad(
+          'H8 the light is behind',
+          `the <GlowOrb> is mounted at child slot ${orbSlot} of ${kids.length}, so ${orbSlot} sibling(s) paint ` +
+            'UNDER it — with no zIndex of its own the light is over the page it is supposed to be behind. Note the ' +
+            'bee says nothing about this: it rides zIndex 5 and is above the content wherever it is mounted, so ' +
+            'orb-before-bee stays true while the light becomes a ground.',
+        );
+      } else if (beeSlot <= orbSlot) {
+        bad('H8 the light is behind', 'the <FlyingBee> is mounted at or before the <GlowOrb>; the hero must paint after the light that stages him.');
       } else {
-        ok(`H8 paint order: bloom (no zIndex, first) -> scroll content -> bee (zIndex ${flyZ[1]}) — the light is behind the words it stages and behind the hero standing in it`);
+        ok(
+          `H8 paint order, asserted structurally: the bloom is child slot 0 of ${kids.length} and carries no zIndex ` +
+            `(none on this screen at all), so all ${kids.length - 1} sibling(s) — content and hero — paint over it; ` +
+            `the bee (slot ${beeSlot}) rides zIndex ${flyZ[1]} above that content. Light behind the words it stages, ` +
+            'behind the hero standing in it',
+        );
       }
     }
   }
