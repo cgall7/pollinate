@@ -494,19 +494,23 @@ const renderArms = (name) => {
     if (!a) return { names: ['accent'], how: 'the component default' };
     // Not a literal — enumerate the reachable domain instead of guessing, and
     // say that is what happened (§0: a domain claim inherits the scope of the
-    // probe that produced it). The consumer reads `<something>.color` off a
-    // list element, so the population is `color:` on objects that are ARRAY
-    // ELEMENTS. Every `color:` in the file is the wrong probe and I ran it
-    // first: it swept up the StyleSheet's text colours and reported `ink` and
+    // probe that produced it). The consumer reads `<something>.<key>` off a
+    // list element (`key` taken from `lit` itself, not assumed, since R127.1
+    // renamed this key from `color` to `glow` specifically so a hardcoded
+    // 'color' probe would go stale the moment the field moved) so the
+    // population is `<key>:` on objects that are ARRAY ELEMENTS. Every
+    // `color:` in the file was the wrong probe when this was hardcoded: it
+    // swept up the StyleSheet's text colours and reported `ink` and
     // `inkSoft` as candidate glow hues, which turned four pre-existing text
     // pairs into twelve nonsense ones. A StyleSheet block is a property of one
     // object; a slide is an element of a list. That is the discriminator.
+    const key = lit?.split('.').pop();
     const names = new Set();
     visit(site.ast, (n) => {
-      if (n.type !== 'ArrayExpression') return;
+      if (!key || n.type !== 'ArrayExpression') return;
       for (const el of n.elements) {
         if (!el || el.type !== 'ObjectExpression') continue;
-        const c = el.properties.find((x) => x.type === 'ObjectProperty' && (x.key.name ?? x.key.value) === 'color');
+        const c = el.properties.find((x) => x.type === 'ObjectProperty' && (x.key.name ?? x.key.value) === key);
         if (!c) continue;
         const m = /^theme\.colors\.([A-Za-z]+)$/.exec(site.src.slice(c.value.start, c.value.end));
         if (m) names.add(m[1]);
