@@ -119,18 +119,13 @@ for (const name of Object.keys(BANNED)) {
 // This list may only SHRINK. T4 reds on any entry that is no longer a defect,
 // so a fix cannot leave its cover behind — an allowlist nobody has to revisit
 // is how the licence got to stay standing in the first place.
-const RESIDUE = [
-  { file: 'src/screens/RecapTab.js', line: 433, token: 'accentDeep', ratio: 2.3482, floor: 3,
-    what: 'statValue — h1@34 ExtraBold on washYellow', owner: 'unassigned (Pixel raised)' },
-  { file: 'src/screens/TodayTab.js', line: 410, token: 'accentDeep', ratio: 2.3712, floor: 4.5,
-    what: 'themeBadge — label 12 SemiBold on accentDeepWash over surface', owner: 'unassigned (Pixel raised)' },
-  { file: 'src/screens/HiveDetail.js', line: 362, token: 'accentDeep', ratio: 2.6133, floor: 4.5,
-    what: 'rosterInvite — bodySm 14 SemiBold on surface', owner: 'unassigned (Pixel raised)' },
-  { file: 'src/screens/Onboarding.js', line: 1045, token: 'accentDeep', ratio: 2.3482, floor: 4.5,
-    what: 'consentLink — bodySm on washYellow', owner: 'already reported in-file at Onboarding.js:1082' },
-  { file: 'src/screens/Onboarding.js', line: 1056, token: 'accentDeep', ratio: 2.3482, floor: 4.5,
-    what: 'switchModeText — bodySm on washYellow', owner: 'already reported in-file at Onboarding.js:1082' },
-];
+//
+// The widened sweep's five sites are FIXED, not merely reassigned: RecapTab's
+// hero numeral and TodayTab's themeBadge take `ink` (the numeral/fill-pairing
+// remedy); HiveDetail's roster invite and both Onboarding sites are links, and
+// take `inkSoft` per R127.1 — weight and position carry the affordance, never
+// hue. All five are deleted from this list rather than re-pointed at an owner.
+const RESIDUE = [];
 
 // ── the exemption: ratified, and a different thing from the residue ─────────
 // Decorative marks carry no information, so no floor applies to them. Ratified

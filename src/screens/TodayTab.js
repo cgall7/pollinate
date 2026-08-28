@@ -407,7 +407,10 @@ const styles = StyleSheet.create({
   },
   themeBadge: {
     ...theme.type.label,
-    color: theme.colors.accentDeep,
+    // ink, not accentDeep — same fix as Wrapped's identical pairing
+    // (accentDeep-on-accentDeepWash 2.3712:1 -> ink-on-accentDeepWash
+    // 15.5404:1). The pigment keeps its job as the fill; text reads ink.
+    color: theme.colors.ink,
     backgroundColor: theme.colors.accentDeepWash,
     paddingVertical: 6,
     paddingHorizontal: 14,
