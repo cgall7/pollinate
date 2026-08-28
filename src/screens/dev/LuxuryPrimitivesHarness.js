@@ -1,152 +1,96 @@
 import React, { useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import Svg, { Polygon, Circle, Defs, ClipPath } from 'react-native-svg';
 import { theme } from '../../constants/theme';
-import { HONEY, HONEY_EASING, DURATIONS, useReducedMotion } from '../../constants/motion';
-import { drip } from '../../constants/haptics';
+import { HONEY, HONEY_EASING, useReducedMotion } from '../../constants/motion';
+import { hexTap } from '../../constants/haptics';
+import { hexPoints } from '../../components/HexShape';
+import { useSvgId } from '../../utils/svgId';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
-// Luxury pass, Lane B — a demo rig for the three primitives Lumen asked
-// for (HONEY, shadows.glow(), haptics.js), deliberately NOT wired into any
-// navigator or screen. Nobody routes here; open it by swapping it in as
-// App.js's root for a device pass, the same way every prior device-gate
-// screenshot in this repo has been taken, then revert the swap.
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// Luxury pass, Lane D — a device rig for the hex tap's remaining primitives,
+// deliberately NOT wired into any navigator or screen. Nobody routes here;
+// open it by swapping it in as App.js's root for a device pass, the same way
+// every prior device-gate screenshot in this repo has been taken, then
+// revert the swap.
 //
-// This is the INSTRUMENT, not the SCORE. The geometry below (bead scale,
-// neck squeeze, fall distance) is a placeholder good enough to feel each
-// phase's timing and easing — Deezine's hex-tap storyboard supplies the
-// real shape once it lands, and this rig gets rebuilt against it then, not
-// guessed at now (Lumen: "don't guess the choreography, you'll build it
-// twice").
+// REBUILT 2026-08-28 for MB-D2b. What used to be here was a bead that
+// swelled, necked, fell and pooled — a PLACEHOLDER geometry ("good enough to
+// feel each phase's timing"), written under Lumen's "don't guess the
+// choreography, you'll build it twice." LP-R21 retired all four of those
+// beats, so the placeholder was instrumenting nothing.
 //
-// Repointed onto Lumen's landed `shadows.glow(color, level='bloom')` —
-// zero offset always, throws on an unknown level. The bead sits at 'bloom'
-// (responding to you); 'peak' is reserved for the one frame something is
-// fully alight, which this instrument never claims to be.
+// It is not replaced with a second placeholder. `hexPoints` and
+// `HONEY`/`HONEY_EASING` are imported LIVE and are the same expressions the
+// shipped cell uses — the only thing this file invents is the SIZE (90pt
+// circumradius, against the comb's 44), because the one thing a rig can show
+// that the comb cannot is the curve at a scale where you can see it. A rig
+// that re-typed the curve would only be checking what it did not inherit.
 //
-// Glow colour is `accentBurst` — same as the bead's own fill. Lumen's
-// first pass measured ΔE00 (a distance, no direction) and picked
-// `accentDeep` as "furthest from the ground," which just means "stains
-// darkest." Re-measured in L*: every yellow darkens this cream page
-// undimmed, so ΔE00 was answering a question nobody asked. Once
-// `colors.spotlightDim` (0.25) is behind the glow — production-only, this
-// instrument doesn't scrim its stage — `accentBurst` reads as light
-// thrown outward while `accentDeep` reads as dark as the dimmed room
-// itself. `accentDeep` keeps its real job: `gradients.honey[2]`, the
-// bead's own shaded underside, material sitting on a white cell.
+// What you are looking for, at 90pt: the circle covers 90.7% of the hexagon
+// by the time it reaches the edge midpoints, and spends its last 64.7ms
+// creeping into the six corners. That is the settle, and it is geometry, not
+// score — nobody chose it, so it is worth confirming it reads as honey
+// finding the corners rather than as the animation being late.
 export const LuxuryPrimitivesHarness = () => {
   const reduced = useReducedMotion();
   const [phase, setPhase] = useState('rest');
-  const scale = useRef(new Animated.Value(1)).current;
-  const squeeze = useRef(new Animated.Value(1)).current;
-  const fallY = useRef(new Animated.Value(0)).current;
-  const poolOpacity = useRef(new Animated.Value(1)).current;
-  const poolSpread = useRef(new Animated.Value(1)).current;
+  const fill = useRef(new Animated.Value(0)).current;
+  const clipId = useSvgId('harnessCell');
 
-  const reset = () => {
-    scale.setValue(1);
-    squeeze.setValue(1);
-    fallY.setValue(0);
-    poolOpacity.setValue(1);
-    poolSpread.setValue(1);
-  };
+  const SIZE = 90;
 
-  const runDrip = () => {
-    reset();
-    setPhase('swell');
-    drip.swell();
+  const runFill = () => {
+    fill.setValue(0);
+    hexTap.contact();
 
     if (reduced) {
-      Animated.timing(scale, {
-        toValue: 1.15,
-        duration: DURATIONS.reducedMotionFade,
-        useNativeDriver: true,
-      }).start(() => setPhase('rest'));
+      // LP-R21's reduced-motion line: final value, no sweep. Same branch the
+      // shipped cell takes — `setValue`, not a short timing.
+      setPhase('held (reduced motion)');
+      fill.setValue(1);
       return;
     }
 
-    Animated.timing(scale, {
-      toValue: 1.25,
-      duration: HONEY.swell,
-      easing: HONEY_EASING.swell,
-      useNativeDriver: true,
-    }).start(() => {
-      setPhase('neck');
-      Animated.timing(squeeze, {
-        toValue: 0.4,
-        duration: HONEY.neck,
-        easing: Easing.inOut(Easing.quad), // unscored — see HONEY_EASING.neck note
-        useNativeDriver: true,
-      }).start(() => {
-        setPhase('pinch');
-        drip.pinch();
-        setPhase('fall');
-        Animated.parallel([
-          Animated.timing(fallY, {
-            toValue: 180,
-            duration: HONEY.fall,
-            easing: HONEY_EASING.fall,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scale, {
-            toValue: 0.6,
-            duration: HONEY.fall,
-            easing: HONEY_EASING.fall,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          setPhase('pool');
-          Animated.parallel([
-            Animated.timing(poolSpread, {
-              toValue: 2.2,
-              duration: HONEY.pool,
-              easing: HONEY_EASING.pool,
-              useNativeDriver: true,
-            }),
-            Animated.timing(poolOpacity, {
-              toValue: 0,
-              duration: HONEY.pool,
-              easing: HONEY_EASING.pool,
-              useNativeDriver: true,
-            }),
-          ]).start(() => setPhase('rest'));
-        });
-      });
-    });
+    setPhase('filling');
+    Animated.timing(fill, {
+      toValue: 1,
+      duration: HONEY.fill,
+      easing: HONEY_EASING.fill,
+      useNativeDriver: false,
+    }).start(() => setPhase('held'));
   };
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.heading}>Luxury primitives — instrument, not score</Text>
-      <Text style={styles.phase}>phase: {phase}{reduced ? ' (reduced motion)' : ''}</Text>
+      <Text style={styles.heading}>Hex tap — fill and hold (instrument, not score)</Text>
+      <Text style={styles.phase}>
+        phase: {phase} · {HONEY.fill}ms · circumradius {SIZE}pt
+      </Text>
 
       <View style={styles.stage}>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.bead,
-            theme.shadows.glow(theme.colors.accentBurst, 'bloom'),
-            {
-              transform: [
-                { translateY: fallY },
-                { scale },
-                { scaleX: squeeze },
-              ],
-            },
-          ]}
-        />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.pool,
-            {
-              opacity: poolOpacity,
-              transform: [{ scale: poolSpread }],
-            },
-          ]}
-        />
+        <Svg width={SIZE * 2} height={SIZE * 2}>
+          <Defs>
+            <ClipPath id={clipId}>
+              <Polygon points={hexPoints(SIZE)} />
+            </ClipPath>
+          </Defs>
+          <Polygon points={hexPoints(SIZE)} fill={theme.colors.surface} />
+          <Polygon points={hexPoints(SIZE)} fill={theme.colors.washYellow} />
+          <AnimatedCircle
+            cx={SIZE}
+            cy={SIZE}
+            r={fill.interpolate({ inputRange: [0, 1], outputRange: [0, SIZE] })}
+            fill={theme.colors.accent}
+            clipPath={`url(#${clipId})`}
+          />
+          <Polygon points={hexPoints(SIZE)} fill="none" stroke={theme.colors.ink} strokeWidth={2.5} />
+        </Svg>
       </View>
 
-      <PrimaryButton onPress={runDrip}>Trigger drip</PrimaryButton>
+      <PrimaryButton onPress={runFill}>Trigger fill</PrimaryButton>
     </View>
   );
 };
@@ -170,24 +114,7 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
   },
   stage: {
-    width: 220,
-    height: 260,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 40,
-  },
-  bead: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.accentBurst,
-  },
-  pool: {
-    position: 'absolute',
-    bottom: 20,
-    width: 48,
-    height: 16,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.accentBurst,
+    justifyContent: 'center',
   },
 });

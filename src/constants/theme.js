@@ -213,9 +213,12 @@ const colors = {
   // warns about, complete with the predicted stale comment.
   accentEdge: withAlpha(pigment.accent, 0.6),
   accentDeepWash: withAlpha(pigment.accentDeep, 0.1), // was `accentDeep + '1A'` (0.102)
-  // Pooled honey. Translucent because honey IS translucent — a pool that is
-  // opaque reads as paint. Motion only, like `accentBurst`.
-  honeyPool: withAlpha(pigment.accentDeep, 0.22),
+  // `honeyPool` (accentDeep @ 0.22) RETIRED 2026-08-28 by LP-R21 guardrail 3,
+  // in the commit that removed Beat 6. The pool was its only job, and a wash
+  // looking for a new home is how `washPeach` kept coming back (R50 class;
+  // the `weekWash`/`monthWash` retirement note above states the rule). Do
+  // not revive it for "translucent honey somewhere else" — the held fill is
+  // opaque `accent`, ruled, and the pool it was named for does not exist.
 
   // --- Press feedback (C9) ---
   // Two tints, not one, because a press over a filled dark surface (`ink`)
