@@ -517,6 +517,354 @@ if (TOKENS.washYellow && TOKENS.background) {
   else bad('G3 preset settle', `${fireSites} onSettle fire site(s), expected at least 3 (preset flight end, preset suppressed, resident home) — a replacement rather than an addition hangs Welcome's loginArc`);
 }
 
+
+console.log('\nH. P1a — the greeting adoption, measured at the props the call site passes');
+
+// The first real consumer of the staged mode: `TodayTab` puts a 132pt hero in
+// the greeting's negative space and this light behind him.
+//
+// EVERY ROW HERE RESOLVES THE CALL SITE'S OWN VALUES rather than the
+// component's defaults. Section F measured the bloom at `intensity` 0.5 x
+// 0.875 — GlowOrb's default through the breathe interpolation — and the call
+// site passes 0.55 into the staged branch, which reaches its argument exactly.
+// A rig that renders a component with its defaults checks a flight nobody
+// flies (R82); the same is true of a rig that measures a colour nobody ships.
+{
+  const todaySrc = await readFile(path.join(SRC, 'screens', 'TodayTab.js'), 'utf8');
+  const todayAst = ast(todaySrc);
+  const mascotSrc = await readFile(path.join(SRC, 'constants', 'mascot.js'), 'utf8');
+
+  // The mascot constants, evaluated from their own source. `MASCOT_WIDTH_FRACTION`
+  // is written `16.4 / 24`, so a regex for a number does not read it.
+  const mascotConst = (name) => {
+    const m = new RegExp(`export const ${name} = ([^;]+);`).exec(mascotSrc);
+    if (!m) return null;
+    try { return Function(`"use strict"; return (${m[1]});`)(); } catch { return null; }
+  };
+  const MASCOT = {
+    MASCOT_WIDTH_FRACTION: mascotConst('MASCOT_WIDTH_FRACTION'),
+    MASCOT_BASE_PX: mascotConst('MASCOT_BASE_PX'),
+  };
+
+  // The screen's module-level numeric constants, evaluated in a scope holding
+  // the mascot ones. Only arithmetic declarators are admitted — a component or
+  // a `StyleSheet.create` would need React to evaluate, and admitting it would
+  // turn a resolver into an interpreter.
+  const numericish = (n) =>
+    !n ? false :
+    n.type === 'NumericLiteral' ? true :
+    n.type === 'Identifier' ? true :
+    n.type === 'UnaryExpression' ? numericish(n.argument) :
+    n.type === 'BinaryExpression' ? numericish(n.left) && numericish(n.right) :
+    false;
+
+  const decls = [];
+  for (const n of todayAst.program.body) {
+    if (n.type !== 'VariableDeclaration') continue;
+    for (const d of n.declarations) {
+      if (d.id.type === 'Identifier' && numericish(d.init)) {
+        decls.push(`const ${d.id.name} = ${todaySrc.slice(d.init.start, d.init.end)};`);
+      }
+    }
+  }
+  const names = decls.map((d) => d.slice(6, d.indexOf(' =')));
+  const evalInScope = (expr) => {
+    const body = `${decls.join('\n')}\nreturn (${expr});`;
+    // eslint-disable-next-line no-new-func
+    return Function(...Object.keys(MASCOT), body)(...Object.values(MASCOT));
+  };
+
+  // A style property's expression, by name — the same resolver, so a style
+  // that hardcodes 90.2 and a style that derives it are distinguishable.
+  const styleExpr = (styleName, prop) => {
+    let out = null;
+    visit(todayAst, (n) => {
+      if (out || n.type !== 'ObjectProperty' || n.key.name !== styleName) return;
+      if (n.value.type !== 'ObjectExpression') return;
+      const q = n.value.properties.find((x) => x.type === 'ObjectProperty' && x.key.name === prop);
+      if (q) out = { src: todaySrc.slice(q.value.start, q.value.end), node: q.value };
+    });
+    return out;
+  };
+
+  const orb = (() => {
+    let found = null;
+    visit(todayAst, (n) => {
+      if (n.type === 'JSXOpeningElement' && jsxName(n) === 'GlowOrb') found = found ?? n;
+    });
+    return found;
+  })();
+  const bee = (() => {
+    let found = null;
+    visit(todayAst, (n) => {
+      if (n.type === 'JSXOpeningElement' && jsxName(n) === 'FlyingBee') found = found ?? n;
+    });
+    return found;
+  })();
+
+  if (!MASCOT.MASCOT_WIDTH_FRACTION || !MASCOT.MASCOT_BASE_PX || !orb || !bee) {
+    bad(
+      'H0 the call site is readable',
+      `resolver came up empty (widthFraction=${MASCOT.MASCOT_WIDTH_FRACTION}, basePx=${MASCOT.MASCOT_BASE_PX}, ` +
+        `GlowOrb=${!!orb}, FlyingBee=${!!bee}). Every row below would pass vacuously, so this fails closed.`,
+    );
+  } else {
+    ok(`H0 call site read: ${names.length} module constant(s) resolved (${names.join(', ')}), mascot width fraction ${MASCOT.MASCOT_WIDTH_FRACTION.toFixed(6)}, base cut ${MASCOT.MASCOT_BASE_PX}px`);
+
+    // H1 — the greeting mounts the STAGED mode, not the ambient one. The
+    // component throws on both together; what it cannot catch is a bloom that
+    // quietly breathes on a screen whose whole argument is that it is quiet.
+    {
+      const a = attrNames(orb);
+      if (a.includes('staged') && !a.includes('breathe')) {
+        ok(`H1 the greeting bloom is staged, not ambient (props: ${a.join(', ')})`);
+      } else {
+        bad('H1 staged, not ambient', `TodayTab's <GlowOrb> carries ${a.join(', ')} — the greeting's light must be one-shot (\`staged\`) and never \`breathe\`.`);
+      }
+    }
+
+    // H2 — ONE STRING, TWO READERS. The bloom is placed by reading the perch
+    // the bee lives at, so the anchor's `id` and the handler's `read()`
+    // argument must be the same value. Two spellings is a light that lands
+    // nowhere, and it is invisible: `read()` returns null and the bloom simply
+    // never mounts.
+    {
+      const homeIds = [];
+      visit(todayAst, (n) => {
+        if (n.type !== 'JSXOpeningElement' || jsxName(n) !== 'PerchAnchor') return;
+        if (!attrNames(n).includes('home')) return;
+        const id = attr(n, 'id');
+        homeIds.push(id?.value?.type === 'JSXExpressionContainer' ? id.value.expression : id?.value);
+      });
+      const reads = [];
+      visit(todayAst, (n) => {
+        if (n.type !== 'CallExpression') return;
+        if (n.callee.type !== 'MemberExpression' || n.callee.property.name !== 'read') return;
+        reads.push(n.arguments[0]);
+      });
+      const key = (node) =>
+        !node ? null :
+        node.type === 'Identifier' ? `ident:${node.name}` :
+        node.type === 'StringLiteral' ? `str:${node.value}` : `<${node.type}>`;
+      const homeKeys = homeIds.map(key);
+      const readKeys = reads.map(key);
+      if (homeKeys.length !== 1) {
+        bad('H2 one anchor id, two readers', `found ${homeKeys.length} \`home\` anchors on TodayTab; the bloom is placed at THE residence and there must be exactly one.`);
+      } else if (!readKeys.length) {
+        bad('H2 one anchor id, two readers', 'nothing calls `.read(...)` on TodayTab, so the bloom has no measured position — it is either hardcoded or absent.');
+      } else if (!readKeys.every((k) => k === homeKeys[0])) {
+        bad(
+          'H2 one anchor id, two readers',
+          `the \`home\` anchor is ${homeKeys[0]} and the read(s) ask for ${readKeys.join(', ')}. ` +
+            'A second spelling of the anchor id is a stage light that lands nowhere, and it fails silently: ' +
+            '`read()` returns null and the bloom simply never mounts.',
+        );
+      } else if (!homeKeys[0].startsWith('ident:')) {
+        bad('H2 one anchor id, two readers', `both sites use the literal ${homeKeys[0]}. They agree today; a shared binding is what keeps them agreeing.`);
+      } else {
+        ok(`H2 the anchor id is one binding read at both sites (${homeKeys[0]}) — the bloom cannot land at an anchor that does not exist`);
+      }
+    }
+
+    // H3 — the hero renders on the BASE cut. Above the LOD threshold
+    // `MascotBee` reaches for the hero pair, which the register rules lands
+    // with its first hero mount — i.e. a new asset in this commit. Derived
+    // from the live constants, at @3x, which is the dense case.
+    {
+      const sizeAttr = attr(bee, 'size');
+      const expr = sizeAttr?.value?.type === 'JSXExpressionContainer'
+        ? todaySrc.slice(sizeAttr.value.expression.start, sizeAttr.value.expression.end)
+        : null;
+      if (!expr) {
+        bad('H3 the hero renders on the base cut', 'TodayTab\'s <FlyingBee> passes no resolvable `size`, so which cut it draws cannot be decided here.');
+      } else {
+        let size = null;
+        try { size = evalInScope(expr); } catch (err) { size = null; }
+        const threshold = MASCOT.MASCOT_BASE_PX / (MASCOT.MASCOT_WIDTH_FRACTION * 3);
+        if (typeof size !== 'number' || !Number.isFinite(size)) {
+          bad('H3 the hero renders on the base cut', `\`size={${expr}}\` did not resolve to a number.`);
+        } else if (size * MASCOT.MASCOT_WIDTH_FRACTION * 3 > MASCOT.MASCOT_BASE_PX) {
+          bad(
+            'H3 the hero renders on the base cut',
+            `size ${size} draws ${(size * MASCOT.MASCOT_WIDTH_FRACTION).toFixed(2)}pt of character, which at @3x is ` +
+              `${(size * MASCOT.MASCOT_WIDTH_FRACTION * 3).toFixed(1)}px against a ${MASCOT.MASCOT_BASE_PX}px base cut. ` +
+              'Above the threshold the hero asset is required, and it lands with its first hero mount — so this ' +
+              'commit now owes an asset it does not ship.',
+          );
+        } else {
+          ok(`H3 hero size ${size} is under the LOD threshold ${threshold.toFixed(4)} (${(size * MASCOT.MASCOT_WIDTH_FRACTION * 3).toFixed(1)}px of ${MASCOT.MASCOT_BASE_PX} at @3x) — base cut, no hero-asset dependency`);
+        }
+      }
+    }
+
+    // H4 — "never over text" is a property of the LAYOUT. The acceptance line
+    // for this lane (PRESENCE_PASS_REGISTER.md, P1a) is "hero in negative
+    // space never over text", and today's three greeting strings happen to be
+    // short enough. That is not the same claim: the reserve has to be the
+    // character's own width, derived, so the invariant survives Lane P3's copy
+    // and any type retune.
+    {
+      const reserve = styleExpr('greetingReserve', 'paddingRight');
+      const perch = styleExpr('heroPerch', 'right');
+      if (!reserve || !perch) {
+        bad('H4 the hero column is reserved structurally', `could not read greetingReserve.paddingRight (${!!reserve}) / heroPerch.right (${!!perch}).`);
+      } else {
+        let r = null, q = null;
+        try { r = evalInScope(reserve.src); q = evalInScope(perch.src); } catch { /* fall through */ }
+        const size = (() => { try { return evalInScope('HERO_SIZE'); } catch { return null; } })();
+        const charW = size === null ? null : size * MASCOT.MASCOT_WIDTH_FRACTION;
+        if (r === null || q === null || charW === null) {
+          bad('H4 the hero column is reserved structurally', 'the reserve or the perch offset did not resolve against the live mascot constants.');
+        } else if (Math.abs(r - charW) > 1e-9) {
+          bad(
+            'H4 the hero column is reserved structurally',
+            `the text reserve is ${r.toFixed(4)}pt but the character is ${charW.toFixed(4)}pt wide. ` +
+              'A reserve that is not derived from the character goes stale the moment either the hero size or ' +
+              'MASCOT_WIDTH_FRACTION moves, and it goes stale silently — the greeting simply starts running under the bee.',
+          );
+        } else if (!/[A-Za-z_$]/.test(reserve.src) || !/[A-Za-z_$]/.test(perch.src)) {
+          // A VALUE CHECK CANNOT SEE A FROZEN DERIVATION. Found by mutation:
+          // replacing `HERO_CHAR_WIDTH` with the literal `90.2` left every row
+          // above green, because 90.2 IS the right answer today. It stops
+          // being the right answer the moment `MASCOT_WIDTH_FRACTION` or
+          // `HERO_SIZE` moves, and it stops silently — the greeting simply
+          // starts running under the bee. So the expression has to still
+          // REFER to something, not merely agree with it.
+          bad(
+            'H4 the hero column is reserved structurally',
+            `the reserve (\`${reserve.src}\`) or the perch offset (\`${perch.src}\`) is a bare literal. ` +
+              'It agrees with the character width today and would stop agreeing, without failing, the next time ' +
+              'the hero size or MASCOT_WIDTH_FRACTION moves.',
+          );
+        } else if (Math.abs(q - charW / 2) > 1e-9) {
+          bad(
+            'H4 the hero column is reserved structurally',
+            `the perch box is offset ${q.toFixed(4)}pt from the content edge; §32.2 draws the bee CENTRED on the ` +
+              `resolved point, so the offset must be half a character (${(charW / 2).toFixed(4)}pt) or ` +
+              `${(charW / 2).toFixed(2)}pt of him hangs off the screen.`,
+          );
+        } else {
+          ok(`H4 the reserve is the character (${charW.toFixed(2)}pt) and the perch is offset half of it (${q.toFixed(2)}pt) — "never over text" is layout, not string length`);
+        }
+      }
+    }
+
+    // H5 — the bloom's diameter is derived from the hero it stages, per
+    // MB-D1's "radius = bee bounding box x 1.2". Two numbers that must move
+    // together earn a derivation; the doc's "~160pt" is a rounding of its own
+    // formula and typing it would freeze the hero size into the light.
+    {
+      const sizeAttr = attr(orb, 'size');
+      const expr = sizeAttr?.value?.type === 'JSXExpressionContainer'
+        ? todaySrc.slice(sizeAttr.value.expression.start, sizeAttr.value.expression.end) : null;
+      let d = null, hero = null;
+      try { d = evalInScope(expr); hero = evalInScope('HERO_SIZE'); } catch { /* fall through */ }
+      if (d === null || hero === null) {
+        bad('H5 the bloom is sized from its hero', `the bloom's \`size\` (${expr}) did not resolve.`);
+      } else if (!/[A-Za-z_$]/.test(expr)) {
+        bad(
+          'H5 the bloom is sized from its hero',
+          `the bloom's size is the bare literal \`${expr}\` — it matches 1.2 x the hero today and would freeze ` +
+            'there the moment the hero is resized, which is the one change this ratio exists to survive.',
+        );
+      } else if (Math.abs(d / (2 * hero) - 1.2) > 1e-9) {
+        bad(
+          'H5 the bloom is sized from its hero',
+          `bloom ${d.toFixed(2)}pt across against a ${hero}pt hero is a radius ratio of ${(d / (2 * hero)).toFixed(4)}; ` +
+            'MB-D1 scores 1.2 x the bee\'s bounding box. Re-score it in the doc or restore the ratio, but a light ' +
+            'whose size no longer follows its object is not staging anything.',
+        );
+      } else {
+        ok(`H5 bloom ${d.toFixed(2)}pt across = 1.2 x the ${hero}pt hero's box, both sides derived — resizing the hero resizes its light`);
+      }
+    }
+
+    // H6 — the words survive the light, AT THE INTENSITY THE CALL SITE PASSES.
+    // The bloom's core is its darkest point and it sits over the greeting.
+    {
+      const intAttr = attr(orb, 'intensity');
+      const expr = intAttr?.value?.type === 'JSXExpressionContainer'
+        ? todaySrc.slice(intAttr.value.expression.start, intAttr.value.expression.end) : null;
+      let alpha = null;
+      try { alpha = evalInScope(expr); } catch { /* fall through */ }
+      const inkTok = token('ink');
+      const softTok = token('inkSoft');
+      if (alpha === null || typeof alpha !== 'number' || !inkTok || !softTok) {
+        bad(
+          'H6 the words survive the light at the shipped intensity',
+          `could not resolve the call site's intensity (${expr}) or the ink tokens. Fails closed: section F's ` +
+            'figure is the DEFAULT intensity through the breathe interpolation, which is not what this screen ships.',
+        );
+      } else {
+        const core = overGround(TOKENS.accent, alpha, TOKENS.background);
+        const lum = (c) => { const f = c.map((v) => { const t = v / 255; return t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4; }); return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]; };
+        const ratio = (a, b) => { const la = lum(a), lb = lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+        const rInk = ratio(rgb(inkTok), core), rSoft = ratio(rgb(softTok), core);
+        if (rInk >= 4.5 && rSoft >= 4.5) {
+          ok(`H6 at the SHIPPED intensity ${alpha}: ink ${rInk.toFixed(4)}:1, inkSoft ${rSoft.toFixed(4)}:1 over the bloom's core — both clear 4.5:1 (headroom ${(rSoft - 4.5).toFixed(4)} on the weaker)`);
+        } else {
+          bad(
+            'H6 the words survive the light at the shipped intensity',
+            `intensity ${alpha} puts ink at ${rInk.toFixed(4)}:1 and inkSoft at ${rSoft.toFixed(4)}:1 over the bloom's ` +
+              'core, against a 4.5:1 floor. The stage light is costing the words it stages — lower `intensity`, ' +
+              'which is the one prop §34 gives for exactly this.',
+          );
+        }
+      }
+    }
+
+    // H7 — CALIBRATION for H6, red direction. H6 passing proves the resolver
+    // ran; it does not prove the resolver would notice a call site that turned
+    // the light up. So walk the intensity until the row's own predicate fails,
+    // and require that point to be reachable and above what we ship.
+    {
+      const inkTok = token('inkSoft');
+      const lum = (c) => { const f = c.map((v) => { const t = v / 255; return t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4; }); return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]; };
+      const ratio = (a, b) => { const la = lum(a), lb = lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+      let breaks = null;
+      for (let a = 0; a <= 1.0001; a += 0.001) {
+        if (ratio(rgb(inkTok), overGround(TOKENS.accent, a, TOKENS.background)) < 4.5) { breaks = a; break; }
+      }
+      let shipped = null;
+      try {
+        const intAttr = attr(orb, 'intensity');
+        shipped = evalInScope(todaySrc.slice(intAttr.value.expression.start, intAttr.value.expression.end));
+      } catch { /* fall through */ }
+      if (breaks === null) {
+        bad(
+          'H7 H6 can fail',
+          'no intensity in 0..1 puts inkSoft under 4.5:1 on this ground, so H6 is unfalsifiable — it would pass ' +
+            'for any call site whatsoever and is asserting nothing about this one.',
+        );
+      } else if (shipped === null || shipped >= breaks) {
+        bad('H7 H6 can fail', `the shipped intensity (${shipped}) is at or past the ${breaks.toFixed(3)} where H6's own predicate breaks.`);
+      } else {
+        ok(`H7 calibration: H6's predicate breaks at intensity ${breaks.toFixed(3)} and the call site ships ${shipped} — the row discriminates, and the shipped light has ${((breaks - shipped) / shipped * 100).toFixed(1)}% of headroom to that edge`);
+      }
+    }
+
+    // H8 — the light is BEHIND. Not a taste call: MB-D1's "bloom layers behind
+    // the object" and §29.1's "gold never a ground" are the same fact here —
+    // a bloom painted over the greeting is a gold field with words under it.
+    // Paint order is source order plus zIndex, so both have to be read.
+    {
+      const orbZ = /orb:\s*\{[^}]*zIndex/.test(componentSrc);
+      const flyingSrc = await readFile(path.join(SRC, 'components', 'FlyingBee.js'), 'utf8');
+      const flyZ = /fill:\s*\{[^}]*zIndex:\s*(\d+)/.exec(flyingSrc);
+      const orbFirst = orb.start < bee.start;
+      if (orbZ) {
+        bad('H8 the light is behind', 'GlowOrb\'s own style now carries a `zIndex`, so paint order is no longer decided at the call site — re-read this row against whatever it is.');
+      } else if (!flyZ) {
+        bad('H8 the light is behind', 'could not read FlyingBee\'s fill zIndex, so "the bee is above the light" is unverified.');
+      } else if (!orbFirst) {
+        bad('H8 the light is behind', 'the <GlowOrb> is mounted after the <FlyingBee> in source order; with no zIndex of its own it would paint over the hero it is lighting.');
+      } else {
+        ok(`H8 paint order: bloom (no zIndex, first) -> scroll content -> bee (zIndex ${flyZ[1]}) — the light is behind the words it stages and behind the hero standing in it`);
+      }
+    }
+  }
+}
+
 console.log(`\ncheck-stage-light: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   failures.forEach((f) => console.log(`  - ${f}`));
