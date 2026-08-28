@@ -16,7 +16,11 @@ import { useSvgId } from '../utils/svgId';
 //
 // THREE MODES, AND THE THIRD EXCLUDES THE FIRST:
 //
-//   * static  — nothing passed. A warm ground that holds.
+//   * static  — nothing passed. A warm ground that holds — at the
+//     `intensity` and the `size` the call site wrote, since 2026-08-28.
+//     This line was already here and the code did not do it: static fell
+//     through to the breathing arm and rendered 0.875x / 1.04x. See the
+//     render block below.
 //   * breathe — `breathe`. Ambient, 2400ms, reduced-motion aware.
 //   * staged  — `staged`. One-shot: entrance on true, fade on false.
 //
@@ -122,18 +126,35 @@ export const GlowOrb = ({
   // composed, because a value with two animations running has one of them
   // silently stopped (AnimatedValue holds a single `_animation`).
   //
-  // Note what this fixes on the way past: the breathe branch's opacity
-  // interpolates [0,1] -> [intensity*0.75, intensity], and a NON-breathing
-  // orb holds `pulse` at 0.5, so `intensity` has always rendered at 0.875x
-  // its own value there. The staged branch reaches `intensity` exactly,
-  // which is what §34 says the prop means. The three merged static/breathe
-  // call sites keep their shipped numbers untouched.
+  // THREE modes, and only two of them animate. `staged` owns `stage`,
+  // `breathe` owns `pulse`, and the third case — a light that is passed
+  // neither — is simply LIT. It has to render the numbers its call site
+  // wrote, and until 2026-08-28 it did not: it fell through to the breathing
+  // arm, where `pulse` rests at 0.5, so `intensity` rendered at 0.875x and
+  // `size` drew at 1.04x. Both errors are silent, and they pull in opposite
+  // directions — a dimmer, wider light — which is a diffusion nobody chose.
+  //
+  // The fix is Lumen's own P1a ruling read one lane over: the stage HOLDS
+  // what ambient breathes TO, i.e. `intensity` is the breath's peak and a
+  // light that is not breathing holds it. A static orb is a held light.
+  // §34's "strength is `intensity`" is the same sentence from the token end.
+  //
+  // Scope, deliberately: the `breathe` arm is untouched, INCLUDING its
+  // reduced-motion rest. Under Reduce Motion a breather still parks at
+  // `pulse` 0.5 and renders 0.875x — that is a breath frozen at its own
+  // midpoint, which is a defensible settled state and a different question
+  // from a light that never breathes. Two sites move; four do not.
+  const breathing = breathe && !staging;
   const opacity = staging
     ? stage.interpolate({ inputRange: [0, 1], outputRange: [0, intensity] })
-    : pulse.interpolate({ inputRange: [0, 1], outputRange: [intensity * 0.75, intensity] });
+    : breathing
+      ? pulse.interpolate({ inputRange: [0, 1], outputRange: [intensity * 0.75, intensity] })
+      : intensity;
   const scale = staging
     ? stage.interpolate({ inputRange: [0, 1], outputRange: [BLOOM.entranceScale, 1] })
-    : pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+    : breathing
+      ? pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] })
+      : 1;
 
   return (
     <Animated.View

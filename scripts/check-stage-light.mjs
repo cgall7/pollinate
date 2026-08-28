@@ -342,33 +342,233 @@ console.log('\nD. the score lives in motion.js, not in the component');
   }
 }
 
-console.log('\nE. the merged call sites keep their shipped behaviour');
-
-// E1 — the three static/breathe sites pass no `staged`, so they resolve
-// through the unchanged `pulse` arm. This is the no-regression row.
-{
-  const sites = [];
-  for (const f of files) {
-    const src = await readFile(f, 'utf8');
-    if (!/<GlowOrb/.test(src)) continue;
-    visit(ast(src), (n) => {
-      if (n.type === 'JSXOpeningElement' && jsxName(n) === 'GlowOrb') {
-        sites.push({ file: path.relative(root, f), line: n.loc.start.line, props: attrNames(n) });
-      }
-    });
-  }
-  const unstaged = sites.filter((s) => !s.props.includes('staged'));
-  const staged = sites.filter((s) => s.props.includes('staged'));
-  ok(`E1 ${unstaged.length} unstaged site(s) unchanged, ${staged.length} staged site(s) — ${sites.map((s) => `${s.file}:${s.line}${s.props.includes('staged') ? ' [staged]' : ''}`).join(', ')}`);
-}
-
-console.log('\nF. the colour ruling that struck the three-hue stack, re-derived live');
-
 const themeSrc = await readFile(path.join(SRC, 'constants', 'theme.js'), 'utf8');
 const token = (name) => {
   const m = new RegExp(`^\\s*${name}:\\s*'(#[0-9A-Fa-f]{6})'`, 'm').exec(themeSrc);
   return m ? m[1] : null;
 };
+const rgb = (h) => { const c = parseColor(h); return [c.r, c.g, c.b]; };
+const Lstar = (c) => rgbToLab({ r: c[0], g: c[1], b: c[2] }).L;
+const overGround = (hex, alpha, groundHex) => {
+  const c = rgb(hex), g = rgb(groundHex);
+  return c.map((v, k) => v * alpha + g[k] * (1 - alpha));
+};
+// Contrast of an opaque text token against an already-composited ground.
+const lumOf = (c) => { const f = c.map((v) => { const t = v / 255; return t <= 0.03928 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4; }); return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]; };
+const ratioOf = (textHex, groundArr) => {
+  const la = lumOf(rgb(textHex)), lb = lumOf(groundArr);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+};
+
+console.log('\nE. the three modes, and the one that renders no multiplier');
+
+// The mode census, and it is an ASSERTION rather than a census line. E1 used
+// to print whatever it found and pass — including "0 sites", which is a
+// blinded extractor reported as a clean app. It also called the population
+// "the three static/breathe sites" while there were four unstaged mounts and
+// two static ones; a count in a comment that nothing checks is how a wrong
+// number survives being quoted twice (it reached my core note and a
+// ratification message before this row was written).
+const orbSites = await (async () => {
+  const out = [];
+  for (const f of files) {
+    const src = await readFile(f, 'utf8');
+    if (!/<GlowOrb/.test(src)) continue;
+    const fileAst = ast(src);
+    visit(fileAst, (n) => {
+      if (n.type !== 'JSXOpeningElement' || jsxName(n) !== 'GlowOrb') return;
+      const props = attrNames(n);
+      out.push({
+        file: path.relative(root, f), line: n.loc.start.line, props, src, ast: fileAst, el: n,
+        mode: props.includes('staged') ? 'staged' : props.includes('breathe') ? 'breathe' : 'static',
+      });
+    });
+  }
+  return out;
+})();
+
+{
+  const by = (m) => orbSites.filter((s) => s.mode === m);
+  const [staged, breathing, still] = ['staged', 'breathe', 'static'].map(by);
+  if (!orbSites.length) {
+    bad('E1 the mode census', 'zero <GlowOrb> mounts found — the extractor is blind, not the app empty. Every row below would be vacuous.');
+  } else if (orbSites.some((s) => s.props.includes('staged') && s.props.includes('breathe'))) {
+    bad('E1 the mode census', 'a call site passes both `staged` and `breathe`; the component throws on that pair, so this is a crash, not a mode.');
+  } else {
+    ok(
+      `E1 ${orbSites.length} mount(s), each in exactly one mode — ${staged.length} staged (${staged.map((s) => `${s.file}:${s.line}`).join(', ') || 'none'}), ` +
+        `${breathing.length} breathe (${breathing.map((s) => `${s.file}:${s.line}`).join(', ') || 'none'}), ` +
+        `${still.length} static (${still.map((s) => `${s.file}:${s.line}`).join(', ') || 'none'})`,
+    );
+  }
+}
+
+// The declaration chain for a rendered value, walked to its LAST alternate —
+// the arm a call site reaches by passing neither prop.
+const renderArms = (name) => {
+  let decl = null;
+  visit(componentAst, (n) => {
+    if (n.type !== 'VariableDeclarator') return;
+    if (n.id.type !== 'Identifier' || n.id.name !== name) return;
+    decl = n.init;
+  });
+  if (!decl || decl.type !== 'ConditionalExpression') return null;
+  const arms = [];
+  let cur = decl;
+  while (cur && cur.type === 'ConditionalExpression') {
+    arms.push({ test: componentSrc.slice(cur.test.start, cur.test.end), value: cur.consequent });
+    cur = cur.alternate;
+  }
+  return { arms, fallthrough: cur };
+};
+
+// E2 — the static arm carries NO multiplier. This is the whole repair: a
+// light passed neither prop rendered through the breathing arm, where `pulse`
+// rests at 0.5, so `intensity` came out at 0.875x and `size` drew at 1.04x.
+// Asserted on the SHAPE of the fallthrough rather than on a number, because
+// the defect was a number that was arithmetically consistent with itself.
+{
+  const op = renderArms('opacity');
+  const sc = renderArms('scale');
+  if (!op || !sc) {
+    bad('E2 the static arm renders what the call site wrote', `could not read the ${!op ? 'opacity' : 'scale'} declaration as a conditional chain — the modes are no longer decided where this row looks.`);
+  } else if (op.arms.length < 2 || sc.arms.length < 2) {
+    bad(
+      'E2 the static arm renders what the call site wrote',
+      `opacity has ${op.arms.length} guarded arm(s) and scale ${sc.arms.length}; there are three modes and a two-arm chain means one of them is falling through to another's driver — which is exactly the defect this row exists for.`,
+    );
+  } else {
+    const opF = op.fallthrough, scF = sc.fallthrough;
+    const opOk = opF && opF.type === 'Identifier' && opF.name === 'intensity';
+    const scOk = scF && scF.type === 'NumericLiteral' && scF.value === 1;
+    if (!opOk || !scOk) {
+      bad(
+        'E2 the static arm renders what the call site wrote',
+        `a light in neither mode renders opacity \`${opF ? componentSrc.slice(opF.start, opF.end) : 'none'}\` and scale ` +
+          `\`${scF ? componentSrc.slice(scF.start, scF.end) : 'none'}\`. It must be \`intensity\` and \`1\` exactly — ` +
+          'anything else is a multiplier on a prop that names the quantity, and it fails silently because the ' +
+          'rendered result is still self-consistent. §34: strength IS `intensity`.',
+      );
+    } else {
+      ok('E2 a light in neither mode renders `intensity` and scale 1 — no driver, no interpolation, no multiplier between the call site and the screen');
+    }
+  }
+}
+
+// E3 — CALIBRATION for E2, and the no-regression row for the four mounts that
+// do not move. The breathing arm must still carry its own numbers, INCLUDING
+// under Reduce Motion, where `pulse` parks at 0.5 and a breather renders
+// 0.875x on purpose: a breath frozen at its own midpoint is a settled state,
+// which is a different question from a light that never breathes.
+{
+  const op = renderArms('opacity');
+  const breatheArm = op?.arms?.find((a) => /breath/i.test(a.test));
+  const txt = breatheArm ? componentSrc.slice(breatheArm.value.start, breatheArm.value.end) : '';
+  const keepsRange = /intensity\s*\*\s*0\.75/.test(txt) && /intensity/.test(txt);
+  const parksAtMid = /pulse\.setValue\(0\.5\)/.test(componentSrc);
+  if (!breatheArm) {
+    bad('E3 the breathing arm is unmoved', 'no arm of the opacity chain is guarded by a breathing test, so the ambient sites\' behaviour is not decidable here. E2 would then be asserting the only arm there is.');
+  } else if (!keepsRange || !parksAtMid) {
+    bad(
+      'E3 the breathing arm is unmoved',
+      `the breathing arm is \`${txt}\` and pulse-parks-at-0.5 is ${parksAtMid}. The static repair was scoped to leave ` +
+        'ambient alone; a change here moves CoreRitual and Onboarding, which nothing has ratified.',
+    );
+  } else {
+    ok('E3 calibration: the breathing arm still spans [intensity x 0.75, intensity] and still parks at pulse 0.5 under Reduce Motion — the repair reaches the static arm and stops there');
+  }
+}
+
+// E4 — NO REGRESSION on the words. The static sites got BRIGHTER (their core
+// alpha rose from 0.875x the declared value to the declared value), and a
+// brighter core is a darker composite under gold. So every ink token that can
+// sit over one must not LOSE a floor it held. Pre-existing failures are
+// reported rather than swallowed — this row is about what the change costs,
+// not about what it inherited.
+{
+  const grounds = new Map();
+  const colourFor = (site) => {
+    const a = attr(site.el, 'color');
+    const lit = a?.value?.type === 'JSXExpressionContainer' ? site.src.slice(a.value.expression.start, a.value.expression.end) : null;
+    if (lit && /^theme\.colors\.[A-Za-z]+$/.test(lit)) return { names: [lit.split('.').pop()], how: 'the call site\'s literal' };
+    if (!a) return { names: ['accent'], how: 'the component default' };
+    // Not a literal — enumerate the reachable domain instead of guessing, and
+    // say that is what happened (§0: a domain claim inherits the scope of the
+    // probe that produced it). The consumer reads `<something>.color` off a
+    // list element, so the population is `color:` on objects that are ARRAY
+    // ELEMENTS. Every `color:` in the file is the wrong probe and I ran it
+    // first: it swept up the StyleSheet's text colours and reported `ink` and
+    // `inkSoft` as candidate glow hues, which turned four pre-existing text
+    // pairs into twelve nonsense ones. A StyleSheet block is a property of one
+    // object; a slide is an element of a list. That is the discriminator.
+    const names = new Set();
+    visit(site.ast, (n) => {
+      if (n.type !== 'ArrayExpression') return;
+      for (const el of n.elements) {
+        if (!el || el.type !== 'ObjectExpression') continue;
+        const c = el.properties.find((x) => x.type === 'ObjectProperty' && (x.key.name ?? x.key.value) === 'color');
+        if (!c) continue;
+        const m = /^theme\.colors\.([A-Za-z]+)$/.exec(site.src.slice(c.value.start, c.value.end));
+        if (m) names.add(m[1]);
+      }
+    });
+    return names.size ? { names: [...names], how: `enumerated from the ${site.file} list elements that supply \`${lit}\`` } : null;
+  };
+  const groundFor = (site) => {
+    let out = null;
+    visit(site.ast, (n) => {
+      if (out || n.type !== 'ObjectProperty' || (n.key.name ?? n.key.value) !== 'container') return;
+      if (n.value.type !== 'ObjectExpression') return;
+      const bg = n.value.properties.find((x) => x.type === 'ObjectProperty' && (x.key.name ?? x.key.value) === 'backgroundColor');
+      if (bg) out = /^theme\.colors\.([A-Za-z]+)$/.exec(site.src.slice(bg.value.start, bg.value.end))?.[1] ?? null;
+    });
+    return out;
+  };
+  const still = orbSites.filter((s) => s.mode === 'static');
+  const lost = [], preexisting = [], checked = [];
+  let blind = null;
+  for (const site of still) {
+    const iAttr = attr(site.el, 'intensity');
+    let declared = null;
+    try { declared = Number(site.src.slice(iAttr.value.expression.start, iAttr.value.expression.end)); } catch { declared = null; }
+    const col = colourFor(site);
+    const gName = groundFor(site);
+    if (declared === null || Number.isNaN(declared) || !col || !gName || !token(gName)) {
+      blind = `${site.file}:${site.line} (intensity=${declared}, colour=${col ? col.names.join('/') : 'unresolved'}, ground=${gName ?? 'unresolved'})`;
+      break;
+    }
+    grounds.set(site.file, gName);
+    for (const cn of col.names) {
+      const cTok = token(cn);
+      if (!cTok) { blind = `${site.file}:${site.line} colour token \`${cn}\``; break; }
+      for (const tn of ['ink', 'inkSoft']) {
+        const before = ratioOf(token(tn), overGround(cTok, declared * 0.875, token(gName)));
+        const after = ratioOf(token(tn), overGround(cTok, declared, token(gName)));
+        checked.push(`${site.file}:${site.line} ${cn}/${tn} ${before.toFixed(4)}->${after.toFixed(4)}`);
+        if (before >= 4.5 && after < 4.5) lost.push(`${site.file}:${site.line} ${tn} over ${cn} falls ${before.toFixed(4)} -> ${after.toFixed(4)}`);
+        else if (before < 4.5) preexisting.push(`${site.file}:${site.line} ${tn} over ${cn} was ALREADY ${before.toFixed(4)} and is now ${after.toFixed(4)}`);
+      }
+    }
+    if (blind) break;
+  }
+  if (blind) {
+    bad('E4 the repair costs no floor', `could not resolve ${blind}, so the change's cost is unmeasured. Fails closed — a brighter core is a darker composite and that is the direction that costs text.`);
+  } else if (!checked.length) {
+    bad('E4 the repair costs no floor', 'no static mount resolved, so this row measured nothing. If the static arm has genuinely gone unused, delete it and E2 with it rather than leaving a green row over an empty set.');
+  } else if (lost.length) {
+    bad('E4 the repair costs no floor', `the static repair drops text under 4.5:1: ${lost.join('; ')}. Retune the call site's \`intensity\` — that is the prop §34 gives for exactly this.`);
+  } else {
+    ok(
+      `E4 ${checked.length} (site x colour x ink token) pair(s) re-measured over each screen's own ground ` +
+        `(${[...grounds].map(([f, g]) => `${f} -> ${g}`).join(', ')}): no floor lost to the repair` +
+        (preexisting.length ? `. PRE-EXISTING and not caused here — ${preexisting.join('; ')}` : '') +
+        `. Worst pair after: ${checked.map((c) => [c, Number(c.split('->')[1])]).sort((a, b) => a[1] - b[1])[0][0]}`,
+    );
+  }
+}
+
+console.log('\nF. the colour ruling that struck the three-hue stack, re-derived live');
+
 const TOKENS = ['accent', 'accentDeep', 'washYellow', 'background'].reduce((acc, n) => {
   acc[n] = token(n); return acc;
 }, {});
@@ -381,12 +581,6 @@ const TOKENS = ['accent', 'accentDeep', 'washYellow', 'background'].reduce((acc,
   else ok(`F0 live tokens read from theme.js: ${Object.entries(TOKENS).map(([k, v]) => `${k} ${v}`).join(', ')}`);
 }
 
-const rgb = (h) => { const c = parseColor(h); return [c.r, c.g, c.b]; };
-const Lstar = (c) => rgbToLab({ r: c[0], g: c[1], b: c[2] }).L;
-const overGround = (hex, alpha, groundHex) => {
-  const c = rgb(hex), g = rgb(groundHex);
-  return c.map((v, k) => v * alpha + g[k] * (1 - alpha));
-};
 
 // F1 — accentDeep sits FURTHER below the ground than accent, which is why a
 // stack with accentDeep outside accent has its lightness minimum in a ring.
