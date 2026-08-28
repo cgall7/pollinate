@@ -46,9 +46,10 @@ const pigment = {
   // Accents — Sunbeam v1 (GUIDES/GRATITUDE_DESIGN_SYSTEM_V1.md §1). Zero green anywhere.
   accent: '#FFD200', // Marigold — THE one accent. Active states, celebration badge, key highlights.
   // Warm amber. FILL, STROKE, GLYPH AND GRADIENT STOP — never text, on any
-  // ground, at any size (§35/R127). It clears 3:1 as text against exactly two
-  // colours in this file, the ink family and `paperEvening`, and both are dark;
-  // no light ground in the system admits it. The roles this comment used to
+  // ground, at any size (§35/R127). It clears 3:1 as text against exactly three
+  // colours in this file — `inkVeil`, the ink family, and `paperEvening`, five
+  // names between them — and all three are dark; no light ground in the system
+  // admits it. The roles this comment used to
   // name — "hero numerals, emphasis on cream" — were a licence: they were the
   // third and last place the app authorised amber lettering, and they outlived
   // four separate strikes at four call sites because nobody was striking THIS.

@@ -22,10 +22,24 @@
 // down the same StyleSheet paints `statValue` accentDeep at 2.3482:1. Nobody
 // re-opens the case the spec says is settled.
 //
-// WHAT IT READS. Every `color:` property of an object LITERAL under src/ — that
-// is the RN text-pigment slot, and it is a text-only style prop. Destructuring
-// patterns (`{ color = theme.colors.accent }`, a component's prop default) are
-// excluded: those are props on their way to an SVG stop or an icon, not text.
+// WHAT IT READS — and this is a PLURAL, which cost a ride-along to learn.
+//
+//   1. every `color:` property of an object LITERAL under src/ — the RN
+//      text-pigment style slot, and a text-only style prop. Destructuring
+//      patterns (`{ color = theme.colors.accent }`, a component's prop default)
+//      are excluded: those are props on their way to an SVG stop or an icon.
+//   2. `placeholderTextColor` — a JSX attribute, not a style key. Placeholder
+//      text is text, so R127 binds it, and the first draft of this gate was
+//      completely blind to it (Lumen's mutation: `SealHive.js:151` set to
+//      `accentDeep`, gate stayed green).
+//
+// T5 exists because of how that hole was shaped. The `color:` half failed
+// closed on anything it could not resolve, and the attribute half did not exist
+// — TWO SOUND HALVES WITH THE HOLE AT THE JOIN. A gate that reads N transports
+// is silent about the N+1th by construction, and no amount of rigour inside a
+// transport detects one that was never enumerated. So T5 asserts the
+// ENUMERATION: the ways a glyph can be given a colour in this codebase are
+// closed, and a new one has to be taught here rather than assumed absent.
 //
 // FAILS CLOSED. A `color:` this gate cannot resolve to a concrete token is a
 // FAIL, not a skip — "unreadable is not the same as passing" (check-type-floor's
@@ -53,6 +67,24 @@ const TOKENS = new Map();
 for (const m of themeSrc.matchAll(/^\s{2,}([a-zA-Z][\w]*):\s*'(#[0-9A-Fa-f]{6})'/gm)) {
   if (!TOKENS.has(m[1])) TOKENS.set(m[1], m[2]);
 }
+
+// AN ALPHA OF A PIGMENT IS STILL THAT PIGMENT. `inkFaint: withAlpha(pigment.ink,
+// 0.62)` has no hex literal of its own, and the first version of this gate
+// failed closed on the three `placeholderTextColor` sites that use it — correct,
+// but the right answer is to resolve it, not to except it. Resolving through the
+// alpha also closes a bypass the hex map alone would miss:
+// `withAlpha(pigment.accentDeep, 0.9)` is amber lettering with a decimal in it.
+//
+// Only a DIRECT `withAlpha(pigment.X, n)` resolves. `spotlightDim` wraps a
+// `mix()` and has no single base, so it stays unresolvable and fails closed if
+// anything ever paints text with it.
+const ALPHA_BASE = new Map();
+for (const m of themeSrc.matchAll(/^\s{2,}([a-zA-Z][\w]*):\s*withAlpha\(pigment\.(\w+),\s*([\d.]+)\)/gm)) {
+  const base = TOKENS.get(m[2]);
+  if (base && !ALPHA_BASE.has(m[1])) ALPHA_BASE.set(m[1], { base, alpha: Number(m[3]), baseName: m[2] });
+}
+// A pigment's hex, whether it is declared as one or wears an alpha over one.
+const hexOf = (name) => TOKENS.get(name) ?? ALPHA_BASE.get(name)?.base ?? null;
 
 // The banned pigments and, for each, the EXACT set of tokens it can legally be
 // read against. Enumerated, not thresholded: a threshold would need a number
@@ -189,20 +221,33 @@ for (const file of files) {
   try { ast = parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] }); }
   catch (err) { unresolved.push(`${path.relative(ROOT, file)} — parse failed: ${err.message}`); continue; }
   walk(ast, (node, parent) => {
-    if (node.type !== 'ObjectProperty') return;
-    if (!parent || parent.type !== 'ObjectExpression') return; // a pattern is a prop default, not text
-    const key = node.key && (node.key.name ?? node.key.value);
-    if (key !== 'color') return;
-    const text = code.slice(node.value.start, node.value.end).replace(/\s+/g, ' ');
+    // Two transports, one resolver. `node` is either a style `color:` property
+    // or a `placeholderTextColor` JSX attribute; both hand a pigment to a glyph.
+    let valueNode = null;
+    let transport = null;
+    if (node.type === 'ObjectProperty' && parent && parent.type === 'ObjectExpression') {
+      const key = node.key && (node.key.name ?? node.key.value);
+      if (key === 'color') { valueNode = node.value; transport = 'color:'; }
+    } else if (node.type === 'JSXAttribute' && node.name && node.name.name === 'placeholderTextColor') {
+      // `placeholderTextColor="#FF7A00"` is a StringLiteral; the expression form
+      // is a container. Both reach the same resolver.
+      valueNode = node.value && node.value.type === 'JSXExpressionContainer' ? node.value.expression : node.value;
+      transport = 'placeholderTextColor';
+    }
+    if (!valueNode) return;
+    const node_ = node;
+    const text = code.slice(valueNode.start, valueNode.end).replace(/\s+/g, ' ')
+      .replace(/^"(#[0-9A-Fa-f]{6})"$/, "'$1'");
     const rel = path.relative(ROOT, file);
-    const at = { file: rel, line: node.loc.start.line, expr: text };
+    const at = { file: rel, line: node_.loc.start.line, expr: text, transport };
     // A resolved site carries the HEXES it can paint, not just the names — the
     // names are for the message, the hexes are what the rows decide on.
     const push = (names, via, hexes) => {
-      const resolved = hexes ?? names.map((n) => TOKENS.get(n));
+      const resolved = hexes ?? names.map((n) => hexOf(n));
       if (resolved.some((h) => !h)) {
-        unresolved.push(`${rel}:${node.loc.start.line} — \`color: ${text}\` names ${names.join('|')}, ` +
-          `which is not a plain hex literal in theme.js, so its legibility cannot be measured`);
+        unresolved.push(`${rel}:${node_.loc.start.line} — \`${transport} ${text}\` names ${names.join('|')}, ` +
+          `which resolves to no pigment this gate can name — not a hex literal, not a direct ` +
+          `withAlpha(pigment.X, n) — so its legibility cannot be measured`);
         return;
       }
       sites.push({ ...at, tokens: names, hexes: resolved.map((h) => h.toUpperCase()), via });
@@ -213,7 +258,7 @@ for (const file of files) {
     else if (literal) push([literal[1]], 'raw hex literal', [literal[1]]);
     else if (COVER_TEXT.test(text)) push(coverTextTokens, 'cover.textColor');
     else if (PAPER_INK.test(text)) push(paperInkTokens, 'paperInk()');
-    else unresolved.push(`${rel}:${node.loc.start.line} — \`color: ${text}\` resolves to no token this gate can name`);
+    else unresolved.push(`${rel}:${node_.loc.start.line} — \`${transport} ${text}\` resolves to no token this gate can name`);
   });
 }
 
@@ -223,14 +268,15 @@ if (unresolved.length) {
   bad('T2 every text pigment resolves',
     `${unresolved.length} site(s) this gate cannot resolve, and unreadable is not the same as passing: ` +
     unresolved.join('; ') + '. Teach the resolver the new indirection (see COVER_TEXT / PAPER_INK above).');
-} else if (sites.length < 200) {
+} else if (sites.length < 240) {
   bad('T2 every text pigment resolves',
     `only ${sites.length} \`color:\` sites found across ${files.length} files — the population was 268 when this ` +
     `gate was written. An extractor that suddenly finds far fewer has broken, not been fixed.`);
 } else {
-  const byVia = sites.reduce((acc, s) => ({ ...acc, [s.via]: (acc[s.via] ?? 0) + 1 }), {});
-  ok(`T2 ${sites.length} text-pigment sites across ${files.length} files, 0 unresolved ` +
-    `(${Object.entries(byVia).map(([k, v]) => `${v} ${k}`).join(', ')})`);
+  const tally = (key) => sites.reduce((acc, s) => ({ ...acc, [s[key]]: (acc[s[key]] ?? 0) + 1 }), {});
+  const fmt = (o) => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ');
+  ok(`T2 ${sites.length} text-pigment sites across ${files.length} files, 0 unresolved — ` +
+    `by transport: ${fmt(tally('transport'))}; by indirection: ${fmt(tally('via'))}`);
 }
 // Calibration: the extractor must still be able to SEE a banned pigment. If the
 // residue ever empties this row keeps its meaning by pointing at the exemption,
@@ -265,7 +311,7 @@ const stale = [];
 for (const entry of [...RESIDUE, ...DECORATIVE]) {
   const site = sites.find((s) => s.file === entry.file && s.line === entry.line);
   if (!site) stale.push(`${entry.file}:${entry.line} (${entry.what}) is listed but no \`color:\` sits there any more`);
-  else if (!site.hexes.includes((TOKENS.get(entry.token) ?? '').toUpperCase())) stale.push(`${entry.file}:${entry.line} (${entry.what}) is listed as \`${entry.token}\` but now paints \`${site.tokens.join('|')}\``);
+  else if (!site.hexes.includes((hexOf(entry.token) ?? '').toUpperCase())) stale.push(`${entry.file}:${entry.line} (${entry.what}) is listed as \`${entry.token}\` but now paints \`${site.tokens.join('|')}\``);
 }
 if (stale.length) {
   bad('T4 the residue shrinks',
@@ -274,6 +320,51 @@ if (stale.length) {
 } else {
   ok(`T4 all ${RESIDUE.length + DECORATIVE.length} listed sites are still exactly what the list says they are`);
   for (const e of RESIDUE) console.log(`         owed: ${e.file}:${e.line} ${e.what} — ${e.ratio}:1 against a ${e.floor}:1 floor — ${e.owner}`);
+}
+
+// ── T5: the ENUMERATION of text transports, not just their contents ────────
+// Rows T2-T4 are rigorous inside the transports they read and silent about a
+// transport nobody added. That is not a bug in them — it is a property of every
+// gate that reads a list. So the list itself is the assertion here: each
+// transport this gate does NOT read must have an empty population, and gaining
+// a member reds with instructions rather than passing quietly.
+console.log('\nT5 the ways a glyph can be given a colour are enumerated, not assumed');
+const allSrc = files.map((f) => ({ rel: path.relative(ROOT, f), code: fs.readFileSync(f, 'utf8') }));
+const UNREAD_TRANSPORTS = [
+  {
+    name: 'react-native-svg text nodes',
+    why: 'an SVG <Text>/<TSpan> takes its colour from `fill`, which is not a style `color:`',
+    find: ({ code }) => [...code.matchAll(/import\s*\{([^}]*)\}\s*from\s*'react-native-svg'/g)]
+      .flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]))
+      .filter((n) => n === 'Text' || n === 'TSpan' || n === 'TextPath'),
+  },
+  {
+    name: '`selectionColor`',
+    why: 'it paints the glyph highlight behind selected text',
+    find: ({ code }) => (code.match(/\bselectionColor\s*=/g) ?? []),
+  },
+  {
+    name: '`cursorColor`',
+    why: 'it paints the caret inside a text field',
+    find: ({ code }) => (code.match(/\bcursorColor\s*=/g) ?? []),
+  },
+];
+const READ_TRANSPORTS = ['style `color:`', '`placeholderTextColor`'];
+let transportsClean = true;
+for (const t of UNREAD_TRANSPORTS) {
+  const hits = allSrc.flatMap((f) => t.find(f).map(() => f.rel));
+  if (hits.length) {
+    transportsClean = false;
+    bad(`T5 ${t.name} is unread`,
+      `${hits.length} occurrence(s) now exist (${[...new Set(hits)].join(', ')}) — ${t.why}. This gate reads ` +
+      `${READ_TRANSPORTS.join(' and ')} and would be SILENT about these. Teach the transport in the extractor ` +
+      `and move it out of UNREAD_TRANSPORTS; do not widen the exemption lists instead.`);
+  }
+}
+if (transportsClean) {
+  ok(`T5 ${READ_TRANSPORTS.length} transports read (${READ_TRANSPORTS.join(', ')}); ` +
+    `${UNREAD_TRANSPORTS.length} known-but-unread transports all have an empty population ` +
+    `(${UNREAD_TRANSPORTS.map((t) => t.name).join(', ')})`);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
