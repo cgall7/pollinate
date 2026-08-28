@@ -78,9 +78,19 @@ const DayCell = ({ day, filled, index, filledCount, cascade, reduced, w, h, x, y
 // `cascade` — bump to re-stagger the entrance (a month swipe, a finale replay).
 // `selectedDay` — optional; paints the ink selection ring Recap uses. The
 // finale beat never passes it.
-export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0, selectedDay = null }) => {
+// `onSettled` — optional; fires once the last filled cell's entrance has
+// visibly landed (or immediately, for an empty grid), so a caller that
+// assembles the grid as its own beat (§14.2 respec Beat 4) knows when to
+// detonate. Timed rather than threaded through every cell's own animation
+// callback (StreakHexTrail's `onSettle` shape) because the grid's entrance
+// is driven by two independent animations per filled cell (the pop and the
+// glow) and only the slower one, the glow's `DURATIONS.arrival` bloom,
+// decides when the LAST cell is actually done.
+export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0, selectedDay = null, onSettled }) => {
   const reduced = useReducedMotion();
   const points = useMemo(() => hexPoints(cellW, cellH), [cellW, cellH]);
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
   // One hatch pattern per mounted MonthGrid, not per cell — R38's shared
   // root paints every empty cell's hatch from the same `<Defs>` entry, and
   // a screen can keep several months mounted at once (Recap's pager), so
@@ -100,6 +110,18 @@ export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0
 
   const filledCount = filledDays.size;
   const selectedCell = selectedDay === null ? null : cells.find((c) => c.day === selectedDay);
+
+  useEffect(() => {
+    if (!onSettledRef.current) return undefined;
+    const ms =
+      filledCount === 0
+        ? 0
+        : reduced
+          ? DURATIONS.reducedMotionFade
+          : staggerDelay(filledCount - 1, filledCount) + DURATIONS.arrival;
+    const t = setTimeout(() => onSettledRef.current?.(), ms);
+    return () => clearTimeout(t);
+  }, [cascade, filledCount, reduced]);
 
   return (
     <View style={[styles.comb, { width: cellW * COLS, height }]}>

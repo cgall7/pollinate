@@ -46,7 +46,11 @@ const BEE_PATH = {
   rotate: ['-6deg', '0deg'],
 };
 
-export const SealCrack = ({ onCracked }) => {
+// §14.2 respec §3.0: the monthly edition keeps the pour metaphor (§15
+// reserves it for Wrapped exclusively) but moves the noun — "Your year,
+// poured" names a year Beat 0 no longer always tells. Exact wording is
+// Deezine's; this default preserves the annual call's copy unchanged.
+export const SealCrack = ({ onCracked, copy = 'Your year, poured.' }) => {
   const reduced = useReducedMotion();
   const [beeKey, setBeeKey] = useState(0);
   const [cracked, setCracked] = useState(false);
@@ -174,7 +178,7 @@ export const SealCrack = ({ onCracked }) => {
           </View>
         )}
       </View>
-      <Text style={styles.copy}>Your year, poured.</Text>
+      <Text style={styles.copy}>{copy}</Text>
       <Animated.View pointerEvents="none" style={[styles.flash, { opacity: flash }]} />
     </Pressable>
   );

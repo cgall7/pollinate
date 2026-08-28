@@ -38,6 +38,12 @@ const SAFE_ZONE_WIDTH = '70%';
 export const YearCard = ({
   totalEntries,
   themeWord,
+  // §14.2 respec §3.4: the monthly Month Card is "this frame with a
+  // month's content, not a second component" — the one thing its content
+  // adds is the month's name, which the annual card has no use for (a
+  // year already names itself in the door). Optional, so the annual call
+  // site is untouched.
+  subtitle = null,
   // Miniaturized completed tapestry, passed in as an element once Beats
   // 4–5 exist — R15 settled the unit as hex month-grids, but the frame
   // stays agnostic and just renders whatever it's handed.
@@ -67,8 +73,13 @@ export const YearCard = ({
     </View>
 
     <View style={styles.safeZone}>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       <Text style={styles.numeral}>{String(totalEntries)}</Text>
-      <Text style={styles.themeWord}>{themeWord}</Text>
+      {/* §4.2's "a plurality of one is not a finding" applies here too: the
+          monthly card passes no theme word for a month whose dominant
+          theme was a tie broken by insertion order, rather than repeat
+          Beat 3's suppressed claim on the keepsake. */}
+      {themeWord ? <Text style={styles.themeWord}>{themeWord}</Text> : null}
     </View>
   </View>
 );
@@ -114,6 +125,12 @@ const styles = StyleSheet.create({
     width: SAFE_ZONE_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Same pigment rule as the numeral below (R15/R127): ink only.
+  subtitle: {
+    ...theme.type.label,
+    color: theme.colors.ink,
+    marginBottom: theme.spacing.xs,
   },
   // R15: ink only on the gold field — accentDeep is a warm-amber-on-cream
   // rule and lands at 1.53:1 here; ink is 10.01:1. Not a prop, so the
