@@ -46,6 +46,7 @@
     "check:nectar-ledger": "node scripts/check-nectar-ledger.mjs",
     "check:hive-volumes": "node scripts/check-hive-volumes.mjs",
     "check:multi-writer-hives": "node scripts/check-multi-writer-hives.mjs",
+    "check:contributor-names": "node scripts/check-contributor-names.mjs",
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",

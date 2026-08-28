@@ -116,4 +116,5 @@ export const SENTINELS = {
   // widening all ride the same version-order guarantee as everything else
   // below a 'column'-kind row.
   '20260827000001_multi_writer_hives': { kind: 'column', table: 'private_hives', column: 'is_collective' },
+  '20260828000001_multiwriter_contributor_names': { kind: 'column', table: 'private_hives', column: 'contributor_names' },
 };
