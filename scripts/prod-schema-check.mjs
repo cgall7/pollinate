@@ -147,6 +147,23 @@ const classify = (probe, r) => {
   if (probe.kind === 'rpc') {
     if (r.code === 'PGRST202') return 'MISSING';
     if (probe.expect === 'exists') return r.status < 500 ? 'LIVE' : `INSTRUMENT(${r.status}/${r.code ?? '??'})`;
+    // 'success' is NOT 'exists' with a friendlier name. 'exists' answers "was
+    // this function created" and discriminates on PGRST202 alone — right for
+    // a migration whose effect is CREATE FUNCTION, wrong for one whose effect
+    // is a GRANT, because a grant's before-state (42501, permission denied)
+    // is a resolved function and so already cleared the PGRST202 check above.
+    // Under 'exists', 42501 arrives as status 401 < 500 and reads as LIVE —
+    // both the before and after state of a grant-only migration classify the
+    // same way, so the row can never turn red (Lumen, thread d1783906,
+    // 2026-08-29, caught on 20260829000001/2 reading LIVE for three weeks
+    // before either was actually deployed). 'success' asks the question a
+    // grant migration actually answers: did anon's call go all the way
+    // through, not just resolve to a real function.
+    if (probe.expect === 'success') {
+      if (r.status === 200) return 'LIVE';
+      if (r.code === '42501') return `MISSING (fn answered ${r.status}/42501 permission denied, expected 200)`;
+      return `INSTRUMENT(${r.status}/${r.code ?? '??'})`;
+    }
     return r.code === probe.expect ? 'LIVE' : `MISSING (fn answered ${r.status}/${r.code ?? 'ok'}, expected ${probe.expect})`;
   }
   if (probe.kind === 'storage') {
