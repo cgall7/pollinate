@@ -6197,11 +6197,80 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         }
         ok(
           `N13 REPORTED — three lattice-scoped figures, restated on the errand's own domain. `
-          + `CYCLE COUNT reaches ${maxC.v.toFixed(4)} (${maxC.label}) against the lattice's 1.5000: R-LF-8's "c <= 1.5 everywhere, an identity rather than a hope" is an identity OF THE LATTICE, and on a long first errand R-LF-8 ADDS undulation rather than removing it — ~${(maxC.v / 1.5).toFixed(1)}x the count the fixed 1.5 ever produced. R-LF-3.1 does not care (the envelope closes the join at every c, which is why it was squared), but the reassurance was scoped to a probe and written as though scoped to the function. `
+          + `CYCLE COUNT reaches ${maxC.v.toFixed(4)} (${maxC.label}) against the lattice's 1.5000: R-LF-8's "c <= 1.5 everywhere, an identity rather than a hope" is an identity OF THE LATTICE, and on a long first errand R-LF-8 ADDS undulation rather than removing it — the uncapped build reached 4.3042 cycles, and since R-LF-10 the count is bounded by construction (ceiling seconds x the rate), which is the CORRECT direction: the rate is the ratified quantity, and the ceiling shortens the walk rather than breaking its rhythm. R-LF-3.1 does not care (the envelope closes the join at every c, which is why it was squared), but the reassurance was scoped to a probe and written as though scoped to the function. `
           + `APPROACH CHORD reaches ${maxL.v.toFixed(2)}pt against 165.80. `
           + `And WEAVE_BODY_AMPLITUDE_MULTIPLE binds on ${bodyBinds} of ${WIDE.length} plans (${((bodyBinds / WIDE.length) * 100).toFixed(0)}%, min A/L ${minShape.toFixed(5)}) where it binds on NONE of the 336 — so N9's "exactly 0.18000 on every plan" is the lattice speaking, not the build. The MAX is still 0.18 and that is domain-independent (A = min(0.18L, 1.5body), so A/L <= 0.18 always); the DEGENERACY is not. `
-          + `Worst flight over this domain ${maxDur.v.toFixed(1)}ms (${maxDur.label}) against N8's ${'2502.4'}ms — reported, not bounded, and Colin should see it`,
+          + `Worst flight over this domain ${maxDur.v.toFixed(1)}ms (${maxDur.label}) against N8's ${'2502.4'}ms — Colin saw the uncapped 4429.3 and ruled 2026-08-29; N14 holds the ceiling this figure argued for`,
         );
+      }
+
+      // --- N14. R-LF-10: the approach saturates — an errand is a commute --
+      //
+      //     Colin's 2026-08-29 ruling ("let's implement your recommendation
+      //     on time to landing"). The ceiling must hold on BOTH sides, and
+      //     the two halves red for different retunes:
+      //       (a) STRICTLY above the lattice's measured worst approach — the
+      //           constant coming down into the lattice, or a cruise retune
+      //           pushing the lattice up into the constant, both silently
+      //           re-time ratified flights, and this half is what sees it;
+      //       (b) a LIVE bound on the wide domain — a ceiling nothing
+      //           reaches is dead code wearing a ruling's name.
+      //     The ruled value is pinned here rather than read off the module
+      //     (N4's RULED_CAP_DEG precedent): a gate that enforces a ruling
+      //     keys on what the ruling names, and R-LF-10 names 1200.
+      {
+        const RULED_CEILING_MS = 1200;
+        const flatOf = (plan) => plan.profile.approachMs - plan.profile.launchMs / 2;
+        const CEIL = flight.APPROACH_MS_CEILING;
+        if (CEIL !== RULED_CEILING_MS) {
+          bad(
+            'N14 APPROACH_MS_CEILING is the ruled 1200ms',
+            `module exports ${CEIL}. If this moved on purpose, the ruling moved — re-derive both halves of N14 against the new value, do not just retype this constant`,
+          );
+        } else {
+          let latMax = { v: 0, label: '' };
+          for (const p of PLANS) {
+            const f = flatOf(p.plan);
+            if (f > latMax.v) latMax = { v: f, label: p.label };
+          }
+          if (latMax.v < CEIL) {
+            ok(
+              `N14a the ceiling clears the ratified lattice STRICTLY — worst seat-to-seat approach ${latMax.v.toFixed(1)}ms (${latMax.label}) against APPROACH_MS_CEILING ${CEIL}ms, ${(((CEIL / latMax.v) - 1) * 100).toFixed(1)}% headroom (LAUNCH_MS's own order), so the cap binds on 0 of ${PLANS.length} ratified plans and every figure N1..N9 asserts is untouched by R-LF-10 — measured bit-identical at ruling time, held here by the strict ordering`,
+            );
+          } else {
+            bad(
+              'N14a the ceiling clears the ratified lattice strictly',
+              `worst lattice approach ${latMax.v.toFixed(1)}ms (${latMax.label}) >= ceiling ${CEIL}ms — either the ceiling came down into the lattice or a cruise retune pushed the lattice up into it; both silently re-time ratified flights`,
+            );
+          }
+          let over = { v: 0, label: '' };
+          let binds = 0;
+          let maxDur = { v: 0, label: '' };
+          let maxMult = { v: 0, label: '' };
+          for (const p of WIDE) {
+            const f = flatOf(p.plan);
+            if (f - CEIL > over.v) over = { v: f - CEIL, label: p.label };
+            if (Math.abs(f - CEIL) < 1e-6) binds += 1;
+            if (p.plan.durationMs > maxDur.v) maxDur = { v: p.plan.durationMs, label: p.label };
+            const m = p.speed > 0 ? p.plan.profile.cruisePxS / p.speed : 0;
+            if (m > maxMult.v) maxMult = { v: m, label: p.label };
+          }
+          if (over.v > 1e-9) {
+            bad(
+              'N14b no approach exceeds the ceiling anywhere in any container',
+              `worst excess ${over.v.toFixed(4)}ms (${over.label}) — the saturation line in buildPollinationPlan is not doing its job`,
+            );
+          } else if (binds === 0) {
+            bad(
+              'N14b the ceiling is LIVE on the wide domain',
+              `no plan of ${WIDE.length} reaches it — either the ceiling was raised past the domain's own worst approach or the errand domain shrank; a bound nothing reaches asserts nothing`,
+            );
+          } else {
+            ok(
+              `N14b the approach saturates on the errand's domain — no approach exceeds the ceiling (worst excess ${over.v.toExponential(2)}ms) and it BINDS on ${binds} of ${WIDE.length} plans, so the bound is live. What the errand pays in speed instead of time: worst cruise ${maxMult.v.toFixed(3)}x approachSpeedPxS (${maxMult.label}), and the worst time to landing anywhere in any container is ${maxDur.v.toFixed(1)}ms (${maxDur.label}) — descent-dominated (R-LF-2.1's shape, which no approach lever compresses), against 4429.3ms before the ruling`,
+            );
+          }
+        }
       }
     }
   }
