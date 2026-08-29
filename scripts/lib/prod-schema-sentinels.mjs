@@ -39,11 +39,46 @@ export const SENTINELS = {
   '20260813000002_seeds_schema': { kind: 'column', table: 'seeds', column: 'id' },
   '20260813000003_hive_state_facts': { kind: 'rpc', fn: 'list_hive_state', args: {}, expect: 'exists' },
   '20260813000004_entries_hive_visibility': { kind: 'column', table: 'entries', column: 'hive_id' },
-  // 42501 is this migration WORKING: it revokes definer-function execute from
-  // anon, so the function answering "permission denied" to the anon key is the
-  // observable. A 200 here would mean the revoke is NOT applied — but 'exists'
-  // for 000003 above would still hold, which is why these are two rows.
-  '20260813000005_revoke_definer_execute_from_anon': { kind: 'rpc', fn: 'list_hive_state', args: {}, expect: '42501' },
+  // CORRECTED (Lumen, thread d1783906, 2026-08-29): this row named
+  // list_hive_state, but 20260813000005 never touches list_hive_state — that
+  // function's anon revoke happened two migrations earlier, at
+  // 20260813000003:80. 20260813000005's own three revokes are
+  // find_connectable_profile, owns_entry, and handle_new_user (:92-95);
+  // list_hive_state appears in its file only inside a comment saying so.
+  // Both possible before-states — 000003 applied/000005 not, or both
+  // applied — answer 42501 on list_hive_state, so this row could never fail
+  // regardless of whether 000005 itself was deployed. Same failure shape as
+  // the `expect: 'exists'` gap fixed on 20260829000001/2 earlier tonight,
+  // one row over: the expectation was never wired to what THIS migration's
+  // effect actually is.
+  //
+  // Repointed to find_connectable_profile, which 20260809000002's row above
+  // already probes with `expect: 'exists'` for its creation — this row
+  // probes the SAME function for the anon revoke specifically, the
+  // identical two-rows-one-function shape this table already uses for
+  // list_hive_state itself (000003 + this row, just previously aimed at the
+  // wrong fn). Before 20260813000005: find_connectable_profile carries
+  // `revoke all from public` from its own creation (20260809000002), but
+  // anon's NAMED grant (20260808000001's `alter default privileges ...
+  // grant all on functions to anon`) survives a from-public revoke, so anon
+  // could still call it — a real 200 (empty result; the function's own
+  // self-exclusion clause nulls out when auth.uid() is null for anon).
+  // After: 42501. Live-verified directly against production, 2026-08-29 —
+  // current answer is 401/42501, with both controls (fabricated fn name,
+  // real fn/wrong arg name) answering PGRST202/404, proving the 42501 is a
+  // resolved function denying EXECUTE, not a signature miss.
+  //
+  // NOT owns_entry — the other function this same migration revokes from
+  // anon, and the obvious other choice from the same file. 20260829000002
+  // re-granted it to anon tonight, so a row expecting 42501 from owns_entry
+  // would be permanently red as of today, for a reason that has nothing to
+  // do with whether 20260813000005 is deployed.
+  '20260813000005_revoke_definer_execute_from_anon': {
+    kind: 'rpc',
+    fn: 'find_connectable_profile',
+    args: { lookup_email: 'calibration@example.invalid' },
+    expect: '42501',
+  },
   '20260813000006_entries_theme_column': { kind: 'column', table: 'entries', column: 'theme' },
   '20260813000007_entries_one_per_day_dedupe': { kind: 'order', reason: 'unique index; anon cannot insert to trip it' },
   '20260815000001_private_hives': { kind: 'column', table: 'private_hives', column: 'owner_id' },
