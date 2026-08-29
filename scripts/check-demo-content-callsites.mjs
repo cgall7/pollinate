@@ -94,23 +94,27 @@
 //      reads no demoHive data, and imports no dev-only module is caught by
 //      NOTHING here; green-on-a-trap.
 //
-//        a. DevVersionTag (RecapTab.js): the fifth affordance (Pixel,
-//           thread 4510c5c8) — its only rendered string is a version
-//           number, its "demo" strings are Alert args rule 1 deliberately
-//           excludes. Every <DevVersionTag> JSX usage must be guarded, so
-//           production renders no five-tap picker surface at all; rule 3
-//           and the capability guard sit behind it in depth.
+//        (The list is EMPTY today, and that is a state to be uncomfortable
+//        with rather than proud of — rule 4 exists because rules 1-3 have a
+//        hole, and an empty list means nothing is currently standing in it.)
 //
-//           FlowToggle (Onboarding.js) was entry (a) until One Door deleted
-//           it. It is the reason this list exists — its labels said "Flow
-//           B"/"Flow C" and never "demo", so rule 1 was structurally blind
-//           to it. Recorded because the hole it named is still open, even
-//           though the example is gone.
+//           DevVersionTag (RecapTab.js) was entry (a) — the fifth affordance
+//           (Pixel, thread 4510c5c8) — until G5 deleted it (Lumen,
+//           2026-08-29): the Garden's `v1.0.0` tag duplicated Account's
+//           footer version line, and its five-tap onboarding replay reached
+//           a screen demo builds already open on. Removed under this
+//           header's own self-deleting-controls authorisation, control and
+//           entry in the same commit.
+//
+//           FlowToggle (Onboarding.js) was entry (a) before it, until One
+//           Door deleted it. It is the reason this list exists — its labels
+//           said "Flow B"/"Flow C" and never "demo", so rule 1 was
+//           structurally blind to it. Both are recorded because the hole
+//           they named is still open, even though the examples are gone.
 //
 // SELF-DELETING CONTROLS: the walker-control assertions below ("finds
-// 'Load demo data'", "DevVersionTag is rendered at least once", "some file
-// imports demoHive") exist so a silently-broken extractor cannot report an
-// empty universe as green. Their cost: legitimately REMOVING one of those
+// 'Load demo data'", "some file imports demoHive") exist so a silently-
+// broken extractor cannot report an empty universe as green. Their cost: legitimately REMOVING one of those
 // features reds this gate. That red is authorisation to delete the
 // corresponding control (and, for a removal, its named entry) in the same
 // commit — this note is the sign-off, no thread required.
@@ -373,12 +377,19 @@ const methodReferencesFlag = (rel, methodName) => {
 check(`EntryStore.seedDemoData consults ${FLAG} in its body`,
   methodReferencesFlag('src/services/EntryStore.js', 'seedDemoData'), true);
 
-// --- Named 4a: DevVersionTag usages are guarded ---------------------------
-// FlowToggle was the other member until One Door deleted it; its control
-// went red with the component and the entry came out with it (see the
-// self-deleting-controls note in the header). The loop shape stays — this
-// list is expected to grow again, and a one-element loop costs nothing.
-for (const componentName of ['DevVersionTag']) {
+// --- Named 4a: named-component usages are guarded ------------------------
+// EMPTY BY REMOVAL, NOT BY DESIGN. FlowToggle left with One Door;
+// DevVersionTag left with G5 (Lumen, 2026-08-29) — each control went red
+// here first and each entry came out in the same commit, which is the
+// self-deleting-controls note in the header working as written.
+//
+// The loop shape stays, and it is deliberately a loop over an empty list
+// rather than deleted code: rule 4's hole (an affordance that never says
+// "demo", reads no demoHive data, and imports no dev-only module) is
+// exactly as open as it was, and the next one that appears needs a place to
+// be named that already exists. An empty loop asserts nothing and costs
+// nothing; a deleted loop asserts that the hole closed.
+for (const componentName of []) {
   const uses = [];
   const unguarded = [];
   for (const { rel, ast } of parsed) {

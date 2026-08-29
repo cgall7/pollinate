@@ -366,9 +366,13 @@ export const TodayTab = ({ navigation }) => {
             R122a: he rests AT the anchor (the hover that displaced him by one
             17.3pt radius is retired with the rest of it), drawn centred on it,
             spanning 30.07pt at size 44. On a left-aligned full-width block
-            `on: 'left'` is where the glyphs BEGIN — that is the live defect
-            this pass fixes, the streak caption reading "2 ays to 3." under a
-            resting bee — and `on: 'right'` is the trailing gutter. */}
+            `on: 'left'` is where the glyphs BEGIN — the defect that pass
+            fixed was a resting bee clipping the line beneath him into "2 ays
+            to 3." That line has since retired with the streak register (T2,
+            below), so the example is history rather than a live defect; the
+            geometry it proved is why every anchor on this screen is `right`,
+            and that outlives the sentence it was found on. `on: 'right'` is
+            the trailing gutter. */}
 
         {/* T2 (Lumen, 2026-08-26): the streak whisper that lived here — a
             live countdown toward the next milestone, spoken instead of

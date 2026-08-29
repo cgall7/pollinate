@@ -17,8 +17,6 @@ import { EntryStore } from '../services/EntryStore';
 import { dominantTheme } from '../utils/themeTagger';
 import { recentMonths, monthName } from '../utils/dateRanges';
 import { WrappedSeenState } from '../services/wrappedSeenState';
-import { DevVersionTag } from '../components/DevVersionTag';
-import { DEMO_CONTENT } from '../constants/demoMode';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
 import { PressableScale } from '../components/PressableScale';
@@ -61,6 +59,19 @@ export const buildMonths = (allEntries) => {
   }));
 };
 
+// G1 (Colin's ruling, 2026-08-26, UX Design thread `64ea4949…`: "the streak
+// board is no longer needed with our new direction of the app"): `StatsCard`
+// — CURRENT / BEST EVER / THIS YEAR — is deleted, not hidden. The theme wrote
+// the reason before the ruling arrived: §29.1 admits gold only for material
+// that is FINISHED, KEPT and SINGULAR, and its own words are "a streak count
+// fails (2)". A live process watched daily is a leaderboard against yourself.
+//
+// The successor already shipped and is one line further down the screen:
+// `MonthlyRecap`'s "N of 31 days filled in". Same number, stated once, under
+// the thing it describes. "Best ever" does not move somewhere quieter — a
+// record revealed at year's end is a keepsake, a record watched every morning
+// is a score, and only Wrapped is allowed to be the former.
+//
 // Which month you're on, and that there are others. A paging scroll with no
 // indicator is a screen that hides its own second half — the swipe is only
 // discoverable by accident.
@@ -281,6 +292,18 @@ export const RecapTab = () => {
   // list — first render, and any reload that trimmed the window.
   const activeIndex = trackedIndex >= 0 ? trackedIndex : months.length - 1;
 
+  // The year the page you are on belongs to (G4's eyebrow), read off the
+  // month list rather than off a clock: page back to December and the eyebrow
+  // has to follow the pager, not the calendar.
+  const activeMonthYear = months[activeIndex]?.key.slice(0, 4) ?? null;
+
+  // G2's one accent cell. Derived here, once, and matched by month KEY rather
+  // than by day number alone — every month has a 14th, so a bare day-of-month
+  // would paint "today" onto twelve pages of the pager at once.
+  const today = new Date();
+  const todayMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const todayDayOfMonth = today.getDate();
+
   // §14.2 respec §1: the Wrapped door's window is the previous calendar
   // month, sliced from the same `allEntries` read everything else on this
   // screen uses — a second query for one card's badge would be the thing
@@ -320,9 +343,18 @@ export const RecapTab = () => {
           it sat in is now the account door's reserved column. (G1, Lumen,
           2026-08-26: the badge's successor, `StatsCard`, retired in turn —
           a streak/summary scoreboard fails theme.js §29.1's KEEPSAKE test,
-          the same test the badge itself never passed.) */}
+          the same test the badge itself never passed.)
+
+          G4 — ONE UTTERANCE PER FACT. The eyebrow used to print the active
+          month, and `MonthlyRecap` prints it again as the page title a
+          hundred points below: AUGUST / Garden / August, the month said
+          twice inside one viewport. The eyebrow takes the YEAR instead, which
+          is the fact the page title genuinely does not carry (it adds a year
+          only once the pager scrolls out of the current one — `recentMonths`
+          `title`). Read top to bottom it now says 2026 / Garden / August:
+          three facts, three utterances. */}
       <ScreenHeader
-        eyebrow={unknown ? null : months[activeIndex]?.label}
+        eyebrow={unknown ? null : activeMonthYear}
         title="Garden"
       />
 
@@ -396,6 +428,7 @@ export const RecapTab = () => {
                     insightTheme={insight ? insight.theme : null}
                     insightDescription={insight ? describeTheme(insight, 'days this month') : null}
                     active={index === activeIndex}
+                    todayDay={month.key === todayMonthKey ? todayDayOfMonth : null}
                   />
                 </View>
               );
@@ -417,7 +450,27 @@ export const RecapTab = () => {
           shipping tab. If production support ever needs a visible version
           number, that's a new always-rendered label WITHOUT the gesture,
           not an ungating of this one. */}
-      {DEMO_CONTENT && <DevVersionTag />}
+      {/* G5 (Lumen, 2026-08-29): the `v1.0.0` tag that floated here, above
+          the tab bar, is deleted rather than restyled. Two reasons, and the
+          second is the load-bearing one:
+
+            - ONE UTTERANCE PER FACT. `Account.js` already prints "Version
+              1.0.0" in its footer, which is the place the file's own header
+              names as the reason the screen exists ("Support needs to know
+              which build someone is on"). The Garden was saying it a second
+              time, in the last slot before the tab bar, on the tab whose
+              content is a year of somebody's life.
+            - The five-tap replay it carried is redundant, not lost: a demo
+              build already OPENS on Onboarding (`App.js`, `initialRoute =
+              DEMO_MODE ? 'Onboarding' : null`), so the gesture existed to
+              reach a screen the build starts on.
+
+          Deleting it reds `check-demo-content-callsites.mjs`'s walker
+          control, which is that gate's designed behaviour — its header
+          grants the authorisation in writing ("legitimately REMOVING one of
+          those features reds this gate ... authorisation to delete the
+          corresponding control and, for a removal, its named entry, in the
+          same commit"). Named entry 4a comes out here, same commit. */}
     </ScrollView>
   );
 };
