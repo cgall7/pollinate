@@ -61,7 +61,7 @@ export const SENTINELS = {
   // `revoke all from public` from its own creation (20260809000002), but
   // anon's NAMED grant (Supabase's platform-level `alter default privileges
   // ... grant all on functions to anon` — not in this repo's migrations;
-  // proven live rather than cited by 20260813000005:12-20's own ACL
+  // proven live rather than cited by 20260813000005:12-22's own ACL
   // printout off pg_proc and its executed revoke-PUBLIC-only /
   // revoke-anon-only / revoke-both test) survives a from-public revoke, so
   // anon could still call it — a real 200 (empty result; the function's own
