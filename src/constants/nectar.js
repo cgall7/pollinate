@@ -194,16 +194,23 @@ export const NECTAR_SURFACES = [
     id: 'author-notification',
     deliverable: 'DES-28 D4',
     preConsent: 'No notification of this type exists.',
-    host: null,
-    probe: 'none',
+    host: 'src/components/FlyingBee.js',
+    anchor: 'carrying',
     note:
-      'THE CONTAINER DOES NOT EXIST. The deliverable places this in "the hive\'s ' +
-      'notification pull". This app has three ITEM inboxes — NotesInbox, ' +
-      'SeedsInbox, ReceivedPackages — each a list of objects addressed to you. ' +
-      'A zap notification is author-side and event-shaped ("X zapped your entry"), ' +
-      'which is a different subject and a different row. Scoped: no event feed ' +
-      'found in src/screens at 35194bd. Declared unprobeable — this row is a ' +
-      'completeness declaration, not an absence proof.',
+      'FILLED BY R-N4 (Lumen, 2026-08-29), and the row moved from unhosted to ' +
+      'hosted WITHOUT a notification ever being built. This used to read "THE ' +
+      'CONTAINER DOES NOT EXIST", scoped to a search for an event feed, and ' +
+      'that absence was correct and is still correct: there is no event feed, ' +
+      'no badge, no pull, no row, and MVP1\'s scope lock is why. What fills D4 ' +
+      'instead is the bee. He is already carrying the gift when you open the ' +
+      'Hive and he crosses to your own seat and gives it — an object present ' +
+      'on arrival, which is the one form of "you have something waiting" that ' +
+      'survives your not having been there. The host is the carrier and the ' +
+      'anchor is the prop that puts the drop in his hands; the crossing is ' +
+      'commanded through HoneycombGrid\'s `pollinateOwnCell` and is ' +
+      'conditional on the own seat existing (R-N4.2). `preConsent` is ' +
+      'UNCHANGED and still binds: the balance read early-returns without ' +
+      'consent, so nothing arrives and nothing is carried.',
   },
   {
     id: 'action-menu-row',

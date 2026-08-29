@@ -118,10 +118,10 @@ export const MUTATIONS = [
   },
   {
     row: 'F2',
-    why: 'the collapsed spelling stops being reachable — the row cannot price the defect it names if the zero case answers null too',
+    why: 'the collapsed spelling stops being reachable — the row cannot price the defect it names if the zero case answers null too. ON THE `lastSeenDrops` GUARD, and that correction is the mutation earning its keep: it first pointed at the BALANCE guard, where `!500` is false, so it changed nothing and the miss read as a weak row rather than as a mutation aimed at the wrong argument. F2\'s zero is the REMEMBERED side',
     file: 'src/constants/nectar.js',
-    from: "  if (balanceDrops === null || balanceDrops === undefined || !Number.isFinite(now)) return null;",
-    to: "  if (!balanceDrops || balanceDrops === undefined || !Number.isFinite(now)) return null;",
+    from: "  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;",
+    to: "  if (!lastSeenDrops || lastSeenDrops === undefined || !Number.isFinite(then)) return null;",
   },
   {
     row: 'F3',
@@ -139,31 +139,38 @@ export const MUTATIONS = [
   },
   {
     row: 'F5',
-    why: 'the aim stops escaping the component — the handle narrows back to one function and R-N4 has no destination',
+    why: 'the crossing stops escaping the component — the handle narrows back to one function and R-N4 has no door in',
     file: 'src/components/HoneycombGrid.js',
-    from: "  useImperativeHandle(ref, () => ({ igniteLanding, aimOwnCell }));",
+    from: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell }));",
     to: "  useImperativeHandle(ref, () => ({ igniteLanding }));",
   },
   {
-    row: 'F6',
-    why: 'Reduce Motion gates the MEASUREMENT rather than the crossing — the P1a residence defect in a smaller costume: a suppression that decides WHERE instead of WHETHER, invisible to the screen that owns the beat',
+    row: 'F5',
+    why: 'THE CORRECTED BUILD PUT BACK — a handle member that returns a fact instead of taking a command. This is the exact defect Lumen ruled out, and it is the one a key-COUNT row could not see: the arity is unchanged and a value leaves anyway',
     file: 'src/components/HoneycombGrid.js',
-    from: "      const node = clusterRef.current;\n      if (!node || typeof node.measureInWindow !== 'function') {",
-    to: "      const node = clusterRef.current;\n      if (reduced || !node || typeof node.measureInWindow !== 'function') {",
+    from: "    node.measureInWindow((x, y) => {\n      if (![x, y].every((n) => typeof n === 'number' && Number.isFinite(n))) return;\n      launchPollination(cell, { x, y }, 'arrival');\n    });",
+    to: "    return { x: cell.x, y: cell.y };",
   },
   {
     row: 'F6',
-    why: 'the ruling-blocked case is folded back into the measurement guard — three cases, two guards, and the site where Lumen\'s answer lands no longer exists',
+    why: 'Reduce Motion stops gating the crossing — §5\'s collapse is dropped and the bee flies for a user who asked the OS to stop motion',
     file: 'src/components/HoneycombGrid.js',
-    from: "      if (!cell) {\n        // NO OWN CELL.",
-    to: "      if (false) {\n        // NO OWN CELL.",
+    from: "    if (!onPollinate || reduced) return;\n    // ONE GUARD PER CASE",
+    to: "    if (!onPollinate) return;\n    // ONE GUARD PER CASE",
+  },
+  {
+    row: 'F6',
+    why: 'R-N4.2 NEGATIVE 1 AND 2 AT ONCE — with no own seat the crossing falls back to the first cell, which is an invite seat (honey in it says a stranger has honey) or the most recent poster\'s face (your honey on somebody else). The decline is the whole ruling',
+    file: 'src/components/HoneycombGrid.js',
+    from: "    const cell = layout.cells.find((c) => c.member && c.member.isOwn);\n    if (!cell) return;",
+    to: "    const cell = layout.cells.find((c) => c.member && c.member.isOwn) ?? layout.cells.find((c) => c.member);\n    if (!cell) return;",
   },
   {
     row: 'F7',
     why: 'the window origin is read from the layout-time cache instead of measured — stale by the scroll offset the instant the comb moves',
     file: 'src/components/HoneycombGrid.js',
-    from: "      node.measureInWindow((x, y) => {",
-    to: "      ((cb) => cb(clusterOrigin?.x ?? 0, clusterOrigin?.y ?? 0))((x, y) => {",
+    from: "    node.measureInWindow((x, y) => {",
+    to: "    ((cb) => cb(clusterOrigin?.x ?? 0, clusterOrigin?.y ?? 0))((x, y) => {",
   },
   {
     row: 'F8',
@@ -171,6 +178,74 @@ export const MUTATIONS = [
     file: 'src/screens/HoneycombTab.js',
     from: "  const combMembers = honeyLevel",
     to: "  const combMembers = [...todayMembers].sort((a, b) => Number(b.isOwn) - Number(a.isOwn)) && honeyLevel",
+  },
+  {
+    row: 'G1',
+    why: 'the arrival gets its own publisher again — one line, and §28.9 silently stops covering gift flights because `aimRef` is never written for them. This is the correction restated as a mutation: the cost of resolving instead of emitting was never stylistic',
+    file: 'src/components/HoneycombGrid.js',
+    from: "      launchPollination(cell, { x, y }, 'arrival');",
+    to: "      onPollinate({ key: 1, cause: 'arrival', x, y, ringStep: ringStepFor(cellSize) });",
+  },
+  {
+    row: 'G2',
+    why: 'the arrival is published with the tap\'s cause — every gift flight now looks like a tap, the bee carries nothing, and the beat vanishes with no error anywhere',
+    file: 'src/components/HoneycombGrid.js',
+    from: "      launchPollination(cell, { x, y }, 'arrival');",
+    to: "      launchPollination(cell, { x, y }, 'tap');",
+  },
+  {
+    row: 'G3',
+    why: 'THE LANDING BECOMES THE ONLY WRITER — the level is committed from the flight\'s own callback instead of from the read. Every gift the bee never delivers (Reduce Motion, no seat, an abort) is then silently lost, which is the failure R-N4.1 names',
+    file: 'src/screens/HoneycombTab.js',
+    from: "            combRef.current?.igniteLanding();\n            setPollination(null);",
+    to: "            combRef.current?.igniteLanding();\n            setHoneyLevel(honeyLevelForDrops(drops));\n            setPollination(null);",
+  },
+  {
+    row: 'G4',
+    why: 'the drop stops being a property of the flight and becomes a state of its own — nothing clears it, so the bee carries a drop forever, which is the badge R-N4.2 negative 3 forbids by name',
+    file: 'src/screens/HoneycombTab.js',
+    from: "          carrying={pollination?.cause === 'arrival' ? giftDrops : null}",
+    to: "          carrying={giftDrops || null}",
+  },
+  {
+    row: 'G5',
+    why: 'the cargo gets its own scale instead of the gift\'s — a fixed radius, so every gift is the same size and R-N3\'s "the amount IS the radius" stops being true the moment the drop changes hands',
+    file: 'src/components/FlyingBee.js',
+    from: "  const carriedRadius = carrying ? Math.min(dropRadiusForAmount(carrying), size / 2) : 0;",
+    to: "  const carriedRadius = carrying ? 12 : 0;",
+  },
+  {
+    row: 'G6',
+    // RELABELLED after the run: this mutation makes the cargo UNREACHABLE, it
+    // does not reorder it. The first label said "drawn in front of the
+    // carrier", which is a different defect and the one the row's ORDER half
+    // catches — and a mutation whose `why` describes something it does not do
+    // is a number nobody can correct later, only doubt.
+    why: 'the cargo is never drawn — the JSX stays exactly where it is and the beat is deleted, which is the half source order cannot see',
+    file: 'src/components/FlyingBee.js',
+    from: "          {carriedRadius > 0 && (",
+    to: "          {false && (",
+  },
+  {
+    row: 'G6',
+    why: 'the cargo is drawn AFTER the carrier — a genuine reorder of the two children, so it sits in FRONT of him: a collision instead of a delivery, and exactly the kind of change a screenshot review waves through',
+    file: 'src/components/FlyingBee.js',
+    from: "          {carriedRadius > 0 && (\n            /* Drawn BEFORE the character, so he is in front of what he is\n               holding \u2014 cargo behind the carrier reads as carried, in front\n               of him reads as a collision. It rides his own transform, so it\n               banks and mirrors with him; a circle with a horizontal\n               highlight is symmetric under `scaleX`, so the mirror is a\n               no-op on it and only the bank shows, which is the swing.\n\n               Hung from his midline: the drop's crown at the bee box's\n               vertical centre, centred on his horizontal one. Stated as a\n               fraction of `size` and the drop's own radius so a smaller mount\n               keeps the relationship instead of inheriting a pixel. */\n            <HoneyDrop\n              radius={carriedRadius}\n              style={{\n                position: 'absolute',\n                left: size / 2 - carriedRadius,\n                top: size / 2,\n              }}\n            />\n          )}\n          <MascotBee\n            size={size}\n            flutter={plan ? plan.flutter !== false : true}\n            // `&& !reduced` is what the parked pose used to carry (`breath={!reduced}`)\n            // and it has to come with the bee to his home: a resting bee under\n            // Reduce Motion is the doctrine's \u00a7State-2 \"complete freeze at rest\n            // pose\", and 2 degrees on a 4.2s clock is still a motion someone\n            // asked the OS to stop.\n            breath={plan?.kind === 'rest' && !reduced}\n          />\n",
+    to: "          <MascotBee\n            size={size}\n            flutter={plan ? plan.flutter !== false : true}\n            // `&& !reduced` is what the parked pose used to carry (`breath={!reduced}`)\n            // and it has to come with the bee to his home: a resting bee under\n            // Reduce Motion is the doctrine's \u00a7State-2 \"complete freeze at rest\n            // pose\", and 2 degrees on a 4.2s clock is still a motion someone\n            // asked the OS to stop.\n            breath={plan?.kind === 'rest' && !reduced}\n          />\n          {carriedRadius > 0 && (\n            /* Drawn BEFORE the character, so he is in front of what he is\n               holding \u2014 cargo behind the carrier reads as carried, in front\n               of him reads as a collision. It rides his own transform, so it\n               banks and mirrors with him; a circle with a horizontal\n               highlight is symmetric under `scaleX`, so the mirror is a\n               no-op on it and only the bank shows, which is the swing.\n\n               Hung from his midline: the drop's crown at the bee box's\n               vertical centre, centred on his horizontal one. Stated as a\n               fraction of `size` and the drop's own radius so a smaller mount\n               keeps the relationship instead of inheriting a pixel. */\n            <HoneyDrop\n              radius={carriedRadius}\n              style={{\n                position: 'absolute',\n                left: size / 2 - carriedRadius,\n                top: size / 2,\n              }}\n            />\n          )}\n",
+  },
+  {
+    row: 'G7',
+    why: 'D4\'s row keeps a host that no longer contains its anchor — the registration goes stale in the direction that reads as "still filled"',
+    file: 'src/constants/nectar.js',
+    from: "    anchor: 'carrying',",
+    to: "    anchor: 'notificationPull',",
+  },
+  {
+    row: 'G8',
+    why: 'the memory is written only when something arrived — so a balance that fell is never remembered, and the moment it climbs back to a number it already reached the bee announces it as a gift',
+    file: 'src/screens/HoneycombTab.js',
+    from: "      NectarArrivalState.rememberDrops(userId, drops);\n      const arrived = nectarArrivalDrops(lastSeen, drops);\n      if (!arrived) return;",
+    to: "      const arrived = nectarArrivalDrops(lastSeen, drops);\n      if (!arrived) return;\n      NectarArrivalState.rememberDrops(userId, drops);",
   },
   {
     row: null,
@@ -1022,111 +1097,164 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     bad('F4', `body resolved=${Boolean(readBody)}, zero-defaults found=[${zeroDefaults.join(', ')}], tests raw === null=${returnsNullForMissing} — the unknown would reach \`nectarArrivalDrops\` as a 0`);
   }
 
-  // F5 — THE AIM, AND ITS THREE `null`s. `requestPollination` needs no
-  // measurement: a tap hands it the same point in two coordinate systems.
-  // R-N4's crossing has no tap, so the origin must be measured — and the
-  // measurement can fail in three ways whose correct response is identical
-  // (do not fly) and whose correct response to a WRONG point is not.
+  // ==========================================================================
+  // F5-F8 — THE CROSSING'S MECHANISM (R-N4.1, Lumen 2026-08-29)
   //
-  // The population is the imperative handle, enumerated from the AST and
-  // fail-closed: the handle has been exactly one function for a reason, and
-  // a row that only checked `aimOwnCell` is present would not notice the
-  // widening it is here to record.
+  // AMENDED FROM A BUILD LUMEN CORRECTED. The first draft of these four rows
+  // gated `aimOwnCell`: a handle member that RESOLVED THE OWN CELL'S POINT
+  // back to the screen. The ruling is that this put a fact outward on the
+  // command-inward channel, and the concrete cost was not stylistic — by
+  // resolving the point instead of emitting it, the aim skipped everything
+  // `requestPollination` does on the way past, so `aimRef` was never written
+  // and a gift flight was the ONE flight in this app §28.9's abort predicate
+  // could not cancel. The corrected shape is a second COMMAND with no
+  // payload; the point leaves on `onPollinate`, which already carries points.
+  //
+  // What changed in these rows, stated rather than silently re-pointed:
+  //   * F5 asserts the invariant instead of the arity. "Commands in, no
+  //     state out" is checkable — no member of the handle may return a
+  //     value — and it is what would have caught `aimOwnCell`, which a
+  //     key-count row did not.
+  //   * F6 INVERTS. It used to assert the aim does NOT reference `reduced`,
+  //     because a measurement under Reduce Motion is just a number. That
+  //     reasoning was right for a measurement and is wrong for a crossing:
+  //     the corrected member IS the crossing, so §5's suppression is
+  //     inherited from the shared early return and the row now requires it.
+  // ==========================================================================
+
+  // F5 — THE HANDLE'S INVARIANT IS NOT ITS ARITY.
+  //
+  //   > The handle's invariant is not "one function." It is: commands in, no
+  //   > state out. One function was the consequence.  — R-N4.1
+  //
+  // Two assertions, and the second is the one with teeth: the membership is
+  // enumerated from the AST and fail-closed, and then EVERY member is proved
+  // to be a command by showing its body returns no value. A bare `return;`
+  // is a decline and is legal; `return <anything>` is state leaving.
   const GRID = await read('src/components/HoneycombGrid.js');
   const gridTree = ast(GRID);
   let handleKeys = null;
-  let aimFn = null;
+  const gridFns = new Map();
   visit(gridTree, (n) => {
     if (n.type === 'CallExpression' && n.callee?.name === 'useImperativeHandle') {
-      const factory = n.arguments?.[1];
-      const body = factory?.body;
+      const body = n.arguments?.[1]?.body;
       if (body?.type === 'ObjectExpression') handleKeys = body.properties.map((p) => p.key?.name ?? p.argument?.name ?? '?');
     }
-    if (n.type === 'VariableDeclarator' && n.id?.name === 'aimOwnCell') aimFn = n.init;
+    if (n.type === 'VariableDeclarator' && n.id?.name && n.init) gridFns.set(n.id.name, n.init);
   });
-  const expectedHandle = ['igniteLanding', 'aimOwnCell'];
-  if (handleKeys && handleKeys.length === expectedHandle.length && expectedHandle.every((k) => handleKeys.includes(k))) {
-    ok(`F5 the comb's imperative handle publishes exactly {${handleKeys.join(', ')}} — the ONE widening R-N4 needed, recorded rather than assumed. Enumerated from the AST and asserted on the SET, so a third escape added later reds this row instead of arriving unremarked`);
-  } else {
-    bad('F5', `handle keys = ${handleKeys ? `{${handleKeys.join(', ')}}` : 'unresolved'}, want exactly {${expectedHandle.join(', ')}}`);
-  }
-
-  // F6 — THE AIM RETURNS `null` RATHER THAN A GUESS, and one of its three
-  // cases is the population Sage sharpened: `isOwn` only ever exists on a
-  // member derived from a share (`HoneycombTab.js:72/75`) and the comb seats
-  // TODAY's shares, so a user who has not posted today has NO SEAT — which is
-  // not an edge case, it is the unconditional state of every recipient who
-  // has not written. Read structurally, brace-matched to `aimOwnCell`'s own
-  // body: a `[\s\S]*?` window would walk into whichever function follows.
-  const aimSrc = aimFn ? GRID.slice(aimFn.start, aimFn.end) : '';
-  const resolves = [];
-  if (aimFn) {
-    visit(aimFn, (n) => {
-      if (n.type !== 'CallExpression' || n.callee?.name !== 'resolve') return;
-      const a = n.arguments?.[0];
-      resolves.push(a?.type === 'NullLiteral' ? 'null' : a?.type ?? 'none');
+  const expectedHandle = ['igniteLanding', 'pollinateOwnCell'];
+  // "No state out" — for each member, walk its own body and collect any
+  // `return` that carries an argument. Nested function expressions are
+  // deliberately INCLUDED: `aimOwnCell` leaked through a `new Promise`
+  // executor's `resolve`, and a row that only read top-level returns would
+  // have missed it, so the `resolve(<value>)` shape is caught here too.
+  const stateOut = [];
+  for (const k of handleKeys ?? []) {
+    const fn = gridFns.get(k);
+    if (!fn) { stateOut.push(`${k}: not resolvable`); continue; }
+    visit(fn, (n) => {
+      if (n.type === 'ReturnStatement' && n.argument) stateOut.push(`${k}: return ${n.argument.type}`);
+      if (n.type === 'CallExpression' && n.callee?.name === 'resolve' && n.arguments?.length && n.arguments[0]?.type !== 'NullLiteral') {
+        stateOut.push(`${k}: resolve(${n.arguments[0].type})`);
+      }
     });
   }
-  const nullResolves = resolves.filter((r) => r === 'null').length;
-  // The suppression scoping, in the same shape P1a's residence bug had: what
-  // Reduce Motion forbids is the CROSSING, and a measurement under Reduce
-  // Motion is just a number. A `reduced` reference inside the aim would be a
-  // suppression gating WHERE rather than WHETHER — invisible to the screen
-  // that owns the beat.
-  const mentionsReduced = aimFn
-    ? (() => { let f = false; visit(aimFn, (n) => { if (n.type === 'Identifier' && n.name === 'reduced') f = true; }); return f; })()
-    : true;
-  const findsOwn = /\.find\(\s*\(\w+\)\s*=>\s*\w+\.member\s*&&\s*\w+\.member\.isOwn\s*\)/.test(aimSrc);
-  if (aimFn && nullResolves === 3 && !mentionsReduced && findsOwn) {
-    ok(`F6 \`aimOwnCell\` resolves \`null\` in exactly ${nullResolves} places — no own cell, no measurable node, a non-finite measurement — and never a fallback point, because the caller's response to all three is "do not fly" and its response to a WRONG point is not. It looks the seat up by \`member.isOwn\`, which is the same flag the honeyed gate reads, and it does NOT reference \`reduced\`: a measurement under Reduce Motion is a number, and putting the suppression here would gate WHERE rather than WHETHER — the P1a residence defect in a smaller costume`);
+  const handleSetOk = handleKeys && handleKeys.length === expectedHandle.length && expectedHandle.every((k) => handleKeys.includes(k));
+  if (handleSetOk && stateOut.length === 0) {
+    ok(`F5 the comb's handle publishes exactly {${handleKeys.join(', ')}} and EVERY member is a command: zero value-carrying returns across both bodies, nested function expressions included. The membership is asserted as a SET so a third escape reds this row rather than arriving unremarked; the no-state-out half is the invariant itself, and it is what a key-count row could not see — \`aimOwnCell\` was one key and still a fact leaving`);
   } else {
-    bad('F6', `aimOwnCell resolved=${Boolean(aimFn)}, resolve(null) count=${nullResolves} (want 3, saw [${resolves.join(', ')}]), references \`reduced\`=${mentionsReduced}, finds the own seat=${findsOwn}`);
+    bad('F5', `handle keys = ${handleKeys ? `{${handleKeys.join(', ')}}` : 'unresolved'} (want exactly {${expectedHandle.join(', ')}}), state leaving = [${stateOut.join(' | ')}]`);
   }
 
-  // F7 — MEASURED AT THE MOMENT OF USE, NEVER CACHED. The comb scrolls and
-  // the camera dive scales the cluster for its first 600ms, so a window
-  // origin read at layout is wrong by the scroll offset the instant the user
-  // moves, and wrong by `(scale - 1) x offset` before the camera settles.
-  // This is `measure-on-use needs no scroll wiring` stated as a row: the
-  // proof is that the aim calls `measureInWindow` itself and reads no stored
-  // origin.
-  const measuresItself = /node\.measureInWindow\(/.test(aimSrc);
-  const readsStoredOrigin = /clusterOrigin/.test(aimSrc);
+  // F6 — THE CROSSING DECLINES RATHER THAN GUESSES, in four positions whose
+  // correct response is identical (do not fly) and whose correct response to
+  // a WRONG point is not: suppressed or unpublishable, no own seat, no
+  // measurable node, a non-finite measurement.
+  //
+  // R-N4.2's three negatives ARE the second of those. When there is no seat
+  // nothing happens on the comb — never an empty cell (that seat is the
+  // invite target, and honey in it says a stranger has honey), never the
+  // centre as a proxy for "you", never held over for later. A bare `return`
+  // is all three, which is why the row counts declines and separately proves
+  // no point is published on any of them.
+  //
+  // Read brace-matched to the member's own body: a `[\s\S]*?` window walks
+  // into whichever function follows, which is a mistake this file has made
+  // before and now refuses to be able to make.
+  const crossFn = gridFns.get('pollinateOwnCell') ?? null;
+  const crossSrc = crossFn ? GRID.slice(crossFn.start, crossFn.end) : '';
+  const bareReturns = [];
+  const valuedPublishes = [];
+  if (crossFn) {
+    visit(crossFn, (n) => {
+      if (n.type === 'ReturnStatement' && !n.argument) bareReturns.push('return');
+      if (n.type === 'CallExpression' && n.callee?.name === 'onPollinate') valuedPublishes.push('direct onPollinate');
+    });
+  }
+  // §5's suppression is INHERITED, not re-derived: the member takes the same
+  // early return `requestPollination` does. This is the row that inverted —
+  // see the section header.
+  const gatesReduced = /if \(!onPollinate \|\| reduced\) return;/.test(crossSrc);
+  const findsOwn = /\.find\(\s*\(\w+\)\s*=>\s*\w+\.member\s*&&\s*\w+\.member\.isOwn\s*\)/.test(crossSrc);
+  // AND THE DECLINE MUST BE REACHABLE. Counting `return`s proves the branch
+  // is written; it does not prove anything can arrive at it. A `?? <any other
+  // seat>` on the lookup leaves all four declines in place, unreachable, and
+  // hands the gift to an invite seat or to whoever posted most recently —
+  // R-N4.2 negatives 1 and 2, passing a row that only counts. Found by the
+  // mutation harness: the first spelling of that mutation was caught by F8
+  // instead, which is a miss, because F8 is about POSITION and this is about
+  // SUBSTITUTION.
+  const seatFallbacks = [];
+  if (crossFn) {
+    visit(crossFn, (n) => {
+      if (n.type !== 'VariableDeclarator' || n.id?.name !== 'cell') return;
+      if (n.init?.type === 'LogicalExpression') seatFallbacks.push(n.init.operator);
+    });
+  }
+  if (crossFn && bareReturns.length === 4 && gatesReduced && findsOwn && valuedPublishes.length === 0 && seatFallbacks.length === 0) {
+    ok(`F6 \`pollinateOwnCell\` declines in exactly ${bareReturns.length} positions — suppressed/unpublishable, no own seat, no measurable node, a non-finite measurement — and publishes no point on any of them (zero direct \`onPollinate\` calls: the single launch below is the only publisher). It inherits §5 through the SAME early return \`requestPollination\` takes, it finds the seat by \`member.isOwn\` (the flag the honeyed gate reads), and the seat lookup carries NO substitute — so the decline is reachable, which counting \`return\`s alone would not have shown`);
+  } else {
+    bad('F6', `resolved=${Boolean(crossFn)}, bare declines=${bareReturns.length} (want 4), inherits the reduced/onPollinate guard=${gatesReduced}, finds the own seat=${findsOwn}, publishes directly=[${valuedPublishes.join(', ')}], substitute seats=[${seatFallbacks.join(', ')}] (want none — a decline nothing can reach is not a decline)`);
+  }
+
+  // F7 — MEASURED AT THE MOMENT OF USE, NEVER CACHED, and the measured
+  // origin is the MORE EXACT of the two rather than a fallback (R-N4.1):
+  // the tap-derived one is the same quantity by construction but carries the
+  // camera dive's `(scale - 1) x offset` drift, because the dive runs on the
+  // native driver where `measureInWindow` cannot see it.
+  const measuresItself = /node\.measureInWindow\(/.test(crossSrc);
+  const readsStoredOrigin = /clusterOrigin/.test(crossSrc);
   if (measuresItself && !readsStoredOrigin) {
-    ok('F7 the aim calls `measureInWindow` inside its own body and reads no stored origin — measured at the moment of use, so it owes nothing to a scroll listener and cannot be stale by the scroll offset or by the camera dive\'s `(scale - 1) x offset`');
+    ok('F7 the crossing calls `measureInWindow` inside its own body and reads no stored origin — measured at the moment of use, so it owes nothing to a scroll listener and cannot be stale by the scroll offset or by the camera dive');
   } else {
     bad('F7', `measures itself=${measuresItself}, reads a cached origin=${readsStoredOrigin} — a cached window origin is wrong the instant the comb scrolls`);
   }
 
-  // F8 — THE AIM IS POSITION-INDEPENDENT, WHICH IS WHY THE SEATING QUESTION
-  // DOES NOT BLOCK R-N4.
+  // F8 — POSITION-INDEPENDENT, WHICH IS WHY THE SEATING QUESTION DOES NOT
+  // BLOCK R-N4 AND WHY R-N4.2's NEGATIVE 2 HOLDS.
   //
-  // Found while measuring the aim: the comb's header claimed "you in the
-  // middle", and it is false. `buildCombLayout` seats `seated[index]` into
-  // `hexSpiral(1)`, whose index 0 IS {q:0,r:0}, and the list reaching it is
-  // `created_at` DESC with no own-first sort anywhere in the chain. The
-  // centre belongs to whoever posted most recently. That is the comb's
-  // ruling to make, not this build's — so what is gated is the property that
-  // makes R-N4 correct under EITHER ordering: the aim resolves the seat by
-  // `member.isOwn` and never by position.
+  // Found while building the crossing and independently ruled the same day:
+  // the comb's header claimed "you in the middle" and it is false. Seats
+  // fill centre-out from a `created_at DESC` list with no own-first sort, so
+  // the centre belongs to whoever posted most recently. What is gated is the
+  // property that makes the crossing correct under EITHER ordering — the
+  // seat is resolved by `member.isOwn` and never by position — and the
+  // absence of the sort that would answer the seating question in a build
+  // instead of in a ruling.
   //
   // DELIBERATELY NOT A PROSE ROW. The corrected header quotes the retired
-  // claim by design (a justification comment is a dependency — the next
-  // person must be able to see what was wrong). A row searching for that
-  // sentence would red on its own explanation, which is the trap this gate's
-  // D5 row already documents one section up.
+  // claim on purpose (a justification comment is a dependency), so a row
+  // hunting that sentence would red on its own explanation.
   const positional = [];
-  if (aimFn) {
-    visit(aimFn, (n) => {
+  if (crossFn) {
+    visit(crossFn, (n) => {
       if (n.type === 'MemberExpression' && n.property?.type === 'NumericLiteral') positional.push(`[${n.property.value}]`);
       if (n.type === 'Identifier' && n.name === 'index') positional.push('index');
     });
   }
-  // The own-first-sort probe is STRUCTURAL, not a `[^)]*` window: a sort
-  // callback opens with its own parenthesised parameter list, so a lazy
-  // bracket class stops at `(a, b` and never reaches the property it is
-  // hunting for. Every `.sort(` call in either file is located from the AST
-  // and its whole source range read.
+  // STRUCTURAL, not a `[^)]*` window: a sort callback opens with its own
+  // parenthesised parameter list, so a lazy bracket class stops at `(a, b`
+  // and never reaches the property it is hunting for.
   const TAB = await read('src/screens/HoneycombTab.js');
   const sortsOn = (src) => {
     const found = [];
@@ -1139,10 +1267,224 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   };
   const ownSortSites = [...sortsOn(GRID), ...sortsOn(TAB)];
   const ownSort = ownSortSites.length > 0;
-  if (aimFn && positional.length === 0 && findsOwn && !ownSort) {
-    ok('F8 the aim is position-independent: `aimOwnCell` contains no numeric index or `index` reference and resolves the seat by `member.isOwn` alone. This is what makes R-N4 correct under either seating rule — and the seating rule is genuinely in question, because seats fill centre-out from a `created_at DESC` list with no own-first sort (asserted here too), so the centre belongs to whoever posted most recently and not to you. Routed to Lumen as the comb\'s ruling; the crossing does not wait on it');
+  if (crossFn && positional.length === 0 && findsOwn && !ownSort) {
+    ok('F8 the crossing is position-independent: no numeric index and no `index` reference anywhere in `pollinateOwnCell`, and the seat is resolved by `member.isOwn` alone — so it is correct under either seating rule. The absence of an own-first sort is asserted here too, in both files, because answering the seating question in the build rather than in a ruling is the direction this row exists to catch as much as the other');
   } else {
-    bad('F8', `aimOwnCell resolved=${Boolean(aimFn)}, positional references=[${positional.join(', ')}] (want none), resolves by isOwn=${findsOwn}, an own-first sort exists=${ownSort} [${ownSortSites.join(' | ')}]`);
+    bad('F8', `resolved=${Boolean(crossFn)}, positional references=[${positional.join(', ')}] (want none), resolves by isOwn=${findsOwn}, an own-first sort exists=${ownSort} [${ownSortSites.join(' | ')}]`);
+  }
+
+  // ==========================================================================
+  // SECTION G — THE ARRIVAL, END TO END (R-N4 / R-N4.1 / R-N4.2)
+  // ==========================================================================
+
+  const BEE = await read('src/components/FlyingBee.js');
+
+  // G1 — ONE LAUNCH, TWO DOORS. This is the row that encodes what the
+  // correction actually bought. A tap and an arrival must go through the
+  // SAME publisher, because everything §28.9 needs — the key, the person,
+  // the local point, the scroll offset — is written on the way past, and the
+  // first build of R-N4 skipped it by resolving instead of emitting. Proved
+  // by counting the writers: exactly one site writes `aimRef.current`,
+  // exactly one calls `onPollinate`, and both public entries reach them
+  // through it.
+  const launchFn = gridFns.get('launchPollination') ?? null;
+  const aimWriters = [];
+  const publishers = [];
+  visit(gridTree, (n) => {
+    if (n.type === 'AssignmentExpression' && GRID.slice(n.left.start, n.left.end) === 'aimRef.current' && n.right?.type === 'ObjectExpression') {
+      aimWriters.push(n.start);
+    }
+    if (n.type === 'CallExpression' && n.callee?.name === 'onPollinate') publishers.push(n.start);
+  });
+  const inLaunch = (pos) => launchFn && pos >= launchFn.start && pos <= launchFn.end;
+  const callsLaunch = (fn) => {
+    if (!fn) return false;
+    let f = false;
+    visit(fn, (n) => { if (n.type === 'CallExpression' && n.callee?.name === 'launchPollination') f = true; });
+    return f;
+  };
+  const tapCalls = callsLaunch(gridFns.get('requestPollination'));
+  const arrivalCalls = callsLaunch(crossFn);
+  if (launchFn && aimWriters.length === 1 && aimWriters.every(inLaunch) && publishers.length === 1 && publishers.every(inLaunch) && tapCalls && arrivalCalls) {
+    ok('G1 one launch, two doors: `aimRef.current` is written in exactly one place and `onPollinate` is called in exactly one place, both inside `launchPollination`, and BOTH the tap and the arrival reach it. So §28.9\'s abort predicate covers a gift flight by construction — which the first build of R-N4 did not, because a member that RESOLVES a point skips every step the publisher takes on the way past');
+  } else {
+    bad('G1', `launch resolved=${Boolean(launchFn)}, aimRef writers=${aimWriters.length} (all inside launch=${aimWriters.every(inLaunch)}), onPollinate callers=${publishers.length} (all inside launch=${publishers.every(inLaunch)}), tap routes through it=${tapCalls}, arrival routes through it=${arrivalCalls}`);
+  }
+
+  // G2 — THE CAUSE RIDES THE FACT CHANNEL, and it has exactly two values.
+  // The screen needs to know which flights are gifts (the bee carries a drop
+  // on those and only those); deriving that from "did I just call the
+  // command" would be a race against a measurement that resolves a frame
+  // later. One field on the channel that already exists — not a second
+  // channel, and not state on the handle.
+  const causes = [];
+  visit(gridTree, (n) => {
+    if (n.type !== 'CallExpression' || n.callee?.name !== 'launchPollination') return;
+    const a = n.arguments?.[2];
+    if (a?.type === 'StringLiteral') causes.push(a.value);
+    else causes.push(`non-literal:${a?.type ?? 'missing'}`);
+  });
+  const causeInPayload = launchFn ? /onPollinate\(\{[\s\S]{0,120}\bcause,/.test(GRID.slice(launchFn.start, launchFn.end)) : false;
+  const wantCauses = ['tap', 'arrival'];
+  if (causeInPayload && causes.length === 2 && wantCauses.every((c) => causes.includes(c))) {
+    ok(`G2 \`cause\` travels in the published fact and takes exactly the two literal values {${causes.join(', ')}} — enumerated from the call sites, so a third cause added later reds this row instead of silently widening what the screen treats as a gift`);
+  } else {
+    bad('G2', `cause is in the payload=${causeInPayload}, call-site causes=[${causes.join(', ')}] (want exactly ${wantCauses.join(' + ')})`);
+  }
+
+  // G3 — THE LANDING CAUSES NOTHING, and this is the row that proves the
+  // ordering rather than trusting the comment.
+  //
+  //   > The level is correct before he moves. The flight animates the
+  //   > meniscus TO a height that is already true, never causes it. An
+  //   > aborted or suppressed gift flight is not a lost gift.  — R-N4.1
+  //
+  // Two assertions. First, inside the arrival effect the level is committed
+  // BEFORE the command is issued — read as source positions, not as prose.
+  // Second, and this is the load-bearing half: `setHoneyLevel` appears
+  // NOWHERE inside any of the flight's callbacks. A commit that only ran on
+  // touchdown would satisfy an ordering check and still lose every gift the
+  // bee never delivered.
+  const tabTree = ast(TAB);
+  let commitPos = null;
+  let commandPos = null;
+  visit(tabTree, (n) => {
+    // BOTH call node types, and that is not defensiveness — `?.` parses to
+    // `OptionalCallExpression`, so a `CallExpression`-only walk finds the
+    // commit and reports the command as MISSING, which reads as "there is no
+    // crossing" rather than as "the row cannot see it".
+    if (n.type !== 'CallExpression' && n.type !== 'OptionalCallExpression') return;
+    const src = TAB.slice(n.start, n.end);
+    //
+    // AND BOTH TESTS ARE ON THE CALLEE, never on the node's source. AN
+    // ANCESTOR'S SOURCE RANGE CONTAINS ITS DESCENDANTS', so `src.includes`
+    // over a walk matches the OUTERMOST node that spans the text — here the
+    // whole async IIFE, which starts before either statement and reported
+    // the command as coming FIRST. The row went red on correct code and the
+    // number it printed was the enclosing function's offset. Identify a call
+    // by what it calls.
+    if (n.callee?.name === 'setHoneyLevel' && src.includes('honeyLevelForDrops(drops)') && commitPos === null) commitPos = n.start;
+    if ((n.callee?.property?.name ?? n.callee?.name) === 'pollinateOwnCell' && commandPos === null) commandPos = n.start;
+  });
+  // Every JSX prop on `FlyingBee` whose name ends in a handler position, and
+  // the comb's cancel — the full set of callbacks a flight can reach.
+  const flightCallbackWrites = [];
+  visit(tabTree, (n) => {
+    if (n.type !== 'JSXAttribute') return;
+    const name = n.name?.name ?? '';
+    if (!/^on(Pollinate|Settle)/.test(name)) return;
+    const src = TAB.slice(n.start, n.end);
+    if (src.includes('setHoneyLevel')) flightCallbackWrites.push(name);
+  });
+  if (commitPos !== null && commandPos !== null && commitPos < commandPos && flightCallbackWrites.length === 0) {
+    ok('G3 the landing causes nothing: the level is committed from the READ (source position before the command that dispatches the crossing), and `setHoneyLevel` appears in none of the flight\'s callbacks — so a suppressed, declined or aborted crossing costs the beat and never the gift. The ordering alone would not have been enough; a commit that ran only on touchdown passes an ordering check and loses every undelivered gift');
+  } else {
+    bad('G3', `commit position=${commitPos}, command position=${commandPos} (want commit first), setHoneyLevel inside flight callbacks=[${flightCallbackWrites.join(', ')}] (want none)`);
+  }
+
+  // G4 — NOTHING CAN STRAND THE DROP (R-N4.2 negative 3: "never held over
+  // for later" — a drop the bee keeps until a cell appears is the badge this
+  // beat exists to replace).
+  //
+  // The guarantee is structural and the row asserts the structure: what the
+  // bee carries is DERIVED from the live flight's `cause`, so it is born
+  // with the flight and dies with it. A `carrying` held in its own state and
+  // cleared on landing would be a second thing to keep in step, and the
+  // failure mode of getting that wrong is a permanent badge.
+  const carryAttr = (() => {
+    let v = null;
+    visit(tabTree, (n) => {
+      if (n.type === 'JSXAttribute' && n.name?.name === 'carrying') v = TAB.slice(n.start, n.end);
+    });
+    return v;
+  })();
+  const derivedFromFlight = Boolean(carryAttr) && /pollination\?\.cause === 'arrival'/.test(carryAttr);
+  // Both terminations must clear the flight, or one of them strands it.
+  const clearsOnEnd = /onPollinateEnd=\{\(\) => \{[\s\S]{0,900}?setPollination\(null\)/.test(TAB);
+  const clearsOnCancel = /onPollinateCancel=\{\(\) => setPollination\(null\)\}/.test(TAB);
+  if (derivedFromFlight && clearsOnEnd && clearsOnCancel) {
+    ok('G4 the drop cannot be stranded: `carrying` is derived from the live flight\'s own `cause`, and BOTH terminations clear the flight — touchdown (`onPollinateEnd`) and abort (`onPollinateCancel`). There is no path on which the bee keeps a drop, and the release lands on the same frame as `burstPollen`');
+  } else {
+    bad('G4', `carrying derived from the flight=${derivedFromFlight} (${carryAttr ?? 'attribute missing'}), clears on touchdown=${clearsOnEnd}, clears on abort=${clearsOnCancel}`);
+  }
+
+  // G5 — THE CARGO IS THE GIFT'S OWN SIZE, and the clamp is a guard rather
+  // than the mechanism. `dropRadiusForAmount` is the one function that
+  // answers "how big is this gift" (R-N3), so the carried drop reads it
+  // rather than inventing a second scale. It is then clamped to half the
+  // carrier: past that a bee is not carrying a drop, it is colliding with
+  // one. COMPUTED IN BOTH DIRECTIONS — at the shipped mount the clamp binds
+  // on nothing, and at a smaller mount it binds — because a clamp asserted
+  // only where it is inert is a clamp nobody has tested.
+  const { dropRadiusForAmount, DROP_MAX_RADIUS } = await import('../src/components/nectarFlight.js');
+  const carriedExpr = /const carriedRadius = carrying \? Math\.min\(dropRadiusForAmount\(carrying\), size \/ 2\) : 0;/.test(BEE);
+  const mountSize = (() => { const m = BEE.match(/const DEFAULT_SIZE = (\d+);/); return m ? Number(m[1]) : null; })();
+  // The largest amount the ledger can put in one arrival is unbounded above
+  // in principle, so the bound that matters is the function's own ceiling.
+  const bindsAtMount = DROP_MAX_RADIUS > (mountSize ?? 0) / 2;
+  const halfMount = (mountSize ?? 0) / 2;
+  const bindsSmaller = DROP_MAX_RADIUS > 44 / 4;
+  const presetRadii = [10, 50, 100].map((n) => dropRadiusForAmount(n));
+  if (carriedExpr && mountSize && !bindsAtMount && bindsSmaller) {
+    ok(`G5 the cargo is \`dropRadiusForAmount\` clamped to half the carrier. At the shipped mount (size ${mountSize}) the clamp binds on NOTHING — the function's ceiling is ${DROP_MAX_RADIUS} and half the bee is ${halfMount.toFixed(1)}, and they agree exactly because both descend from the same ratified 44pt box — while at a smaller mount it binds, so it is a guard that has been measured in both directions rather than one asserted where it is inert. The three presets carry at r = ${presetRadii.map((r) => r.toFixed(2)).join(' / ')}pt`);
+  } else {
+    bad('G5', `expression present=${carriedExpr}, mount size=${mountSize}, clamp binds at the mount=${bindsAtMount} (want false), binds at a smaller mount=${bindsSmaller} (want true)`);
+  }
+
+  // G6 — THE CARRIER IS IN FRONT OF THE CARGO, and the cargo is the DROP
+  // rather than a lookalike. Both halves are about the same claim: what
+  // arrives is the same object the ledger is made of (R-N3.2 closed this one
+  // layer up, for the send), and cargo drawn in front of its carrier is a
+  // collision rather than a delivery. Read from the JSX order inside the
+  // bee's own transformed box, so a reorder reds it.
+  const beeBox = (() => {
+    const i = BEE.indexOf('transform: [{ translateX }, { translateY }, { rotate }, { scaleX }]');
+    return i === -1 ? '' : BEE.slice(i, BEE.indexOf('</Animated.View>', i));
+  })();
+  const dropAt = beeBox.indexOf('<HoneyDrop');
+  const mascotAt = beeBox.indexOf('<MascotBee');
+  const importsDrop = /import \{ HoneyDrop \} from '\.\/HoneyDrop';/.test(BEE);
+  // AND IT MUST BE REACHABLE UNDER THE REAL CONDITION. Source order is a
+  // claim about the picture; it says nothing about whether the picture can
+  // ever be drawn. `{false && (` leaves the JSX exactly where it is and
+  // deletes the beat — the harness caught this row passing that mutation, so
+  // the guard is now read as well as the order.
+  const drawnUnderCargo = /\{carriedRadius > 0 && \(/.test(beeBox);
+  if (importsDrop && dropAt !== -1 && mascotAt !== -1 && dropAt < mascotAt && drawnUnderCargo) {
+    ok('G6 the cargo is `HoneyDrop` itself — the component, not a circle drawn to match — and it is rendered BEFORE `MascotBee` inside the bee\'s own transformed box, so he is in front of what he is holding and it banks with him. Cargo in front of its carrier is a collision, not a delivery. Rendered under \`carriedRadius > 0\` — the real condition, asserted because source order alone survives the branch being made unreachable');
+  } else {
+    bad('G6', `imports the drop=${importsDrop}, drop position=${dropAt}, mascot position=${mascotAt} (want the drop first, both inside the transformed box), rendered under \`carriedRadius > 0\`=${drawnUnderCargo}`);
+  }
+
+  // G7 — D4's SURFACE ROW IS FILLED, AND ITS PRE-CONSENT CLAUSE IS
+  // UNCHANGED. R-N4 does not add a row to `NECTAR_SURFACES`; it fills
+  // `author-notification`, whose host was `null` and whose note read "THE
+  // CONTAINER DOES NOT EXIST". The row must now name a real host with a real
+  // anchor in it — and `preConsent` must still say what it said, because
+  // nothing about filling the container changes what exists before consent.
+  const { NECTAR_SURFACES } = await import('../src/constants/nectar.js');
+  const d4 = NECTAR_SURFACES.find((r) => r.id === 'author-notification');
+  const d4Host = d4?.host ? await read(d4.host) : null;
+  const d4AnchorPresent = d4?.anchor && d4Host ? new RegExp(`\\b${d4.anchor}\\b`).test(d4Host) : false;
+  const d4PreConsent = d4?.preConsent === 'No notification of this type exists.';
+  if (d4 && d4.host && d4AnchorPresent && d4PreConsent) {
+    ok(`G7 D4 is filled rather than declared absent: host \`${d4.host}\`, anchor \`${d4.anchor}\` present in it, and \`preConsent\` unchanged verbatim — the balance read early-returns without consent, so nothing arrives and nothing is carried, and no notification of this type exists either way`);
+  } else {
+    bad('G7', `row found=${Boolean(d4)}, host=${d4?.host ?? 'null'}, anchor "${d4?.anchor ?? ''}" present in host=${d4AnchorPresent}, preConsent unchanged=${d4PreConsent}`);
+  }
+
+  // G8 — THE MEMORY IS WRITTEN ON EVERY SUCCESSFUL READ, NOT ONLY ON A RISE.
+  // `nectarArrivalState`'s own header says why: remembering only rises would
+  // re-announce a balance the moment it climbed back to a number it had
+  // already reached. The defect shape is an early return placed above the
+  // write, so the row asserts the ORDER — `rememberDrops` before the
+  // `if (!arrived) return`, inside the same effect.
+  const rememberPos = TAB.indexOf('NectarArrivalState.rememberDrops(userId, drops)');
+  const arrivalGuardPos = TAB.indexOf('if (!arrived) return;');
+  if (rememberPos !== -1 && arrivalGuardPos !== -1 && rememberPos < arrivalGuardPos) {
+    ok('G8 the arrival memory is written on every successful read — `rememberDrops` runs before the no-arrival early return, so a balance that fell or did not move is remembered too. Remembering only rises would re-announce a balance the moment it climbed back to a number it had already reached');
+  } else {
+    bad('G8', `rememberDrops position=${rememberPos}, no-arrival guard position=${arrivalGuardPos} — the write must come first`);
   }
 }
 
