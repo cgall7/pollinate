@@ -255,6 +255,27 @@ export const MUTATIONS = [
     to: "                left: size / 2 - carriedRadius,\n                top: size / 2,\n                elevation: 1,\n",
   },
   {
+    row: 'G9',
+    // LUMEN'S PROBE, 2026-08-29, verbatim in shape — the one that found the
+    // Identifier hole and ran 47/0 against this row before the repair. The
+    // anchor is wide because the defect is two edits that must arrive
+    // together: a local const holding the override, and the identifier in
+    // style position that carries it in. If the span ever stops matching,
+    // the harness reports a missing anchor rather than mutating a site
+    // nobody named — loud, which is the direction to fail in.
+    why: 'THE OVERRIDE ARRIVES BEHIND A NAME: a local `dropCarryStyle` holds `zIndex: 1` and reaches the drop as a bare identifier. Nothing about the style prop tells this row what the name holds — which is why the arm answers "I could not read it" instead of calling it clean. Before the repair this ran 47 passed / 0 failed with the cargo painting in front of its carrier, and G9\'s own ok line printed "with nothing unresolvable"',
+    file: 'src/components/FlyingBee.js',
+    from: "  const flightOpacity = presetOpacity ?? 1;\n\n  return (\n    <View ref={containerRef} style={[styles.fill, style]} onLayout={onLayout} pointerEvents=\"none\">\n      <Animated.View style={[styles.fill, { opacity: presence }]} pointerEvents=\"none\">\n      {layout &&\n        trailPool.map((slot, i) => (\n          <Animated.View\n            key={i}\n            style={[\n              styles.trailDot,\n              {\n                opacity: slot.opacity,\n                // `pos` is where the particle was born (jumped to with\n                // `setValue`, never animated) and `drift` is the pollen push\n                // (zero for a trail drop). Two translations compose additively,\n                // so one pool serves both. `scale` stays last: RN applies the\n                // array right-to-left, so it scales about the fleck's own\n                // centre before it is moved.\n                //\n                // Every entry here is an `Animated.Value` and §28.13 is why:\n                // one plain number in this array is frozen at its first commit.\n                transform: [\n                  { translateX: slot.pos.x },\n                  { translateY: slot.pos.y },\n                  { translateX: slot.driftX },\n                  { translateY: slot.driftY },\n                  { scale: slot.scale },\n                ],\n              },\n            ]}\n          />\n        ))}\n      {layout && translateX && (\n        <Animated.View\n          style={[\n            styles.bee,\n            {\n              opacity: flightOpacity,\n              transform: [{ translateX }, { translateY }, { rotate }, { scaleX }],\n            },\n          ]}\n        >\n          {/* §19.5 puts the airborne wingbeat on the airborne path only, and\n              the plan says which that is. `plan.flutter` is the plan builder's,\n              so this stays one source rather than a second reading of `kind`.\n              What a resting bee wears instead is `breath` — Bee Doctrine\n              §State-2, a 2-degree sweep on a 4.2s clock against the airborne\n              18 over 0.16s. The two are the same channel inside `MascotBee`\n              and cannot both be live. */}\n          {carriedRadius > 0 && (\n            /* Drawn BEFORE the character, so he is in front of what he is\n               holding — cargo behind the carrier reads as carried, in front\n               of him reads as a collision. It rides his own transform, so it\n               banks and mirrors with him; a circle with a horizontal\n               highlight is symmetric under `scaleX`, so the mirror is a\n               no-op on it and only the bank shows, which is the swing.\n\n               Hung from his midline: the drop's crown at the bee box's\n               vertical centre, centred on his horizontal one. Stated as a\n               fraction of `size` and the drop's own radius so a smaller mount\n               keeps the relationship instead of inheriting a pixel. */\n            <HoneyDrop\n              radius={carriedRadius}\n              style={{\n                position: 'absolute',\n                left: size / 2 - carriedRadius,\n                top: size / 2,\n              }}\n            />\n",
+    to: "  const flightOpacity = presetOpacity ?? 1;\n\n  const dropCarryStyle = { position: 'absolute', left: size / 2 - carriedRadius, top: size / 2, zIndex: 1 };\n\n  return (\n    <View ref={containerRef} style={[styles.fill, style]} onLayout={onLayout} pointerEvents=\"none\">\n      <Animated.View style={[styles.fill, { opacity: presence }]} pointerEvents=\"none\">\n      {layout &&\n        trailPool.map((slot, i) => (\n          <Animated.View\n            key={i}\n            style={[\n              styles.trailDot,\n              {\n                opacity: slot.opacity,\n                // `pos` is where the particle was born (jumped to with\n                // `setValue`, never animated) and `drift` is the pollen push\n                // (zero for a trail drop). Two translations compose additively,\n                // so one pool serves both. `scale` stays last: RN applies the\n                // array right-to-left, so it scales about the fleck's own\n                // centre before it is moved.\n                //\n                // Every entry here is an `Animated.Value` and §28.13 is why:\n                // one plain number in this array is frozen at its first commit.\n                transform: [\n                  { translateX: slot.pos.x },\n                  { translateY: slot.pos.y },\n                  { translateX: slot.driftX },\n                  { translateY: slot.driftY },\n                  { scale: slot.scale },\n                ],\n              },\n            ]}\n          />\n        ))}\n      {layout && translateX && (\n        <Animated.View\n          style={[\n            styles.bee,\n            {\n              opacity: flightOpacity,\n              transform: [{ translateX }, { translateY }, { rotate }, { scaleX }],\n            },\n          ]}\n        >\n          {/* §19.5 puts the airborne wingbeat on the airborne path only, and\n              the plan says which that is. `plan.flutter` is the plan builder's,\n              so this stays one source rather than a second reading of `kind`.\n              What a resting bee wears instead is `breath` — Bee Doctrine\n              §State-2, a 2-degree sweep on a 4.2s clock against the airborne\n              18 over 0.16s. The two are the same channel inside `MascotBee`\n              and cannot both be live. */}\n          {carriedRadius > 0 && (\n            /* Drawn BEFORE the character, so he is in front of what he is\n               holding — cargo behind the carrier reads as carried, in front\n               of him reads as a collision. It rides his own transform, so it\n               banks and mirrors with him; a circle with a horizontal\n               highlight is symmetric under `scaleX`, so the mirror is a\n               no-op on it and only the bank shows, which is the swing.\n\n               Hung from his midline: the drop's crown at the bee box's\n               vertical centre, centred on his horizontal one. Stated as a\n               fraction of `size` and the drop's own radius so a smaller mount\n               keeps the relationship instead of inheriting a pixel. */\n            <HoneyDrop radius={carriedRadius} style={dropCarryStyle} />\n",
+  },
+  {
+    row: 'G9',
+    why: 'THE SHAPE THE RETIRED LABEL NAMED: the component\'s own incoming `style` prop is forwarded to the drop. The old comment called exactly this clean — "a bare `style` pass-through, which carries no key of its own ... whatever it holds is the caller\'s" — and every word of that is unknowable from this position: the caller\'s style is a `FlyingBee` prop, so a `zIndex` in it lands INSIDE the transformed box, on one member of the pair. One node, one edit, no new declaration, and the identifier is genuinely in scope',
+    file: 'src/components/FlyingBee.js',
+    from: "            <HoneyDrop\n              radius={carriedRadius}\n              style={{\n                position: 'absolute',\n                left: size / 2 - carriedRadius,\n                top: size / 2,\n              }}\n            />",
+    to: "            <HoneyDrop radius={carriedRadius} style={style} />",
+  },
+  {
     row: null,
     why: 'MUST NOT FIRE — a LAYER-level stacking site is retuned (`styles.fill` 5 -> 6). Lumen\'s sharpening is that these order the layer against the screen and say nothing about the pair; a file-wide `zIndex` rule would red here, on shipped code, and the next person would widen it until it meant nothing. This control is what makes G9 a claim about the pair',
     file: 'src/components/FlyingBee.js',
@@ -1551,6 +1572,19 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // FAILS CLOSED on a style expression it cannot resolve. "I could not read
   // it" and "there is nothing there" are the same green otherwise, and this
   // row exists because a green that means neither is what G6 was.
+  //
+  // AND THAT SENTENCE WAS ONE NODE TYPE WIDER THAN ITS MECHANISM UNTIL
+  // 2026-08-29, when Lumen ran this row's own argument back at this row.
+  // The `Identifier` arm returned CLEAN on the justification that a bare
+  // identifier is "a `style` pass-through, which carries no key of its
+  // own" — a label the code did nothing to earn, because it never checked
+  // the identifier's name or its origin. Measured at `main@7ec9db4`: a
+  // local `dropCarryStyle` holding `zIndex: 1`, handed in by name, left
+  // this gate at 47 passed / 0 failed with the cargo in front of its
+  // carrier and this row printing "with nothing unresolvable". The arm now
+  // answers `unresolved`. Both routes are in the harness (mutations 4 and
+  // 5): the local const, and the component's own incoming `style` prop —
+  // the very shape the retired label described as safe.
   const BEE_AST = ast(BEE);
   const STACK_KEYS = ['zIndex', 'elevation'];
   const beeStyles = (() => {
@@ -1579,10 +1613,32 @@ const PANEL = await read('src/components/NectarSendPanel.js');
       case 'LogicalExpression':
         scanStack(node.left, via, acc, seen);
         return scanStack(node.right, via, acc, seen);
-      case 'NullLiteral': case 'BooleanLiteral': case 'StringLiteral': case 'Identifier':
-        // `Identifier` here is a bare `style` pass-through, which carries no
-        // key of its own; whatever it holds is the caller's and is ordered
-        // against the caller's siblings, not against this pair.
+      case 'NullLiteral': case 'BooleanLiteral': case 'StringLiteral':
+        // Clean by the NODE TYPE, not by a label: none of these can hold a
+        // key at all, whatever they were named. That is the test the
+        // `Identifier` arm below fails.
+        return;
+      case 'Identifier':
+        // FAILS CLOSED — Lumen's find, 2026-08-29, and it is this row's own
+        // argument turned on this row. This arm used to return clean on the
+        // justification that a bare identifier is "a `style` pass-through,
+        // which carries no key of its own". Nothing in the code checked the
+        // identifier's name or its origin, so that was a label earned by
+        // nothing: it read `style={dropCarryStyle}` — a local const holding
+        // `{ ..., zIndex: 1 }` — as an absence, and printed "with nothing
+        // unresolvable" while the cargo painted in front of its carrier.
+        // Measured at `main@7ec9db4` before the repair: 47 passed, 0 failed.
+        //
+        // An identifier's contents are not knowable from its style position,
+        // so "I could not read it" is the honest verdict and it must not
+        // share a colour with "there is nothing there" — which is the exact
+        // sentence that made this row necessary against G6. Free at HEAD:
+        // no member of the pair carries an identifier in style position
+        // today (`HoneyDrop` is an inline object, `MascotBee` takes no
+        // `style`), so the tightening reds nothing real. If a genuine
+        // pass-through ever arrives here, red-and-restate is the behaviour
+        // the rest of this row already argues for.
+        acc.unresolved.push(`${via}: Identifier \`${node.name}\` (a style this row cannot read — resolve it inline, or restate R-N4.3's precondition against whatever it holds)`);
         return;
       case 'ObjectExpression':
         for (const p of node.properties) {
