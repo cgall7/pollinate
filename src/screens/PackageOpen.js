@@ -15,6 +15,8 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { NectarConsentSheet } from '../components/NectarConsentSheet';
 import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
 import { NectarGiftLayer } from '../components/NectarGiftLayer';
+import { HoneyDrop } from '../components/HoneyDrop';
+import { DROP_MAX_RADIUS } from '../components/nectarFlight';
 import { useNectarGift } from '../components/useNectarGift';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
@@ -535,7 +537,18 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                       containerStyle={styles.nectarDoor}
                       accessibilityLabel="Give a gift"
                     >
-                      <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
+                      {/* R-N6 — pre-consent the door keeps its DISTINCT
+                          GLYPH and carries no money word and no drop form:
+                          `nectar.js`'s D3 row and Apple 2.3.1(a) both bind,
+                          and a drop IS the money form. So only the size is
+                          corrected, and the correction is borrowed rather
+                          than chosen — the design system's own icon-circle
+                          pairing is a 22pt Ionicons glyph in a 44pt circle
+                          (§9.3's build sheet as logged in the Review Log:
+                          "white 44pt icon circles on washYellow; moon /
+                          cloud / leaf / heart at 22pt ink"). 16pt in a 32pt
+                          box was neither half of that pair. */}
+                      <Ionicons name="enter-outline" size={22} color={theme.colors.ink} />
                     </PressableScale>
                   )
                 )}
@@ -554,7 +567,25 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                       containerStyle={styles.nectarDoor}
                       accessibilityLabel="Send nectar for this memory"
                     >
-                      <Ionicons name="water-outline" size={16} color={theme.colors.ink} />
+                      {/* R-N6 — THE DOOR IS A DROP. A 16pt `water-outline`
+                          is not an invitation; the affordance is the same
+                          object the whole system is made of, at rest, so
+                          the thing you tap looks like the thing you send.
+                          `DROP_MAX_RADIUS` is not a size picked for this
+                          slot — it was DERIVED FROM this slot (R-N3: the
+                          ceiling is "the door IS this object at rest in the
+                          ratified 44pt box"), so the door and the flight
+                          cannot drift into two sizes.
+
+                          NO CLOCK OF ITS OWN, and none is added: this
+                          element is already inside the entry card's
+                          `bloomOpacity`/`bloomScale` view (`:497`), so it
+                          arrives on the entry's own bloom by position. One
+                          more ambient loop is banned (standing rule), which
+                          is why "it breathes on the entry's own bloom
+                          clock" is satisfied by an ABSENCE here rather than
+                          by an animation. */}
+                      <HoneyDrop radius={DROP_MAX_RADIUS} />
                     </PressableScale>
                   )
                 )}
@@ -801,8 +832,15 @@ const styles = StyleSheet.create({
   nectarDoor: {
     alignSelf: 'flex-end',
     marginTop: theme.spacing.sm,
-    width: 32,
-    height: 32,
+    // R-N6 — 44pt, which is TWO ratified numbers landing on one value: the
+    // design system's minimum touch target (§16.5, "min 44pt touch
+    // targets") and the drop's own
+    // ratified rest diameter (`2 * DROP_MAX_RADIUS`). 32 was under the
+    // first and unrelated to the second. Not written as an expression of
+    // `DROP_MAX_RADIUS` on purpose — the box is the TAP TARGET, and it must
+    // not shrink if the drop's ceiling is ever retuned.
+    width: 44,
+    height: 44,
     borderRadius: theme.borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
