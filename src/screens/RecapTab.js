@@ -15,12 +15,11 @@ import { hexPoints, HEX_ASPECT } from '../utils/combGeometry';
 import { MonthlyRecap } from './MonthlyRecap';
 import { EntryStore } from '../services/EntryStore';
 import { dominantTheme } from '../utils/themeTagger';
-import { recentMonths, currentStreak, longestStreak, monthName } from '../utils/dateRanges';
+import { recentMonths, monthName } from '../utils/dateRanges';
 import { WrappedSeenState } from '../services/wrappedSeenState';
 import { DevVersionTag } from '../components/DevVersionTag';
 import { DEMO_CONTENT } from '../constants/demoMode';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { StaggeredItem } from '../components/StaggeredItem';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
 import { PressableScale } from '../components/PressableScale';
 import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
@@ -61,26 +60,6 @@ export const buildMonths = (allEntries) => {
     entries: allEntries.filter((entry) => entry.date.startsWith(month.key)),
   }));
 };
-
-// The three numbers worth chasing, up top where they're the first thing you
-// see — Recap used to open on a theme card with no score of any kind.
-const StatsCard = ({ streak, best, total }) => (
-  <View style={styles.statsCard}>
-    {[
-      { value: streak, label: 'CURRENT' },
-      { value: best, label: 'BEST EVER' },
-      { value: total, label: 'THIS YEAR' },
-    ].map((stat, index) => (
-      <React.Fragment key={stat.label}>
-        {index > 0 && <View style={styles.statSeparator} />}
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{stat.value}</Text>
-          <Text style={styles.statLabel}>{stat.label}</Text>
-        </View>
-      </React.Fragment>
-    ))}
-  </View>
-);
 
 // Which month you're on, and that there are others. A paging scroll with no
 // indicator is a screen that hides its own second half — the swipe is only
@@ -302,13 +281,6 @@ export const RecapTab = () => {
   // list — first render, and any reload that trimmed the window.
   const activeIndex = trackedIndex >= 0 ? trackedIndex : months.length - 1;
 
-  // `currentStreak`/`longestStreak` read every entry, not just this year's:
-  // "BEST EVER" was measuring the calendar year, so a record set in December
-  // vanished on New Year's Day. "THIS YEAR" stays year-scoped — it says so.
-  const currentYear = String(new Date().getFullYear());
-  const thisYear = allEntries.filter((entry) => entry.date.startsWith(currentYear));
-  const streak = currentStreak(allEntries);
-
   // §14.2 respec §1: the Wrapped door's window is the previous calendar
   // month, sliced from the same `allEntries` read everything else on this
   // screen uses — a second query for one card's badge would be the thing
@@ -344,9 +316,11 @@ export const RecapTab = () => {
           of mismatch nobody files a bug for and everybody trips on. The
           monthly recap is still what the screen opens on — the month pager
           below names each month itself. */}
-      {/* DES-27 (Pixel, 2026-08-26): the header badge retired — `StatsCard`
-          below already reads the same number ("180 CURRENT"), and the
-          corner it sat in is now the account door's reserved column. */}
+      {/* DES-27 (Pixel, 2026-08-26): the header badge retired — the corner
+          it sat in is now the account door's reserved column. (G1, Lumen,
+          2026-08-26: the badge's successor, `StatsCard`, retired in turn —
+          a streak/summary scoreboard fails theme.js §29.1's KEEPSAKE test,
+          the same test the badge itself never passed.) */}
       <ScreenHeader
         eyebrow={unknown ? null : months[activeIndex]?.label}
         title="Garden"
@@ -382,10 +356,6 @@ export const RecapTab = () => {
         />
       ) : (
         <>
-          <StaggeredItem index={0}>
-            <StatsCard streak={streak} best={longestStreak(allEntries)} total={thisYear.length} />
-          </StaggeredItem>
-
           {months.length > 1 && <MonthRail count={months.length} activeIndex={activeIndex} />}
 
           {/* §17.5: one month per page, current month first. The vertical scroll
@@ -537,38 +507,6 @@ const styles = StyleSheet.create({
   // solid border is the one visual tell that this card doesn't respond.
   wrappedCardStatic: {
     borderStyle: 'dashed',
-  },
-  statsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.washYellow,
-    borderRadius: theme.borderRadius.large,
-    paddingVertical: 22,
-    marginBottom: 16,
-  },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statSeparator: {
-    width: 1,
-    alignSelf: 'stretch',
-    backgroundColor: theme.colors.surfaceBorderStrong,
-    marginVertical: 4,
-  },
-  statValue: {
-    ...theme.type.h1,
-    fontSize: 34,
-    // ink, not accentDeep — a hero numeral is text, and accentDeep is never
-    // text on any ground (§35/R127). Was 2.3482:1 on washYellow, under 3:1.
-    color: theme.colors.ink,
-  },
-  statLabel: {
-    ...theme.type.label,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: theme.colors.inkSoft,
-    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,

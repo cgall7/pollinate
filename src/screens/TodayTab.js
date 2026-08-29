@@ -18,7 +18,6 @@ import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { Avatar } from '../components/Avatar';
 import { PressableScale } from '../components/PressableScale';
-import { currentStreak, nextMilestone } from '../utils/dateRanges';
 import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 
@@ -108,20 +107,10 @@ const greeting = (date) => {
 const longDate = (date) =>
   date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-// The line under the streak — a goal, not just a number. Turns "7" into
-// "3 days to 10," which is the whole point of showing a streak at all.
-const streakCaption = (streak) => {
-  if (streak === 0) return 'Write today to start your streak.';
-  const next = nextMilestone(streak);
-  if (!next) return "You've caught every milestone. Keep going.";
-  return `${next.remaining} ${next.remaining === 1 ? 'day' : 'days'} to ${next.target}.`;
-};
-
 export const TodayTab = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [entry, setEntry] = useState(null);
-  const [streak, setStreak] = useState(0);
   // §32.2 — where the bee may land, held by the screen and read by the flight.
   // Membership only: the coordinates are measured at the moment of choosing,
   // so scrolling this list does not touch this value and does not re-render.
@@ -176,20 +165,10 @@ export const TodayTab = ({ navigation }) => {
       (async () => {
         const now = new Date();
         try {
-          const [today, allEntries] = await Promise.all([
-            EntryStore.getEntry(now),
-            EntryStore.getAllEntries(),
-          ]);
+          const today = await EntryStore.getEntry(now);
           if (cancelled) return;
           setError(false);
           setEntry(today);
-          // Streak reads every entry, not just this year's — Recap already
-          // fixed this (RecapTab.js: "'BEST EVER' was measuring the calendar
-          // year, so a record set in December vanished on New Year's Day").
-          // Today had the same bug: a year-scoped streak resets to 1 on
-          // January 1st mid-run (Pixel, thread 19e90cf8, 2026-08-13).
-          // "THIS YEAR" stays year-scoped — it says so.
-          setStreak(currentStreak(allEntries, now));
         } catch (err) {
           // requireUserId (EntryStore.js) throws 'Not signed in' with no
           // session — reachable via DEMO_MODE's Welcome skip link, which
@@ -198,18 +177,15 @@ export const TodayTab = ({ navigation }) => {
           // (Sage/Pixel, thread 19e90cf8, 2026-08-13).
           //
           // `error` is what actually distinguishes this from a genuinely
-          // empty day (Pixel, thread 19e90cf8: setting entry/streak/total
-          // to their empty values here was asserting four specific false
-          // things — 0-day streak, 0 this year, "Write today to start your
-          // streak.", "Today's page is blank." — about a user we simply
-          // failed to read, not one who wrote nothing). §23 unknown state
-          // is Deezine's when it lands; this is the placeholder that keeps
-          // the read/write path honest until then.
+          // empty day (Pixel, thread 19e90cf8: setting entry to its empty
+          // value here was asserting "Today's page is blank." about a user
+          // we simply failed to read, not one who wrote nothing). §23
+          // unknown state is Deezine's when it lands; this is the
+          // placeholder that keeps the read/write path honest until then.
           if (cancelled) return;
           console.warn('TodayTab: failed to load entries', err);
           setError(true);
           setEntry(null);
-          setStreak(0);
         } finally {
           if (!cancelled) setLoading(false);
         }
@@ -327,17 +303,13 @@ export const TodayTab = ({ navigation }) => {
 
       <PerchField perches={perches}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* DES-27 (Pixel, 2026-08-26, corrected): the header badge retired,
-            and NOT because the caption repeats it — `streakCaption` below
-            prints `nextMilestone(streak).remaining`, i.e. `target - streak`,
-            which equals the streak at exactly three values in 1..365 (7, 15,
-            30). At a 180-day streak the badge read `180` and this line reads
-            "185 days to 365." It goes because the corner is now the account
-            door's reserved column (`tabBarLayout.js`, DOOR_RESERVE) and
-            because this screen states the streak as a sentence rather than a
-            score — see the whisper's own comment below. Consequence, on
-            purpose: Today prints the streak length nowhere; Garden's
-            StatsCard does. */}
+        {/* DES-27 (Pixel, 2026-08-26, corrected): the header badge retired
+            because the corner is now the account door's reserved column
+            (`tabBarLayout.js`, DOOR_RESERVE). (T2, Lumen, 2026-08-26: the
+            badge's spoken successor, the streak-whisper below, retired in
+            turn — same register as Garden's scoreboard, a live countdown
+            toward a milestone. Today prints the streak nowhere now; the
+            slot is quiet until Lane P3's time-aware greeting lands.) */}
         {/* P1a — THE STAGE. Three parts, and each of them is a contract
             rather than a coordinate (R30: deliver contracts, not positions).
 
@@ -398,37 +370,15 @@ export const TodayTab = ({ navigation }) => {
             this pass fixes, the streak caption reading "2 ays to 3." under a
             resting bee — and `on: 'right'` is the trailing gutter. */}
 
-        {/* The streak, spoken instead of scored (Colin, UX Design thread
-            2026-08-17: quiet morning page). The scoreboard card's numerals
-            duplicated the header badge ("7") and Recap's year count; what
-            survives is the one line that was ever a goal rather than a
-            number. Hidden on error — a streak caption is an assertion about
-            a user we failed to read, not one who wrote nothing (Pixel,
-            thread 19e90cf8); the entry card below carries the error copy
-            alone, where before this state said it twice. */}
-        {!error && (
-          <StaggeredItem index={0}>
-            {/* NOT home any more — P1a moved the residence up to the
-                greeting, where the negative space is. What is left here is an
-                errand landing site, like `entry-card` below: declared, and
-                nothing lands on it yet.
+        {/* T2 (Lumen, 2026-08-26): the streak whisper that lived here — a
+            live countdown toward the next milestone, spoken instead of
+            scored — retired with Garden's scoreboard (G1). Same register,
+            one door over: theme.js §29.1's KEEPSAKE test fails a summary of
+            a live process regardless of whether it's numerals or a
+            sentence. The slot is quiet until Lane P3's time-aware greeting
+            lands. */}
 
-                The geometry this comment used to carry was the resident's at
-                size 44 (character 362.97..393.03, 45.77pt of gutter to his
-                left) and it is gone with him rather than kept as a record of
-                where he was — a coordinate table for a bee that no longer
-                lives here is the stalest cargo there is. The caption's own
-                measurement survives because it is the caption's: the block
-                runs x 24..378 at 402pt wide and the longest string ("You've
-                caught every milestone. Keep going.") sets 293.20pt at
-                bodySm/PlusJakarta Medium 14, so its glyphs end at 317.20. */}
-            <PerchAnchor id="streak-whisper" on="right" at={0.5}>
-              <Text style={styles.whisper}>{streakCaption(streak)}</Text>
-            </PerchAnchor>
-          </StaggeredItem>
-        )}
-
-        <StaggeredItem index={1}>
+        <StaggeredItem index={0}>
           <PerchAnchor id="entry-card" on="right" at={0.5}>
           {entry ? (
             <View style={styles.quoteCard}>
@@ -468,8 +418,8 @@ export const TodayTab = ({ navigation }) => {
           </PerchAnchor>
         </StaggeredItem>
 
-        {/* Private Hives shelf (8b.2/8b.3, WP-1 §26.1). Indices 0–1 above
-            are the journal's; this is the next cascade step, so the two
+        {/* Private Hives shelf (8b.2/8b.3, WP-1 §26.1). Index 0 above
+            is the journal's; this is the next cascade step, so the two
             shelves settle in reading order. The written-state footer that
             used to sit between them narrated exactly what this shelf now IS
             ("share it with your hive") — the affordance replaced its own
@@ -477,7 +427,7 @@ export const TodayTab = ({ navigation }) => {
             shelf into nothing — the door card still renders, since it's a
             local navigation target with no data dependency, same reasoning
             as the journal's own error branch not hiding its CTA. */}
-        <StaggeredItem index={2}>
+        <StaggeredItem index={1}>
           <PerchAnchor id="hive-shelf" on="left" at={0.5}>
           <View style={styles.hiveShelf}>
             <Text style={styles.shelfLabel}>PRIVATE HIVES</Text>
@@ -509,7 +459,7 @@ export const TodayTab = ({ navigation }) => {
             "start a hive" door card), so a zero-row state and a failed read
             both simply withhold the shelf rather than asserting either one. */}
         {contributingHives.length > 0 && (
-          <StaggeredItem index={3}>
+          <StaggeredItem index={2}>
             <PerchAnchor id="contributing-hive-shelf" on="left" at={0.5}>
               <View style={styles.hiveShelf}>
                 <Text style={styles.shelfLabel}>WRITING WITH OTHERS</Text>
@@ -573,11 +523,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: HERO_CHAR_WIDTH / 2,
     width: 1,
-  },
-  whisper: {
-    ...theme.type.bodySm,
-    color: theme.colors.inkSoft,
-    marginBottom: 16,
   },
   emptyCard: {
     backgroundColor: theme.colors.surface,

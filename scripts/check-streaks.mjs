@@ -122,17 +122,22 @@ invariant('gapped real-world history', gapped);
 // away — actually calls `currentStreak(yearEntries, now)`. Same fix as
 // buildMonths below: read the real source instead of asserting on a
 // fixture that can't reach the call site.
+// T2 (Lumen, GUIDES/GARDEN_LUXURY_REDESIGN.md, 2026-08-26): the streak
+// whisper this gate used to guard retired with Garden's scoreboard — Today
+// no longer reads a streak at all, so the live regression to watch for
+// is the year-windowed query coming BACK in a re-add that skips this
+// history (Pixel, thread 19e90cf8). A bare `currentStreak(` call is fine
+// on its own; it is `getEntriesBetween(startOfYear` feeding one that
+// reintroduces the Jan-1 understatement.
 {
   const todaySource = await readFile(path.join(ROOT, 'src/screens/TodayTab.js'), 'utf8');
   if (/EntryStore\.getEntriesBetween\(\s*startOfYear/.test(todaySource)) {
     bad(
       'TodayTab static check',
-      'still fetches a year-windowed entry set for the streak — currentStreak(yearEntries, now) understates any run crossing Jan 1 (Pixel, thread 19e90cf8)'
+      'fetches a year-windowed entry set for a streak — currentStreak(yearEntries, now) understates any run crossing Jan 1 (Pixel, thread 19e90cf8)'
     );
-  } else if (!/EntryStore\.getAllEntries\(\)/.test(todaySource)) {
-    bad('TodayTab static check', 'no getAllEntries() call found — streak source changed shape, re-verify by hand');
   } else {
-    ok('TodayTab static check: streak reads getAllEntries(), not a year-windowed query');
+    ok('TodayTab static check: no year-windowed streak query (Today reads no streak — T2)');
   }
 }
 
