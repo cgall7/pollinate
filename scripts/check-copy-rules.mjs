@@ -332,10 +332,10 @@ for (const position of POSITIONS) {
 // so these two are constrained by a gate that knows what they are.
 const NOT_COPY_ATTRS = new Set([
   // RN / component API enums and identifiers
-  'accessibilityRole', 'autoCapitalize', 'icon', 'id', 'importantForAccessibility',
-  'key', 'keyboardShouldPersistTaps', 'keyboardType', 'mode', 'name', 'on',
-  'pointerEvents', 'preset', 'resizeMode', 'returnKeyType', 'size', 'stage',
-  'tint', 'tone', 'variant',
+  'accessibilityRole', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
+  'importantForAccessibility', 'key', 'keyboardShouldPersistTaps', 'keyboardType',
+  'mode', 'name', 'on', 'pointerEvents', 'preset', 'resizeMode', 'returnKeyType',
+  'size', 'stage', 'tint', 'tone', 'variant',
   // SVG geometry and paint
   'cx', 'cy', 'fill', 'fillRule', 'gradientUnits', 'height', 'offset',
   'patternTransform', 'patternUnits', 'preserveAspectRatio', 'r', 'stopOpacity',

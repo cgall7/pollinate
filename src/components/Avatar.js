@@ -22,7 +22,11 @@ const hashName = (name) => {
   return hash;
 };
 
-const initialsFor = (name) => {
+// Exported for the account door, which draws the initials WITHOUT the circle:
+// see `AccountDoor.js`. The rule for deriving them is the same everywhere and
+// there is no version of this app where your door and your seat in a hive
+// abbreviate your name differently.
+export const initialsFor = (name) => {
   const trimmed = (name || '?').trim();
   if (!trimmed) return '?';
   const parts = trimmed.split(/\s+/);
