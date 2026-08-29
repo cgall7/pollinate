@@ -5133,6 +5133,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       let headNow = { v: 0, label: '' };
       let legMin = Infinity;
       let legMax = 0;
+      const maxCruiseShipped = PLANS.reduce((m, p) => Math.max(m, p.plan.profile.cruisePxS), 0);
       for (const p of PLANS) {
         const t = geometryFor(p);
         if (!t) continue;
@@ -5157,8 +5158,26 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       // with the same phase-swept instrument. Cruise is the live plan's: main's
       // own cruise is higher, so this column UNDERSTATES the baseline, which
       // is the safe direction for a claim of improvement.
-      let headBefore = { v: 0, label: '' };
-      for (const p of PLANS) {
+      //
+      // AND THE BASELINE RUNS AT MAIN'S OWN CRUISE, which is the correction
+      // Lumen's residual turned out to be. I first walked main's curve at the
+      // SHIPPED plan's cruise and called the understatement "the safe
+      // direction" — but that is the frame error this whole arc keeps
+      // landing on, committed by me one row after I wrote "each column in its
+      // own frame on purpose" into the row above. main's max cruise is
+      // 301.97 px/s against the shipped 264.35, a factor of 1.1423, and that
+      // factor IS the whole 77.30-vs-79.14 gap she flagged: a phase sweep
+      // cannot come out below a single-phase reading of the same instrument,
+      // so the instruments were not the same.
+      //
+      // main's cruise is RECONSTRUCTED, not forked: `cruise = approachLen /
+      // approachDurationMs(|from -> staging|, speed)`, which is main's own
+      // formula over the fillet geometry `filletRef` already publishes, using
+      // the live module's own sampler and duration helper (both unchanged by
+      // R-LF-7). Validated bit-exact against main's real profile on all 336
+      // plans — worst error 2.8e-12 px/s — by the same method that validates
+      // `filletRef` against D8's 1.8201pt.
+      const filletCruise = (p) => {
         const ref = filletRef(p);
         const r = 0.25 * Math.min(ref.L, OFFSET_PX);
         const end = {
@@ -5170,8 +5189,22 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
           x: p.from.x + (end.x - p.from.x) * u + ref.n.x * off(u),
           y: p.from.y + (end.y - p.from.y) * u + ref.n.y * off(u),
         });
-        const w = walk(at, p.plan.profile.cruisePxS);
+        const pts = flight.adaptiveCurveSamples(at);
+        let arc = 0;
+        for (let i = 1; i < pts.length; i += 1) arc += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        const flatMs = flight.approachDurationMs(ref.L, p.speed);
+        return { at, cruise: flatMs > 0 ? (arc / flatMs) * 1000 : 0 };
+      };
+      let headBefore = { v: 0, label: '' };
+      let headBeforeSameCruise = { v: 0, label: '' };
+      let mainCruiseMax = 0;
+      for (const p of PLANS) {
+        const { at, cruise } = filletCruise(p);
+        mainCruiseMax = Math.max(mainCruiseMax, cruise);
+        const w = walk(at, cruise);
         if (w > headBefore.v) headBefore = { v: w, label: p.label };
+        const wSame = walk(at, p.plan.profile.cruisePxS);
+        if (wSame > headBeforeSameCruise.v) headBeforeSameCruise = { v: wSame, label: p.label };
       }
 
       // ---- PROVENANCE: radius, and the sampler ---------------------------
@@ -5218,7 +5251,8 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         + `main@42a83c7 measures 36.3323deg/frame on this channel; that figure is CITED, not recomputed here (Lumen's shell and mine, off main's real source), because the bank channel needs main's entire timing pipeline and reconstructing that would be a fork of the file rather than a reconstruction of a corner. `
         + `CHANNEL 2 — THE PATH HEADING, walked at arc-length steps of cruise/60 on the drawn curve: worst ${deg(headNow.v).toFixed(2)}deg/frame (${headNow.label}), ${(headNow.v / flight.MAX_FRAME_SPEED_STEP_FRACTION).toFixed(2)}x the turn's bound, over legs ${legMin.toFixed(1)}..${legMax.toFixed(1)}pt. `
         + `By leg: ${bins.map((b) => `${b.lo.toFixed(0)}-${b.hi === Infinity ? '+' : b.hi.toFixed(0)}pt n=${b.n} ${deg(b.worst).toFixed(2)} (${b.over} over)`).join('; ')} — every plan at every scale, so there is no sub-population to carve out and the carve-out had to be the QUANTITY. `
-        + `Baseline, same instrument, main's weave over main's own drawn span at 1.5 fixed cycles: ${deg(headBefore.v).toFixed(2)}deg/frame — this commit improves it ${(headBefore.v / headNow.v).toFixed(2)}x and the residual is pre-existing. `
+        + `BASELINE, same instrument, main's weave over main's own drawn span at 1.5 fixed cycles AND AT MAIN'S OWN CRUISE (${mainCruiseMax.toFixed(2)} px/s against the shipped ${maxCruiseShipped.toFixed(2)}, reconstructed from main's own formula and validated bit-exact against its real profile): ${deg(headBefore.v).toFixed(2)}deg/frame — this commit improves it ${(headBefore.v / headNow.v).toFixed(2)}x and the residual is pre-existing. `
+        + `Held at the SHIPPED cruise instead, which isolates the CURVE from the speed, main reads ${deg(headBeforeSameCruise.v).toFixed(2)}deg/frame — a different question, and the one I first answered by mistake. A baseline belongs in its own frame; that is the rule this row's own drawn-span column already follows. `
         + `INSTRUMENT: both channel-2 figures are PHASE-SWEPT over ${PHASES} phases, which is a correction to the single-phase walks published in the ratification thread — a worst-per-frame from one walk depends on where its marks land, and the tell was that the single-phase baseline was NON-MONOTONE in cruise speed, which no property of a curve can be. Swept, it is monotone and both figures rise. `
         + `PROVENANCE, never the headline: the weave's minimum radius of curvature is ${weaveRadius.radius.toFixed(4)}pt at u=${weaveRadius.u.toFixed(3)} (${weaveRadius.label}) — a number in NEITHER channel's frame, being neither what the path does per frame nor what the character does; and the rendered polyline's worst VERTEX turn is ${vertex.v.toFixed(3)}deg, a property of MAX_CHORD_DEVIATION_PX=${flight.MAX_CHORD_DEVIATION_PX} and of no curve here`,
       );
