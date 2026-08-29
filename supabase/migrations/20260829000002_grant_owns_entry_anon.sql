@@ -1,0 +1,41 @@
+-- Third instance of 20260829000001's bug, found by following up on the
+-- question Lumen raised alongside it (thread d1783906, 2026-08-29): is
+-- owns_entry() -- revoked from anon by 20260813000005, the precedent
+-- 20260829000001 cited -- reachable through the same inlining path? Yes,
+-- live-verified against a real anon-key connection with no session: an
+-- INSERT into `shares` for a real entry_id 42501s with "permission denied
+-- for function owns_entry" instead of the RLS-shaped denial every other
+-- anon write in this schema produces.
+--
+-- shares_insert_own's WITH CHECK calls owns_entry(entry_id)
+-- (20260809000004). `shares` carries the same grant-all-to-anon default
+-- every public table gets (20260808000001's `alter default privileges ...
+-- grant all on tables to anon`), so anon has always had table-level INSERT
+-- privilege on `shares` -- RLS was the only thing standing between that
+-- grant and a row. owns_entry() is `language sql stable`, so Postgres
+-- inlines it at query-rewrite time and checks EXECUTE on the reference
+-- inside the WITH CHECK expression itself, not only on rows that reach it.
+-- 20260813000005 revoked that EXECUTE from anon -- correctly, for the
+-- problem it was solving (closing a widened SELECT/UPDATE path) -- and that
+-- revoke has been quietly producing this exact 500 on any anon INSERT
+-- attempt against `shares` ever since, undetected because no gate had ever
+-- driven an anon INSERT down that path.
+--
+-- Same fix, same argument 20260813000005 itself already made and
+-- 20260829000001 already reused: owns_entry()'s `e.user_id = auth.uid()`
+-- clause is null for a signed-out caller (auth.uid() is null by contract),
+-- so the function returns false for every entry_id anon could supply,
+-- regardless of the other two clauses in its WHERE (entry-id match,
+-- `hive_id is null`). Granting execute makes anon able to *call* the
+-- function, not able to make it return anything but false -- no new data
+-- becomes reachable, only the error surface changes back to a normal
+-- RLS-shaped denial.
+--
+-- Named exception recorded in scripts/check-share-visibility.mjs
+-- (ALLOWED_ANON_DEFINERS) alongside is_hive_contributor/is_volume_open, with
+-- owns_entry's own paragraph -- not folded into 20260829000001's as if the
+-- same argument covered all three interchangeably (it doesn't; see that
+-- file's comment for why each was argued separately).
+grant execute on function public.owns_entry(uuid) to anon;
+
+notify pgrst, 'reload schema';

@@ -117,4 +117,29 @@ export const SENTINELS = {
   // below a 'column'-kind row.
   '20260827000001_multi_writer_hives': { kind: 'column', table: 'private_hives', column: 'is_collective' },
   '20260828000001_multiwriter_contributor_names': { kind: 'column', table: 'private_hives', column: 'contributor_names' },
+  // Inverse of 20260813000005's shape: that migration made an RPC 42501 for
+  // anon and used that as its live-signal. This one un-does the 42501 for
+  // is_hive_contributor specifically (829's grant covers is_volume_open too,
+  // but one probe per migration is this table's existing convention — see
+  // 20260813000005 naming only list_hive_state for a three-function revoke).
+  // Post-migration, anon calling it gets a real boolean back (`false`,
+  // always, per check-share-visibility.mjs's named exception and Sage's
+  // ruling in thread d1783906), not a permission error — so 'exists' is the
+  // deployed-signal, matching 20260809000002's row, not 20260813000005's.
+  '20260829000001_grant_hive_definer_helpers_anon': {
+    kind: 'rpc',
+    fn: 'is_hive_contributor',
+    args: { p_hive_id: '00000000-0000-0000-0000-000000000000' },
+    expect: 'exists',
+  },
+  // Same inverse-of-813 shape as 20260829000001's row above, for the third
+  // function in that migration's family: owns_entry() re-gains anon EXECUTE
+  // here, so a post-migration anon call gets a real boolean back instead of
+  // 813's 42501.
+  '20260829000002_grant_owns_entry_anon': {
+    kind: 'rpc',
+    fn: 'owns_entry',
+    args: { p_entry_id: '00000000-0000-0000-0000-000000000000' },
+    expect: 'exists',
+  },
 };

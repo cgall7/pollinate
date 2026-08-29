@@ -254,6 +254,89 @@ async function main() {
   // against has_function_privilege rather than inferred from a call, because
   // a function that errors for an unrelated reason looks identical to one
   // that refused.
+  //
+  // NAMED EXCEPTION (Sage, thread d1783906, 2026-08-29, ruling on
+  // 20260829000001 and 20260829000002). `language sql stable` functions are
+  // inlined at query-rewrite time, so Postgres checks EXECUTE on every
+  // REFERENCE to the function — including one buried in an RLS policy an
+  // anon query never matches a row for — not just on ones that run. Any
+  // anon request that merely touches a table whose policy chain reaches one
+  // of these three 500s with 42501 instead of the normal empty/denied
+  // result, which is why the two migrations above re-grant them. That
+  // forces a real choice between "anon requests 500" and "these three are
+  // anon-executable"; a blanket revoke cannot have both.
+  //
+  // The three are NOT interchangeable and were argued separately, not as a
+  // group, despite 20260829000001's comment treating its two as one case:
+  //
+  //   is_hive_contributor(uuid) — `c.profile_id = auth.uid()` is one of
+  //   three ANDed clauses in the function body (alongside the hive_id match
+  //   and `removed_at is null`), but it is the one doing identity-gating
+  //   directly, not an incidental side effect of an unrelated clause.
+  //   auth.uid() is null for anon by Supabase Auth's own contract (a
+  //   platform invariant, not a fact this function's body has to keep
+  //   proving), so `c.profile_id = auth.uid()` evaluates to NULL — never
+  //   TRUE — for every hive_id anon could supply, and AND with a
+  //   NULL/false clause never becomes TRUE regardless of what the other two
+  //   clauses do. This is NOT the same shape as find_connectable_profile's
+  //   near-miss (20260813000005): there, auth.uid()-is-null silenced the
+  //   result as a side effect of an unrelated self-exclusion clause, and
+  //   deleting that one clause turned the same body into an
+  //   account-existence oracle. Here, only removing or altering the
+  //   auth.uid() clause itself could break the safety argument — removing
+  //   either of the other two leaves it standing.
+  //
+  //   owns_entry(uuid) — same shape as is_hive_contributor, argued the same
+  //   way: `e.user_id = auth.uid()` is one of three ANDed clauses
+  //   (alongside the entry-id match and `hive_id is null`), and it is the
+  //   identity-gating one, never TRUE for anon regardless of the other two.
+  //   This is the SAME function 20260813000005 already revoked anon
+  //   EXECUTE from — that revoke was correct for the problem it was
+  //   solving (closing a widened SELECT/UPDATE surface), but it created
+  //   this exact inlining failure mode two weeks early:
+  //   shares_insert_own's WITH CHECK calls owns_entry(entry_id)
+  //   (20260809000004), the `shares` table carries the same
+  //   grant-all-to-anon default every table gets (20260808000001), and no
+  //   test in this suite had ever driven an anon INSERT against `shares`
+  //   to notice. Live-verified (Sage, thread d1783906, 2026-08-29): before
+  //   20260829000002, an anon INSERT into `shares` against a real entry_id
+  //   42501s with "permission denied for function owns_entry" instead of
+  //   the RLS-shaped denial every other anon write in this schema
+  //   produces. 20260829000002 re-grants EXECUTE the same way as the other
+  //   two — false always for anon, not newly-reachable data.
+  //
+  //   is_volume_open(uuid) — does not reference auth.uid() at all, by
+  //   design (its own comment: it must "answer the same regardless of the
+  //   caller's current standing on the roster", for the removed-contributor-
+  //   deletes-own-work case). That makes it a caller-independent oracle:
+  //   once EXECUTE exists for a role, that role can call
+  //   `rpc/is_volume_open` DIRECTLY, not just trigger it via inlining, and
+  //   learn whether any guessed/enumerated hive_volumes.id is currently
+  //   sealed — a fact `hive_volumes_select_own` otherwise restricts to the
+  //   hive's owner or an active contributor. This is not a new hole this
+  //   migration opens: `grant execute ... to authenticated` already made
+  //   every signed-in account able to do this (20260827000001), regardless
+  //   of hive membership. 20260829000001's actual, sole effect on
+  //   is_volume_open is removing the "must hold a signed-in session" cost
+  //   from that pre-existing oracle, down to "holds the anon key shipped in
+  //   the app bundle." Accepted here as a low-severity widening of an
+  //   already-accepted gap, not a new one — but it is NOT covered by the
+  //   "auth.uid() is null" argument the migration cites, which is is_hive_
+  //   contributor's (and owns_entry's) argument, not this function's.
+  //   Follow-up, not tonight's blocker: consider relocating
+  //   anon-necessary-but-RPC-undesirable definer helpers like this one to a
+  //   schema PostgREST does not expose, which would close the oracle for
+  //   authenticated AND anon at once without touching the inlining fix.
+  //
+  // A fourth function landing in this set without its own argument in this
+  // comment is exactly the failure mode a blanket accept would produce —
+  // this list is a name check, not a count check, and stays exactly three
+  // until someone adds a paragraph above to go with a fourth.
+  const ALLOWED_ANON_DEFINERS = new Set([
+    'is_hive_contributor(uuid)',
+    'is_volume_open(uuid)',
+    'owns_entry(uuid)',
+  ]);
   const definers = (
     await client.query(`
       select p.oid::regprocedure::text as sig
@@ -272,15 +355,23 @@ async function main() {
     ]);
     if (rows[0].e) anonCanRun.push(sig);
   }
+  const unexpected = anonCanRun.filter((sig) => !ALLOWED_ANON_DEFINERS.has(sig));
   if (definers.length === 0) {
     bad(
-      '`anon` cannot execute any SECURITY DEFINER function',
+      '`anon` cannot execute any SECURITY DEFINER function beyond the named exceptions',
       'found no SECURITY DEFINER functions at all — the query is wrong, or the schema changed shape'
     );
-  } else if (anonCanRun.length === 0) {
-    ok(`\`anon\` cannot execute any of the ${definers.length} SECURITY DEFINER functions in \`public\``);
+  } else if (unexpected.length === 0) {
+    ok(
+      `\`anon\` cannot execute any of the ${definers.length} SECURITY DEFINER functions in \`public\`` +
+        (anonCanRun.length ? `, except the ${anonCanRun.length} named exception(s): ${anonCanRun.join(', ')}` : '')
+    );
   } else {
-    bad('`anon` cannot execute any SECURITY DEFINER function', `signed-out callers can run: ${anonCanRun.join(', ')}`);
+    bad(
+      '`anon` cannot execute any SECURITY DEFINER function beyond the named exceptions',
+      `signed-out callers can run: ${unexpected.join(', ')} — if this is deliberate, argue its safety in the ` +
+        'comment above ALLOWED_ANON_DEFINERS and add it there by name; do not widen the check to accept it implicitly'
+    );
   }
 
   // --- Fixtures --------------------------------------------------------------
