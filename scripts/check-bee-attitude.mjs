@@ -5083,8 +5083,20 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         }
         return worst;
       };
+      // M10 OF THE BATTERY FOUND THIS ONE. These two strings ARE the baseline
+      // — if either stops matching, `bankBefore` silently becomes a second
+      // copy of `bankNow` and the row reports a 1x improvement as if it were
+      // measured. N9b's lesson, one row over: A REPORT CANNOT POLICE ITS OWN
+      // INPUTS, so the inputs get policed here. This is the one part of N2b
+      // that can fail, and it is a claim about the INSTRUMENT, not a bound on
+      // the thing measured.
+      const BANK_MUTATIONS = [
+        [flightSource, 'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)'],
+        [moduleSource, 'const pitch = pitchFor(dx, dy, heldPitch);'],
+      ];
+      const bankMutationsReachable = BANK_MUTATIONS.every(([src, needle]) => src.includes(needle));
       const bankNow = await bankWorst(flightSource, moduleSource);
-      const bankBefore = await bankWorst(
+      const bankBefore = !bankMutationsReachable ? { v: NaN, label: 'unreachable' } : await bankWorst(
         flightSource.replace(
           'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)',
           'const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt)',
@@ -5168,6 +5180,14 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         }
       }
 
+      if (!bankMutationsReachable || !(bankBefore.v > bankNow.v)) {
+        bad(
+          'N2b channel 1 has a baseline that is actually a baseline',
+          !bankMutationsReachable
+            ? 'one of the two R-LF-9.1 revert patches no longer matches its source, so the "before" column is a second copy of the "after" column and the improvement it reports is 1x by construction'
+            : `the reverted build measures ${bankBefore.v.toFixed(4)}deg/frame against the shipped ${bankNow.v.toFixed(4)} — the baseline must be WORSE, or R-LF-9.1 is not the thing this row is attributing the difference to`,
+        );
+      }
       ok(
         `N2b REPORTED, not gated — TWO CHANNELS, and R-LF-9 is why they are two. §7 row 2's bound is on THE TURN (N2); the weave is GAIT, whose rate is already ruled in Hz by WEAVE_RATE_HZ=${flight.WEAVE_RATE_HZ}, and a second bound on it in rad/frame forbids ${PLANS.length} of ${PLANS.length} plans including the rhythm Colin approved. `
         + `CHANNEL 1 — THE DRAWN BANK, what renders as the bee: worst ${bankNow.v.toFixed(4)}deg/frame (${bankNow.label}) against the turn's ruled ${RATE_BOUND_DEG.toFixed(4)}, i.e. ${(RATE_BOUND_DEG / bankNow.v).toFixed(1)}x INSIDE it. `
@@ -5424,7 +5444,15 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       const degenerateMax = Math.max(...sweeps.filter((v) => v <= flight.TURN_SWEEP_TIE_RAD), 0);
       const realMin = Math.min(...sweeps.filter((v) => v > flight.TURN_SWEEP_TIE_RAD));
 
-      if (live.length === 0 && reachable && mutHits.length === 40 && overlap === 0 && zeroSweepLabels.size === 32) {
+      // M3 OF THE BATTERY FOUND THIS HOLE. The row PRINTED the void and did
+      // not assert the threshold sits in it, so widening TURN_SWEEP_TIE_RAD
+      // to 1e-1 stayed green — harmless only because the void happens to be
+      // fourteen orders wide. A threshold justified by a measurement has to
+      // be CHECKED against that measurement, or the justification expires
+      // silently the first time the geometry moves a sweep down toward it.
+      const epsilonInVoid = flight.TURN_SWEEP_TIE_RAD > degenerateMax && flight.TURN_SWEEP_TIE_RAD < realMin;
+
+      if (live.length === 0 && reachable && mutHits.length === 40 && overlap === 0 && zeroSweepLabels.size === 32 && epsilonInVoid) {
         ok(
           `N4c §7 row 4(b) — NO ZERO-LENGTH SEGMENT anywhere in \`path\`, on any of ${PLANS.length} plans. `
           + `CALIBRATED BY MUTATION: restore the bare \`turn.sweep > 0\` emission guard and ${mutHits.length} plans grow a coincident waypoint — exactly the ${mutTiny} whose sweep lands in (0, ${flight.TURN_SWEEP_TIE_RAD}], and DISJOINT from N4's ${zeroSweepLabels.size} sweep-exactly-zero plans (overlap ${overlap}). `
@@ -5436,7 +5464,9 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
           'N4c no zero-length segment anywhere in path (R-LF-9.1)',
           !reachable
             ? `the calibration mutation matched nothing — the emission guard is spelled differently now, so this row ran uncalibrated and its green would mean nothing`
-            : `${live.length} live plans carry a coincident waypoint; mutation reproduced ${mutHits.length} (expected 40), overlap with N4's ${zeroSweepLabels.size} sweep-zero plans ${overlap} (expected 0). A coincident waypoint takes ZERO wall time, so the position channel stays bit-for-bit correct and only the derived attitude shows it — see N4d`,
+            : !epsilonInVoid
+              ? `TURN_SWEEP_TIE_RAD is ${flight.TURN_SWEEP_TIE_RAD}, which is NOT strictly inside the void it is justified by: largest degenerate sweep ${degenerateMax.toExponential(3)} rad, smallest real one ${realMin.toFixed(4)} rad. Either it now reclassifies a real turn as no-turn, or a real sweep has come down to meet it — re-derive the threshold, do not widen it`
+              : `${live.length} live plans carry a coincident waypoint; mutation reproduced ${mutHits.length} (expected 40), overlap with N4's ${zeroSweepLabels.size} sweep-zero plans ${overlap} (expected 0). A coincident waypoint takes ZERO wall time, so the position channel stays bit-for-bit correct and only the derived attitude shows it — see N4d`,
         );
       }
     }
