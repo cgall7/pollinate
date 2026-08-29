@@ -4773,6 +4773,76 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       radiusPx: p.plan.turn.radiusPx, inboardSign: p.target.x * 2 < BOX ? 1 : -1,
     });
 
+    // R-LF-9.1's OWN BEFORE-STATE, and it reverts BOTH sites rather than one.
+    // That distinction is not pedantry: `f32112a` had the bare `> 0` in the
+    // emission guard AND in `turnPointAt`, and reverting only the guard leaves
+    // `turnPointAt` returning `{...tangent}` for every `u`, which makes all 40
+    // degenerate plans emit BIT-IDENTICAL samples. `f32112a` did not — it ran
+    // real trigonometry over a 1e-15 arc, so 8 of the 40 came out differing in
+    // the last ulp. A one-site revert is therefore a DIFFERENT and TIDIER
+    // defect than the one that shipped, and calibrating against it would have
+    // hidden the 8. Spelled once, here, because two copies of a reconstruction
+    // is how they drift apart.
+    const REVERTS = [
+      ['const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)',
+        'const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt)'],
+      ['if (!turnIsSwept(turn)) return { ...turn.tangent };',
+        'if (!(turn.sweep > 0)) return { ...turn.tangent };'],
+    ];
+    const BANK_HOLD_REVERT = ['const pitch = pitchFor(dx, dy, heldPitch);', 'const pitch = pitchFor(dx, dy);'];
+    const revertsReachable = REVERTS.every(([from]) => flightSource.includes(from))
+      && moduleSource.includes(BANK_HOLD_REVERT[0]);
+    const preGuardSource = REVERTS.reduce((acc, [from, to]) => acc.replace(from, to), flightSource);
+    const preHoldSource = moduleSource.replace(BANK_HOLD_REVERT[0], BANK_HOLD_REVERT[1]);
+    const preGuardMod = revertsReachable
+      ? await import(`data:text/javascript;base64,${Buffer.from(preGuardSource).toString('base64')}`)
+      : null;
+    const planWith = (mod, p) => mod.buildPollinationPlan({
+      from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
+      width: BOX, height: BOX, approachSpeedPxS: p.speed, weaveSign: p.weaveSign,
+    });
+
+    // The drawn-bank channel, spelled once: N2b reports it and N4d measures
+    // R-LF-9.1's two repairs against each other with it.
+    const bankWorst = async (fSrc, aSrc) => {
+      const mod = fSrc === flightSource ? flight
+        : await import(`data:text/javascript;base64,${Buffer.from(fSrc).toString('base64')}`);
+      const build = aSrc === moduleSource ? buildAttitude
+        : (await import(`data:text/javascript;base64,${Buffer.from(aSrc).toString('base64')}`)).buildAttitude;
+      let worst = { v: 0, label: '' };
+      for (const p of PLANS) {
+        const plan = mod === flight ? p.plan : mod.buildPollinationPlan({
+          from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
+          width: BOX, height: BOX, approachSpeedPxS: p.speed, weaveSign: p.weaveSign,
+        });
+        const at = build(plan.path, {
+          width: BOX, height: BOX, size: 44, closed: false,
+          easing: plan.easing, durationMs: plan.durationMs, heldFacing: plan.heldFacing,
+        });
+        const frames = Math.max(2, Math.round((plan.durationMs / 1000) * 60));
+        const ir = at.inputRange;
+        const ro = at.rotateOutput;
+        let prev = null;
+        for (let f = 0; f <= frames; f += 1) {
+          const t = f / frames;
+          let v = ro[ro.length - 1];
+          if (t <= ir[0]) v = ro[0];
+          else {
+            for (let k = 1; k < ir.length; k += 1) {
+              if (t <= ir[k]) {
+                const w = ir[k] === ir[k - 1] ? 1 : (t - ir[k - 1]) / (ir[k] - ir[k - 1]);
+                v = ro[k - 1] + w * (ro[k] - ro[k - 1]);
+                break;
+              }
+            }
+          }
+          if (prev !== null && Math.abs(v - prev) > worst.v) worst = { v: Math.abs(v - prev), label: p.label };
+          prev = v;
+        }
+      }
+      return worst;
+    };
+
     // ------------------------------------------------------------------
     // THE BASELINE COLUMN — `main@42a83c7`'s fillet, reconstructed from its
     // own published formula so every row below can be read against what
@@ -5045,44 +5115,6 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       // reconstructing that is a fork of the file rather than a
       // reconstruction of a corner, which is the line the baseline discipline
       // above draws deliberately. It is cited with its provenance instead.
-      const bankWorst = async (fSrc, aSrc) => {
-        const mod = fSrc === flightSource ? flight
-          : await import(`data:text/javascript;base64,${Buffer.from(fSrc).toString('base64')}`);
-        const build = aSrc === moduleSource ? buildAttitude
-          : (await import(`data:text/javascript;base64,${Buffer.from(aSrc).toString('base64')}`)).buildAttitude;
-        let worst = { v: 0, label: '' };
-        for (const p of PLANS) {
-          const plan = mod === flight ? p.plan : mod.buildPollinationPlan({
-            from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
-            width: BOX, height: BOX, approachSpeedPxS: p.speed, weaveSign: p.weaveSign,
-          });
-          const at = build(plan.path, {
-            width: BOX, height: BOX, size: 44, closed: false,
-            easing: plan.easing, durationMs: plan.durationMs, heldFacing: plan.heldFacing,
-          });
-          const frames = Math.max(2, Math.round((plan.durationMs / 1000) * 60));
-          const ir = at.inputRange;
-          const ro = at.rotateOutput;
-          let prev = null;
-          for (let f = 0; f <= frames; f += 1) {
-            const t = f / frames;
-            let v = ro[ro.length - 1];
-            if (t <= ir[0]) v = ro[0];
-            else {
-              for (let k = 1; k < ir.length; k += 1) {
-                if (t <= ir[k]) {
-                  const w = ir[k] === ir[k - 1] ? 1 : (t - ir[k - 1]) / (ir[k] - ir[k - 1]);
-                  v = ro[k - 1] + w * (ro[k] - ro[k - 1]);
-                  break;
-                }
-              }
-            }
-            if (prev !== null && Math.abs(v - prev) > worst.v) worst = { v: Math.abs(v - prev), label: p.label };
-            prev = v;
-          }
-        }
-        return worst;
-      };
       // M10 OF THE BATTERY FOUND THIS ONE. These two strings ARE the baseline
       // — if either stops matching, `bankBefore` silently becomes a second
       // copy of `bankNow` and the row reports a 1x improvement as if it were
@@ -5090,19 +5122,10 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       // INPUTS, so the inputs get policed here. This is the one part of N2b
       // that can fail, and it is a claim about the INSTRUMENT, not a bound on
       // the thing measured.
-      const BANK_MUTATIONS = [
-        [flightSource, 'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)'],
-        [moduleSource, 'const pitch = pitchFor(dx, dy, heldPitch);'],
-      ];
-      const bankMutationsReachable = BANK_MUTATIONS.every(([src, needle]) => src.includes(needle));
+      const bankMutationsReachable = revertsReachable;
       const bankNow = await bankWorst(flightSource, moduleSource);
-      const bankBefore = !bankMutationsReachable ? { v: NaN, label: 'unreachable' } : await bankWorst(
-        flightSource.replace(
-          'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)',
-          'const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt)',
-        ),
-        moduleSource.replace('const pitch = pitchFor(dx, dy, heldPitch);', 'const pitch = pitchFor(dx, dy);'),
-      );
+      const bankBefore = !bankMutationsReachable ? { v: NaN, label: 'unreachable' }
+        : await bankWorst(preGuardSource, preHoldSource);
 
       // ---- CHANNEL 2: the path heading ----------------------------------
       const LEG_BINS = [[0, 30.1], [30.1, 60.1], [60.1, 120.3], [120.3, Infinity]];
@@ -5390,8 +5413,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
     // --- N4c. §7 row 4(b) — THE MULTIPLICITY ASSERTION --------------------
     //
     //     Named `4(b)` in the spec; `N4b` in this file was already taken by
-    //     acceptance 4's other half, so it is `N4c` here and the numbering is
-    //     the only thing that differs.
+    //     acceptance 4's other half, so it is `N4c` here.
     //
     //     R-LF-9.1, and the reason it exists is the reason N4 could never have
     //     caught it. N4 walks the 32 plans whose sweep is EXACTLY zero and
@@ -5399,11 +5421,23 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
     //     point's VALUE, at one index. The defect is a point occurring TWICE,
     //     somewhere else, on a DISJOINT population. A row that enumerates a
     //     set which does not contain the defect is worse than a row that does
-    //     not look, because it prints a number that reads as coverage.
+    //     not look: it prints a number that reads as coverage.
     //
-    //     Both facts below are asserted, not just the headline: no zero-length
-    //     segment anywhere in `path`, AND the calibration population is 40 and
-    //     shares nothing with N4's 32.
+    //     AND THE POPULATION IS TWO POPULATIONS, WHICH THE RULING'S "40" ELIDES.
+    //     Restoring `f32112a` FAITHFULLY — both bare `> 0` sites, not just the
+    //     emission guard — splits the 40 degenerate-sweep plans in two:
+    //
+    //       32  a segment of EXACTLY zero length (bit-identical samples)
+    //        8  a segment of 4.441e-13pt with `dy` exactly 0 (hop 4->2, all
+    //           four containers, both signs) — NOT coincident, so no
+    //           bit-equality test finds it, and `pitchFor` reads a perfectly
+    //           legitimate horizontal from it. Same 0.0000deg flick between
+    //           neighbours banked 14-15deg. The defect is identical on screen
+    //           and the mechanism is not.
+    //
+    //     Both are closed by the emission guard, which replaces the whole arc
+    //     with one point. Only the first is closed by the bank hold — see N4d,
+    //     where that asymmetry is measured rather than assumed.
     {
       const coincidentIn = (pts) => {
         for (let i = 1; i < pts.length; i += 1) {
@@ -5411,49 +5445,42 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         }
         return false;
       };
-      const live = PLANS.filter((p) => coincidentIn(p.plan.path));
+      // "Shorter than anything the sampler claims to resolve, and horizontal
+      // enough that `pitchFor` will answer 0" — the near-zero sibling. The
+      // length scale is the sampler's OWN declared resolution, read from the
+      // module, not a number invented here.
+      const nearZeroIn = (pts, width, height) => {
+        for (let i = 1; i < pts.length; i += 1) {
+          const dx = (pts[i].x - pts[i - 1].x) * width;
+          const dy = (pts[i].y - pts[i - 1].y) * height;
+          const len = Math.hypot(dx, dy);
+          if (len > 0 && len < flight.MAX_CHORD_DEVIATION_PX * 1e-3) return true;
+        }
+        return false;
+      };
+      const live = PLANS.filter((p) => coincidentIn(p.plan.path) || nearZeroIn(p.plan.path, BOX, BOX));
 
-      // THE CALIBRATION, and it is a source mutation rather than an argument:
-      // put the bare `> 0` back and rebuild the same lattice. A row asserting
-      // an ABSENCE has to show the absence is a property of the build and not
-      // of the probe.
-      const MUT_FROM = 'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)';
-      const MUT_TO = 'const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt)';
-      const reachable = flightSource.includes(MUT_FROM);
-      let mutHits = [];
-      let mutTiny = 0;
-      if (reachable) {
-        const mutated = await import(`data:text/javascript;base64,${Buffer.from(flightSource.replace(MUT_FROM, MUT_TO)).toString('base64')}`);
+      let mutCoincident = [];
+      let mutNearZero = [];
+      if (revertsReachable) {
         for (const p of PLANS) {
-          const plan = mutated.buildPollinationPlan({
-            from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
-            width: BOX, height: BOX, approachSpeedPxS: p.speed, weaveSign: p.weaveSign,
-          });
-          if (coincidentIn(plan.path)) mutHits.push(p.label);
-          const sw = plan.turn.sweepRad;
-          if (sw > 0 && sw <= flight.TURN_SWEEP_TIE_RAD) mutTiny += 1;
+          const path = planWith(preGuardMod, p).path;
+          if (coincidentIn(path)) mutCoincident.push(p.label);
+          else if (nearZeroIn(path, BOX, BOX)) mutNearZero.push(p.label);
         }
       }
-      // Disjointness is the half of the ruling that corrects the first draft,
-      // so it is asserted rather than described.
       const zeroSweepLabels = new Set(PLANS.filter((p) => p.plan.turn.sweepRad === 0).map((p) => p.label));
-      const overlap = mutHits.filter((l) => zeroSweepLabels.has(l)).length;
-      // And the void the threshold sits in, measured rather than asserted:
-      // 1e-6 is only "not a tuned number" if nothing real is near it.
-      //
-      // THE VOID IS READ FROM THE GEOMETRY, NOT FROM THE CONSTANT. My first
-      // spelling partitioned the sweeps BY `TURN_SWEEP_TIE_RAD` and then
-      // asserted the constant sat between the two halves — which is a
-      // tautology, because the halves are defined by it. It could not fail,
-      // and the battery's M3 stayed green through a 100000x widening. Third
-      // outing of A ROW THAT READS ITS OWN BOUND CANNOT SEE THE BOUND MOVE,
-      // and the first where I wrote it INTO the fix for the previous one.
-      //
-      // Instead: sort the sweeps and find the largest MULTIPLICATIVE gap.
-      // That is a property of the lattice alone — no constant on either side
-      // — and the claim becomes the one actually being made, that the
-      // threshold sits in the empty space between the degenerate sweeps and
-      // the real ones.
+      const tinyLabels = new Set(PLANS.filter((p) => {
+        const sw = p.plan.turn.sweepRad;
+        return sw > 0 && sw <= flight.TURN_SWEEP_TIE_RAD;
+      }).map((p) => p.label));
+      const defective = [...mutCoincident, ...mutNearZero];
+      const overlap = defective.filter((l) => zeroSweepLabels.has(l)).length;
+      // IDENTITY, NOT COUNT. "Exactly the 40 whose sweep is degenerate" is a
+      // claim about WHICH plans, and two sets of the same size are not the
+      // same set — the trap that made "32 or 40?" answerable two ways.
+      const sameSet = defective.length === tinyLabels.size && defective.every((l) => tinyLabels.has(l));
+
       const sweeps = PLANS.map((p) => p.plan.turn.sweepRad).filter((v) => v > 0).sort((a, b) => a - b);
       let gapAt = 0;
       let gapRatio = 0;
@@ -5463,30 +5490,28 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       }
       const degenerateMax = sweeps[gapAt];
       const realMin = sweeps[gapAt + 1];
-
-      // M3 OF THE BATTERY FOUND THIS HOLE. The row PRINTED the void and did
-      // not assert the threshold sits in it, so widening TURN_SWEEP_TIE_RAD
-      // to 1e-1 stayed green — harmless only because the void happens to be
-      // fourteen orders wide. A threshold justified by a measurement has to
-      // be CHECKED against that measurement, or the justification expires
-      // silently the first time the geometry moves a sweep down toward it.
       const epsilonInVoid = flight.TURN_SWEEP_TIE_RAD > degenerateMax && flight.TURN_SWEEP_TIE_RAD < realMin;
 
-      if (live.length === 0 && reachable && mutHits.length === 40 && overlap === 0 && zeroSweepLabels.size === 32 && epsilonInVoid) {
+      if (live.length === 0 && revertsReachable && mutCoincident.length === 32 && mutNearZero.length === 8
+          && overlap === 0 && zeroSweepLabels.size === 32 && sameSet && epsilonInVoid) {
         ok(
-          `N4c §7 row 4(b) — NO ZERO-LENGTH SEGMENT anywhere in \`path\`, on any of ${PLANS.length} plans. `
-          + `CALIBRATED BY MUTATION: restore the bare \`turn.sweep > 0\` emission guard and ${mutHits.length} plans grow a coincident waypoint — exactly the ${mutTiny} whose sweep lands in (0, ${flight.TURN_SWEEP_TIE_RAD}], and DISJOINT from N4's ${zeroSweepLabels.size} sweep-exactly-zero plans (overlap ${overlap}). `
-          + `That disjointness is the finding: the sweep-0 branch was always correct — it emits ONE point and \`slice(1)\` removes it cleanly — and the defect lived in the other branch, where an arc of ~1e-15 rad over R=${BODY_LENGTH_PX.toFixed(4)}pt is ~3e-14pt long and \`adaptiveCurveSamples\` emits bit-identical points. `
-          + `THE THRESHOLD IS NOT TUNED, and this row measures the void rather than taking that on faith: the largest degenerate sweep is ${degenerateMax.toExponential(3)} rad and the smallest real one is ${realMin.toFixed(4)} rad, so ${flight.TURN_SWEEP_TIE_RAD} sits in the middle of ${Math.round(Math.log10(realMin / degenerateMax))} orders of magnitude with nothing in them`,
+          `N4c §7 row 4(b) — NO ZERO-LENGTH AND NO NEAR-ZERO SEGMENT anywhere in \`path\`, on any of ${PLANS.length} plans. `
+          + `CALIBRATED BY A FAITHFUL REVERSION (both bare \`> 0\` sites, which is what f32112a had): ${mutCoincident.length} plans grow a segment of EXACTLY zero length and ${mutNearZero.length} more grow one of ~4.4e-13pt with dy exactly 0 — a DIFFERENT mechanism with the identical 0.0000deg flick, invisible to any bit-equality test. `
+          + `THE RULING'S "40" IS THOSE TWO ADDED UP, and the split matters because only the first is closed by the bank hold (N4d). `
+          + `Their union is EXACTLY the ${tinyLabels.size} degenerate-sweep plans — asserted as set identity, not as a matching count — and DISJOINT from N4's ${zeroSweepLabels.size} sweep-exactly-zero plans (overlap ${overlap}). `
+          + `That disjointness is the finding: the sweep-0 branch was always correct, emitting ONE point that \`slice(1)\` removes cleanly, and the defect lived in the other branch. `
+          + `THE THRESHOLD IS NOT TUNED, and the void is read from the GEOMETRY rather than from the constant under test (largest multiplicative gap in the sorted sweeps): degenerate side ${degenerateMax.toExponential(3)} rad, real side ${realMin.toFixed(4)} rad, and ${flight.TURN_SWEEP_TIE_RAD} sits strictly between them`,
         );
       } else {
         bad(
-          'N4c no zero-length segment anywhere in path (R-LF-9.1)',
-          !reachable
-            ? `the calibration mutation matched nothing — the emission guard is spelled differently now, so this row ran uncalibrated and its green would mean nothing`
+          'N4c no zero-length or near-zero segment anywhere in path (R-LF-9.1)',
+          !revertsReachable
+            ? 'one of the three calibration patches no longer matches its source, so this row ran uncalibrated and its green would mean nothing'
             : !epsilonInVoid
-              ? `TURN_SWEEP_TIE_RAD is ${flight.TURN_SWEEP_TIE_RAD}, which is NOT strictly inside the void it is justified by: largest degenerate sweep ${degenerateMax.toExponential(3)} rad, smallest real one ${realMin.toFixed(4)} rad. Either it now reclassifies a real turn as no-turn, or a real sweep has come down to meet it — re-derive the threshold, do not widen it`
-              : `${live.length} live plans carry a coincident waypoint; mutation reproduced ${mutHits.length} (expected 40), overlap with N4's ${zeroSweepLabels.size} sweep-zero plans ${overlap} (expected 0). A coincident waypoint takes ZERO wall time, so the position channel stays bit-for-bit correct and only the derived attitude shows it — see N4d`,
+              ? `TURN_SWEEP_TIE_RAD is ${flight.TURN_SWEEP_TIE_RAD}, not strictly inside the geometry's own void (${degenerateMax.toExponential(3)} .. ${realMin.toFixed(4)} rad). Either it reclassifies a real turn as no-turn, or a real sweep has come down to meet it — re-derive it, do not widen it`
+              : !sameSet
+                ? `the ${defective.length} defective plans are not the same SET as the ${tinyLabels.size} degenerate-sweep ones — a defect has appeared somewhere the sweep does not explain`
+                : `${live.length} live plans carry a zero-length or near-zero segment; reversion produced ${mutCoincident.length} coincident (expected 32) and ${mutNearZero.length} near-zero (expected 8), overlap with N4's ${zeroSweepLabels.size} sweep-zero plans ${overlap} (expected 0)`,
         );
       }
     }
@@ -5532,18 +5557,37 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       // table is made of.
       const flickDeg = mutated === null ? NaN : Math.max(Math.abs(mutated[0] - mutated[1]), Math.abs(mutated[2] - mutated[1]));
 
-      if (holds && mutFlicks) {
+      // AND THE ASYMMETRY, MEASURED RATHER THAN ASSUMED. §8 says "each repair
+      // alone returns the same 1.6070" and ships both as belt-and-braces. The
+      // first half is not true, and it is not true in the direction that
+      // matters: the INSTANCE fix alone closes it, the CLASS fix alone does
+      // NOT, because 8 of the 40 (N4c) are near-zero rather than zero and an
+      // exact-zero hold cannot see them. The conclusion — ship both — is
+      // unchanged; the ARGUMENT for the class fix is not "it independently
+      // closes this lattice", it is "it closes exact zero wherever a future
+      // call site produces one".
+      const bankBoth = await bankWorst(flightSource, moduleSource);
+      const bankInstanceOnly = await bankWorst(flightSource, preHoldSource);
+      const bankClassOnly = await bankWorst(preGuardSource, moduleSource);
+      const bankNeither = await bankWorst(preGuardSource, preHoldSource);
+      const classAloneIsWeaker = bankClassOnly.v > bankInstanceOnly.v + 1e-9;
+
+      if (holds && mutFlicks && classAloneIsWeaker) {
         ok(
           `N4d R-LF-9.1's CLASS half, forced: handed a path with a coincident pair, \`buildAttitude\` holds the previous waypoint's bank through it (${shipped[1].toFixed(4)}deg, inherited from ${shipped[0].toFixed(4)}) instead of answering \`atan2(0,0)\` with horizontal. `
-          + `Mutation \`pitchFor(dx, dy)\` — drop the held pitch — puts the level frame back at ${mutated[1].toFixed(4)}deg between neighbours banked ${mutated[0].toFixed(4)} and ${mutated[2].toFixed(4)}, a ${flickDeg.toFixed(4)}deg roll injected into two adjacent frames. `
-          + `FORCED ON PURPOSE: on the shipped lattice N4c's guard means no plan reaches this code, so each repair alone measures the SAME worst drawn-bank rate (§7 row 2's table, both repairs and either one) and a row reading the real lattice would go green with the hold DELETED. A zero returned for an absent quantity is indistinguishable from a zero that was measured, and only a synthetic input can tell them apart here`,
+          + `Mutation \`pitchFor(dx, dy)\` puts the level frame back at ${mutated[1].toFixed(4)}deg between neighbours banked ${mutated[0].toFixed(4)} and ${mutated[2].toFixed(4)} — a ${flickDeg.toFixed(4)}deg roll injected into two adjacent frames. `
+          + `FORCED ON PURPOSE, because the shipped lattice cannot see this repair at all: N4c's guard means no plan reaches the degenerate case, so a row reading real plans would go green with the hold DELETED. Only a synthetic input separates a zero that was measured from a zero returned for an absent quantity. `
+          + `AND THE TWO REPAIRS ARE NOT INTERCHANGEABLE — measured here, all four configurations, worst drawn bank per frame: neither ${bankNeither.v.toFixed(4)} (${bankNeither.label}), CLASS ALONE ${bankClassOnly.v.toFixed(4)} (${bankClassOnly.label}), INSTANCE ALONE ${bankInstanceOnly.v.toFixed(4)}, both ${bankBoth.v.toFixed(4)}, against the turn's ${RATE_BOUND_DEG.toFixed(4)}. `
+          + `§8's "each repair alone returns the same figure" holds for the instance and NOT for the class, and the reason is N4c's split: ${8} of the 40 carry a segment of ~4.4e-13pt with dy exactly 0, so \`pitchFor\` reads a legitimate horizontal and an EXACT-ZERO hold never engages. The conclusion (ship both) is unchanged; the argument is not "it independently closes this lattice" but "it closes exact zero wherever a future call site produces one"`,
         );
       } else {
         bad(
           'N4d a directionless segment inherits its bank rather than being answered horizontal',
           !reachable
             ? 'the calibration mutation matched nothing — `buildAttitude` no longer threads a held pitch through `pitchFor`, so this row ran uncalibrated'
-            : `shipped banks ${JSON.stringify(shipped.map((b) => Number(b.toFixed(4))))} (the middle one must equal the first and be non-zero), mutated ${JSON.stringify(mutated?.map((b) => Number(b.toFixed(4))))} (the middle one must be 0, or the mutation is not reaching the defect)`,
+            : !classAloneIsWeaker
+              ? `the class repair alone now measures ${bankClassOnly.v.toFixed(4)}deg/frame against the instance repair's ${bankInstanceOnly.v.toFixed(4)} — if they have become equal, either the near-zero population has gone (say so and simplify N4c) or the hold has grown a length threshold it was deliberately denied`
+              : `shipped banks ${JSON.stringify(shipped.map((b) => Number(b.toFixed(4))))} (the middle must equal the first and be non-zero), mutated ${JSON.stringify(mutated?.map((b) => Number(b.toFixed(4))))} (the middle must be 0, or the mutation is not reaching the defect)`,
         );
       }
     }
@@ -5588,7 +5632,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         + `AND IT IS A DIFFERENT ANSWER FROM THE COUNT. |phi| takes exactly ${distinct} values over all ${PLANS.length} plans: ${CAP_DEG.toFixed(4)}deg on ${atCap} and EXACTLY 0 on ${atZero}. `
         + `Strictly interior: ${interiorVals.length}. The ALIGN candidate — the whole reason the candidate set has a third member — never wins at a value of its own anywhere on this lattice; it wins only where it coincides with 0, i.e. where \`from\` already sits on the descent line. `
         + `Cross-tabbed against the sweep, because these are two degeneracies and not one: phi=cap x sweep-real ${cell('cap', 'real')}, phi=cap x sweep-0 ${cell('cap', 'zero')}, phi=cap x sweep-tiny ${cell('cap', 'tiny')}, phi=0 x sweep-0 ${cell('zero', 'zero')}, phi=0 x sweep-tiny ${cell('zero', 'tiny')}. `
-        + `N4c's 40 coincident-waypoint plans are the two tiny-sweep cells (${cell('zero', 'tiny')} + ${cell('cap', 'tiny')}), not a third population. `
+        + `N4c's 40 defective plans are exactly these two tiny-sweep cells (${cell('zero', 'tiny')} at phi=0, all zero-length, + ${cell('cap', 'tiny')} at the cap, all NEAR-zero) — not a third population, and the phi split is also the MECHANISM split. `
         + `SIGN, since it is what R-LF-7.1 resolves: of the ${atCap} at the cap, ${capPos} take +${CAP_DEG.toFixed(0)} and ${capNeg} take -${CAP_DEG.toFixed(0)} — the sweep is equal at both, so the ruled quantity is silent there and only the inboard clause decides. `
         + `WHAT THE SHAPE SAYS, and this is a report and not a verdict: on a two-valued parameter the cap is not a ceiling the optimum happens to reach, it IS the staging bearing on seven flights in eight — §28.5's shape, more so than the count suggested. N4b separately proves this is the true global minimum and not a search artefact, so it is a property of the geometry (the sweep is monotone in phi, so its minimum sits at an interval end or at its zero, and here the zero is only ever reachable AT zero). Owed the device pass: whether 30 reads as a bound or as a value`,
       );
