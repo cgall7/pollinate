@@ -20,6 +20,7 @@
     "check:hive-state-rls": "node scripts/check-hive-state-rls.mjs",
     "check:honey-fill": "node scripts/check-honey-fill.mjs",
     "check:hex-tap": "node scripts/check-hex-tap.mjs",
+    "check:nectar-exchange": "node scripts/check-nectar-exchange.mjs",
     "check:stage-light": "node scripts/check-stage-light.mjs",
     "check:streaks": "node scripts/check-streaks.mjs",
     "check:share-visibility": "node scripts/check-share-visibility.mjs",
