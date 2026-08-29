@@ -59,9 +59,12 @@ export const SENTINELS = {
   // list_hive_state itself (000003 + this row, just previously aimed at the
   // wrong fn). Before 20260813000005: find_connectable_profile carries
   // `revoke all from public` from its own creation (20260809000002), but
-  // anon's NAMED grant (20260808000001's `alter default privileges ...
-  // grant all on functions to anon`) survives a from-public revoke, so anon
-  // could still call it — a real 200 (empty result; the function's own
+  // anon's NAMED grant (Supabase's platform-level `alter default privileges
+  // ... grant all on functions to anon` — not in this repo's migrations;
+  // proven live rather than cited by 20260813000005:12-20's own ACL
+  // printout off pg_proc and its executed revoke-PUBLIC-only /
+  // revoke-anon-only / revoke-both test) survives a from-public revoke, so
+  // anon could still call it — a real 200 (empty result; the function's own
   // self-exclusion clause nulls out when auth.uid() is null for anon).
   // After: 42501. Live-verified directly against production, 2026-08-29 —
   // current answer is 401/42501, with both controls (fabricated fn name,
