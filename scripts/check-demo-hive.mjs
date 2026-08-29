@@ -185,5 +185,43 @@ console.log(`     line lengths: ${Math.min(...lens)}–${Math.max(...lens)} char
 check('no line longer than the longest original (57)', lines.filter((l) => l.length > 57), []);
 check('every line ends in a period', lines.filter((l) => !l.endsWith('.')), []);
 
+// --- 7. The sample disclosure travels with the MEMBER (Lumen, MVP1 screen pass) ---
+//
+// The defect this exists to catch is not a missing word. It is a disclosure
+// gated on a predicate that outlives nothing: HoneycombTab's empty-state chain
+// admitted the demo seats in one branch, and every branch of it disappears the
+// moment `mergedFeed` has one item — so a tester's own first share took the
+// admission off the screen and left six fabricated faces behind.
+//
+// So the assertions below key on the LIFETIME, not on the copy:
+//
+//   (a) the comb's disclosure is gated on a count derived from `members` — the
+//       same array the cells are drawn from, so it cannot outlive or under-live
+//       the population by construction;
+//   (b) the reveal card — the one place a sample person's own WORDS are
+//       rendered — carries a marker gated on that member's own flag;
+//   (c) HoneycombGrid.js cannot see the feed or the connection list at all.
+//       (c) is what makes (a) structural rather than a promise: a future edit
+//       cannot re-gate the note on emptiness without first importing emptiness
+//       into a file that has no business knowing about it.
+//
+// FeedCard's own marker (§23.9.1) is pinned here too, so the two surfaces that
+// render demo-authored content are asserted in one place rather than each
+// drifting alone.
+const grid = read('src/components/HoneycombGrid.js');
+const feedCard = read('src/components/FeedCard.js');
+
+check('comb: sample count is derived from the drawn members',
+  /const sampleSeats = members\.filter\(\(m\) => m\?\.isDemo\)\.length;/.test(grid), true);
+check('comb: the note is gated on that count',
+  /\{sampleSeats > 0 && \(/.test(grid), true);
+check('comb: reveal card marks a sample member',
+  /\{held\.isDemo && <Text style=\{styles\.revealSample\}>SAMPLE<\/Text>\}/.test(grid), true);
+check('feed card marks a sample share',
+  /\{isDemo && <Text style=\{styles\.sampleLabel\}>SAMPLE<\/Text>\}/.test(feedCard), true);
+// The negative half, and it is the load-bearing one.
+check('comb cannot see the feed or the connection list',
+  ['mergedFeed', 'connections', 'listFeed'].filter((t) => grid.includes(t)), []);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

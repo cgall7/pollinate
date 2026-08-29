@@ -437,6 +437,15 @@ export const HoneycombGrid = ({
   // showing," and they have to move on the same frame or the release comes
   // apart into three.
   const [heldId, setHeldId] = useState(null);
+  // COUNT, not appearance. The first draft of this disclosure said "faded
+  // seats" and pointed at `DEMO_OPACITY` — but the register only reads as
+  // faded NEXT TO a real seat, and the state a tester actually lands in is
+  // all seven demo, where there is nothing to be faded against. A disclosure
+  // that needs the reader to compare two things is inert exactly when every
+  // thing on screen is the thing being disclosed. The count is true in every
+  // mix and needs no comparison to decode. (Found on the simulator, on my own
+  // fix, one screenshot after writing it.)
+  const sampleSeats = members.filter((m) => m?.isDemo).length;
   const selected = selectedId === null ? null : members.find((m) => personKey(m) === selectedId) ?? null;
   const held = heldId === null ? null : members.find((m) => personKey(m) === heldId) ?? null;
   const reduced = useReducedMotion();
@@ -794,6 +803,32 @@ export const HoneycombGrid = ({
         </Animated.View>
       </View>
 
+      {/* The comb's own disclosure, and it is gated on the POPULATION it
+          describes — never on an emptiness predicate. HoneycombTab's
+          empty-state chain already admits the demo seats in one of its four
+          branches, but every one of those branches disappears the moment the
+          feed has a single item in it, and the seats do not: the first entry
+          a tester shares takes the admission off the screen and leaves six
+          faces behind. A disclosure whose lifetime is shorter than the thing
+          it discloses is not a disclosure (same defect class as the Wrapped
+          preview subtitle that vanished after slide 1).
+
+          It also names the register rather than replacing it — `DEMO_OPACITY`
+          keeps carrying the distinction cell by cell, and this line is what
+          makes that register legible. A label retires a register only when it
+          shares the register's scope; this one has exactly the scope.
+
+          Above `HexTapOverlay` in paint order on purpose: it recedes under
+          the scrim with the comb it belongs to, rather than staying lit over
+          a dimmed hive. */}
+      {sampleSeats > 0 && (
+        <Text style={styles.sampleNote}>
+          {sampleSeats === members.length
+            ? 'These seats are all samples.'
+            : `${sampleSeats} of these seats are samples.`}
+        </Text>
+      )}
+
       {/* Ruling 4 — container-level, between stage and the reveal card, so
           the card lands inside the dimmed region (Option A's continuity). */}
       <HexTapOverlay
@@ -825,7 +860,22 @@ export const HoneycombGrid = ({
             },
           ]}
         >
-          <Text style={styles.revealName}>{held.isOwn ? 'You' : held.name}</Text>
+          {/* §23.9.1, extended to the comb (Lumen, MVP1 screen pass): the
+              label travels with the MEMBER, not with an emptiness predicate.
+              FeedCard already marks a demo share this way and this card is
+              the comb's equivalent surface — it is the only place a sample
+              person's own WORDS are rendered, and an unmarked quotation is
+              the app telling you someone said something to you.
+
+              Same register and the same ground as FeedCard's (`type.label`
+              in `inkSoft` on `surface`, 6.3074:1), so the borrow carries its
+              measurement. It sits at the far end of the row rather than
+              beside the name because `revealName` is ALREADY label register
+              here — adjacent, the two words would read as one string. */}
+          <View style={styles.revealNameRow}>
+            <Text style={styles.revealName}>{held.isOwn ? 'You' : held.name}</Text>
+            {held.isDemo && <Text style={styles.revealSample}>SAMPLE</Text>}
+          </View>
           <Text style={styles.revealQuote}>"{held.gratitude}"</Text>
         </Animated.View>
       )}
@@ -836,6 +886,15 @@ export const HoneycombGrid = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
+  },
+  // `inkSoft` on `background` (#FFF7CC — this container is transparent, same
+  // ground the cell dimming is measured against): 5.8353:1, measured with
+  // scripts/lib/color.mjs.
+  sampleNote: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+    marginTop: 4,
   },
   stage: {
     alignItems: 'center',
@@ -867,10 +926,24 @@ const styles = StyleSheet.create({
     padding: 16,
     ...theme.shadows.card,
   },
+  revealNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
   revealName: {
     ...theme.type.label,
     color: theme.colors.inkSoft,
-    marginBottom: 8,
+    flexShrink: 1,
+  },
+  // `flexShrink: 0` for the same reason FeedCard's does it: a long display
+  // name wraps, the label stays on the card.
+  revealSample: {
+    ...theme.type.label,
+    color: theme.colors.inkSoft,
+    flexShrink: 0,
   },
   revealQuote: {
     fontFamily: theme.fonts.bodyItalic,
