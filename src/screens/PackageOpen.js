@@ -414,7 +414,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
               <Animated.View
                 style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
               >
-                <ScrollView style={styles.entryScrollView} contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
                   <PaperBlock paper={step.paper}>
                     <Text style={[styles.entryText, { color: paperInk(step.paper) }]}>{step.text}</Text>
                     {/* DES-21 §4 — a SIGNATURE, not a byline: inside PaperBlock,
@@ -655,9 +655,6 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     maxHeight: '62%',
     ...theme.shadows.floating,
-  },
-  entryScrollView: {
-    flex: 1,
   },
   entryScroll: {
     flexGrow: 1,
