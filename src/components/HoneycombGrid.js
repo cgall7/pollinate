@@ -462,9 +462,26 @@ const HexCell = ({ member, size, x, y, delay, selected, held, reduced, pressDept
   );
 };
 
-// The hive's Today view: who in your circle has shared today. Seven seats,
-// you in the middle, one ring around you. Tap a face to read what they
-// wrote; tap a gap to invite someone into it.
+// The hive's Today view: who in your circle has shared today. Seven seats
+// filled centre-out, the rest left as honest gaps. Tap a face to read what
+// they wrote; tap a gap to invite someone into it.
+//
+// THE CENTRE IS NOT YOURS, and this sentence used to say it was ("you in
+// the middle, one ring around you"). Found while building R-N4's aim:
+// `buildCombLayout` seats `seated[index]` into `hexSpiral(1)`, whose index 0
+// IS `{q:0,r:0}`, and the list reaching it is `created_at` DESC with no
+// own-first sort anywhere in the chain — `HoneycombStore.listFeed`'s
+// `.order('created_at', { ascending: false })`, through `partitionHive`
+// (filter/map/dedupe/slice, no sort), through `combMembers` (a map). So the
+// centre belongs to whoever posted most recently, and on any day you write
+// before your friends do, you are on the ring.
+//
+// Left as a correction rather than a reorder: seating is the comb's, not
+// R-N4's, and moving every user's seat is a ruling. What R-N4 needed from it
+// is answered either way — `aimOwnCell` resolves the seat by `member.isOwn`
+// and never by position, so the crossing is correct under both orderings.
+// Routed to Lumen with the citation; whichever way it is ruled, the sentence
+// and the code have to agree.
 //
 // `forwardRef` exists for exactly one thing: R-LF-5's landing light. The
 // bee lives in `FlyingBee`, a screen-level sibling of this grid, not a
@@ -551,6 +568,9 @@ export const HoneycombGrid = forwardRef(({
   // this `onLayout` (relative to `stage`) already IS the container-space
   // origin (Lumen's ruling; don't re-derive it).
   const [clusterOrigin, setClusterOrigin] = useState(null);
+  // R-N4 — the cluster's own host view, for the ONE aim that has no tap to
+  // derive an origin from. See `aimOwnCell`.
+  const clusterRef = useRef(null);
   const [tapCentre, setTapCentre] = useState(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -817,7 +837,81 @@ export const HoneycombGrid = forwardRef(({
     ]).start();
   };
 
-  useImperativeHandle(ref, () => ({ igniteLanding }));
+  // R-N4 — WHERE THE OWN CELL IS, WITHOUT A TAP.
+  //
+  // `requestPollination` needs no measurement: a tap hands it the same point
+  // in both coordinate systems (`pageX/Y` and `locationX/Y`), so subtracting
+  // gives the cluster's window origin for free. R-N4's crossing has no tap —
+  // its cause is a gift that arrived while the user was elsewhere — so that
+  // trick is unavailable and the origin has to be measured.
+  //
+  // MEASURED AT THE MOMENT OF USE, never cached. The comb scrolls, and the
+  // camera dive scales the cluster for its first 600ms; a window origin read
+  // at layout is wrong by the scroll offset the instant the user moves, and
+  // wrong by `(scale - 1) x offset` before the camera settles. Reading it
+  // here costs one frame and owes nothing to a scroll listener.
+  //
+  // RETURNS `null` RATHER THAN A GUESS, in three separate cases, because the
+  // caller's correct response to all three is the same (do not fly) and its
+  // correct response to a wrong point is not:
+  //   * THERE IS NO OWN CELL. `todayMembers` filters on `entryDate === today`
+  //     (HoneycombTab `partitionHive`) and `isOwn` only ever reaches a member
+  //     from a share (`toGridMember`), so a user who has not posted today has
+  //     no seat in the spiral — and that is the population most likely to be
+  //     RECEIVING rather than giving. A gift can arrive for someone whose
+  //     cell is not on screen; this returns `null` and the beat stands down.
+  //     Flagged to Lumen as an open question rather than dressed up here: the
+  //     honest fallback is R-N4's own Reduce Motion end state ("the bee does
+  //     not cross; the balance is simply right"), reached for a different
+  //     reason, and a richer answer is a ruling and not a build decision.
+  //   * the cluster is not mounted or cannot measure;
+  //   * the measurement is not finite.
+  //
+  // NOT gated on `reduced`, unlike `requestPollination`. This is a
+  // measurement, and a measurement under Reduce Motion is just a number. What
+  // Reduce Motion forbids is the CROSSING, and the crossing is the caller's —
+  // putting the suppression here would hide it from the screen that owns the
+  // beat, which is the P1a defect (a suppression gating WHERE rather than
+  // WHETHER) in a smaller costume.
+  const aimOwnCell = () =>
+    new Promise((resolve) => {
+      // ONE GUARD PER CASE, and the split is not tidiness. Case 1 is a
+      // RULING-BLOCKED state (Lumen owes the answer for a recipient with no
+      // seat) and cases 2 and 3 are a view that could not be measured, which
+      // is never a beat. They all answer `null` today; folding them into one
+      // condition would mean the site where that ruling lands does not exist
+      // yet, and the next person would have to re-derive which half of a
+      // compound guard they were amending.
+      const cell = layout.cells.find((c) => c.member && c.member.isOwn);
+      if (!cell) {
+        // NO OWN CELL. `todayMembers` is TODAY's shares and `isOwn` only
+        // exists on a member derived from a share, so this is not an edge
+        // case — it is the unconditional state of everyone who has not
+        // written today, which is the population most likely to be
+        // RECEIVING rather than giving.
+        resolve(null);
+        return;
+      }
+      const node = clusterRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') {
+        resolve(null);
+        return;
+      }
+      const centre = cellCentre(cell, cellSize);
+      node.measureInWindow((x, y) => {
+        if (![x, y].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+          resolve(null);
+          return;
+        }
+        resolve({
+          x: x + centre.x,
+          y: y + centre.y,
+          ringStep: ringStepFor(cellSize),
+        });
+      });
+    });
+
+  useImperativeHandle(ref, () => ({ igniteLanding, aimOwnCell }));
 
   const requestPollination = (member, tap) => {
     // Under Reduce Motion there is no bee to break from — `FlyingBee` renders
@@ -892,6 +986,7 @@ export const HoneycombGrid = forwardRef(({
     <View style={styles.container} onLayout={(e) => setContainerSize(e.nativeEvent.layout)}>
       <View style={[styles.stage, { height: layout.height + 24 }]}>
         <Animated.View
+          ref={clusterRef}
           onLayout={(e) => setClusterOrigin({ x: e.nativeEvent.layout.x, y: e.nativeEvent.layout.y })}
           style={{
             width: layout.width,

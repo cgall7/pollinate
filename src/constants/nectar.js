@@ -437,5 +437,57 @@ export const honeyLevelForDrops = (drops) => {
 // between those two. Routed to Lumen with the numbers rather than resolved
 // by quietly moving her constant.
 
-// Balance (drops) -> rung 0..NECTAR_LADDER_RUNGS.
+// ---------------------------------------------------------------------------
+// R-N4 — THE ARRIVAL. Did a gift land while you were not looking?
 //
+// (The two lines that stood here were the header of `honeyRungForDrops`,
+// left behind when R-N2 removed the function under them. A comment whose
+// subject is gone is worse than no comment: it is a promise that something
+// below it exists. Removed rather than left for a sweep.)
+//
+// This is the whole of R-N4's detection half, and it is a PURE COMPARISON so
+// that it lives here — in the one nectar module a gate can import — rather
+// than inside the effect that performs it. The same reason `honeyLevelForDrops`
+// is here: ledger arithmetic, no renderer units, importable from bare `node`.
+//
+// THE TRAP IS `null`, AND IT IS THE ONE `NectarStore` ALREADY WROTE DOWN.
+// `getBalanceDrops` returns `null` for UNKNOWN-or-unprovisioned and `0` for a
+// real, read, empty wallet, and its own comment says the caller must not
+// collapse them ("empty is a positive claim", §23.1). Here that stops being a
+// rendering nicety and becomes arithmetic: treat an unknown as a previous
+// balance of 0 and the first successful read after ANY failed one fabricates
+// a gift OF THE ENTIRE BALANCE — 500 drops of bee, for nothing. So both
+// unknowns return `null`, and `null` means "no arrival", never "no gift".
+//
+// THE FIRST READ OF A USER'S LIFE IS ALSO AN UNKNOWN, and that is what closes
+// the starter grant. Consent provisions the accounts and the balance goes from
+// no-row to 500 in one step; with no remembered value there is nothing to have
+// risen FROM, so the grant lands on the first-run path and announces nothing.
+// A grant is not a gift, and this is why nothing has to say so.
+//
+// WHAT A RISE IS SCOPED TO. R-N4's own words are "your balance has risen since
+// your last read" — a rise in the AVAILABLE BALANCE, which is what this
+// returns. It is not "a gift was received", and the difference is not
+// pedantry: the ledger is the server's and this function has read exactly one
+// number. Every rise the product can currently produce is a received zap
+// (`record_zap` credits only the recipient) and the one other riser, the
+// grant, is closed above — but that is a property of today's RPCs, not of
+// this function, and it is stated here so the next writer of a credit path
+// knows they are inside this claim.
+//
+// A FALL IS NOT AN ERROR AND NOT AN ARRIVAL. You sent a gift. The caller
+// still remembers the new, lower number — otherwise the balance you spent
+// down to would be re-announced as an arrival the moment it climbed back to
+// where it already was.
+//
+// @param lastSeenDrops  the remembered balance, or `null` if never recorded
+// @param balanceDrops   the balance just read, or `null` if unknown
+// @returns the number of drops that arrived (> 0), or `null` for no arrival
+export const nectarArrivalDrops = (lastSeenDrops, balanceDrops) => {
+  const now = Number(balanceDrops);
+  const then = Number(lastSeenDrops);
+  if (balanceDrops === null || balanceDrops === undefined || !Number.isFinite(now)) return null;
+  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;
+  const risen = now - then;
+  return risen > 0 ? risen : null;
+};
