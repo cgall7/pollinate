@@ -633,9 +633,35 @@ export const solveTurn = ({ from, target, offsetPx, phi, sigma, radiusPx }) => {
   return { phi, sigma, radiusPx, staging, centre, tangent, theta0, sweep };
 };
 
+// R-LF-9.1 — THE MODULE'S ONE DEFINITION OF "THIS SWEEP IS ZERO".
+//
+// It was already here, used by `chooseTurn` to decide when two sweeps are the
+// SAME. Two other sites asked the same question — is this sweep zero? — and
+// answered it with a bare `> 0` on a computed float. A module that has decided
+// how small is zero, and then lets a call site decide again, has two
+// definitions of zero and only one of them is written down.
+//
+// What the second definition cost: `solveTurn` returns sweeps of ~1e-15 rad on
+// forty of the lattice's plans (they are not the 32 that reach EXACTLY zero —
+// the two populations are disjoint). Not zero, so they took the arc branch; an
+// arc of 1e-15 rad over R = 30.07pt is ~3e-14pt long, so `adaptiveCurveSamples`
+// emitted BIT-IDENTICAL points and a coincident waypoint survived `slice(1)`
+// into `path`. A zero-length segment has no direction, and `pitchFor` answered
+// it with horizontal — so the bee rolled level for one frame and slammed back
+// to full bank, on the run-in to the landing. See `beeAttitude`'s own half of
+// this fix; each closes it alone, and both ship.
+//
+// The threshold is not tuned. Between the largest degenerate sweep (4.441e-15
+// rad) and the smallest real one (0.6971 rad) there is nothing at all, so 1e-6
+// sits in the middle of a fourteen-order void: no real plan is reclassified,
+// and the 296 that keep their arc are bit-identical.
+export const TURN_SWEEP_TIE_RAD = 1e-6;
+
+export const turnIsSwept = (turn) => !!turn && turn.sweep > TURN_SWEEP_TIE_RAD;
+
 // A point on the arc, `u` in [0,1] from the tangent point to `staging`.
 export const turnPointAt = (turn, u) => {
-  if (!(turn.sweep > 0)) return { ...turn.tangent };
+  if (!turnIsSwept(turn)) return { ...turn.tangent };
   const th = turn.theta0 + turn.sigma * turn.sweep * u;
   return { x: turn.centre.x + turn.radiusPx * Math.cos(th), y: turn.centre.y + turn.radiusPx * Math.sin(th) };
 };
@@ -668,8 +694,6 @@ export const turnCandidateBearings = ({ from, target, capRad = STAGING_BEARING_C
   if (Number.isFinite(align) && Math.abs(align) < capRad) out.unshift(align);
   return out;
 };
-
-export const TURN_SWEEP_TIE_RAD = 1e-6;
 
 /**
  * @param inboardSign  R-LF-7.1 — +1 when "away from the nearest screen edge"
@@ -980,8 +1004,12 @@ export const buildFlightCurve = ({
 
   const approachPoints = adaptiveCurveSamples(approachCurveAt);
   // A sweep of zero is not an arc, and sampling it would emit a run of
-  // identical points for the segment arithmetic to divide by.
-  const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt) : [{ ...entry }];
+  // identical points for the segment arithmetic to divide by. `turnIsSwept`
+  // rather than `> 0` — R-LF-9.1, and the note on TURN_SWEEP_TIE_RAD. This is
+  // the same predicate `turnPointAt` uses, which matters more than either
+  // spelling: if the two disagreed, the branch that says "swept" would sample
+  // a curve that says "not swept" and emit N copies of the tangent point.
+  const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt) : [{ ...entry }];
   const dropPoints = adaptiveCurveSamples(dropAt);
   // `arcPoints`'s last point and `dropPoints`'s first are both exactly
   // `staging` — dropped here so the waypoint isn't duplicated.

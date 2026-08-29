@@ -4965,60 +4965,198 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       }
       const bound = flight.MAX_FRAME_SPEED_STEP_FRACTION;
       if (worst.v <= bound + 1e-12) {
-        ok(`N2 the turn's own rate is under R-LF-2.1's ratified bound on every one of ${PLANS.length} SEAT-TO-SEAT plans — a domain on which it CANNOT fail, because R's frame term never binds here; N12 is the row that gates it where it can: worst ${deg(worst.v).toFixed(4)}deg/frame (${worst.label}, cruise ${worst.cruise.toFixed(2)} px/s over R ${worst.R.toFixed(4)}pt) against ${RATE_BOUND_DEG.toFixed(4)}deg/frame. Continuous instrument (v/R), not a frame difference off the polyline — see N2b`);
+        ok(`N2 the TURN's own rate — R-LF-9 scopes §7 row 2 to the turn, the weave being gait with its own ruled rate in Hz (N2b) — is under R-LF-2.1's ratified bound on every one of ${PLANS.length} SEAT-TO-SEAT plans — a domain on which it CANNOT fail, because R's frame term never binds here; N12 is the row that gates it where it can: worst ${deg(worst.v).toFixed(4)}deg/frame (${worst.label}, cruise ${worst.cruise.toFixed(2)} px/s over R ${worst.R.toFixed(4)}pt) against ${RATE_BOUND_DEG.toFixed(4)}deg/frame. Continuous instrument (v/R), not a frame difference off the polyline — see N2b`);
       } else {
         bad('N2 the turn stays inside R-LF-2.1\'s rate bound', `worst ${deg(worst.v).toFixed(4)}deg/frame at ${worst.label} (cruise ${worst.cruise.toFixed(2)} px/s, R ${worst.R.toFixed(4)}pt) against ${RATE_BOUND_DEG.toFixed(4)}deg/frame — the radius is no longer solved against the bound it claims to come from`);
       }
     }
 
-    // --- N2b. REPORTED, not gated: what else on the path turns, and how
-    //     fast — with the baseline, because the answer is pre-existing.
+    // --- N2b. REPORTED, not gated — TWO CHANNELS, LABELLED -----------------
+    //
+    //     R-LF-9 (Lumen, 2026-08-29). §7 row 2's bound is on THE TURN, and the
+    //     weave is gait rather than steering: its rate is already ruled, in Hz,
+    //     by R-LF-8's WEAVE_RATE_HZ. A second bound on the same quantity in a
+    //     foreign unit is either redundant or contradictory, and 0.15 rad/frame
+    //     on the weave forbids every plan on the lattice including the rhythm
+    //     Colin approved. So this row REPORTS, and it reports two DIFFERENT
+    //     things that must never be substituted for one another:
+    //
+    //       CHANNEL 1  the DRAWN BANK — what renders as the bee itself.
+    //                  `buildAttitude` derives it from the tangent of the
+    //                  drawn polyline, sampled at 60fps through the plan's
+    //                  own easing. Bank is blind to purely horizontal heading
+    //                  change by construction (`pitchFor` reads dy against
+    //                  |dx|), so it is NOT a proxy for channel 2.
+    //       CHANNEL 2  the PATH HEADING — what the trajectory does per frame,
+    //                  walked at arc-length steps of cruise/60 on the drawn
+    //                  curve. Neither the sampler's polyline nor a point
+    //                  curvature: the eye's own frame.
+    //
+    //     The weave's minimum RADIUS stays below as PROVENANCE and never as
+    //     the headline — it is the one number here in nobody's frame, being
+    //     neither what the path does per frame nor what the character does.
+    //
+    //     AND THE INSTRUMENT IS PHASE-SWEPT, which is a correction to both of
+    //     the single-phase walks published in the ratification thread. A
+    //     worst-per-frame taken from ONE walk depends on where the walk's
+    //     marks happen to land relative to the curve's sharpest point. The
+    //     tell was that the baseline was NON-MONOTONE in cruise speed —
+    //     71.67 / 72.60 / 80.54 / 73.39 / 80.54 as cruise scaled 1.00 .. 1.20,
+    //     which no property of a curve can be. Swept over 16 phases it becomes
+    //     monotone, and both published figures rise. A sampled maximum is a
+    //     property of the sampling phase until the phase is swept — the same
+    //     animal as permuting a spatial sweep before trusting it.
     {
-      // The weave's curvature. `weaveSlopeAt` is the module's own closed-form
-      // first derivative; the second is differenced from it IN THE INTERIOR,
-      // where a central difference is legitimate and where N7 calibrates it.
-      const weaveWorst = (mod, cyclesOf, ampOf, spanOf) => {
-        let worst = { omega: 0, radius: Infinity };
-        for (const p of PLANS) {
-          const A = ampOf(p);
-          const L = spanOf(p);
-          const c = cyclesOf(p);
-          const h = 1e-6;
-          for (let u = 0.002; u < 1; u += 0.002) {
-            const o1 = mod.weaveSlopeAt(u, A, c, p.weaveSign);
-            const o2 = (mod.weaveSlopeAt(u + h, A, c, p.weaveSign) - mod.weaveSlopeAt(u - h, A, c, p.weaveSign)) / (2 * h);
-            const k = Math.abs(L * o2) / ((L * L + o1 * o1) ** 1.5);
-            if (!(k > 1e-12)) continue;
-            const omega = (p.plan.profile.cruisePxS * k) / 60;
-            if (omega > worst.omega) worst = { omega, radius: 1 / k, label: p.label, u, A, L, c };
+      const PHASES = 16;
+      const WALK_STEPS = 6000;
+      const walkPhase = (pointAt, cruisePxS, phase) => {
+        const step = cruisePxS / 60;
+        let acc = -phase * step;
+        let prev = pointAt(0);
+        let mark = pointAt(0);
+        let prevHeading = null;
+        let worst = 0;
+        for (let i = 1; i <= WALK_STEPS; i += 1) {
+          const q = pointAt(i / WALK_STEPS);
+          acc += Math.hypot(q.x - prev.x, q.y - prev.y);
+          prev = q;
+          if (acc >= step) {
+            const h = { x: q.x - mark.x, y: q.y - mark.y };
+            if (prevHeading) worst = Math.max(worst, turnBetween(prevHeading, h));
+            prevHeading = h;
+            mark = q;
+            acc = 0;
           }
         }
         return worst;
       };
-      const now = weaveWorst(flight, (p) => p.plan.weaveCycles, (p) => p.plan.weaveAmplitudePx, (p) => p.plan.weaveSpanPx);
-      // The same instrument on `main`'s weave, in `main`'s own frame: the
-      // fillet's drawn span and a fixed 1.5 cycles.
-      const beforeWorst = (() => {
-        let worst = { omega: 0, radius: Infinity };
+      const walk = (pointAt, cruisePxS) => {
+        let w = 0;
+        for (let k = 0; k < PHASES; k += 1) w = Math.max(w, walkPhase(pointAt, cruisePxS, k / PHASES));
+        return w;
+      };
+
+      // ---- CHANNEL 1: the drawn bank ------------------------------------
+      //
+      // Baseline is R-LF-9.1's OWN before-state — both repairs reverted in
+      // the live modules — because that is the comparison this row exists to
+      // make and it is computable here. `main@42a83c7`'s figure is NOT
+      // recomputed: the bank channel needs main's whole timing pipeline, and
+      // reconstructing that is a fork of the file rather than a
+      // reconstruction of a corner, which is the line the baseline discipline
+      // above draws deliberately. It is cited with its provenance instead.
+      const bankWorst = async (fSrc, aSrc) => {
+        const mod = fSrc === flightSource ? flight
+          : await import(`data:text/javascript;base64,${Buffer.from(fSrc).toString('base64')}`);
+        const build = aSrc === moduleSource ? buildAttitude
+          : (await import(`data:text/javascript;base64,${Buffer.from(aSrc).toString('base64')}`)).buildAttitude;
+        let worst = { v: 0, label: '' };
         for (const p of PLANS) {
-          const ref = filletRef(p);
+          const plan = mod === flight ? p.plan : mod.buildPollinationPlan({
+            from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
+            width: BOX, height: BOX, approachSpeedPxS: p.speed, weaveSign: p.weaveSign,
+          });
+          const at = build(plan.path, {
+            width: BOX, height: BOX, size: 44, closed: false,
+            easing: plan.easing, durationMs: plan.durationMs, heldFacing: plan.heldFacing,
+          });
+          const frames = Math.max(2, Math.round((plan.durationMs / 1000) * 60));
+          const ir = at.inputRange;
+          const ro = at.rotateOutput;
+          let prev = null;
+          for (let f = 0; f <= frames; f += 1) {
+            const t = f / frames;
+            let v = ro[ro.length - 1];
+            if (t <= ir[0]) v = ro[0];
+            else {
+              for (let k = 1; k < ir.length; k += 1) {
+                if (t <= ir[k]) {
+                  const w = ir[k] === ir[k - 1] ? 1 : (t - ir[k - 1]) / (ir[k] - ir[k - 1]);
+                  v = ro[k - 1] + w * (ro[k] - ro[k - 1]);
+                  break;
+                }
+              }
+            }
+            if (prev !== null && Math.abs(v - prev) > worst.v) worst = { v: Math.abs(v - prev), label: p.label };
+            prev = v;
+          }
+        }
+        return worst;
+      };
+      const bankNow = await bankWorst(flightSource, moduleSource);
+      const bankBefore = await bankWorst(
+        flightSource.replace(
+          'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)',
+          'const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt)',
+        ),
+        moduleSource.replace('const pitch = pitchFor(dx, dy, heldPitch);', 'const pitch = pitchFor(dx, dy);'),
+      );
+
+      // ---- CHANNEL 2: the path heading ----------------------------------
+      const LEG_BINS = [[0, 30.1], [30.1, 60.1], [60.1, 120.3], [120.3, Infinity]];
+      const bins = LEG_BINS.map(([lo, hi]) => ({ lo, hi, n: 0, worst: 0, over: 0 }));
+      let headNow = { v: 0, label: '' };
+      let legMin = Infinity;
+      let legMax = 0;
+      for (const p of PLANS) {
+        const t = geometryFor(p);
+        if (!t) continue;
+        const chord = { x: t.tangent.x - p.from.x, y: t.tangent.y - p.from.y };
+        const L = Math.hypot(chord.x, chord.y);
+        const nrm = { x: -chord.y / L, y: chord.x / L };
+        const A = p.plan.weaveAmplitudePx;
+        const c = p.plan.weaveCycles;
+        const at = (u) => {
+          const off = flight.weaveOffsetAt(u, A, c, p.weaveSign);
+          return { x: p.from.x + chord.x * u + nrm.x * off, y: p.from.y + chord.y * u + nrm.y * off };
+        };
+        const w = walk(at, p.plan.profile.cruisePxS);
+        legMin = Math.min(legMin, L);
+        legMax = Math.max(legMax, L);
+        if (w > headNow.v) headNow = { v: w, label: p.label };
+        const b = bins.find((bb) => L >= bb.lo && L < bb.hi);
+        if (b) { b.n += 1; b.worst = Math.max(b.worst, w); if (w > flight.MAX_FRAME_SPEED_STEP_FRACTION) b.over += 1; }
+      }
+      // main's weave over main's OWN drawn span and its fixed 1.5 cycles —
+      // the closed-form reconstruction `filletRef` already validates, walked
+      // with the same phase-swept instrument. Cruise is the live plan's: main's
+      // own cruise is higher, so this column UNDERSTATES the baseline, which
+      // is the safe direction for a claim of improvement.
+      let headBefore = { v: 0, label: '' };
+      for (const p of PLANS) {
+        const ref = filletRef(p);
+        const r = 0.25 * Math.min(ref.L, OFFSET_PX);
+        const end = {
+          x: ref.staging.x + (p.from.x - ref.staging.x) * (r / ref.L),
+          y: ref.staging.y + (p.from.y - ref.staging.y) * (r / ref.L),
+        };
+        const off = (u) => ref.A * p.weaveSign * Math.sin(Math.PI * u) * Math.sin(TAU_N * 1.5 * u);
+        const at = (u) => ({
+          x: p.from.x + (end.x - p.from.x) * u + ref.n.x * off(u),
+          y: p.from.y + (end.y - p.from.y) * u + ref.n.y * off(u),
+        });
+        const w = walk(at, p.plan.profile.cruisePxS);
+        if (w > headBefore.v) headBefore = { v: w, label: p.label };
+      }
+
+      // ---- PROVENANCE: radius, and the sampler ---------------------------
+      const weaveRadius = (() => {
+        let worst = { radius: Infinity, label: '', u: 0 };
+        for (const p of PLANS) {
+          const A = p.plan.weaveAmplitudePx;
+          const L = p.plan.weaveSpanPx;
+          const c = p.plan.weaveCycles;
           const h = 1e-6;
-          const slope = (u) => ref.A * p.weaveSign * (Math.PI * Math.cos(Math.PI * u) * Math.sin(TAU_N * 1.5 * u)
-            + TAU_N * 1.5 * Math.sin(Math.PI * u) * Math.cos(TAU_N * 1.5 * u));
-          const span = ref.L - 0.25 * Math.min(ref.L, OFFSET_PX);
           for (let u = 0.002; u < 1; u += 0.002) {
-            const o1 = slope(u);
-            const o2 = (slope(u + h) - slope(u - h)) / (2 * h);
-            const k = Math.abs(span * o2) / ((span * span + o1 * o1) ** 1.5);
+            const o1 = flight.weaveSlopeAt(u, A, c, p.weaveSign);
+            const o2 = (flight.weaveSlopeAt(u + h, A, c, p.weaveSign) - flight.weaveSlopeAt(u - h, A, c, p.weaveSign)) / (2 * h);
+            const k = Math.abs(L * o2) / ((L * L + o1 * o1) ** 1.5);
             if (!(k > 1e-12)) continue;
-            const omega = (p.plan.profile.cruisePxS * k) / 60;
-            if (omega > worst.omega) worst = { omega, radius: 1 / k, label: p.label, u };
+            if (1 / k < worst.radius) worst = { radius: 1 / k, label: p.label, u };
           }
         }
         return worst;
       })();
-      // And the sampler's own contribution, so the polyline figure is not
-      // mistaken for either of the two above.
       let vertex = { v: 0, label: '' };
       for (const p of PLANS) {
         for (let i = 1; i < p.pts.length - 1; i += 1) {
@@ -5029,13 +5167,17 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
           if (th > vertex.v) vertex = { v: th, label: p.label };
         }
       }
+
       ok(
-        `N2b REPORTED, not gated — §7 row 2 says "every frame of every plan" and §5's carve-out says the weave's tightness is not reopened; both cannot hold, and the weave is what decides it. `
-        + `THE WEAVE turns at ${deg(now.omega).toFixed(2)}deg/frame (min radius ${now.radius.toFixed(4)}pt at u=${now.u.toFixed(3)}, ${now.label}), which is ${(now.omega / flight.MAX_FRAME_SPEED_STEP_FRACTION).toFixed(2)}x the ruled bound. `
-        + `BASELINE, same instrument, main@42a83c7's weave over main's own drawn span: ${deg(beforeWorst.omega).toFixed(2)}deg/frame (min radius ${beforeWorst.radius.toFixed(4)}pt, ${beforeWorst.label}) = ${(beforeWorst.omega / flight.MAX_FRAME_SPEED_STEP_FRACTION).toFixed(1)}x — and that radius is D8's published 1.820pt, which is how I know the reconstruction is the fillet's and not an approximation of it. `
-        + `EACH COLUMN IS IN ITS OWN FRAME ON PURPOSE: the drawn span IS what renders, so this is the like-for-like the screen sees, not two measurements of one curve. `
-        + `So this commit improves the fastest thing on the path by ${(beforeWorst.omega / now.omega).toFixed(1)}x and still leaves it outside the bound — a pre-existing property §5 declined to reopen, not a regression, and Lumen's to rule. `
-        + `Separately, the SAMPLER: the rendered polyline's worst vertex turn is ${vertex.v.toFixed(3)}deg (${vertex.label}), a property of MAX_CHORD_DEVIATION_PX=${flight.MAX_CHORD_DEVIATION_PX} and not of any curve here`,
+        `N2b REPORTED, not gated — TWO CHANNELS, and R-LF-9 is why they are two. §7 row 2's bound is on THE TURN (N2); the weave is GAIT, whose rate is already ruled in Hz by WEAVE_RATE_HZ=${flight.WEAVE_RATE_HZ}, and a second bound on it in rad/frame forbids ${PLANS.length} of ${PLANS.length} plans including the rhythm Colin approved. `
+        + `CHANNEL 1 — THE DRAWN BANK, what renders as the bee: worst ${bankNow.v.toFixed(4)}deg/frame (${bankNow.label}) against the turn's ruled ${RATE_BOUND_DEG.toFixed(4)}, i.e. ${(RATE_BOUND_DEG / bankNow.v).toFixed(1)}x INSIDE it. `
+        + `Its baseline is R-LF-9.1's own before-state, both repairs reverted here: ${bankBefore.v.toFixed(4)}deg/frame (${bankBefore.label}) — over the bound. That whole distance is the coincident waypoint's flick, not the weave. `
+        + `main@42a83c7 measures 36.3323deg/frame on this channel; that figure is CITED, not recomputed here (Lumen's shell and mine, off main's real source), because the bank channel needs main's entire timing pipeline and reconstructing that would be a fork of the file rather than a reconstruction of a corner. `
+        + `CHANNEL 2 — THE PATH HEADING, walked at arc-length steps of cruise/60 on the drawn curve: worst ${deg(headNow.v).toFixed(2)}deg/frame (${headNow.label}), ${(headNow.v / flight.MAX_FRAME_SPEED_STEP_FRACTION).toFixed(2)}x the turn's bound, over legs ${legMin.toFixed(1)}..${legMax.toFixed(1)}pt. `
+        + `By leg: ${bins.map((b) => `${b.lo.toFixed(0)}-${b.hi === Infinity ? '+' : b.hi.toFixed(0)}pt n=${b.n} ${deg(b.worst).toFixed(2)} (${b.over} over)`).join('; ')} — every plan at every scale, so there is no sub-population to carve out and the carve-out had to be the QUANTITY. `
+        + `Baseline, same instrument, main's weave over main's own drawn span at 1.5 fixed cycles: ${deg(headBefore.v).toFixed(2)}deg/frame — this commit improves it ${(headBefore.v / headNow.v).toFixed(2)}x and the residual is pre-existing. `
+        + `INSTRUMENT: both channel-2 figures are PHASE-SWEPT over ${PHASES} phases, which is a correction to the single-phase walks published in the ratification thread — a worst-per-frame from one walk depends on where its marks land, and the tell was that the single-phase baseline was NON-MONOTONE in cruise speed, which no property of a curve can be. Swept, it is monotone and both figures rise. `
+        + `PROVENANCE, never the headline: the weave's minimum radius of curvature is ${weaveRadius.radius.toFixed(4)}pt at u=${weaveRadius.u.toFixed(3)} (${weaveRadius.label}) — a number in NEITHER channel's frame, being neither what the path does per frame nor what the character does; and the rendered polyline's worst VERTEX turn is ${vertex.v.toFixed(3)}deg, a property of MAX_CHORD_DEVIATION_PX=${flight.MAX_CHORD_DEVIATION_PX} and of no curve here`,
       );
     }
 
@@ -5223,6 +5365,183 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       } else {
         bad('N4b the closed candidate set attains the global minimum', `${checked} of ${PLANS.length} plans checked; worst excess over the dense sweep ${worstExcess.v.toFixed(4)}deg at ${worstExcess.label} (chose ${worstExcess.chosen?.toFixed(3)}deg, grid found ${worstExcess.best?.toFixed(3)}deg at phi=${worstExcess.bestPhi?.toFixed(2)}deg) against a ${TOLERANCE_DEG}deg tolerance — a bearing outside the closed set beats it, so the set is not closed`);
       }
+    }
+
+    // --- N4c. §7 row 4(b) — THE MULTIPLICITY ASSERTION --------------------
+    //
+    //     Named `4(b)` in the spec; `N4b` in this file was already taken by
+    //     acceptance 4's other half, so it is `N4c` here and the numbering is
+    //     the only thing that differs.
+    //
+    //     R-LF-9.1, and the reason it exists is the reason N4 could never have
+    //     caught it. N4 walks the 32 plans whose sweep is EXACTLY zero and
+    //     asserts `path[descentStartIndex]` IS `staging` — a claim about one
+    //     point's VALUE, at one index. The defect is a point occurring TWICE,
+    //     somewhere else, on a DISJOINT population. A row that enumerates a
+    //     set which does not contain the defect is worse than a row that does
+    //     not look, because it prints a number that reads as coverage.
+    //
+    //     Both facts below are asserted, not just the headline: no zero-length
+    //     segment anywhere in `path`, AND the calibration population is 40 and
+    //     shares nothing with N4's 32.
+    {
+      const coincidentIn = (pts) => {
+        for (let i = 1; i < pts.length; i += 1) {
+          if (pts[i].x === pts[i - 1].x && pts[i].y === pts[i - 1].y) return true;
+        }
+        return false;
+      };
+      const live = PLANS.filter((p) => coincidentIn(p.plan.path));
+
+      // THE CALIBRATION, and it is a source mutation rather than an argument:
+      // put the bare `> 0` back and rebuild the same lattice. A row asserting
+      // an ABSENCE has to show the absence is a property of the build and not
+      // of the probe.
+      const MUT_FROM = 'const arcPoints = turnIsSwept(turn) ? adaptiveCurveSamples(arcCurveAt)';
+      const MUT_TO = 'const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt)';
+      const reachable = flightSource.includes(MUT_FROM);
+      let mutHits = [];
+      let mutTiny = 0;
+      if (reachable) {
+        const mutated = await import(`data:text/javascript;base64,${Buffer.from(flightSource.replace(MUT_FROM, MUT_TO)).toString('base64')}`);
+        for (const p of PLANS) {
+          const plan = mutated.buildPollinationPlan({
+            from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
+            width: BOX, height: BOX, approachSpeedPxS: p.speed, weaveSign: p.weaveSign,
+          });
+          if (coincidentIn(plan.path)) mutHits.push(p.label);
+          const sw = plan.turn.sweepRad;
+          if (sw > 0 && sw <= flight.TURN_SWEEP_TIE_RAD) mutTiny += 1;
+        }
+      }
+      // Disjointness is the half of the ruling that corrects the first draft,
+      // so it is asserted rather than described.
+      const zeroSweepLabels = new Set(PLANS.filter((p) => p.plan.turn.sweepRad === 0).map((p) => p.label));
+      const overlap = mutHits.filter((l) => zeroSweepLabels.has(l)).length;
+      // And the void the threshold sits in, measured rather than asserted:
+      // 1e-6 is only "not a tuned number" if nothing real is near it.
+      const sweeps = PLANS.map((p) => p.plan.turn.sweepRad).filter((v) => v > 0);
+      const degenerateMax = Math.max(...sweeps.filter((v) => v <= flight.TURN_SWEEP_TIE_RAD), 0);
+      const realMin = Math.min(...sweeps.filter((v) => v > flight.TURN_SWEEP_TIE_RAD));
+
+      if (live.length === 0 && reachable && mutHits.length === 40 && overlap === 0 && zeroSweepLabels.size === 32) {
+        ok(
+          `N4c §7 row 4(b) — NO ZERO-LENGTH SEGMENT anywhere in \`path\`, on any of ${PLANS.length} plans. `
+          + `CALIBRATED BY MUTATION: restore the bare \`turn.sweep > 0\` emission guard and ${mutHits.length} plans grow a coincident waypoint — exactly the ${mutTiny} whose sweep lands in (0, ${flight.TURN_SWEEP_TIE_RAD}], and DISJOINT from N4's ${zeroSweepLabels.size} sweep-exactly-zero plans (overlap ${overlap}). `
+          + `That disjointness is the finding: the sweep-0 branch was always correct — it emits ONE point and \`slice(1)\` removes it cleanly — and the defect lived in the other branch, where an arc of ~1e-15 rad over R=${BODY_LENGTH_PX.toFixed(4)}pt is ~3e-14pt long and \`adaptiveCurveSamples\` emits bit-identical points. `
+          + `THE THRESHOLD IS NOT TUNED, and this row measures the void rather than taking that on faith: the largest degenerate sweep is ${degenerateMax.toExponential(3)} rad and the smallest real one is ${realMin.toFixed(4)} rad, so ${flight.TURN_SWEEP_TIE_RAD} sits in the middle of ${Math.round(Math.log10(realMin / degenerateMax))} orders of magnitude with nothing in them`,
+        );
+      } else {
+        bad(
+          'N4c no zero-length segment anywhere in path (R-LF-9.1)',
+          !reachable
+            ? `the calibration mutation matched nothing — the emission guard is spelled differently now, so this row ran uncalibrated and its green would mean nothing`
+            : `${live.length} live plans carry a coincident waypoint; mutation reproduced ${mutHits.length} (expected 40), overlap with N4's ${zeroSweepLabels.size} sweep-zero plans ${overlap} (expected 0). A coincident waypoint takes ZERO wall time, so the position channel stays bit-for-bit correct and only the derived attitude shows it — see N4d`,
+        );
+      }
+    }
+
+    // --- N4d. THE CLASS HALF, and it has to be FORCED ---------------------
+    //
+    //     R-LF-9.1 ships two repairs: the emission guard (N4c) and
+    //     `pitchFor`'s hold. Measured on the real lattice they are
+    //     INDISTINGUISHABLE — each alone returns the same worst drawn-bank
+    //     rate as both together (§7 row 2's table),
+    //     because with the guard fixed no plan produces a coincident waypoint
+    //     for the hold to hold through. So a row that reads the shipped
+    //     lattice can only ever report the class fix as dormant, and would
+    //     stay green if someone deleted it. Same shape as N10's pass-closed
+    //     convergence claim, and the same answer: force it.
+    //
+    //     The force is a SYNTHETIC path with a coincident pair in it, handed
+    //     straight to `buildAttitude`. That is not a hypothetical: it is what
+    //     `path` contained at f32112a, and the next stale premise can put it
+    //     back from a different call site.
+    {
+      // Three waypoints of real descent, with the middle one duplicated.
+      const probePath = [
+        { x: 0.20, y: 0.20 }, { x: 0.30, y: 0.40 }, { x: 0.30, y: 0.40 }, { x: 0.32, y: 0.80 },
+      ];
+      const OPTS = { width: 400, height: 800, size: 44, closed: false };
+      const banksOf = (mod) => mod.buildAttitude(probePath, OPTS).segments.map((s) => s.bank);
+      const shipped = banksOf(attitude);
+
+      const MUT_FROM = 'const pitch = pitchFor(dx, dy, heldPitch);';
+      const MUT_TO = 'const pitch = pitchFor(dx, dy);';
+      const reachable = moduleSource.includes(MUT_FROM);
+      let mutated = null;
+      if (reachable) {
+        mutated = banksOf(await import(`data:text/javascript;base64,${Buffer.from(moduleSource.replace(MUT_FROM, MUT_TO)).toString('base64')}`));
+      }
+      // The middle segment is the directionless one. Shipped, it inherits;
+      // mutated, `atan2(0,0)` answers horizontal and `bankFor` draws it.
+      const holds = shipped[1] === shipped[0] && shipped[0] !== 0;
+      const mutFlicks = mutated !== null && mutated[1] === 0 && mutated[0] !== 0;
+      // And the flick's SIZE, in the channel that renders: the roll it injects
+      // between its neighbours, which is what the 15.9622 in §7 row 2's bank
+      // table is made of.
+      const flickDeg = mutated === null ? NaN : Math.max(Math.abs(mutated[0] - mutated[1]), Math.abs(mutated[2] - mutated[1]));
+
+      if (holds && mutFlicks) {
+        ok(
+          `N4d R-LF-9.1's CLASS half, forced: handed a path with a coincident pair, \`buildAttitude\` holds the previous waypoint's bank through it (${shipped[1].toFixed(4)}deg, inherited from ${shipped[0].toFixed(4)}) instead of answering \`atan2(0,0)\` with horizontal. `
+          + `Mutation \`pitchFor(dx, dy)\` — drop the held pitch — puts the level frame back at ${mutated[1].toFixed(4)}deg between neighbours banked ${mutated[0].toFixed(4)} and ${mutated[2].toFixed(4)}, a ${flickDeg.toFixed(4)}deg roll injected into two adjacent frames. `
+          + `FORCED ON PURPOSE: on the shipped lattice N4c's guard means no plan reaches this code, so each repair alone measures the SAME worst drawn-bank rate (§7 row 2's table, both repairs and either one) and a row reading the real lattice would go green with the hold DELETED. A zero returned for an absent quantity is indistinguishable from a zero that was measured, and only a synthetic input can tell them apart here`,
+        );
+      } else {
+        bad(
+          'N4d a directionless segment inherits its bank rather than being answered horizontal',
+          !reachable
+            ? 'the calibration mutation matched nothing — `buildAttitude` no longer threads a held pitch through `pitchFor`, so this row ran uncalibrated'
+            : `shipped banks ${JSON.stringify(shipped.map((b) => Number(b.toFixed(4))))} (the middle one must equal the first and be non-zero), mutated ${JSON.stringify(mutated?.map((b) => Number(b.toFixed(4))))} (the middle one must be 0, or the mutation is not reaching the defect)`,
+        );
+      }
+    }
+
+    // --- N4e. §7 row 4's LAST clause — the |phi| distribution, printed ----
+    //
+    //     "report how often the cap binds, because a ruled ceiling that binds
+    //     everywhere is one number away from being the mechanism."
+    //
+    //     N4 has printed the BINDING COUNT since f32112a — 296 of 336, which
+    //     is the figure Lumen independently measured. What was missing is the
+    //     DISTRIBUTION, and it is not a refinement of the count: it changes
+    //     the answer. A cap binding on 88% with the rest spread across the
+    //     interval is a cap. A cap binding on 88% with the rest at ONE other
+    //     value is a two-valued parameter wearing a bound's clothing, and
+    //     that is §28.5's dead approach clamp exactly. Only the shape tells
+    //     them apart, which is why a count could not.
+    //
+    //     REPORTED, not gated, and deliberately no verdict: §5 rules 30deg and
+    //     N4 asserts it. Whether 30 is a bound or a value is Lumen's, and it
+    //     is owed the device pass.
+    {
+      const signedPhi = PLANS.map((p) => deg(p.plan.turn.bearingRad));
+      const phis = signedPhi.map(Math.abs);
+      const atCap = phis.filter((v) => Math.abs(v - CAP_DEG) < 1e-9).length;
+      const atZero = phis.filter((v) => v < 1e-9).length;
+      const interiorVals = phis.filter((v) => v >= 1e-9 && Math.abs(v - CAP_DEG) >= 1e-9);
+      const distinct = new Set(phis.map((v) => v.toFixed(9))).size;
+      const capPos = signedPhi.filter((v) => Math.abs(v - CAP_DEG) < 1e-9).length;
+      const capNeg = signedPhi.filter((v) => Math.abs(v + CAP_DEG) < 1e-9).length;
+      // Cross-tabbed against the sweep, because the two degeneracies are
+      // different questions and N4c's 40 is one of these cells, not a third.
+      const cell = (phiK, sweepK) => PLANS.filter((p) => {
+        const a = Math.abs(deg(p.plan.turn.bearingRad));
+        const sw = p.plan.turn.sweepRad;
+        const pk = a < 1e-9 ? 'zero' : (Math.abs(a - CAP_DEG) < 1e-9 ? 'cap' : 'interior');
+        const sk = sw === 0 ? 'zero' : (sw <= flight.TURN_SWEEP_TIE_RAD ? 'tiny' : 'real');
+        return pk === phiK && sk === sweepK;
+      }).length;
+      ok(
+        `N4e REPORTED, not gated — the |phi| DISTRIBUTION, which is what §7 row 4's last clause asks for beyond the count N4 already prints, `
+        + `AND IT IS A DIFFERENT ANSWER FROM THE COUNT. |phi| takes exactly ${distinct} values over all ${PLANS.length} plans: ${CAP_DEG.toFixed(4)}deg on ${atCap} and EXACTLY 0 on ${atZero}. `
+        + `Strictly interior: ${interiorVals.length}. The ALIGN candidate — the whole reason the candidate set has a third member — never wins at a value of its own anywhere on this lattice; it wins only where it coincides with 0, i.e. where \`from\` already sits on the descent line. `
+        + `Cross-tabbed against the sweep, because these are two degeneracies and not one: phi=cap x sweep-real ${cell('cap', 'real')}, phi=cap x sweep-0 ${cell('cap', 'zero')}, phi=cap x sweep-tiny ${cell('cap', 'tiny')}, phi=0 x sweep-0 ${cell('zero', 'zero')}, phi=0 x sweep-tiny ${cell('zero', 'tiny')}. `
+        + `N4c's 40 coincident-waypoint plans are the two tiny-sweep cells (${cell('zero', 'tiny')} + ${cell('cap', 'tiny')}), not a third population. `
+        + `SIGN, since it is what R-LF-7.1 resolves: of the ${atCap} at the cap, ${capPos} take +${CAP_DEG.toFixed(0)} and ${capNeg} take -${CAP_DEG.toFixed(0)} — the sweep is equal at both, so the ruled quantity is silent there and only the inboard clause decides. `
+        + `WHAT THE SHAPE SAYS, and this is a report and not a verdict: on a two-valued parameter the cap is not a ceiling the optimum happens to reach, it IS the staging bearing on seven flights in eight — §28.5's shape, more so than the count suggested. N4b separately proves this is the true global minimum and not a search artefact, so it is a property of the geometry (the sweep is monotone in phi, so its minimum sits at an interval end or at its zero, and here the zero is only ever reachable AT zero). Owed the device pass: whether 30 reads as a bound or as a value`,
+      );
     }
 
     // --- N5. Acceptance 5 — no forced loop --------------------------------
