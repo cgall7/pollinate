@@ -234,6 +234,34 @@ export const MUTATIONS = [
     to: "          <MascotBee\n            size={size}\n            flutter={plan ? plan.flutter !== false : true}\n            // `&& !reduced` is what the parked pose used to carry (`breath={!reduced}`)\n            // and it has to come with the bee to his home: a resting bee under\n            // Reduce Motion is the doctrine's \u00a7State-2 \"complete freeze at rest\n            // pose\", and 2 degrees on a 4.2s clock is still a motion someone\n            // asked the OS to stop.\n            breath={plan?.kind === 'rest' && !reduced}\n          />\n          {carriedRadius > 0 && (\n            /* Drawn BEFORE the character, so he is in front of what he is\n               holding \u2014 cargo behind the carrier reads as carried, in front\n               of him reads as a collision. It rides his own transform, so it\n               banks and mirrors with him; a circle with a horizontal\n               highlight is symmetric under `scaleX`, so the mirror is a\n               no-op on it and only the bank shows, which is the swing.\n\n               Hung from his midline: the drop's crown at the bee box's\n               vertical centre, centred on his horizontal one. Stated as a\n               fraction of `size` and the drop's own radius so a smaller mount\n               keeps the relationship instead of inheriting a pixel. */\n            <HoneyDrop\n              radius={carriedRadius}\n              style={{\n                position: 'absolute',\n                left: size / 2 - carriedRadius,\n                top: size / 2,\n              }}\n            />\n          )}\n",
   },
   {
+    row: 'G9',
+    why: 'a `zIndex` on the drop\'s own inline style — the pair\'s order stops being document order and the cargo paints in FRONT of its carrier, with the JSX untouched. This is the exact edit that ran green at 46/0 before G9 existed, which is why the row does: G6 reads the mechanism and cannot see the mechanism being taken away',
+    file: 'src/components/FlyingBee.js',
+    from: "                left: size / 2 - carriedRadius,\n                top: size / 2,\n",
+    to: "                left: size / 2 - carriedRadius,\n                top: size / 2,\n                zIndex: 1,\n",
+  },
+  {
+    row: 'G9',
+    why: 'the same override arriving through the StyleSheet instead of inline — the drop takes `styles.parkedAnchor`, which already carries `zIndex: 5`. An inline-only reading would call this clean, so the row resolves `styles.X` rather than scanning the JSX text',
+    file: 'src/components/FlyingBee.js',
+    from: "              style={{\n                position: 'absolute',\n                left: size / 2 - carriedRadius,\n                top: size / 2,\n              }}",
+    to: "              style={styles.parkedAnchor}",
+  },
+  {
+    row: 'G9',
+    why: 'ANDROID\'S OWN MECHANISM: `elevation`, not `zIndex`. R-N4.3 arms at the first Android build, and a row that watched only `zIndex` would be green on the platform the ruling was written for',
+    file: 'src/components/FlyingBee.js',
+    from: "                left: size / 2 - carriedRadius,\n                top: size / 2,\n",
+    to: "                left: size / 2 - carriedRadius,\n                top: size / 2,\n                elevation: 1,\n",
+  },
+  {
+    row: null,
+    why: 'MUST NOT FIRE — a LAYER-level stacking site is retuned (`styles.fill` 5 -> 6). Lumen\'s sharpening is that these order the layer against the screen and say nothing about the pair; a file-wide `zIndex` rule would red here, on shipped code, and the next person would widen it until it meant nothing. This control is what makes G9 a claim about the pair',
+    file: 'src/components/FlyingBee.js',
+    from: "  fill: {\n    ...StyleSheet.absoluteFill,\n    zIndex: 5,\n  },",
+    to: "  fill: {\n    ...StyleSheet.absoluteFill,\n    zIndex: 6,\n  },",
+  },
+  {
     row: 'G7',
     why: 'D4\'s row keeps a host that no longer contains its anchor — the registration goes stale in the direction that reads as "still filled"',
     file: 'src/constants/nectar.js',
@@ -1431,12 +1459,19 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     bad('G5', `expression present=${carriedExpr}, mount size=${mountSize}, clamp binds at the mount=${bindsAtMount} (want false), binds at a smaller mount=${bindsSmaller} (want true)`);
   }
 
-  // G6 — THE CARRIER IS IN FRONT OF THE CARGO, and the cargo is the DROP
-  // rather than a lookalike. Both halves are about the same claim: what
-  // arrives is the same object the ledger is made of (R-N3.2 closed this one
-  // layer up, for the send), and cargo drawn in front of its carrier is a
-  // collision rather than a delivery. Read from the JSX order inside the
-  // bee's own transformed box, so a reorder reds it.
+  // G6 — THE CARRIER OCCLUDES THE CARGO, and the cargo is the DROP rather
+  // than a lookalike. Both halves are about the same claim: what arrives is
+  // the same object the ledger is made of (R-N3.2 closed this one layer up,
+  // for the send), and cargo drawn in front of its carrier is a collision
+  // rather than a delivery.
+  //
+  // THE RELATION IS R-N4.3's, THE ORDER IS ONLY ITS MECHANISM. Lumen ruled
+  // the occlusion (2026-08-29) and ruled document order to be today's way of
+  // getting it, not the thing itself. This row reads the JSX order inside
+  // the bee's own transformed box, so a reorder reds it — and G9 holds the
+  // precondition that makes reading the order equivalent to reading the
+  // relation. Neither row is the whole claim on its own, which is why the
+  // sentence below says what it READS rather than asserting the picture.
   const beeBox = (() => {
     const i = BEE.indexOf('transform: [{ translateX }, { translateY }, { rotate }, { scaleX }]');
     return i === -1 ? '' : BEE.slice(i, BEE.indexOf('</Animated.View>', i));
@@ -1451,7 +1486,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // the guard is now read as well as the order.
   const drawnUnderCargo = /\{carriedRadius > 0 && \(/.test(beeBox);
   if (importsDrop && dropAt !== -1 && mascotAt !== -1 && dropAt < mascotAt && drawnUnderCargo) {
-    ok('G6 the cargo is `HoneyDrop` itself — the component, not a circle drawn to match — and it is rendered BEFORE `MascotBee` inside the bee\'s own transformed box, so he is in front of what he is holding and it banks with him. Cargo in front of its carrier is a collision, not a delivery. Rendered under \`carriedRadius > 0\` — the real condition, asserted because source order alone survives the branch being made unreachable');
+    ok('G6 the cargo is `HoneyDrop` itself — the component, not a circle drawn to match — and it is rendered BEFORE `MascotBee` inside the bee\'s own transformed box, and it banks with him. That is R-N4.3\'s ruled relation (the carrier occludes the cargo) read through its MECHANISM, document order — the picture follows only while nothing on the pair overrides that order, which is G9\'s row, not this one. Cargo in front of its carrier is a collision, not a delivery. Rendered under \`carriedRadius > 0\` — the real condition, asserted because source order alone survives the branch being made unreachable');
   } else {
     bad('G6', `imports the drop=${importsDrop}, drop position=${dropAt}, mascot position=${mascotAt} (want the drop first, both inside the transformed box), rendered under \`carriedRadius > 0\`=${drawnUnderCargo}`);
   }
@@ -1485,6 +1520,149 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     ok('G8 the arrival memory is written on every successful read — `rememberDrops` runs before the no-arrival early return, so a balance that fell or did not move is remembered too. Remembering only rises would re-announce a balance the moment it climbed back to a number it had already reached');
   } else {
     bad('G8', `rememberDrops position=${rememberPos}, no-arrival guard position=${arrivalGuardPos} — the write must come first`);
+  }
+
+  // G9 — R-N4.3's PRECONDITION: DOCUMENT ORDER IS ONLY THE MECHANISM WHILE
+  // NOTHING ON THE PAIR OVERRIDES IT.
+  //
+  // Lumen's ruling (R-N4.3, `GUIDES/POLLINATE_NECTAR_LIVING_EXCHANGE.md`,
+  // 2026-08-29) is about a RELATION — "the carrier's body occludes the cargo
+  // at the attachment point" — and names document order as TODAY'S MECHANISM
+  // for it rather than as the relation itself. G6 asserts the mechanism. So
+  // a `zIndex` or an `elevation` on either member takes the relation away
+  // from source order WITHOUT TOUCHING SOURCE ORDER, and G6 stays green
+  // while the picture inverts. Measured, not supposed: adding `zIndex: 1` to
+  // the drop's own inline style at `main@457b04f` left this gate at 46
+  // passed / 0 failed with the drop painting in front of the bee.
+  //
+  // SCOPED TO THE PAIR, NOT TO THE FILE — which is Lumen's own sharpening
+  // encoded rather than restated. `FlyingBee.js` legitimately carries two
+  // stacking sites and both order the LAYER against the screen, not the pair
+  // against each other. A file-wide `zIndex` search would red on the shipped
+  // tree and teach the next person to widen it until it stopped meaning
+  // anything. The row prints both populations so the distinction is visible
+  // where a reader actually meets it.
+  //
+  // READ AS EVERY DIRECT CHILD of the transformed box, not as the two
+  // components by name: a wrapper `<View style={{ zIndex: 1 }}>` around
+  // either one is the same defect with an extra node in it, and a row that
+  // named `HoneyDrop` and `MascotBee` would look straight past it.
+  //
+  // FAILS CLOSED on a style expression it cannot resolve. "I could not read
+  // it" and "there is nothing there" are the same green otherwise, and this
+  // row exists because a green that means neither is what G6 was.
+  const BEE_AST = ast(BEE);
+  const STACK_KEYS = ['zIndex', 'elevation'];
+  const beeStyles = (() => {
+    const map = new Map();
+    visit(BEE_AST, (n) => {
+      if (n.type !== 'CallExpression') return;
+      const c = n.callee;
+      if (!(c?.type === 'MemberExpression' && c.object?.name === 'StyleSheet' && c.property?.name === 'create')) return;
+      const obj = n.arguments[0];
+      if (obj?.type !== 'ObjectExpression') return;
+      for (const p of obj.properties) {
+        if (p.type !== 'ObjectProperty') continue;
+        map.set(p.key?.name ?? p.key?.value, p.value);
+      }
+    });
+    return map;
+  })();
+  const scanStack = (node, via, acc, seen) => {
+    if (!node) return;
+    switch (node.type) {
+      case 'JSXExpressionContainer': return scanStack(node.expression, via, acc, seen);
+      case 'ArrayExpression': return node.elements.forEach((e) => scanStack(e, via, acc, seen));
+      case 'ConditionalExpression':
+        scanStack(node.consequent, via, acc, seen);
+        return scanStack(node.alternate, via, acc, seen);
+      case 'LogicalExpression':
+        scanStack(node.left, via, acc, seen);
+        return scanStack(node.right, via, acc, seen);
+      case 'NullLiteral': case 'BooleanLiteral': case 'StringLiteral': case 'Identifier':
+        // `Identifier` here is a bare `style` pass-through, which carries no
+        // key of its own; whatever it holds is the caller's and is ordered
+        // against the caller's siblings, not against this pair.
+        return;
+      case 'ObjectExpression':
+        for (const p of node.properties) {
+          if (p.type === 'SpreadElement') { scanStack(p.argument, via, acc, seen); continue; }
+          if (p.type !== 'ObjectProperty') { acc.unresolved.push(`${via}: ${p.type}`); continue; }
+          const k = p.key?.name ?? p.key?.value;
+          if (STACK_KEYS.includes(k)) acc.keys.push(`${via} -> ${k}`);
+        }
+        return;
+      case 'MemberExpression': {
+        if (node.object?.name === 'styles' && node.property?.name) {
+          const nm = node.property.name;
+          if (seen.has(nm)) return;
+          seen.add(nm);
+          const target = beeStyles.get(nm);
+          if (!target) { acc.unresolved.push(`styles.${nm} (no such entry in the StyleSheet)`); return; }
+          return scanStack(target, `styles.${nm}`, acc, seen);
+        }
+        acc.unresolved.push(`${via}: ${node.type}`);
+        return;
+      }
+      default:
+        acc.unresolved.push(`${via}: ${node.type}`);
+    }
+  };
+  const beeBoxNode = (() => {
+    let found = null;
+    visit(BEE_AST, (n) => {
+      if (found || n.type !== 'JSXElement') return;
+      const open = n.openingElement;
+      const named = open?.name?.type === 'JSXMemberExpression'
+        && open.name.object?.name === 'Animated' && open.name.property?.name === 'View';
+      if (!named) return;
+      const styleAttr = open.attributes.find((a) => a.type === 'JSXAttribute' && a.name?.name === 'style');
+      if (!styleAttr) return;
+      // Identified by the transform it carries, which is what MAKES it the
+      // bee's own box — the box the pair is inside and banks with.
+      if (/\{ rotate \}, \{ scaleX \}/.test(BEE.slice(styleAttr.start, styleAttr.end))) found = n;
+    });
+    return found;
+  })();
+  const beeBoxChildren = (() => {
+    const out = [];
+    const push = (n) => {
+      if (!n) return;
+      if (n.type === 'JSXElement') { out.push(n); return; }
+      if (n.type === 'JSXExpressionContainer') return push(n.expression);
+      if (n.type === 'LogicalExpression') { push(n.left); return push(n.right); }
+      if (n.type === 'ConditionalExpression') { push(n.consequent); return push(n.alternate); }
+      if (n.type === 'JSXFragment') return n.children.forEach(push);
+    };
+    (beeBoxNode?.children ?? []).forEach(push);
+    return out;
+  })();
+  const elementName = (el) => {
+    const nm = el.openingElement?.name;
+    if (!nm) return '?';
+    return nm.type === 'JSXMemberExpression' ? `${nm.object?.name}.${nm.property?.name}` : nm.name;
+  };
+  const pairScan = { keys: [], unresolved: [] };
+  for (const el of beeBoxChildren) {
+    const styleAttr = el.openingElement.attributes
+      .find((a) => a.type === 'JSXAttribute' && a.name?.name === 'style');
+    if (styleAttr) scanStack(styleAttr.value, `<${elementName(el)}> style`, pairScan, new Set());
+  }
+  // The other population, printed rather than asserted: the file's own
+  // layer-level stacking sites. They are why this row is scoped to the pair.
+  const layerStackSites = [...beeStyles.entries()]
+    .map(([nm, node]) => {
+      const acc = { keys: [], unresolved: [] };
+      scanStack(node, `styles.${nm}`, acc, new Set([nm]));
+      return acc.keys;
+    })
+    .flat();
+  const childNames = beeBoxChildren.map(elementName);
+  const pairPresent = childNames.includes('HoneyDrop') && childNames.includes('MascotBee');
+  if (beeBoxNode && pairPresent && pairScan.keys.length === 0 && pairScan.unresolved.length === 0) {
+    ok(`G9 R-N4.3's precondition holds: NO member of the bee's transformed box claims a stacking order — every direct child (<${childNames.join('>, <')}>) resolves to zero \`zIndex\`/\`elevation\`, inline and through the StyleSheet, with nothing unresolvable. So document order is still the whole story between them and G6's reading is still valid. The file's ${layerStackSites.length} layer-level stacking sites (${layerStackSites.join(', ')}) are deliberately NOT in this population — they order the layer against the screen, which is a different claim from the one R-N4.3 rules`);
+  } else {
+    bad('G9', `bee box resolved=${Boolean(beeBoxNode)}, direct children=[${childNames.join(', ')}] (want the pair among them), stacking props ON THE PAIR=[${pairScan.keys.join('; ')}] (want none — one of these silently overrides the document order G6 reads, so the carrier stops occluding the cargo while G6 stays green), unresolvable style expressions=[${pairScan.unresolved.join('; ')}] (want none — this row fails closed)`);
   }
 }
 
