@@ -5168,6 +5168,61 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       }
     }
 
+    // --- N4b. Acceptance 4's other half — the candidate set is CLOSED ------
+    //
+    //     `turnCandidateBearings` returns three bearings (ALIGN, +-cap, 0) and
+    //     `chooseTurn` picks the minimum sweep over them. The module's own
+    //     comment argues that is enough — the sweep is monotone in `phi` for
+    //     a fixed sigma, so a minimum sits at an end of the interval or at its
+    //     zero, and the zero is closed form. §7 asks for the EVIDENCE and not
+    //     the argument: "the gate re-runs this against a dense sweep of phi
+    //     and asserts the candidate set attains the global minimum."
+    //
+    //     Without this row the minimisation is untested. Measured: replacing
+    //     the comparison with `false` — so the FIRST candidate wins instead of
+    //     the smallest — changes no other row in this file.
+    {
+      const STEP_DEG = 0.25;
+      let worstExcess = { v: 0, label: '' };
+      let checked = 0;
+      for (const p of PLANS) {
+        const chosen = geometryFor(p);
+        if (!chosen) continue;
+        let best = Infinity;
+        let bestPhi = 0;
+        for (let d = -CAP_DEG; d <= CAP_DEG + 1e-9; d += STEP_DEG) {
+          const phi = (d * Math.PI) / 180;
+          for (const sigma of [1, -1]) {
+            const t = flight.solveTurn({
+              from: p.from, target: p.target, offsetPx: OFFSET_PX, phi, sigma, radiusPx: p.plan.turn.radiusPx,
+            });
+            if (t && t.sweep < best) { best = t.sweep; bestPhi = d; }
+          }
+        }
+        checked += 1;
+        // The dense sweep is a LOWER BOUND on the true minimum only to within
+        // its own step, so the chosen sweep may legitimately sit a little
+        // BELOW it — the closed-form ALIGN bearing lands between grid points.
+        // What may not happen is the chosen sweep sitting ABOVE it: that is a
+        // candidate the closed set missed.
+        const excess = deg(chosen.sweep - best);
+        if (excess > worstExcess.v) worstExcess = { v: excess, label: p.label, chosen: deg(chosen.sweep), best: deg(best), bestPhi };
+      }
+      // One step of the grid, converted into sweep. The descent heading is
+      // exactly `pi/2 + phi`, so a bearing step of `STEP_DEG` cannot move the
+      // sweep by more than `STEP_DEG` plus staging's own displacement, which
+      // §5's monotonicity argument bounds below 1x. Two steps is the margin.
+      const TOLERANCE_DEG = 2 * STEP_DEG;
+      if (checked === PLANS.length && worstExcess.v <= TOLERANCE_DEG) {
+        ok(
+          `N4b the closed candidate set attains the global minimum: against a dense phi sweep (${((2 * CAP_DEG) / STEP_DEG + 1).toFixed(0)} bearings x 2 sides x ${PLANS.length} plans), the chosen sweep never exceeds the swept minimum by more than ${worstExcess.v.toFixed(4)}deg (tolerance ${TOLERANCE_DEG}deg = two grid steps; worst ${worstExcess.label}, chose ${worstExcess.chosen.toFixed(3)}deg against a grid best of ${worstExcess.best.toFixed(3)}deg at phi=${worstExcess.bestPhi.toFixed(2)}deg). `
+          + `The module's monotonicity argument says three bearings suffice; this is the evidence rather than the argument, and it is the only row that reds when the minimisation is replaced by "take the first candidate"`,
+        );
+      } else {
+        bad('N4b the closed candidate set attains the global minimum', `${checked} of ${PLANS.length} plans checked; worst excess over the dense sweep ${worstExcess.v.toFixed(4)}deg at ${worstExcess.label} (chose ${worstExcess.chosen?.toFixed(3)}deg, grid found ${worstExcess.best?.toFixed(3)}deg at phi=${worstExcess.bestPhi?.toFixed(2)}deg) against a ${TOLERANCE_DEG}deg tolerance — a bearing outside the closed set beats it, so the set is not closed`);
+      }
+    }
+
     // --- N5. Acceptance 5 — no forced loop --------------------------------
     //
     //     `from` outside the chosen turn circle on every plan, worst sweep
@@ -5446,6 +5501,36 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         + `Weave min radius ${radius.v.toFixed(4)}pt at u=${radius.u.toFixed(3)} (${radius.label}, A ${radius.A.toFixed(4)}, L ${radius.L.toFixed(4)}, c ${radius.c.toFixed(4)}), against 6.6722pt quoted in the fillet's frame. `
         + `AND IT HAS MOVED TO THE JOIN: u=${radius.u.toFixed(3)}, not the u~0.56 interior minimum the ruling scopes it to. Lumen's own closed form R_join = L^2 / (2 pi^2 A |sin 2 pi c|) gives ${joinRadius.toFixed(4)}pt there, which is the same number — so the weave's tightest point on this lattice IS the join, and R_join is not a curiosity of one plan but the quantity that governs`,
       );
+    }
+
+    // --- N9b. The published weave terms ARE the geometry they name --------
+    //
+    //     N9 and N2b both read `plan.weaveSpanPx` and `plan.weaveAmplitudePx`,
+    //     and a REPORT cannot police its own inputs — a span published 10%
+    //     wrong changes every figure in N9 and reds nothing. So the two are
+    //     checked against the leg they claim to describe: the span is the
+    //     distance from `from` to the turn's tangent point, and the amplitude
+    //     is `weaveAmplitudePx` OF that span. Bit-exact, because both sides
+    //     are the same arithmetic on the same numbers.
+    {
+      let spanErr = 0;
+      let ampErr = 0;
+      let label = '';
+      for (const p of PLANS) {
+        const t = geometryFor(p);
+        if (!t) continue;
+        const span = Math.hypot(t.tangent.x - p.from.x, t.tangent.y - p.from.y);
+        const e1 = Math.abs(span - p.plan.weaveSpanPx);
+        const e2 = Math.abs(flight.weaveAmplitudePx(span, BODY_LENGTH_PX) - p.plan.weaveAmplitudePx);
+        if (e1 > spanErr || e2 > ampErr) label = p.label;
+        spanErr = Math.max(spanErr, e1);
+        ampErr = Math.max(ampErr, e2);
+      }
+      if (spanErr === 0 && ampErr === 0) {
+        ok(`N9b the weave terms N9 and N2b report ARE the leg they name: \`weaveSpanPx\` is |from -> T| and \`weaveAmplitudePx\` is weaveAmplitudePx of it, bit-exact on all ${PLANS.length} plans. A report cannot police its own inputs, and every figure in N9 is divided by this span`);
+      } else {
+        bad('N9b the published weave terms are the geometry they name', `worst span error ${spanErr.toExponential(3)}pt, worst amplitude error ${ampErr.toExponential(3)}pt (${label}) — N9's shape parameter and N2b's curvature are both computed from these, so they have been reporting a leg the bee does not fly`);
+      }
     }
 
     // --- N10. The radius fixed point, and the row that keeps it honest ----
