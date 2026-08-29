@@ -511,79 +511,330 @@ export const composeSegmentEasing = (durations, easings) => {
   };
 };
 
-// R-LF-1 (Living Flight) — the approach and descent used to be two straight
-// segments meeting at a hard corner over the staging point ("90 degree
-// robot-like ways," Colin, 2026-08-29). The corner is smoothed with a
-// quadratic-Bezier FILLET: a short length `r` is trimmed off each straight
-// leg where it meets `staging`, and the trimmed vertex is replaced with the
-// Bezier `P1 -> staging -> P2` (staging itself as the control point).
+// R-LF-7 (Living Flight) — the corner over `staging` used to be a quadratic
+// Bezier FILLET: `FILLET_LEG_FRACTION x min(chord, descentChord)` trimmed off
+// each straight leg, the trimmed vertex replaced by a Bezier with `staging`
+// as its control point. It ROUNDED the corner; it did not remove it. D6
+// measured 17 of the 42 hops still arriving at a junction the eye reads as a
+// corner, and D7 named the reason: the fillet's SIZE is derived from the legs
+// rather than from what the turn costs, so the obtuse common case gets the
+// smallest rounding and needs the largest.
 //
-// **Why a fillet and not a single spline through all three points.** A
-// spline blending the approach's own tangent into the interior knot was the
-// first build of this file. It measurably cusped: this errand's two legs
-// are never close to even (the approach runs 41-417pt, the descent is
-// always ~30pt), and ANY single shared tangent at the knot — uniform
-// Catmull-Rom's `(target-from)/2`, or a centripetal-weighted version of it —
-// overshoots on the short side for SOME approach direction, because the
-// long leg's direction can point almost anywhere relative to the descent's
-// (always straight down). Measured: a 417pt diagonal approach produced a
-// genuine sub-1° corner a fraction of a point from touchdown — not a
-// resampling artifact, an actual self-crossing loop (row M3 carries the
-// swept figures for both the uniform and the centripetal attempt).
+// The replacement is a TURN, not a rounding: a circle of radius `R` tangent
+// to the descent line at `staging`, entered on its own tangent from `from`.
+// Both joins are tangential BY CONSTRUCTION at every approach direction, so
+// there is no junction angle left to measure on any of the 42 hops — not a
+// smaller one, none.
 //
-// A quadratic Bezier between two NON-COLLINEAR points can never cusp or
-// self-intersect — that is a property of the curve family, not a tuned
-// parameter — which is what makes the fillet robust across every direction
-// the bee can approach from, including from below the target, where §28.4's
-// own geometry already demands a near-U-turn over the top of the cell.
-// Both joins are exact by construction and need no reconciliation: the
-// fillet's tangent at `P1` is along `staging - P1` (same direction as the
-// leg it was trimmed from) and at `P2` is along `P2 - staging` (same
-// direction as the descent) — the fillet is a smooth continuation of each
-// straight leg's OWN direction, not a blend of the two.
-export const FILLET_LEG_FRACTION = 0.25;
+// Three quantities carry it and not one of them is new:
+//
+//   phi     `staging`'s bearing off vertical. §28.4's DISTANCE is untouched
+//           (C', R88) — the staging offset is a RADIUS, so the bound it
+//           produced is omnidirectional and the point is inside the face the
+//           user tapped at every bearing. Only the direction is chosen now,
+//           and it is bounded at +-30 deg: R-LF-7's own sweep found the
+//           forced-loop class (a 294.6 deg loop-the-loop to reach the seat
+//           next door, 8 of 168 plans) disappears there and nowhere earlier.
+//   sigma   which side of the descent line the circle's centre sits on.
+//   R       `max(bodyLength, cruise / (MAX_FRAME_SPEED_STEP_FRACTION x 60))`.
+//           R-LF-2.1 bounded the MAGNITUDE of the per-frame velocity change
+//           and left the vector free. Applied to the whole velocity the same
+//           ratified 0.15 is an angular rate — `|dv| = 2v sin(w dt / 2) ~
+//           v w dt <= 0.15 v` gives `w <= 0.15 rad/frame` = 9 rad/s, so
+//           `R >= v / 9`. Not a new constant; the same constant, converted
+//           into the frame it was missing. The bee's own length is the FLOOR
+//           and the frame bound is the mechanism on the two biggest boxes.
+export const STAGING_BEARING_CAP_RAD = Math.PI / 6;
+export const FRAMES_PER_SECOND = 60;
+export const MAX_TURN_RATE_RAD_S = MAX_FRAME_SPEED_STEP_FRACTION * FRAMES_PER_SECOND;
+
+export const turnRadiusPx = ({ bodyLengthPx, cruisePxS }) =>
+  Math.max(bodyLengthPx, cruisePxS > 0 ? cruisePxS / MAX_TURN_RATE_RAD_S : 0);
+
+const TURN_EPSILON = 1e-9;
+
+// The radius/cruise fixed point below. The tolerance is a QUARTER OF A POINT
+// of radius, which at the ratified turn rate is 2.25px/s of cruise — under a
+// tenth of the smallest speed the lattice produces — and the pass ceiling is
+// a backstop, not the mechanism: the iteration is a contraction (a longer
+// tangent lengthens the chord, which raises the cruise, which grows `R`,
+// which SHORTENS the tangent), and the gate asserts it converges in far fewer
+// than this on every plan rather than trusting the argument.
+const TURN_RADIUS_TOLERANCE_PX = 0.25;
+const TURN_RADIUS_MAX_PASSES = 24;
 
 const lerpPoint = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
 
-const quadraticBezierAt = (p0, control, p1, u) => {
-  const w0 = (1 - u) * (1 - u);
-  const w1 = 2 * (1 - u) * u;
-  const w2 = u * u;
-  return { x: w0 * p0.x + w1 * control.x + w2 * p1.x, y: w0 * p0.y + w1 * control.y + w2 * p1.y };
+// `staging` at bearing `phi` off vertical, positive toward +x. The DISTANCE
+// is `stagingOffsetFor`'s and is not this function's to choose.
+export const stagingPointFor = (target, offsetPx, phi) => ({
+  x: target.x + offsetPx * Math.sin(phi),
+  y: target.y - offsetPx * Math.cos(phi),
+});
+
+// The turn for ONE `(phi, sigma)`. `null` when `from` is inside the circle —
+// no tangent exists there, and REJECTING the candidate is how acceptance 5's
+// "no forced loop" holds by construction rather than by a bound on the sweep.
+export const solveTurn = ({ from, target, offsetPx, phi, sigma, radiusPx }) => {
+  if (!(radiusPx > 0)) return null;
+  const staging = stagingPointFor(target, offsetPx, phi);
+  // The descent runs `staging` -> `target`, so its unit heading is fixed by
+  // `phi` alone, and is exactly `phi` off vertical. That is what preserves
+  // §28.4's load-bearing half — "the final leg is always a descent whatever
+  // direction he came from" — under the cap rather than under verticality:
+  // the vertical component of the settle is never below cos 30 = 0.866.
+  const ud = { x: -Math.sin(phi), y: Math.cos(phi) };
+  // One radius off the descent line at `staging`, on side sigma. Tangent
+  // there by construction, so the bee LEAVES the arc heading exactly along
+  // the descent line — the second join needs no reconciliation either.
+  const centre = {
+    x: staging.x - sigma * radiusPx * ud.y,
+    y: staging.y + sigma * radiusPx * ud.x,
+  };
+  const fx = from.x - centre.x;
+  const fy = from.y - centre.y;
+  const d = Math.hypot(fx, fy);
+  if (!(d > radiusPx + TURN_EPSILON)) return null;
+  const thetaF = Math.atan2(fy, fx);
+  const alpha = Math.acos(Math.min(1, radiusPx / d));
+  // Two tangent points. Exactly one is entered in the direction the circle is
+  // travelled in, and which one is a question about `sigma` rather than a
+  // preference: rotating about `centre` with sense `sigma` gives the heading
+  // `sigma * perpCcw(p - centre)`, and the approach must arrive along it.
+  let theta0 = null;
+  let tangent = null;
+  for (const branch of [1, -1]) {
+    const th = thetaF + branch * alpha;
+    const p = { x: centre.x + radiusPx * Math.cos(th), y: centre.y + radiusPx * Math.sin(th) };
+    const hx = (sigma * -(p.y - centre.y)) / radiusPx;
+    const hy = (sigma * (p.x - centre.x)) / radiusPx;
+    if (hx * (p.x - from.x) + hy * (p.y - from.y) >= 0) {
+      theta0 = th;
+      tangent = p;
+      break;
+    }
+  }
+  if (tangent === null) return null;
+  const thetaS = Math.atan2(staging.y - centre.y, staging.x - centre.x);
+  let sweep = ((((sigma > 0 ? thetaS - theta0 : theta0 - thetaS) % TAU) + TAU) % TAU);
+  // A sweep of 2*pi is a sweep of zero that lost a bit on the way round.
+  if (sweep > TAU - TURN_EPSILON) sweep = 0;
+  return { phi, sigma, radiusPx, staging, centre, tangent, theta0, sweep };
+};
+
+// A point on the arc, `u` in [0,1] from the tangent point to `staging`.
+export const turnPointAt = (turn, u) => {
+  if (!(turn.sweep > 0)) return { ...turn.tangent };
+  const th = turn.theta0 + turn.sigma * turn.sweep * u;
+  return { x: turn.centre.x + turn.radiusPx * Math.cos(th), y: turn.centre.y + turn.radiusPx * Math.sin(th) };
+};
+
+// R-LF-7 — `(phi, sigma)` is the pair MINIMISING the sweep, and the candidate
+// set below is CLOSED rather than a search. It is closed for a reason.
+//
+// For a fixed `sigma` the sweep is monotone in `phi`: the descent heading is
+// exactly `pi/2 + phi`, so rotating the bearing removes turn one-for-one,
+// while `staging`'s own displacement can only damp that — it moves `offset`
+// per radian against an approach chord that is never shorter than
+// `ringStep - offset` = 46.14pt, so `d(psi)/d(phi) <= 30.07/46.14 < 1` over
+// the whole lattice. A monotone function on `[-cap, cap]` takes its minimum
+// at an end of the interval or at its zero, and its zero is closed-form: the
+// bearing that puts the descent line THROUGH `from`, where the hop has no
+// turn at all. Hence exactly three bearings:
+//
+//   ALIGN   `atan2(from.x - target.x, target.y - from.y)`, when inside the cap
+//   +-cap   the ruled ceiling, which is where the minimum sits on every hop
+//           that turns at all
+//   0       vertical — today's staging is always in the running, so the
+//           degenerate from-directly-above hop reaches it exactly
+//
+// The gate re-runs this against a dense sweep of `phi` and asserts the
+// candidate set attains the global minimum (acceptance 4). The bound above is
+// an argument; the sweep is the evidence.
+export const turnCandidateBearings = ({ from, target, capRad = STAGING_BEARING_CAP_RAD }) => {
+  const align = Math.atan2(from.x - target.x, target.y - from.y);
+  const out = [capRad, -capRad, 0];
+  if (Number.isFinite(align) && Math.abs(align) < capRad) out.unshift(align);
+  return out;
+};
+
+export const TURN_SWEEP_TIE_RAD = 1e-6;
+
+/**
+ * @param inboardSign  R-LF-7.1 — +1 when "away from the nearest screen edge"
+ *                     is +x, -1 when it is -x, 0 when the caller has no box.
+ *                     A TIE-BREAK and only a tie-break: it never buys a
+ *                     larger sweep, because the sweep is the ruled quantity
+ *                     and the sign is only free where the sweep is silent.
+ */
+export const chooseTurn = ({
+  from, target, offsetPx, radiusPx, capRad = STAGING_BEARING_CAP_RAD, inboardSign = 0,
+}) => {
+  let best = null;
+  for (const phi of turnCandidateBearings({ from, target, capRad })) {
+    for (const sigma of [1, -1]) {
+      const candidate = solveTurn({ from, target, offsetPx, phi, sigma, radiusPx });
+      if (!candidate) continue;
+      if (best === null || candidate.sweep < best.sweep - TURN_SWEEP_TIE_RAD) {
+        best = candidate;
+      } else if (
+        inboardSign !== 0
+        && Math.abs(candidate.sweep - best.sweep) <= TURN_SWEEP_TIE_RAD
+        && candidate.phi * inboardSign > best.phi * inboardSign
+      ) {
+        best = candidate;
+      }
+    }
+  }
+  return best;
 };
 
 // R-LF-3 — the weave, a lateral offset perpendicular to the APPROACH leg
 // only ("the descent carries no weave; a landing is a landing").
 //
-//   amplitude(u) = A * sin(pi*u)        zero at u=0 and u=1, by construction
-//   offset(u)    = amplitude(u) * sin(2*pi*k*u)
+//   amplitude(u) = A * sin(pi*u)^2      zero at u=0 and u=1, by construction
+//   offset(u)    = amplitude(u) * sin(2*pi*c*u)
 //   A            = min(0.18 * legLength, 1.5 * bodyLength)
-//   k            = 1.5
+//   c            = WEAVE_RATE_HZ * approachSeconds       (R-LF-8, no rounding)
 //
-// `k = 1.5` rather than a whole number: a whole number of cycles returns the
-// bee to the side he left from and draws a symmetric, decorative ribbon.
-// Half a cycle extra means the last crossing carries him TOWARD the cell.
+// R-LF-8 — `WEAVE_PERIODS` was **1.5 cycles per approach leg, whatever the
+// leg**, so the undulation RATE was decided by which seat you tapped: 5.8717
+// Hz on the shortest hop against 1.1746 Hz on the longest, 4.9989x across the
+// declared containers, 3.31x on 393x852 alone. Same character, same errand,
+// four different wing rhythms — and the fast end is not a snake, it is a buzz.
+// The RATE is the ratified quantity now and the cycle count is its
+// consequence: a short errand gets one lean (0.3001 cycles), a long one gets
+// the snake (1.5000). `WEAVE_RATE_HZ` is the rate the shipped build already
+// flies on its longest leg, so `c <= 1.5` everywhere with equality there —
+// this can only ever REMOVE undulation, stated as an identity rather than a
+// hope. It is also the minimum over the WIDEST declared container set, so it
+// holds whether or not 375x667 turns out to be in support.
 //
-// `legLength` is the FULL approach chord (`from` -> `staging`), not the
-// shorter, fillet-trimmed distance the weave is actually drawn over — R-LF-3
-// ties amplitude to the errand's own scale, and the fillet is a construction
-// detail of how the corner is smoothed, not a second leg with its own scale.
+// `k = 1.5`'s justification retires with the constant. Its stated reason —
+// "half a cycle extra means the last crossing carries him TOWARD the cell" —
+// was the weave doing the arrival's job, and R-LF-7 gives the arrival its own
+// geometry.
+//
+// **The SQUARE on the envelope is a repair, and it is R-LF-7's.** With `k`
+// fixed at 1.5 — a multiple of 0.5 — the carrier vanished at `u = 1` on its
+// own, so `sin(pi u)` only ever had to close a VALUE. Freeing `c` breaks
+// that:
+//
+//   offset'(u) = A [ pi cos(pi u) sin(2 pi c u) + 2 pi c sin(pi u) cos(2 pi c u) ]
+//   offset'(1) = -A pi sin(2 pi c)        zero iff c is a multiple of 0.5
+//
+// which is a lateral VELOCITY at the exact join R-LF-7's acceptance test 1
+// asserts is tangential — up to 32.72 deg off the chord, on 330 of 336 plans,
+// worst on the SHORTEST hops, which are the ones R-LF-8 exists to give one
+// lean. §7's test 1 and test 7 are jointly unsatisfiable with a bare
+// `sin(pi u)`: test 7 closes the envelope's VALUE and test 1 needs its
+// VELOCITY. Squaring closes both, for any `c`, by the envelope ALONE:
+//
+//   env(u)  = sin(pi u)^2        env'(u) = pi sin(2 pi u)      env'(1) = 0
+//
+// Peak is unchanged (`sin^2(pi/2) = 1`), so R-LF-3's amplitude and its
+// `min(0.18 leg, 1.5 body)` bound are untouched. The cost is the OUTER
+// swings: -35.6% on the longest hop's two flanking excursions, -2.4% on the
+// short one, and nothing at all on the centre excursion — concentrated
+// exactly where the weave is richest and absent where R-LF-8 says the figure
+// should be one lean.
+//
+// D8's tightness argument does not reopen, but the sentence has to name its
+// AXIS and its PLAN, because the two run opposite ways (Lumen, 2026-08-29):
+// the amplitude cost is worst on the LONGEST hop and the CURVATURE cost is
+// worst on the SHORTEST, so the two figures are not the same plan. Measured
+// in R-LF-7's own frame — the drawn span is `from` -> the tangent point,
+// which is what acceptance 9 exists to re-report — the weave's minimum radius
+// of curvature is 1.8201pt on `main@42a83c7` and 6.0080pt here: 3.3x LOOSER
+// than what ships today, on the tightest plan each build has.
+//
+// And WHERE it is tightest moved. Under `k = 1.5` the minimum sat near
+// u ~ 0.56, in the body of the figure. Here it sits AT THE JOIN, and its
+// value is Lumen's closed form `R_join = L^2 / (2 pi^2 A |sin 2 pi c|)` —
+// which diverges as `c` approaches a multiple of 0.5, reproducing the old
+// build's straight join as its own limit. That is the strongest confirmation
+// available that this envelope is the same object the ruling describes.
+//
+// `legLength` is the approach chord `from` -> the turn's tangent point, which
+// is the leg the weave is drawn over and, since R-LF-7, the whole of the
+// approach. (Under the fillet it was the FULL chord to `staging` rather than
+// the shorter trimmed distance, because the trim was a construction detail of
+// the corner rather than a leg. The tangent point is not a detail: it is
+// where the flight stops going somewhere and starts arriving.)
 export const WEAVE_LEG_AMPLITUDE_FRACTION = 0.18;
 export const WEAVE_BODY_AMPLITUDE_MULTIPLE = 1.5;
-export const WEAVE_PERIODS = 1.5;
+export const WEAVE_RATE_HZ = 1.1746;
 
 export const weaveAmplitudePx = (legLengthPx, bodyLengthPx) =>
   Math.min(WEAVE_LEG_AMPLITUDE_FRACTION * legLengthPx, WEAVE_BODY_AMPLITUDE_MULTIPLE * bodyLengthPx);
+
+// R-LF-8 — the count is a consequence of the rate and the leg's own duration.
+export const weaveCyclesFor = (approachMs) => (WEAVE_RATE_HZ * Math.max(0, approachMs)) / 1000;
+
+// R-LF-3.1 — the exponent is a RULED constant, not a spelling, and it is
+// named because the ruling is about its VALUE and not about the shape of the
+// expression. Lumen, 2026-08-29: every `p > 1` closes the velocity, so `p = 2`
+// is one of a continuum and a cheaper-looking one exists — but `env'' ~
+// p(p-1)pi^2 sin^(p-2) cos^2` and `sin^(p-2) -> infinity` below 2, so under 2
+// the corner is not removed, it is compressed into a WHIP (`p = 1.25` reaches
+// a radius of 0.0046pt a millionth of the way from the join). Above 2 buys C2,
+// which R-LF-7's own centrepiece does not have — a line joining a turn circle
+// is a curvature step by construction. `p = 2` is the LEAST exponent with a
+// finite second derivative at the join, and that is the whole argument.
+//
+// It is a named constant for a second reason, and this one is the gate's:
+// `weaveSlopeAt` below is the derivative of this envelope, and a derivative
+// written beside its own function is the classic second copy of a derivation.
+// Sharing `p` is what keeps them from drifting — mutate this one token and
+// BOTH move together, which is exactly the mutation §7's acceptance row 1
+// names ("restore the `sin(pi u)` envelope"). A derivative that could not
+// follow that mutation would make the row unfalsifiable.
+export const WEAVE_ENVELOPE_EXPONENT = 2;
 
 // `u <= 0 || u >= 1` is forced to exactly zero rather than trusting
 // `Math.sin(Math.PI)` — which is ~1.22e-16, not 0 — to vanish on its own.
 // The envelope must reach zero to FLOATING-POINT EXACTNESS at both ends, so
 // that the weaved curve's first and last points are bit-identical to `from`
-// and the fillet's own start point, with no reconciliation step.
-export const weaveOffsetAt = (u, amplitudePx, sign = 1) => {
+// and the turn's tangent point, with no reconciliation step.
+export const weaveOffsetAt = (u, amplitudePx, cycles, sign = 1) => {
   if (u <= 0 || u >= 1) return 0;
-  const envelope = Math.sin(Math.PI * u);
-  return sign * amplitudePx * envelope * Math.sin(TAU * WEAVE_PERIODS * u);
+  const envelope = Math.sin(Math.PI * u) ** WEAVE_ENVELOPE_EXPONENT;
+  return sign * amplitudePx * envelope * Math.sin(TAU * cycles * u);
+};
+
+// R-LF-3.1 / §7 acceptance 1 — the weave's lateral slope `d(offset)/du`, in
+// CLOSED FORM. The approach's terminal tangent is this and the chord; the
+// junction angle the ruling forbids is `atan(slope(1) / chordLength)`.
+//
+// **It deliberately does NOT carry `weaveOffsetAt`'s endpoint guard**, and
+// that is the whole reason this function exists rather than the gate
+// differencing the value. The guard on the VALUE is load-bearing: the path's
+// first and last points must be bit-identical to `from` and the tangent
+// point. The slope has no such consumer, and a guarded slope would return
+// exactly 0 at `u = 1` for EVERY exponent — including the `p = 1` the
+// acceptance row must red on. A probe that cannot fail is not a probe.
+//
+// Which leaves the residual honest and non-zero: at `p = 2`,
+// `env'(1) = p * sin(pi)^(p-1) * pi * cos(pi)` is the error in representing
+// `pi` scaled by `A * sin(2 pi c)`, ~1e-14 degrees, peaking at `c = 0.25` and
+// `0.75` where `|sin 2 pi c| = 1`. Five orders under the ruled `1e-9` bar and
+// ten under the `32.71` degree defect — and, unlike an exact 0, it is a
+// number that proves the row executed.
+//
+// Differencing is not an option AT THIS JOIN: `u = 1` is the domain edge, so
+// only a one-sided difference exists and its floor is set by `h` rather than
+// by the envelope (0.116 degrees at h = 1e-3). It still reds against 32.71,
+// so a differenced row passes its own mutation test while having stopped
+// measuring the property — Lumen, 2026-08-29. In the INTERIOR a difference is
+// legitimate, and that is where the gate calibrates this function.
+export const weaveSlopeAt = (u, amplitudePx, cycles, sign = 1) => {
+  const p = WEAVE_ENVELOPE_EXPONENT;
+  const s = Math.sin(Math.PI * u);
+  const envelope = s ** p;
+  const envelopeSlope = p * (s ** (p - 1)) * Math.PI * Math.cos(Math.PI * u);
+  const carrier = Math.sin(TAU * cycles * u);
+  const carrierSlope = TAU * cycles * Math.cos(TAU * cycles * u);
+  return sign * amplitudePx * (envelopeSlope * carrier + envelope * carrierSlope);
 };
 
 // Perpendicular distance from `p` to the segment `a`-`b` — the sagitta
@@ -646,62 +897,81 @@ export const adaptiveCurveSamples = (curveAt, bound = MAX_CHORD_DEVIATION_PX, ma
 };
 
 /**
- * The curve through `from` -> `staging` -> `target`: a weaved approach, a
- * quadratic-Bezier fillet rounding the corner at `staging`, and a straight
- * descent — each piece sampled adaptively off its own continuous
- * parametrisation. Exported so `check-bee-attitude` can sample it directly
- * rather than reimplementing it (R81).
+ * The curve through `from` -> the turn -> `target`: a weaved straight
+ * approach to the turn circle's tangent point `T`, the arc `T` -> `staging`,
+ * and the straight drop `staging` -> `target` — each piece sampled adaptively
+ * off its own continuous parametrisation. Exported so `check-bee-attitude`
+ * can sample it directly rather than reimplementing it (R81).
  *
- * `descentPoints` carries the fillet AND the trimmed straight drop as one
- * sequence — `buildPollinationPlan` treats "the descent" as everything from
- * the corner-rounding point onward, which is what keeps this file's shape
- * (exactly two legs in and out of here) unchanged from before the fillet
- * existed.
+ * `descentPoints` carries the ARC AND the drop as one sequence.
+ * `buildPollinationPlan` treats "the descent" as everything from the
+ * corner-rounding point onward, and R-LF-7 does not redefine that — the arc
+ * IS the corner-rounding. What moved is where it starts: the landing begins
+ * when he stops going somewhere and starts arriving, and that is `T`.
  *
- * The weave rides perpendicular to the STRAIGHT chord `from`->`staging` —
- * the same fixed frame the pre-Living-Flight polyline flew — rather than a
- * frame that rotates with the leg's own direction; irrelevant here since the
- * approach itself is still a straight chord, but named so a future curved
- * approach inherits the same choice deliberately, not by accident.
+ * The weave rides perpendicular to the STRAIGHT chord `from`->`T` — the same
+ * fixed frame the pre-Living-Flight polyline flew — rather than a frame that
+ * rotates with the leg's own direction; irrelevant here since the approach
+ * itself is still a straight chord, but named so a future curved approach
+ * inherits the same choice deliberately, not by accident.
  *
  * `weaveSign` alternates the first excursion's direction — see the call
  * site's comment in `FlyingBee.js` for why it is keyed off the pollination
  * tap, not `Math.random()`: this file stays dependency-free and pure, and a
  * gate can only sample a pure function.
+ *
+ * @param cycles  R-LF-8's count for THIS leg. Passed in rather than derived
+ *                here because it is a function of the approach's DURATION,
+ *                which is a property of the plan and not of the curve.
  */
-export const buildFlightCurve = ({ from, staging, target, bodyLengthPx, weaveSign = 1 }) => {
-  const dx = staging.x - from.x;
-  const dy = staging.y - from.y;
+export const buildFlightCurve = ({
+  from,
+  target,
+  offsetPx,
+  radiusPx,
+  cycles,
+  bodyLengthPx,
+  weaveSign = 1,
+  capRad = STAGING_BEARING_CAP_RAD,
+  inboardSign = 0,
+}) => {
+  const turn = chooseTurn({ from, target, offsetPx, radiusPx, capRad, inboardSign });
+  // No candidate has a tangent only when `from` is inside every circle the
+  // cap admits — which the gate asserts is unreachable over the lattice. If a
+  // live position ever reaches it, the flight degenerates to the straight
+  // vertical staging it had before R-LF-7 rather than to nothing.
+  const staging = turn ? turn.staging : stagingPointFor(target, offsetPx, 0);
+  const entry = turn ? turn.tangent : staging;
+
+  const dx = entry.x - from.x;
+  const dy = entry.y - from.y;
   const chordLenPx = Math.hypot(dx, dy);
   const nx = chordLenPx > 1e-6 ? -dy / chordLenPx : 0;
   const ny = chordLenPx > 1e-6 ? dx / chordLenPx : 0;
   const amplitudePx = weaveAmplitudePx(chordLenPx, bodyLengthPx);
 
-  const descentChordPx = distancePx(staging, target);
-  const filletRadiusPx = FILLET_LEG_FRACTION * Math.min(chordLenPx, descentChordPx);
-  const approachEnd = chordLenPx > 1e-6
-    ? lerpPoint(staging, from, filletRadiusPx / chordLenPx)
-    : { ...from };
-  const descentStart = descentChordPx > 1e-6
-    ? lerpPoint(staging, target, filletRadiusPx / descentChordPx)
-    : { ...target };
-
   const approachCurveAt = (u) => {
-    const base = lerpPoint(from, approachEnd, u);
-    const off = weaveOffsetAt(u, amplitudePx, weaveSign);
+    const base = lerpPoint(from, entry, u);
+    const off = weaveOffsetAt(u, amplitudePx, cycles, weaveSign);
     return { x: base.x + nx * off, y: base.y + ny * off };
   };
-  const filletCurveAt = (u) => quadraticBezierAt(approachEnd, staging, descentStart, u);
-  const straightDescentAt = (u) => lerpPoint(descentStart, target, u);
+  const arcCurveAt = (u) => turnPointAt(turn, u);
+  const dropAt = (u) => lerpPoint(staging, target, u);
 
   const approachPoints = adaptiveCurveSamples(approachCurveAt);
-  const filletPoints = adaptiveCurveSamples(filletCurveAt);
-  const straightDescentPoints = adaptiveCurveSamples(straightDescentAt);
-  // `filletPoints`'s last point and `straightDescentPoints`'s first are both
-  // exactly `descentStart` — dropped here so the waypoint isn't duplicated.
+  // A sweep of zero is not an arc, and sampling it would emit a run of
+  // identical points for the segment arithmetic to divide by.
+  const arcPoints = turn && turn.sweep > 0 ? adaptiveCurveSamples(arcCurveAt) : [{ ...entry }];
+  const dropPoints = adaptiveCurveSamples(dropAt);
+  // `arcPoints`'s last point and `dropPoints`'s first are both exactly
+  // `staging` — dropped here so the waypoint isn't duplicated.
   return {
+    turn,
+    staging,
+    approachChordPx: chordLenPx,
+    amplitudePx,
     approachPoints,
-    descentPoints: [...filletPoints, ...straightDescentPoints.slice(1)],
+    descentPoints: [...arcPoints, ...dropPoints.slice(1)],
   };
 };
 
@@ -751,32 +1021,76 @@ export const buildPollinationPlan = ({
   approachSpeedPxS,
   weaveSign = 1,
 }) => {
-  // §28.4 waypoint 1: DIRECTLY ABOVE the cell centre, by the bee's own length
-  // (C′ — see `stagingOffsetFor`). A bee approaching from below sweeps up and
-  // over it, so the final leg is always a descent whatever direction he came
-  // from — which is what makes the landing read as a landing rather than as
-  // an arrival from the side. And because the offset is inside the target's
-  // own hexagon, the one moment he is stationary is the moment he is hanging
-  // over the face the user tapped.
-  const staging = { x: target.x, y: target.y - stagingOffsetFor({ bodyLengthPx, ringStep }) };
+  // §28.4 waypoint 1: `stagingOffsetFor` from the cell centre (C′), at a
+  // bearing R-LF-7 now CHOOSES rather than fixes. §28.4's own justification
+  // for verticality was "because the offset is inside the target's own
+  // hexagon, THE ONE MOMENT HE IS STATIONARY is the moment he is hanging over
+  // the face the user tapped" — and R-LF-2.1 removed every stop before the
+  // cell, so there has been no stationary moment at `staging` since `d24315d`
+  // merged. The conclusion was resting on a premise the same day's ruling
+  // deleted. What survives is the DISTANCE, and it survives omnidirectionally
+  // because it is a radius: 30.0667pt against the target hexagon's own
+  // apothem of 38.1051pt, in every direction (R88).
+  const offsetPx = stagingOffsetFor({ bodyLengthPx, ringStep });
 
-  // R-LF-1 — one continuous curve through from/staging/target, each leg
-  // resampled by its own arc length so the position track and the timing
-  // below stay in step (see `buildFlightCurve`).
-  const { approachPoints, descentPoints } = buildFlightCurve({ from, staging, target, bodyLengthPx, weaveSign });
+  // R-LF-7.1 — every free sign in the flight resolves AWAY from the nearest
+  // screen edge. `inboardSign` is +1 when inboard is +x, i.e. when the target
+  // sits in the left half of the flight container. It reaches `chooseTurn` as
+  // a tie-break and nothing more: the sweep is the ruled quantity, and the
+  // sign is only free where the sweep is silent.
+  const inboardSign = width > 0 ? (target.x * 2 < width ? 1 : -1) : 0;
+
+  // R-LF-7 — `R` is CIRCULAR with the cruise: the tangent length sets the
+  // approach chord, the chord sets the cruise, the cruise sets `R`, and `R`
+  // moves the tangent point. Iterated to a fixed point rather than solved in
+  // closed form — the constraint is the equality, not the method — and the
+  // loop below is the only place in this file that iterates, so it carries
+  // its own convergence bound rather than trusting one.
+  //
+  // R-LF-8's cycle count rides the same loop for the same reason: it is
+  // `WEAVE_RATE_HZ x approachSeconds`, and the approach's duration is a
+  // function of the chord, which is a function of `R`.
+  let radiusPx = bodyLengthPx;
+  let curve = null;
+  let flatApproachMs = 0;
+  let cruisePxS = 0;
+  let passes = 0;
+  let cycles = 0;
+  for (let pass = 0; pass < TURN_RADIUS_MAX_PASSES; pass += 1) {
+    passes = pass + 1;
+    const probe = chooseTurn({ from, target, offsetPx, radiusPx, inboardSign });
+    const chordPx = distancePx(from, probe ? probe.tangent : stagingPointFor(target, offsetPx, 0));
+    // §28.5's formula, still the only place `distance / speed` is spelled: the
+    // STRAIGHT chord over R-LF-4's ratified speed. Its far end moved from
+    // `staging` to the tangent point, because that is where the approach leg
+    // now ends — and it has to move with it, or the weave's elongation would
+    // be divided by a chord the bee does not fly and the flight would slow
+    // down in proportion to how much turning it does.
+    flatApproachMs = approachDurationMs(chordPx, approachSpeedPxS);
+    // `buildSpeedProfile`'s approach duration, spelled here because R-LF-8
+    // needs it BEFORE the curve exists. It is weave-independent by
+    // construction: `A/v` collapses to the flat chord's own time, so this is
+    // an identity with the profile below rather than a second estimate of it.
+    const launchMs = Math.min(LAUNCH_MS, 2 * flatApproachMs);
+    cycles = weaveCyclesFor(flatApproachMs + launchMs / 2);
+    // R-LF-1 — one continuous curve through from/turn/target, each leg
+    // resampled by its own arc length so the position track and the timing
+    // below stay in step (see `buildFlightCurve`).
+    curve = buildFlightCurve({
+      from, target, offsetPx, radiusPx, cycles, bodyLengthPx, weaveSign, inboardSign,
+    });
+    const arcPx = pathLengthPx(curve.approachPoints, 1, 1);
+    cruisePxS = flatApproachMs > 0 ? (arcPx / flatApproachMs) * 1000 : 0;
+    const next = turnRadiusPx({ bodyLengthPx, cruisePxS });
+    if (Math.abs(next - radiusPx) <= TURN_RADIUS_TOLERANCE_PX) break;
+    radiusPx = next;
+  }
+  const { approachPoints, descentPoints, turn, staging } = curve;
 
   const approachLegs = approachPoints.slice(1).map((p, i) => distancePx(approachPoints[i], p));
   const descentLegs = descentPoints.slice(1).map((p, i) => distancePx(descentPoints[i], p));
   const approachLen = approachLegs.reduce((a, b) => a + b, 0);
   const descentLen = descentLegs.reduce((a, b) => a + b, 0);
-
-  // §28.5's formula, still the only place `distance / speed` is spelled: the
-  // STRAIGHT chord `from`->`staging` over R-LF-4's ratified speed. What that
-  // yields is not the flight's approach DURATION any more, it is the approach
-  // SPEED — the real, weaved ground divided by it. R-LF-2.1: the ratified
-  // quantity is the speed, and the duration is what follows from it.
-  const flatApproachMs = approachDurationMs(distancePx(from, staging), approachSpeedPxS);
-  const cruisePxS = flatApproachMs > 0 ? (approachLen / flatApproachMs) * 1000 : 0;
 
   // R-LF-2.1 — ONE continuous speed function over cumulative arc: a linear
   // ramp off rest, a constant cruise, and a monotone decay to exactly zero at
@@ -824,18 +1138,47 @@ export const buildPollinationPlan = ({
     // adaptively, not to a fixed 3-waypoint shape), so a reader that needs to
     // measure "the descent" in `path` — a gate, or a future caller — has no
     // index to assume. This is the one it can read instead:
-    // `path.slice(descentStartIndex)` is the whole descent, fillet included.
+    // `path.slice(descentStartIndex)` is the whole descent, arc included.
     //
     // **It was called `stagingIndex` and the name was false by construction**
-    // (Lumen, 2026-08-29, Finding 3). `path[descentStartIndex]` is
-    // `approachEnd` — the fillet's trim point, `FILLET_LEG_FRACTION x
-    // min(chord, descentChord)` short of `staging` (7.5167pt at the shipped
-    // pair) — and it can never be `staging`, because the trim IS the fillet.
-    // Nothing read it wrongly; a name that claims what the mechanism
-    // guarantees false is a trap regardless. `plan.staging` already carries
-    // the point for anyone who wants it.
+    // (Lumen, 2026-08-29, Finding 3). Under the fillet `path[descentStartIndex]`
+    // was the trim point, always short of `staging`. Under R-LF-7 it is the
+    // turn circle's TANGENT POINT, which is short of `staging` by the whole
+    // arc — the name got further from true, not closer, and the rename holds.
+    // `plan.staging` already carries the point for anyone who wants it.
     descentStartIndex: approachPoints.length - 1,
     staging: { x: staging.x / width, y: staging.y / height },
+    // R-LF-7 — the turn's own scalars, published rather than left to be
+    // re-derived. Same reason `profile` is published (R-LF-2.1) and the same
+    // reason `descentStartIndex` exists: a reader that has to reconstruct the
+    // geometry from a normalised polyline is measuring its own reconstruction.
+    // SCALARS, not points: `path` and `staging` are normalised by the
+    // container and these are not, so publishing a POINT here would put two
+    // frames in one object. Angles in radians, lengths in the px frame the
+    // caller supplied `from` and `target` in.
+    //
+    // `null` only where `chooseTurn` found no candidate at all — which the
+    // gate asserts is unreachable over the lattice, and which degenerates to
+    // the pre-R-LF-7 vertical staging rather than to nothing.
+    turn: turn
+      ? {
+        radiusPx: turn.radiusPx,
+        sweepRad: turn.sweep,
+        bearingRad: turn.phi,
+        sigma: turn.sigma,
+        passes,
+      }
+      : null,
+    // R-LF-8 / acceptance 9 — the weave's two terms IN THE FRAME IT IS DRAWN
+    // IN. `weaveAmplitudePx` is a fraction of the approach chord `from` -> the
+    // tangent point, and `weaveSpanPx` is that same chord: since R-LF-7 they
+    // are the same leg, where under the fillet the amplitude was taken from
+    // the untrimmed chord and drawn over the trimmed one. Published so
+    // acceptance 9's `A / drawnSpan` is read off the build rather than
+    // recomputed beside it.
+    weaveSpanPx: curve.approachChordPx,
+    weaveAmplitudePx: curve.amplitudePx,
+    weaveCycles: cycles,
     split,
     // R-LF-2.1 — the profile itself, so a caller or a gate reads the speed
     // the flight is actually flown at rather than re-deriving it from the
