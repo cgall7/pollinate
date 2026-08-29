@@ -41,20 +41,40 @@
 export const APPROACH_SPEED_RATIO = 1.15;
 
 // §28.5 — the descent is a GESTURE, not a traverse, so it is specified as a
-// duration. Its distance is the staging offset by construction (see
-// `buildPollinationPlan`), so fixing the duration fixes the speed.
+// duration rather than derived from a speed.
 //
 // R-LF-4, Colin's 2026-08-29 ruling: 160 -> 260ms. The old justification —
 // "he settles onto the face at the pace he was already flying" — answered a
 // cruise that no longer exists (see `APPROACH_SPEED_RATIO`); the new one is
-// what a landing actually is, a DECELERATION: 30.07pt in 260ms is 115.6 px/s,
-// 0.52x the new approach speed (221.26 px/s), about half. Flown on
-// `Easing.out(cubic)` so he lands rather than arrives.
+// what a landing actually is, a DECELERATION.
+//
+// **R-LF-2.1 changed what this constant IS, and the value is the one thing
+// that did not move** (Lumen, 2026-08-29, ratifying `c320f99`). It is now a
+// FLOOR — `descentMs = max(DESCENT_MS, 2D/v)`, resolved in
+// `buildSpeedProfile` — not the descent's duration. Three consequences the
+// next person to retune it has to be told, because each of them was written
+// here as fact and is now false:
+//
+//  * **The descent has no fixed duration.** The floor is exceeded on 214 of
+//    the 336 plans the lattice produces (by 1.12-34.00ms on 393x852 and up,
+//    up to 163ms on SE-class boxes). "Fixing the duration fixes the speed"
+//    described a traverse; a decelerating gesture over a variable arc has
+//    neither fixed.
+//  * **Its distance is NOT the staging offset.** `descentPoints` carries the
+//    fillet, so the real descent arc is 35.12pt against the 30.07pt staging
+//    chord. The old derivation here — 30.07pt in 260ms = 115.6 px/s, 0.52x
+//    the approach — was arithmetic on the chord, and it is what made the
+//    ruling's own linear ramp look like an 11% step when it is 0.16%.
+//  * **It is not flown on `Easing.out(cubic)`.** That curve was retired by
+//    R-LF-2.1, 700 lines below this sentence. The descent is `v -> 0` on the
+//    derived exponent `p = v*T/D - 1`, starting at exactly the cruise.
 //
 // **Named coupling, chosen and not inherited (R-LF-4):** `PRESENCE_FADE_MS`
 // in `FlyingBee.js` is deliberately set equal to this constant, and so is the
-// interval `start()` re-measures a not-yet-mounted anchor on. Both move to
-// 260ms with this change; both are fine at the new figure.
+// interval `start()` re-measures a not-yet-mounted anchor on. Both are a
+// PACING rhyme with the descent and not a synchronisation — which is what
+// lets them survive the floor: neither has to end when the descent does, and
+// the descent no longer ends at a time anything else could be pinned to.
 export const DESCENT_MS = 260;
 
 // §28.4 / C′ — how far above the face he hangs before he settles onto it.
@@ -194,8 +214,22 @@ export const POLLEN_GAP_FRACTION = 0.26;
 // would raise the cruise from 271 to 338 px/s, 25% FASTER, in the ruling
 // whose ask was "slower". So the ramp's cost is paid in time: exactly
 // `LAUNCH_MS / 2` on every flight, because a linear 0->v ramp covers half
-// the ground a cruise would in the same window. Ground speed at every
-// instant is <= today's; total flight length grows 60ms.
+// the ground a cruise would in the same window.
+//
+// Two figures that are true of the LAUNCH TERM and not of the built flight,
+// corrected here rather than carried (Lumen, 2026-08-29, measured old-vs-new
+// across all 336 plans):
+//
+//  * The flight does not grow by 60ms. It grows by exactly `LAUNCH_MS / 2` on
+//    the 122 plans where the descent floor holds, and by 60-223.1ms across the
+//    lattice (60-94ms on 393x852 and up), because the descent floor in this
+//    same commit extends the rest.
+//  * Ground speed at every instant is NOT <= today's, and it is the ruling
+//    working rather than a regression: at the corner the old profile braked
+//    to 135.1 px/s where this one holds 270.6 — exactly 2.0x, and removing
+//    that brake is what R-LF-2.1 IS. What is true, and is the claim worth
+//    keeping, is that the flight's PEAK falls: 337.0 -> 270.6 px/s on the
+//    neighbour hop, because the peak is now the cruise by construction.
 export const LAUNCH_MS = 120;
 
 // The per-frame speed-change bound the whole profile is built to, and the

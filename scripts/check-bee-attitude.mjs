@@ -4437,8 +4437,23 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       //      drop — ONE segment, because `adaptiveCurveSamples` refines on
       //      deviation and a line has none — is flown at one constant speed
       //      and stopped dead, and rows (i)-(iii) would all still pass it.
+      //      The reference is the profile's own arc over THE SAME FRAME —
+      //      `(arcAtMs(t+F) - arcAtMs(t)) / F` — and not `speedAtMs` at the
+      //      frame's midpoint, because the rendered side is a frame
+      //      DIFFERENCE and the midpoint derivative is a first-order
+      //      approximation OF that difference. Sampled against the midpoint
+      //      this row read 0.9037% against its own 1% budget, and every part
+      //      of that was the approximation rather than any drift: measured
+      //      against the exact frame arc it is 0.00011%. A row whose failing
+      //      state is dominated by a quantity it does not assert reds on
+      //      changes that are not defects — swept, `APPROACH_SPEED_RATIO`
+      //      1.15 -> 1.20 reds it, and non-monotonically (1.35 green, 1.30
+      //      and 1.40 red), because the residual depends on where the 60Hz
+      //      grid falls against the descent's curvature. Same quantity on
+      //      both sides, and the tolerance can then be what the claim is.
       for (let i = 0; i < frames.length; i += 1) {
-        const analytic = flight.speedAtMs(plan.profile, frames[i].t + FRAME_MS / 2);
+        const analytic =
+          ((plan.profile.arcAtMs(frames[i].t + FRAME_MS) - plan.profile.arcAtMs(frames[i].t)) / FRAME_MS) * 1000;
         const err = Math.abs(analytic - frames[i].v) / cruise;
         if (err > worstProfileError.v) worstProfileError = { v: err, label: `${label} @${frames[i].t.toFixed(0)}ms` };
       }
@@ -4462,10 +4477,10 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       bad('M4c the speed profile is unimodal', `a counter-direction step of ${(worstDip.v * 100).toFixed(2)}% of cruise at ${worstDip.label} — he slowed and then sped up again`);
     }
 
-    if (worstProfileError.v <= 0.01) {
-      ok(`M4d the RENDERED arc speed is \`speedAtMs(plan.profile, t)\` to within ${(worstProfileError.v * 100).toFixed(3)}% of cruise at every frame of every plan — the composed easing reproduces the profile EXACTLY rather than approximating it by segment count. This is the row the identity-easing spelling of R-LF-2.1 fails: the straight drop is one segment (a line has no deviation for \`adaptiveCurveSamples\` to refine on), so identity easings fly it at one constant speed and stop dead at the cell`);
+    if (worstProfileError.v <= 0.0001) {
+      ok(`M4d the RENDERED arc speed is the profile's own arc over the same frame to within ${(worstProfileError.v * 100).toFixed(5)}% of cruise at every frame of every plan (bound 0.01%) — the composed easing reproduces the profile EXACTLY rather than approximating it by segment count. This is the row the identity-easing spelling of R-LF-2.1 fails: the straight drop is one segment (a line has no deviation for \`adaptiveCurveSamples\` to refine on), so identity easings fly it at one constant speed and stop dead at the cell`);
     } else {
-      bad('M4d rendered arc speed reproduces the profile', `${(worstProfileError.v * 100).toFixed(2)}% of cruise at ${worstProfileError.label} — the durations and the profile have drifted apart`);
+      bad('M4d rendered arc speed reproduces the profile', `${(worstProfileError.v * 100).toFixed(4)}% of cruise at ${worstProfileError.label} — the composed easing and the profile have drifted apart. This row compares the profile's arc over the frame against the path's, so the residual is composition and nothing else: a sampling artefact cannot reach it`);
     }
 
     // --- M11. The profile's own constants, and the two places it is a
@@ -4578,7 +4593,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
     const descentOk = flight.DESCENT_MS === 260;
     const coupled = /PRESENCE_FADE_MS\s*=\s*DESCENT_MS/.test(flyingBeeSource);
     if (ratioOk && descentOk && coupled) {
-      ok('M5 APPROACH_SPEED_RATIO=1.15, DESCENT_MS=260, and FlyingBee.js keeps PRESENCE_FADE_MS = DESCENT_MS (the coupling rides the same retune, not a stale literal)');
+      ok('M5 APPROACH_SPEED_RATIO=1.15, DESCENT_MS=260 (a FLOOR since R-LF-2.1, not the descent\'s duration — exceeded on 214 of the 336 lattice plans), and FlyingBee.js keeps PRESENCE_FADE_MS = DESCENT_MS. The coupling rides the same retune rather than being a stale literal, and it survives the floor because it is a PACING rhyme and not a synchronisation: nothing pinned to it has to end when a descent does');
     } else {
       bad('M5 R-LF-4 constants', `ratio=${flight.APPROACH_SPEED_RATIO} (want 1.15), descent=${flight.DESCENT_MS} (want 260), PRESENCE_FADE_MS coupling present=${coupled}`);
     }

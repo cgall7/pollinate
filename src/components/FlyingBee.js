@@ -94,10 +94,17 @@ const DEFAULT_SIZE = 44;
 // How long the bee takes to leave, and to arrive, when a screen state stops
 // (or starts) declaring anywhere to land.
 //
-// It is `settleMs` deliberately — the same 160ms the descent takes. A bee
-// leaving is not a new gesture that needs a new number, and the two places a
-// mascot appears and disappears reading at the same pace is the whole of why
-// `DESCENT_MS` was pinned rather than tuned.
+// It is `DESCENT_MS` deliberately. A bee leaving is not a new gesture that
+// needs a new number, and the two places a mascot appears and disappears
+// reading at the same pace is the whole of why that constant was pinned
+// rather than tuned.
+//
+// It said "the same 160ms the descent takes" and both halves have since gone
+// stale (Lumen, 2026-08-29): R-LF-4 moved the constant to 260, and R-LF-2.1
+// made it the descent's FLOOR rather than its duration. This is a PACING
+// rhyme, not a synchronisation — nothing here has to end when a descent does,
+// which is why the floor costs it nothing. Keep it reading as one number; do
+// not re-derive it from a flight.
 const PRESENCE_FADE_MS = DESCENT_MS;
 
 
