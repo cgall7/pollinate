@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, Text, TextInput } from 'react-native';
+import { Animated, StyleSheet, View, Text, TextInput } from 'react-native';
 import { theme } from '../constants/theme';
+import { NECTAR_PRESETS } from '../constants/nectar';
 import { PressableScale } from './PressableScale';
 import { PrimaryButton } from './PrimaryButton';
 import { PillButton } from './PillButton';
@@ -42,7 +43,11 @@ import { PillButton } from './PillButton';
 // it — `isUnderGuard` is a within-file ancestor walk and cannot see a guard
 // spelled in the caller (NectarConsentSheet's header, same shape). B8
 // requires the prop be fed by an identifier of the same name.
-export const NECTAR_PRESETS = [10, 50, 100];
+// R-N2 moved the list itself to `constants/nectar.js` (a preset is a ledger
+// quantity, and check-honey-fill measures these three numbers against the
+// vessel from a bare `node` script, which cannot import a file with JSX).
+// Re-exported here so every existing import of this module keeps working.
+export { NECTAR_PRESETS };
 
 // THE MAXIMUM IS THE SERVER'S, quoted rather than re-chosen: `record_zap`
 // raises on anything outside 1..1000 drops
@@ -64,9 +69,30 @@ export const isSendableAmount = (drops, balanceDrops) => {
   return n <= balanceDrops;
 };
 
+// R-N3 — the panel during a gift.
+//
+// THE CONTROLS FALL AWAY. THE NUMERAL DOES NOT, and that is a correction to
+// the letter of the spec rather than an omission from it. Gather says "the
+// panel's contents fall away (fade + 4pt settle) except the chosen amount";
+// Settle, 340ms later, says "the balance numeral COUNTS to its new value
+// over 400ms" and closes with "you watch it leave you." Those two cannot
+// both be true of the same element: a numeral faded out at 180ms is not
+// available to be watched at 520ms. So "the panel's contents" is read as the
+// panel's CONTROLS — heading, presets, custom field, buttons — and the
+// balance line is the one thing that stays, because it is the subject of the
+// beat's last sentence. The card empties down to the number, the drop
+// leaves, the number counts. Flagged to Lumen; it is the only reading under
+// which Settle has anything to act on.
+//
+// `controlsStyle` is that group's animated opacity + 4pt settle, owned by
+// `useNectarGift` and applied here. `displayDrops` is the counting value —
+// the panel renders it INSTEAD of `balanceDrops`, which stays the
+// authoritative number and is what `isSendableAmount` is asked about, so a
+// mid-count frame can never authorise a send the server would refuse.
 export const NectarSendPanel = ({
   nectarConsent,
   balanceDrops,
+  displayDrops,
   selected,
   onSelect,
   customValue,
@@ -75,11 +101,15 @@ export const NectarSendPanel = ({
   failed,
   onSend,
   onCancel,
+  controlsStyle,
+  originRef,
 }) => (
   <>
     {nectarConsent && (
       <View style={styles.card}>
-        <Text style={styles.heading}>Send nectar</Text>
+        <Animated.View style={[styles.controls, controlsStyle]}>
+          <Text style={styles.heading}>Send nectar</Text>
+        </Animated.View>
 
         {/* DES-24 §7.3 was open: "§5.2(b) deletes the Wallet tab but does
             not say what replaces it as the place the exact number is
@@ -88,12 +118,18 @@ export const NectarSendPanel = ({
             drops available, M needed)"), so a control that offers 100 drops
             without saying you hold 40 is a control that hides its own
             failure. The numeral lives where the number is spent. */}
+        {/* THE ONE ELEMENT THAT DOES NOT FALL AWAY — see the header. It
+            reads `displayDrops`, which is `balanceDrops` at rest and the
+            animated value during a gift; the fallback keeps a caller that
+            passes neither on today's behaviour rather than blank. */}
         <Text style={styles.balance}>
-          {balanceDrops === null || balanceDrops === undefined
+          {(displayDrops === undefined ? balanceDrops : displayDrops) === null
+            || (displayDrops === undefined ? balanceDrops : displayDrops) === undefined
             ? "We couldn't check your drops."
-            : `You have ${balanceDrops} drops.`}
+            : `You have ${displayDrops === undefined ? balanceDrops : displayDrops} drops.`}
         </Text>
 
+        <Animated.View style={[styles.controls, controlsStyle]}>
         <View style={styles.presetRow}>
           {NECTAR_PRESETS.map((amount) => {
             const affordable = isSendableAmount(amount, balanceDrops);
@@ -101,6 +137,12 @@ export const NectarSendPanel = ({
             return (
               <PressableScale
                 key={amount}
+                // THE DROP LIFTS OFF THE CHIP IT WAS CHOSEN ON, so the ref
+                // follows the selection rather than sitting on a fixed
+                // control. A custom amount has no chip and the field below
+                // takes it instead — the panel knows which control carries
+                // the amount, and the screen does not have to.
+                innerRef={isSelected ? originRef : undefined}
                 onPress={() => onSelect(amount)}
                 disabled={sending || !affordable}
                 style={[styles.preset, isSelected && styles.presetSelected]}
@@ -116,6 +158,7 @@ export const NectarSendPanel = ({
         </View>
 
         <TextInput
+          ref={selected === null && customValue.trim().length > 0 ? originRef : undefined}
           style={styles.custom}
           keyboardType="number-pad"
           placeholder={`Or an amount, 1-${NECTAR_MAX_DROPS}`}
@@ -145,12 +188,22 @@ export const NectarSendPanel = ({
         <PillButton onPress={onCancel} variant="outline" disabled={sending} style={styles.cancel} accessibilityLabel="Not now">
           Not now
         </PillButton>
+        </Animated.View>
       </View>
     )}
   </>
 );
 
 const styles = StyleSheet.create({
+  // The controls group exists ONLY so Gather has one thing to fade, so it
+  // must be layout-transparent: `card` centres its children and `custom`
+  // stretches to the card's width, and a wrapper that sized to its own
+  // content would have quietly narrowed the text field. Stretch + centre
+  // reproduces the card's own flow exactly.
+  controls: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
   card: {
     width: '100%',
     backgroundColor: theme.colors.surface,

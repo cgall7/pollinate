@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { MascotBee } from './MascotBee';
+import { HoneyDrop } from './HoneyDrop';
+import { dropRadiusForAmount } from './nectarFlight';
 import { buildAttitude } from './beeAttitude';
 import {
   APPROACH_SPEED_RATIO,
@@ -158,6 +160,19 @@ const PRESETS = {
 // comb — a bee that knew the comb's cell size would be a bee that knew what it
 // was flying over.
 //
+// R-N4 — `carrying` is the gift in his hands: a number of drops, or null. It
+// is the ARRIVAL's payload and nothing else ever sets it. Given the drop's
+// own component rather than a lookalike drawn to match, because the whole
+// claim of the beat is that what arrives is the same object the ledger is
+// made of (R-N3.2 closed this one layer up, for the send).
+//
+// THE HOST MUST NOT BE ABLE TO STRAND IT. A drop the bee keeps is "you have
+// something waiting", which is the badge R-N4.2 negative 3 forbids by name —
+// so the screen derives it from the flight's own `cause` rather than from a
+// state it sets and must remember to clear. Nothing here enforces that; what
+// this component guarantees is the other half: the drop is drawn inside the
+// bee's own transformed box, so it cannot be left behind somewhere he is not.
+//
 // §32.2 — `perches` is the live anchor set from `usePerchSet()`, or null.
 // Null is not a degraded mode, it is the OFF switch: a cruise mount that is
 // handed no anchors has nowhere to land and renders no bee. The host gates it
@@ -173,6 +188,7 @@ export const FlyingBee = ({
   pollinate = null,
   onPollinateEnd,
   perches = null,
+  carrying = null,
 }) => {
   const reduced = useReducedMotion();
   const [layout, setLayout] = useState(null);
@@ -918,6 +934,21 @@ export const FlyingBee = ({
   const scaleX = attitude
     ? t.interpolate({ inputRange: attitude.inputRange, outputRange: attitude.scaleXOutput })
     : 1;
+  // R-N4 — THE CARGO, and its size is the gift's size read from the one
+  // function that answers that question (R-N3's `dropRadiusForAmount`, whose
+  // own comment says it lives there so the door and the flight cannot
+  // disagree). Not re-derived here, and deliberately not a second scale.
+  //
+  // CLAMPED TO HALF THE BEE, and the clamp is a guard rather than the
+  // mechanism. `DROP_MAX_RADIUS` is 22 because R-N6's door is the ratified
+  // 44pt tap target; this mount's `size` is also 44, so at the shipped call
+  // site the two agree exactly and the clamp binds on nothing the ledger can
+  // produce. It is here for the mount that is smaller: a carrier cannot be
+  // out-measured by its cargo and still read as carrying it — past that
+  // point it is two objects colliding, which is a different picture and not
+  // a smaller version of this one.
+  const carriedRadius = carrying ? Math.min(dropRadiusForAmount(carrying), size / 2) : 0;
+
   const flightOpacity = presetOpacity ?? 1;
 
   return (
@@ -968,6 +999,27 @@ export const FlyingBee = ({
               §State-2, a 2-degree sweep on a 4.2s clock against the airborne
               18 over 0.16s. The two are the same channel inside `MascotBee`
               and cannot both be live. */}
+          {carriedRadius > 0 && (
+            /* Drawn BEFORE the character, so he is in front of what he is
+               holding — cargo behind the carrier reads as carried, in front
+               of him reads as a collision. It rides his own transform, so it
+               banks and mirrors with him; a circle with a horizontal
+               highlight is symmetric under `scaleX`, so the mirror is a
+               no-op on it and only the bank shows, which is the swing.
+
+               Hung from his midline: the drop's crown at the bee box's
+               vertical centre, centred on his horizontal one. Stated as a
+               fraction of `size` and the drop's own radius so a smaller mount
+               keeps the relationship instead of inheriting a pixel. */
+            <HoneyDrop
+              radius={carriedRadius}
+              style={{
+                position: 'absolute',
+                left: size / 2 - carriedRadius,
+                top: size / 2,
+              }}
+            />
+          )}
           <MascotBee
             size={size}
             flutter={plan ? plan.flutter !== false : true}

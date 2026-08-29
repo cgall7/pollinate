@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { theme } from '../constants/theme';
+import { HoneyDrop } from './HoneyDrop';
+import { DROP_MAX_RADIUS } from './nectarFlight';
 import { PressableScale } from './PressableScale';
 import { PrimaryButton } from './PrimaryButton';
 import { PillButton } from './PillButton';
@@ -33,6 +35,15 @@ export const NectarConsentSheet = ({
     {nectarConsentSheetOpen && (
       <View style={styles.overlay}>
         <View style={styles.card}>
+          {/* R-N7 — the first time a person meets a drop, and until now the
+              sheet only DESCRIBED one. Show the object, at rest, above the
+              headline. Nothing moves: this is an introduction, not a beat,
+              so no `opacity`/`style` animation is passed and none is
+              wanted. Same size the door rests at (R-N6) and the same
+              component the flight throws, so a person meets the object here
+              and recognises it there — that recognition is the entire
+              reason this is `HoneyDrop` and not an illustration. */}
+          <HoneyDrop radius={DROP_MAX_RADIUS} style={styles.drop} />
           <Text style={styles.headline}>Give gifts of gratitude</Text>
           <Text style={styles.body}>
             When you send a gift to {senderName || 'someone'}, we'll add{' '}
@@ -81,6 +92,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...theme.shadows.card,
   },
+  drop: {
+    marginBottom: theme.spacing.md,
+  },
   headline: {
     ...theme.type.h3,
     color: theme.colors.ink,
@@ -104,7 +118,13 @@ const styles = StyleSheet.create({
   },
   error: {
     ...theme.type.bodySm,
-    color: theme.colors.danger,
+    // D5 / R-N7 — `ink`, NOT `theme.colors.danger`. This is the same
+    // deliberate non-reuse `NectarSendPanel.js:172-176` already names by
+    // token and by size: `danger` measures 3.62-3.91 against a 4.5:1 bar at
+    // every existing `bodySm` site (§23's still-open defect), and this was
+    // the sixth — built next door, in the same feature, in the same arc.
+    // `ink` at the same size says the same thing and can be read.
+    color: theme.colors.ink,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
   },

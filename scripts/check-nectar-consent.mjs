@@ -932,9 +932,19 @@ const callAuthority = (hit, ast, universe = null, depth = 0) => {
     if (store) {
       const callers = findStoreMethodCallers(universe, store.binding, store.method);
       if (callers.length === 0) return 'cannot-tell';
-      return callers.every((c) => callAuthority(c, c.ast, universe, depth + 1) === 'guarded')
-        ? 'guarded'
-        : 'unguarded';
+      const verdicts = callers.map((c) => callAuthority(c, c.ast, universe, depth + 1));
+      if (verdicts.every((v) => v === 'guarded')) return 'guarded';
+      // THE LABEL IS THE WORST CALLER'S, NOT A COLLAPSE OF THEM. The fail
+      // direction is unchanged — anything short of every-caller-guarded is
+      // not 'guarded' and E2 still reds — but reporting a store method whose
+      // only unguarded-looking caller is actually UNREADABLE as "unguarded"
+      // is a false accusation, not a safe failure. It sends the next reader
+      // hunting for a missing `nectarConsent` when what is really there is a
+      // named intermediate closure the walker cannot see through, and those
+      // two defects have nothing in common but their colour. (Found
+      // 2026-08-29 by being on the receiving end of it: R-N3's send hoisted
+      // its RPC into `const commit = …` and this row named the wrong cause.)
+      return verdicts.some((v) => v === 'unguarded') ? 'unguarded' : 'cannot-tell';
     }
   }
   return 'cannot-tell';
@@ -1097,13 +1107,20 @@ const ARM_CALIBRATION = [
     'cannot-tell',
   ],
   [
+    // EXPECTATION CORRECTED 2026-08-29 with the three-state label (see
+    // `callAuthority` arm 3). The claim this row makes is unchanged and is
+    // the only one that matters: the wrapper does NOT launder authority, so
+    // the answer is not 'guarded' and E2 reds. What moved is the NAME of the
+    // refusal — the wrapper has no callers of its own, so the truth about it
+    // is that nothing here can tell, and it used to be reported as a missing
+    // guard. Both red; only one of them tells you where to look.
     'arm 3: a caller that is itself an unguarded store method does not launder authority',
     () =>
       authorityOfStoreCall([
         mini('src/services/Store.js', STORE_SRC),
         mini('src/services/Other.js', `export const Other = { async wrap() { return Store.pull(); } };`),
       ]),
-    'unguarded',
+    'cannot-tell',
   ],
   [
     // THE PROBE THAT MAKES THE DEPTH CAP A CLAIM INSTEAD OF A COMMENT. The
@@ -1119,6 +1136,12 @@ const ARM_CALIBRATION = [
     // sets the convention — extend the recogniser when a legitimate shape
     // appears, against the comment, rather than pre-approving shapes nothing
     // uses. If a second hop ever lands, this row is the thing to re-argue.
+    //
+    // EXPECTATION CORRECTED 2026-08-29 for the three-state label, and the
+    // cap is still a claim rather than a comment: with `depth <= 1` the
+    // second hop resolves the outer caller as guarded and the whole thing
+    // reads 'guarded', which is not 'cannot-tell' either. The mutation still
+    // reds this row.
     'arm 3: authority does NOT propagate two hops, even when the outer caller is guarded',
     () =>
       authorityOfStoreCall([
@@ -1126,7 +1149,7 @@ const ARM_CALIBRATION = [
         mini('src/services/Other.js', `export const Other = { async wrap() { return Store.pull(); } };`),
         mini('src/screens/A.js', `function C(){ const handleGo = () => Other.wrap(); return nectarConsent && <B onPress={handleGo} />; }`),
       ]),
-    'unguarded',
+    'cannot-tell',
   ],
   [
     'arm 3: a method on a NON-exported plain object still resolves by its binding',

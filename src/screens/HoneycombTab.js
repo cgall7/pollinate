@@ -23,7 +23,8 @@ import { DEMO_CONTENT } from '../constants/demoMode';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { isBlooming } from '../utils/hiveState';
 import { NectarStore } from '../services/NectarStore';
-import { hasNectarConsent, honeyRungForDrops } from '../constants/nectar';
+import { hasNectarConsent, honeyLevelForDrops, nectarArrivalDrops } from '../constants/nectar';
+import { NectarArrivalState } from '../services/nectarArrivalState';
 
 // Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
 // button and carries it up toward the grid it just joined.
@@ -227,6 +228,14 @@ const RequestRow = ({ request, onRespond, onBlock }) => {
 
 const HoneycombFeed = () => {
   const navigation = useNavigation();
+  // R-N4 — the arrival memory is keyed PER USER (nectarArrivalState's own
+  // header: a device is not an account), so this screen needs the id. Read
+  // with `?.` even though `HoneycombTab` only mounts this branch with a
+  // session in hand: `getLastSeenDrops` answers `null` for a missing id,
+  // which is the same "unknown" every other unreadable case produces, and a
+  // deref that throws here would take the whole hive down for a decoration.
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState([]);
   // 8b.7 — a separate list from `feed`: hive_send_events is its own table
@@ -251,10 +260,31 @@ const HoneycombFeed = () => {
   const [sharing, setSharing] = useState(false);
 
   // ENG-65's producer half. The renderer for `honeyed` merged with ENG-65's
-  // first half; nothing set `member.honeyRung` — check-honey-fill.mjs says
-  // so in its own header. This is that path.
+  // first half; nothing set the cell's level — check-honey-fill.mjs said so
+  // in its own header. This is that path. R-N2 changed what it carries (a
+  // continuous 0..1 level, not a 0..4 rung) and not that it exists.
   const [nectarConsentRow, setNectarConsentRow] = useState(null);
-  const [honeyRung, setHoneyRung] = useState(0);
+  // R-N2: the CONTINUOUS level, 0..1, not a rung index. Held as the level
+  // rather than as the raw balance because that is what the cell consumes,
+  // and a screen that held drops would be a second place the cap is applied.
+  const [honeyLevel, setHoneyLevel] = useState(0);
+  // R-LF-5 / R-N4.1 — the comb's handle. It existed for one thing (`FlyingBee`'s
+  // landing has to fire the comb's own landing light, and the two are
+  // screen-level siblings per §28.2, so this is the one place both are in
+  // scope) and it now carries a second: the arrival's crossing goes in
+  // through it. DECLARED HERE, above the balance effect that commands it —
+  // it used to sit a hundred lines lower, which was legal (the effect body
+  // runs after the whole component has, so the binding is initialised by
+  // then) and read like a bug, and would have become one under any reorder.
+  const combRef = useRef(null);
+
+  // R-N4 — the size of the gift currently in the air, in DROPS. Superseded,
+  // never cleared: what decides whether the bee is holding anything is the
+  // flight's own `cause` (below), not this. A cleared-on-landing state would
+  // be a second thing to keep in step with the flight, and the failure mode
+  // of getting that wrong is a bee holding a drop forever — the badge
+  // R-N4.2 negative 3 forbids by name.
+  const [giftDrops, setGiftDrops] = useState(0);
   const nectarConsent = hasNectarConsent(nectarConsentRow);
 
   const [addEmail, setAddEmail] = useState('');
@@ -292,29 +322,65 @@ const HoneycombFeed = () => {
   // together mean the same thing a `{nectarConsent && …}` means and are what
   // rule E3 recognises (check-nectar-consent.mjs).
   //
-  // A FAILED READ IS NOT AN EMPTY WALLET (§23.1): `honeyRung` stays 0 and the
+  // A FAILED READ IS NOT AN EMPTY WALLET (§23.1): `honeyLevel` stays 0 and the
   // cell shows no honeyed state, which is the same pixels as a real zero —
   // and that is acceptable here for the reason §23.2's tier test gives, that
   // absence changes nothing the cell ASSERTS about the user. It is not
   // acceptable in the send panel, where the same unknown disables a control,
   // and NectarStore.getBalanceDrops keeps the two distinguishable for that
   // caller's sake.
+  //
+  // R-N4 — AND THIS READ IS ALSO THE ARRIVAL DETECTOR. "Your balance has
+  // risen since your last read" is the one part of the beat the server
+  // cannot answer, because seeing is a property of a screen and not of a
+  // row; the comparison is `nectarArrivalDrops` and the memory is
+  // `NectarArrivalState`, both of which treat an unknown as an unknown
+  // rather than as a zero. THE LEVEL IS COMMITTED FIRST AND
+  // UNCONDITIONALLY, and that ordering is R-N4.1's "the landing causes
+  // nothing" written as code: `HoneyFill`'s tween runs off the `honeyLevel`
+  // prop and fires whether or not anyone flies, so a suppressed, declined or
+  // aborted crossing costs the beat and never the gift. The two share
+  // `NECTAR.settle` already (HoneyFill's own comment), which is what R-N4's
+  // "on the same clock" asks for — one duration for one event, not one
+  // trigger.
+  //
+  // REMEMBERED ON EVERY SUCCESSFUL READ, including the ones that fell and
+  // the ones that did not move (see `rememberDrops`). Deliberately not
+  // awaited before the crossing is dispatched: the write is the memory for
+  // NEXT time and nothing this frame reads it, so making the bee wait on
+  // AsyncStorage would put a disk round trip on a beat that already has its
+  // answer.
   useEffect(() => {
     if (!nectarConsent) return undefined;
     let cancelled = false;
-    NectarStore.getBalanceDrops()
-      .then((drops) => {
-        if (!cancelled) setHoneyRung(honeyRungForDrops(drops));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.warn('HoneycombTab: failed to load nectar balance', err);
-        setHoneyRung(0);
-      });
+    (async () => {
+      const lastSeen = await NectarArrivalState.getLastSeenDrops(userId);
+      const drops = await NectarStore.getBalanceDrops();
+      if (cancelled) return;
+      setHoneyLevel(honeyLevelForDrops(drops));
+      NectarArrivalState.rememberDrops(userId, drops);
+      const arrived = nectarArrivalDrops(lastSeen, drops);
+      if (!arrived) return;
+      // The gift's size, for the drop he carries. Set BEFORE the command so
+      // it is already true on the frame the comb publishes the flight —
+      // `measureInWindow` resolves a frame later at the earliest, so there is
+      // no window in which a gift flight is airborne with no amount attached.
+      setGiftDrops(arrived);
+      // R-N4.1 — a command in, no payload. The comb resolves its own seat,
+      // measures its own origin and publishes the point on `onPollinate`
+      // like any other flight; if there is no seat (R-N4.2) or Reduce Motion
+      // is on (§5), it does nothing at all, which is the whole of both
+      // rulings' negative half.
+      combRef.current?.pollinateOwnCell();
+    })().catch((err) => {
+      if (cancelled) return;
+      console.warn('HoneycombTab: failed to load nectar balance', err);
+      setHoneyLevel(0);
+    });
     return () => {
       cancelled = true;
     };
-  }, [nectarConsent]);
+  }, [nectarConsent, userId]);
 
   const [shareCarryKey, setShareCarryKey] = useState(0);
   const [feedArrivalKey, setFeedArrivalKey] = useState(0);
@@ -326,10 +392,6 @@ const HoneycombFeed = () => {
   const [pollination, setPollination] = useState(null);
   const pollinationRef = useRef(null);
   pollinationRef.current = pollination;
-  // R-LF-5 — the only reason this ref exists: `FlyingBee`'s landing needs to
-  // fire the comb's own landing light, and the two are screen-level siblings
-  // (§28.2), so this is the one place both are in scope.
-  const combRef = useRef(null);
   // The live scroll offset (read by value by the abort predicate) and a tick
   // that carries no information and exists only to re-run it. §28.9: put
   // completeness in the trigger and correctness in the predicate.
@@ -507,13 +569,13 @@ const HoneycombFeed = () => {
   // stays a projection of a share.
   //
   // `isOwn` is the same flag HoneycombGrid's own gate reads
-  // (`member.isOwn && member.honeyRung`), so the two agree on which seat is
-  // yours by construction rather than by convention. Pre-consent `honeyRung`
-  // is 0, and 0 is not a low fill — it is no honeyed state at all, which is
-  // D1's `preConsent` ("no honeyed mark anywhere in the hive") holding
-  // without a second flag to keep in step.
-  const combMembers = honeyRung
-    ? todayMembers.map((m) => (m.isOwn ? { ...m, honeyRung } : m))
+  // (`member.isOwn && member.honeyLevel > 0`), so the two agree on which seat
+  // is yours by construction rather than by convention. Pre-consent
+  // `honeyLevel` is 0, and 0 is not a low fill — it is no honeyed state at
+  // all, which is D1's `preConsent` ("no honeyed mark anywhere in the hive")
+  // holding without a second flag to keep in step.
+  const combMembers = honeyLevel
+    ? todayMembers.map((m) => (m.isOwn ? { ...m, honeyLevel } : m))
     : todayMembers;
 
   // 8b.7 — shares and send events are two separate queries against two
@@ -552,9 +614,24 @@ const HoneycombFeed = () => {
           active
           perches={hiveView === 'week' ? null : perches}
           pollinate={pollination}
+          // R-N4 — THE DROP IS A PROPERTY OF THE FLIGHT, NOT OF THIS SCREEN.
+          // Derived from the fact the comb publishes (`cause`), so it is
+          // born with the flight and dies with it: `setPollination(null)`
+          // below already runs at touchdown AND on abort, which means there
+          // is no path where the bee keeps a drop. R-N4.2 negative 3 ("never
+          // held over for later") holds by construction rather than by a
+          // clear() somebody has to remember, and the release lands on the
+          // same frame as `burstPollen` — the drop leaves him exactly when
+          // the pollen fires.
+          carrying={pollination?.cause === 'arrival' ? giftDrops : null}
           onPollinateEnd={() => {
-            // R-LF-5 — "I landed" is the only thing that crosses back; the
-            // comb already knows which cell that means (§28.2).
+            // R-LF-5 — the landing light. This USED to be the whole story
+            // ("'I landed' is the only thing that crosses back"), and that
+            // sentence went stale the moment R-N4.1 put a second command on
+            // the handle: `pollinateOwnCell` now crosses INWARD, unprompted
+            // by any landing. What still holds is the narrower claim it was
+            // making — the comb already knows which cell a landing means
+            // (§28.2), so no cell reference travels back with it.
             combRef.current?.igniteLanding();
             setPollination(null);
           }}

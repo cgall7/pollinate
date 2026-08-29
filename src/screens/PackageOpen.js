@@ -14,6 +14,10 @@ import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { NectarConsentSheet } from '../components/NectarConsentSheet';
 import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
+import { NectarGiftLayer } from '../components/NectarGiftLayer';
+import { HoneyDrop } from '../components/HoneyDrop';
+import { DROP_MAX_RADIUS } from '../components/nectarFlight';
+import { useNectarGift } from '../components/useNectarGift';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
 import {
@@ -94,6 +98,16 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   const bloomOpacity = useRef(new Animated.Value(0)).current;
   const bloomScale = useRef(new Animated.Value(0.85)).current;
   const dateOpacity = useRef(new Animated.Value(0)).current;
+
+  // R-N3's two ends, both REFS and never coordinates. `giftOrigin` follows
+  // the control that carries the amount (the panel decides which);
+  // `entryPaperRef` and `endingTitleRef` are the two destinations
+  // `sendTarget` is exhaustive over — the paper block of the entry, and the
+  // colophon sentence for a gift aimed at the whole package (R-N3.1).
+  const giftOrigin = useRef(null);
+  const entryPaperRef = useRef(null);
+  const endingTitleRef = useRef(null);
+  const gift = useNectarGift({ reduced, balanceDrops });
 
   useFocusEffect(
     useCallback(() => {
@@ -264,40 +278,110 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     setSendCustom(text);
   };
 
+  // `measureInWindow` has a callback and no promise. Wrapped once here so
+  // the beat can await both ends together and so a view that has gone away
+  // between the tap and the measure resolves `null` rather than hanging the
+  // send forever.
+  const measure = (ref) =>
+    new Promise((resolve) => {
+      if (!ref.current || typeof ref.current.measureInWindow !== 'function') {
+        resolve(null);
+        return;
+      }
+      ref.current.measureInWindow((x, y, width, height) => {
+        if ([x, y, width, height].some((n) => typeof n !== 'number' || !Number.isFinite(n))) resolve(null);
+        else resolve({ x, y, width, height });
+      });
+    });
+
   const handleSend = async () => {
     const amount = resolveSendAmount();
     if (!sendTarget.id || sending || !isSendableAmount(amount, balanceDrops)) return;
     setSending(true);
     setSendFailed(false);
-    try {
-      await NectarStore.recordZap({
-        zapId: attemptId.current,
-        targetKind: sendTarget.kind,
-        targetId: sendTarget.id,
-        amountDrops: amount,
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // THE SENDER'S CONFIRMATION IS HERE, AND IT HAS TO BE. Deezine's spec
-      // ends the flow with "entry shows new honeyed mark" — but the honeyed
-      // cell is OWN-CELL-ONLY by construction (HoneycombGrid:199,
-      // `member.isOwn && member.honeyRung`, DES-24 §6.2's isOwn gate), so
-      // the mark that appears is on the RECIPIENT's cell in the RECIPIENT's
-      // app and the sender never sees it. The only honeyed cell a sender
-      // can see is their own, and after a zap it goes DOWN. So a success
-      // haptic, the panel standing down, and a re-read balance are the
-      // whole of the sender-side receipt — D4's cut removed the other half
-      // (the author's notification) rather than deferring it.
-      const drops = await NectarStore.getBalanceDrops();
-      setBalanceDrops(drops);
+
+    // THE REQUEST IS HANDED TO THE BEAT RATHER THAN AWAITED HERE. R-N3 is
+    // optimistic — "the drop leaves before the network answers" — so the
+    // request and the choreography start together and are joined at the end.
+    // The re-read rides inside it, so the authoritative balance lands before
+    // the beat resolves and the count's absolute target is never stale.
+    //
+    // IT IS AN ANONYMOUS THUNK AT THE CALL SITE, AND THAT IS NOT A STYLE
+    // CHOICE. My first cut hoisted it to `const commit = async () => {…}`,
+    // which reds `check-nectar-consent` E2 — and the gate is RIGHT. E2
+    // traces a reserved store call's authority to the JSX that wires the
+    // handler it sits in, and `findEnclosingHandlerName` stops at the first
+    // NAMED arrow it meets walking outward. A named intermediate closure is
+    // therefore a wall: the call is really authorised by `onSend={handleSend}`
+    // under `nectarConsent`, and naming the wrapper hid exactly that chain.
+    // Inline, the walk reaches `handleSend`, whose two wirings are both
+    // inside the guard, and the authority is legible to the gate for the
+    // same reason it is legible to a reader.
+    // THE DESTINATION IS THE TARGET'S, and the two branches are the two
+    // `sendTarget` kinds — exhaustive by construction (see `sendTarget`), so
+    // there is no third case to fall through. `entry` goes to the paper
+    // block of the thing this person wrote; `hive` goes to the colophon
+    // sentence, which is the only thing on the ending screen that IS the
+    // package rather than a part of it, and the only one that renders in all
+    // three of its branches (R-N3.1).
+    const [origin, destination] = await Promise.all([
+      measure(giftOrigin),
+      measure(sendTarget.kind === 'entry' ? entryPaperRef : endingTitleRef),
+    ]);
+
+    // FAIL-SAFE, AND IT FAILS TOWARD THE GIFT. If either end could not be
+    // measured there is no path to fly, but the person still asked to give
+    // something — so the send happens exactly as it did before this ruling
+    // (await, haptic, close) rather than being refused. A beat that could
+    // not draw itself must not become a beat that did not happen.
+    if (!origin || !destination) {
+      try {
+        await NectarStore.recordZap({
+          zapId: attemptId.current,
+          targetKind: sendTarget.kind,
+          targetId: sendTarget.id,
+          amountDrops: amount,
+        });
+        setBalanceDrops(await NectarStore.getBalanceDrops());
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setEntrySendOpen(false);
+        beginAttempt();
+      } catch (err) {
+        console.warn('PackageOpenScreen: record_zap failed', err);
+        setSendFailed(true);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    const result = await gift.send({
+      origin,
+      destination,
+      amount,
+      commit: () =>
+        NectarStore.recordZap({
+          zapId: attemptId.current,
+          targetKind: sendTarget.kind,
+          targetId: sendTarget.id,
+          amountDrops: amount,
+        })
+          .then(() => NectarStore.getBalanceDrops())
+          .then((drops) => setBalanceDrops(drops)),
+    });
+    if (result && result.ok === false) {
+      console.warn('PackageOpenScreen: record_zap failed', result.err);
+      // The drop has already come home and the numeral has already counted
+      // back up; this is only the accessible text, which R-N3 keeps ("the
+      // failure line stays as the accessible text; the motion is what
+      // carries it").
+      setSendFailed(true);
+    } else {
       setEntrySendOpen(false);
       // A second gift is a second zap, so it needs its own handle.
       beginAttempt();
-    } catch (err) {
-      console.warn('PackageOpenScreen: record_zap failed', err);
-      setSendFailed(true);
-    } finally {
-      setSending(false);
     }
+    setSending(false);
   };
 
   const handleNectarDismiss = () => {
@@ -415,7 +499,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                 style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
               >
                 <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
-                  <PaperBlock paper={step.paper}>
+                  <PaperBlock paper={step.paper} blockRef={entryPaperRef}>
                     <Text style={[styles.entryText, { color: paperInk(step.paper) }]}>{step.text}</Text>
                     {/* DES-21 §4 — a SIGNATURE, not a byline: inside PaperBlock,
                         after the body, trailing-aligned, on the entry's own
@@ -453,7 +537,18 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                       containerStyle={styles.nectarDoor}
                       accessibilityLabel="Give a gift"
                     >
-                      <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
+                      {/* R-N6 — pre-consent the door keeps its DISTINCT
+                          GLYPH and carries no money word and no drop form:
+                          `nectar.js`'s D3 row and Apple 2.3.1(a) both bind,
+                          and a drop IS the money form. So only the size is
+                          corrected, and the correction is borrowed rather
+                          than chosen — the design system's own icon-circle
+                          pairing is a 22pt Ionicons glyph in a 44pt circle
+                          (§9.3's build sheet as logged in the Review Log:
+                          "white 44pt icon circles on washYellow; moon /
+                          cloud / leaf / heart at 22pt ink"). 16pt in a 32pt
+                          box was neither half of that pair. */}
+                      <Ionicons name="enter-outline" size={22} color={theme.colors.ink} />
                     </PressableScale>
                   )
                 )}
@@ -472,7 +567,25 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                       containerStyle={styles.nectarDoor}
                       accessibilityLabel="Send nectar for this memory"
                     >
-                      <Ionicons name="water-outline" size={16} color={theme.colors.ink} />
+                      {/* R-N6 — THE DOOR IS A DROP. A 16pt `water-outline`
+                          is not an invitation; the affordance is the same
+                          object the whole system is made of, at rest, so
+                          the thing you tap looks like the thing you send.
+                          `DROP_MAX_RADIUS` is not a size picked for this
+                          slot — it was DERIVED FROM this slot (R-N3: the
+                          ceiling is "the door IS this object at rest in the
+                          ratified 44pt box"), so the door and the flight
+                          cannot drift into two sizes.
+
+                          NO CLOCK OF ITS OWN, and none is added: this
+                          element is already inside the entry card's
+                          `bloomOpacity`/`bloomScale` view (`:497`), so it
+                          arrives on the entry's own bloom by position. One
+                          more ambient loop is banned (standing rule), which
+                          is why "it breathes on the entry's own bloom
+                          clock" is satisfied by an ABSENCE here rather than
+                          by an animation. */}
+                      <HoneyDrop radius={DROP_MAX_RADIUS} />
                     </PressableScale>
                   )
                 )}
@@ -490,7 +603,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
               group. `contributor_names` is the single source (§14.2/§14.4),
               already distinct-per-author in first-appearance order, so no
               second ordering is derived here. */}
-          <Text style={[styles.endingTitle, { color: cover.textColor }]}>
+          <Text ref={endingTitleRef} style={[styles.endingTitle, { color: cover.textColor }]}>
             {sequence && sequence.length > 0
               ? pkg.isCollective
                 ? // Row 17's bijection: this count is `contributorNames.length`,
@@ -525,6 +638,9 @@ export const PackageOpenScreen = ({ navigation, route }) => {
             <NectarSendPanel
               nectarConsent={nectarConsent}
               balanceDrops={balanceDrops}
+              displayDrops={gift.displayDrops}
+              controlsStyle={gift.controlsStyle}
+              originRef={giftOrigin}
               selected={sendAmount}
               onSelect={handleSelectPreset}
               customValue={sendCustom}
@@ -555,10 +671,26 @@ export const PackageOpenScreen = ({ navigation, route }) => {
         // the same thing.
         <>
           {entrySendOpen && (
+        // R-N3.3 — TWO JOBS, SEPARATED. This view was one thing doing both:
+        // a dark veil AND the touch barrier that stops a tap during the gift
+        // from advancing the reveal underneath. The veil now lives in its
+        // own sibling and fades to zero across Gather, because "the drop
+        // should fly over the entry it is for, not over a dimmed copy of
+        // it"; the barrier is this view, which stays mounted and opaque to
+        // touches for the whole beat even when nothing is drawn on it. A
+        // transparent overlay is still a touch barrier — that is the ruling,
+        // and it is the reason the two had to come apart.
         <View style={styles.sendOverlay}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.sendScrim, { opacity: gift.scrim }]}
+          />
           <NectarSendPanel
             nectarConsent={nectarConsent}
             balanceDrops={balanceDrops}
+            displayDrops={gift.displayDrops}
+            controlsStyle={gift.controlsStyle}
+            originRef={giftOrigin}
             selected={sendAmount}
             onSelect={handleSelectPreset}
             customValue={sendCustom}
@@ -572,6 +704,17 @@ export const PackageOpenScreen = ({ navigation, route }) => {
           )}
         </>
       )}
+
+      {/* LAST CHILD, so the drop crosses over the entry, the panel and the
+          overlay alike — it is the one object in this beat that belongs to
+          neither surface. It takes no touches (R-N3.3's other half). */}
+      <NectarGiftLayer
+        gift={gift.gift}
+        travel={gift.travel}
+        dropScale={gift.dropScale}
+        dropOpacity={gift.dropOpacity}
+        bloom={gift.bloom}
+      />
 
       <NectarConsentSheet
         nectarConsentSheetOpen={nectarConsentSheetOpen}
@@ -614,6 +757,10 @@ const styles = StyleSheet.create({
   // inset written to `style` is resolved against the Pressable's own collapsed
   // box instead of this screen, and the control renders wherever flow drops it.
   // Photographed mid-screen on PackageOpen and MemoryLane before this split.
+  sendScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: theme.colors.scrim,
+  },
   closeButtonAnchor: {
     position: 'absolute',
     top: 60,
@@ -685,15 +832,24 @@ const styles = StyleSheet.create({
   nectarDoor: {
     alignSelf: 'flex-end',
     marginTop: theme.spacing.sm,
-    width: 32,
-    height: 32,
+    // R-N6 — 44pt, which is TWO ratified numbers landing on one value: the
+    // design system's minimum touch target (§16.5, "min 44pt touch
+    // targets") and the drop's own
+    // ratified rest diameter (`2 * DROP_MAX_RADIUS`). 32 was under the
+    // first and unrelated to the second. Not written as an expression of
+    // `DROP_MAX_RADIUS` on purpose — the box is the TAP TARGET, and it must
+    // not shrink if the drop's ceiling is ever retuned.
+    width: 44,
+    height: 44,
     borderRadius: theme.borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: theme.colors.scrim,
+    // NO `backgroundColor` — the veil moved to `sendScrim` below. What is
+    // left here is the touch barrier and the panel's centring, and this view
+    // being invisible is exactly the point (R-N3.3).
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

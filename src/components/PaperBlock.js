@@ -10,8 +10,17 @@ import { theme } from '../constants/theme';
 // Only 'evening' gets a background here; everything else (author line,
 // likes, comments, inputs, rails, badges, hairlines) stays outside this
 // component, on its own surface token, untouched.
-export const PaperBlock = ({ paper, style, children }) => (
-  <View style={[paper === 'evening' && styles.evening, style]}>{children}</View>
+// `blockRef` is R-N3's Depart, and it is a ref rather than a coordinate:
+// the drop travels "to the paper block of the thing this person wrote", so
+// the beat needs this view's LIVE window rect at the moment the finger left
+// the chip. Additive and undefined by default — no existing caller changes.
+// `collapsable={false}` rides with it because an Android view with no props
+// of its own can be flattened out of the tree, and a flattened view has
+// nothing to measure.
+export const PaperBlock = ({ paper, style, children, blockRef }) => (
+  <View ref={blockRef} collapsable={blockRef ? false : undefined} style={[paper === 'evening' && styles.evening, style]}>
+    {children}
+  </View>
 );
 
 // The only two ink tokens ever painted inside a `paper === 'evening'`

@@ -4647,7 +4647,25 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
   {
     const burstThenEnd = /burstPollen\(plan\.landing\);[\s\S]{0,200}onPollinateEndRef\.current\?\.\(\)/.test(flyingBeeSource);
     const gridForwardRef = /export const HoneycombGrid = forwardRef\(/.test(gridSource);
-    const gridExposesIgnite = /useImperativeHandle\(ref,\s*\(\)\s*=>\s*\(\{\s*igniteLanding\s*\}\)\)/.test(gridSource);
+    // AMENDED 2026-08-29 (R-N4.1). This used to pin the handle's ENTIRE
+    // literal — `({ igniteLanding })`, exactly one key — and it went red on
+    // correct code the moment the arrival landed a second COMMAND on it.
+    // Lumen's ruling is that the invariant was never the arity:
+    //
+    //   > The handle's invariant is not "one function." It is: commands in,
+    //   > no state out. One function was the consequence.
+    //
+    // So the row asserts what M8 is actually about — `igniteLanding` is
+    // still exposed on a ref-borne object — and the invariant it was
+    // standing in for is asserted properly, as a property of every member,
+    // in `check-nectar-exchange` section G. A row that pins a whole literal
+    // to test one of its members reds on every legal addition and says
+    // nothing about the illegal one.
+    const gridExposesIgnite = (() => {
+      const m = gridSource.match(/useImperativeHandle\(ref,\s*\(\)\s*=>\s*\(\{([^}]*)\}\)\)/);
+      if (!m) return false;
+      return m[1].split(',').map((k) => k.trim()).includes('igniteLanding');
+    })();
     const peakUnderIgnition = (() => {
       const m = gridSource.match(/LANDING_LIGHT_PEAK\s*=\s*([\d.]+)/);
       return m ? Number(m[1]) < 1 : false;

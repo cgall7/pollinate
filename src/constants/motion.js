@@ -130,6 +130,47 @@ export const HONEY_EASING = {
   fill: Easing.inOut(Easing.quad),
 };
 
+// NECTAR — the living exchange (POLLINATE_NECTAR_LIVING_EXCHANGE §3, Lumen
+// 2026-08-29). One gift is ONE gesture in three beats, and the boundaries
+// below are the spec's own: Gather 0-180, Depart 180-520, Settle 520-760.
+// They are written as DURATIONS rather than as timestamps so that a beat
+// retimed here cannot leave a later beat's start stranded at a number that
+// no longer follows it.
+export const NECTAR = {
+  // Gather: the panel's contents fall away and the chosen amount lifts off
+  // its chip as a drop.
+  gather: 180,
+  // Depart: 180 -> 520. The travel.
+  travel: 340,
+  // Absorption: the drop collapses into the paper and the paper takes a warm
+  // bloom at the contact point. Rise and fall are asymmetric BY RULING —
+  // "it reads as a stain spreading and not a flash" is a statement about the
+  // ratio, and 240/520 is the spec's own pair.
+  absorbRise: 240,
+  absorbFall: 520,
+  // Settle: the balance numeral counts to its new value, and the sender's
+  // own meniscus falls by the drop's worth ON THE SAME CLOCK. ONE constant,
+  // read by both — `HoneyFill` imports this rather than declaring 400, so
+  // the count and the level cannot drift into two clocks for one event.
+  settle: 400,
+};
+
+export const NECTAR_EASING = {
+  // The gesture's own curve. `out(cubic)` decelerating into the paper, and
+  // the drop does not bounce — R-N3 says so outright, which rules out every
+  // spring in this file for the travel.
+  travel: Easing.out(Easing.cubic),
+  // The spec's own pair, quoted: rise `out(cubic)`, fall `inOut(cubic)`.
+  absorbRise: Easing.out(Easing.cubic),
+  absorbFall: Easing.inOut(Easing.cubic),
+  // The count and the meniscus share `settle`; the meniscus additionally
+  // requires a MONOTONE curve, because it renders a quantity and an
+  // overshoot would assert a level nobody holds. `HoneyFill` uses
+  // `HONEY_EASING.fill` for that reason and this entry is not it — see that
+  // component's comment.
+  settle: Easing.inOut(Easing.cubic),
+};
+
 // Stage light (MB-D1, Deezine 2026-08-27; Lumen ratified with amendments
 // 2026-08-28) — the one-shot bloom that announces a ceremony hero before it
 // performs. Two consumers, ever: the P2 celebration card and the P3 greeting

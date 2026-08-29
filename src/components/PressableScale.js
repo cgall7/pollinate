@@ -47,6 +47,13 @@ export const PressableScale = ({
   // that needs a stateful stop ("selected") rather than a plain button.
   accessibilityState,
   hitSlop,
+  // Additive, undefined by default: a caller that needs this control's live
+  // window rect (R-N3's drop lifts off the chip it was chosen on) can have
+  // it without every other call site changing. It lands on the `Pressable`,
+  // i.e. the same node `containerStyle` addresses — R43's outer view, the
+  // one that carries layout — and never on the inner `Animated.View`, whose
+  // box is the pressed-scale transform rather than the control's position.
+  innerRef,
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const colorOpacity = useRef(new Animated.Value(0)).current;
@@ -83,6 +90,7 @@ export const PressableScale = ({
 
   return (
     <Pressable
+      ref={innerRef}
       style={containerStyle}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
