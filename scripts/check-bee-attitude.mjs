@@ -5440,9 +5440,29 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       const overlap = mutHits.filter((l) => zeroSweepLabels.has(l)).length;
       // And the void the threshold sits in, measured rather than asserted:
       // 1e-6 is only "not a tuned number" if nothing real is near it.
-      const sweeps = PLANS.map((p) => p.plan.turn.sweepRad).filter((v) => v > 0);
-      const degenerateMax = Math.max(...sweeps.filter((v) => v <= flight.TURN_SWEEP_TIE_RAD), 0);
-      const realMin = Math.min(...sweeps.filter((v) => v > flight.TURN_SWEEP_TIE_RAD));
+      //
+      // THE VOID IS READ FROM THE GEOMETRY, NOT FROM THE CONSTANT. My first
+      // spelling partitioned the sweeps BY `TURN_SWEEP_TIE_RAD` and then
+      // asserted the constant sat between the two halves — which is a
+      // tautology, because the halves are defined by it. It could not fail,
+      // and the battery's M3 stayed green through a 100000x widening. Third
+      // outing of A ROW THAT READS ITS OWN BOUND CANNOT SEE THE BOUND MOVE,
+      // and the first where I wrote it INTO the fix for the previous one.
+      //
+      // Instead: sort the sweeps and find the largest MULTIPLICATIVE gap.
+      // That is a property of the lattice alone — no constant on either side
+      // — and the claim becomes the one actually being made, that the
+      // threshold sits in the empty space between the degenerate sweeps and
+      // the real ones.
+      const sweeps = PLANS.map((p) => p.plan.turn.sweepRad).filter((v) => v > 0).sort((a, b) => a - b);
+      let gapAt = 0;
+      let gapRatio = 0;
+      for (let i = 0; i < sweeps.length - 1; i += 1) {
+        const r = sweeps[i + 1] / sweeps[i];
+        if (r > gapRatio) { gapRatio = r; gapAt = i; }
+      }
+      const degenerateMax = sweeps[gapAt];
+      const realMin = sweeps[gapAt + 1];
 
       // M3 OF THE BATTERY FOUND THIS HOLE. The row PRINTED the void and did
       // not assert the threshold sits in it, so widening TURN_SWEEP_TIE_RAD
