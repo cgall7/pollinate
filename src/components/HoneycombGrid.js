@@ -706,10 +706,21 @@ export const HoneycombGrid = forwardRef(({
   // is the BEE's, on the SAME `glowBloomOpacity` channel, fired by
   // `HoneycombTab` from `FlyingBee`'s existing `onPollinateEnd` — the frame
   // `burstPollen` and the sequencer's own settle already run on. By the time
-  // any hop lands under R-LF-4's new durations the ignition has long since
-  // reached 0 (out at 430ms; the fastest landing is 560ms), so reusing the
+  // any hop lands the ignition has long since reached 0, so reusing the
   // channel needs no reconciliation with whatever the finger's envelope was
-  // doing. No cell reference crosses with it (§28.2) — this re-triggers
+  // doing.
+  //
+  // **The margin, corrected twice.** The ignition is out at 430ms
+  // (`CONTACT_MS` 180 + `HONEY.fill` 250). This comment used to claim the
+  // fastest landing was 560ms — a 130ms margin — which was not measured
+  // against anything: enumerated over the real 7-seat lattice, R-LF-4's
+  // shortest flight was 468.5ms, a margin of 38ms (Lumen, 2026-08-29).
+  // R-LF-2.1's launch ramp then bought 60ms of it back, and its descent
+  // floor a little more: the shortest flight over the lattice is now
+  // 524.2ms, on the largest container, so the margin is 94.2ms. The
+  // conclusion held through all three figures; the number in the comment is
+  // what the next person retuning `HONEY.fill` reads, so it is the number
+  // that has to be true rather than the conclusion. No cell reference crosses with it (§28.2) — this re-triggers
   // whichever cell `glowBloomOpacity`/`tapCentre` already point at, and by
   // §28.9 that is always the cell that just finished landing: an aborted
   // flight never reaches `onPollinateEnd`, so a re-tap elsewhere always
