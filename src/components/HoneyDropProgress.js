@@ -35,7 +35,16 @@ const Drop = ({ filled }) => {
   return (
     <View style={styles.dropWrap}>
       <Svg width={DROP_SIZE} height={DROP_SIZE} viewBox="0 0 24 24">
-        <Path d={DROP_PATH} fill="none" stroke={theme.colors.surfaceBorderStrong} strokeWidth={2} />
+        {/* `trackDim`, not `surfaceBorderStrong`: this row is a progress
+            rail, and §23.11 already ruled the rail pair (`ink` fill on an
+            `ink@0.52` track). `surfaceBorderStrong` is a CARD-EDGE token —
+            `inkVeil@0.14`, which over `goldField` is 1.3100:1, and against a
+            filled `accentDeep` drop 1.1655:1. That last number was the whole
+            defect: the one thing this component exists to say — which beat
+            you are on — was carried at 1.17:1 on the app's showcase screen.
+            Borrowing the rail register also means borrowing its ground, so
+            the token re-solved for `goldField`; see theme.js. */}
+        <Path d={DROP_PATH} fill="none" stroke={theme.colors.trackDim} strokeWidth={2} />
       </Svg>
       {filled && (
         <Animated.View
@@ -43,7 +52,12 @@ const Drop = ({ filled }) => {
           style={[styles.dropFill, { opacity: pop, transform: [{ scale: reduced ? 1 : pop }] }]}
         >
           <Svg width={DROP_SIZE} height={DROP_SIZE} viewBox="0 0 24 24">
-            <Path d={DROP_PATH} fill={theme.colors.accentDeep} />
+            {/* `ink`, not `accentDeep`. R127 licenses `accentDeep` as a
+                glyph fill, but a licence is a role, not a measurement:
+                on `goldField` it is 1.5268:1, and §29.1's own gold block
+                already says `ink` is the only thing that separates from
+                this field. 10.0066:1 here, 15.8455:1 on `background`. */}
+            <Path d={DROP_PATH} fill={theme.colors.ink} />
           </Svg>
         </Animated.View>
       )}
