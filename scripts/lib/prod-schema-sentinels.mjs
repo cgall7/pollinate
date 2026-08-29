@@ -124,22 +124,36 @@ export const SENTINELS = {
   // 20260813000005 naming only list_hive_state for a three-function revoke).
   // Post-migration, anon calling it gets a real boolean back (`false`,
   // always, per check-share-visibility.mjs's named exception and Sage's
-  // ruling in thread d1783906), not a permission error — so 'exists' is the
-  // deployed-signal, matching 20260809000002's row, not 20260813000005's.
+  // ruling in thread d1783906).
+  //
+  // CORRECTED (Lumen, thread d1783906, 2026-08-29): this row shipped with
+  // `expect: 'exists'` and read LIVE for three weeks before either this
+  // migration or 20260829000002 was actually deployed — 'exists' only
+  // discriminates on PGRST202 (function absent), and this migration's
+  // before-state (42501, permission denied) is already a resolved function,
+  // so it cleared that check too. Prod-schema-check's own dry live run
+  // caught the gap directly: `is_hive_contributor` answered 200/false only
+  // AFTER `supabase db push` actually applied this file — before that it was
+  // 401/42501, and this row still said LIVE either way. `expect: 'success'`
+  // is the corrected signal: it requires the actual 200, not just a
+  // resolved function name.
   '20260829000001_grant_hive_definer_helpers_anon': {
     kind: 'rpc',
     fn: 'is_hive_contributor',
     args: { p_hive_id: '00000000-0000-0000-0000-000000000000' },
-    expect: 'exists',
+    expect: 'success',
   },
   // Same inverse-of-813 shape as 20260829000001's row above, for the third
   // function in that migration's family: owns_entry() re-gains anon EXECUTE
   // here, so a post-migration anon call gets a real boolean back instead of
-  // 813's 42501.
+  // 813's 42501. Same correction as above, for the same reason — live-tested
+  // against prod both before and after `supabase db push` applied this file
+  // (2026-08-29): 401/42501 before, 200/false after, and `expect: 'success'`
+  // is what actually tells those two states apart.
   '20260829000002_grant_owns_entry_anon': {
     kind: 'rpc',
     fn: 'owns_entry',
     args: { p_entry_id: '00000000-0000-0000-0000-000000000000' },
-    expect: 'exists',
+    expect: 'success',
   },
 };
