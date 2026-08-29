@@ -231,6 +231,21 @@ const colors = {
   glassRim: withAlpha(pigment.surface, 0.65),
   glassVeil: withAlpha(pigment.surface, 0.85), // was `surface + 'D9'` (0.851)
   glassSheer: withAlpha(pigment.surface, 0.55), // was `surface + '8C'` (0.549)
+  // GL2, ruled (`GUIDES/POLLINATE_GL2_VEIL_DERIVATION.md`): the NATIVE glass
+  // rung takes 0.35 and the blur rung keeps 0.55. Two materials, two values —
+  // this is a PAIR, not a token that moved. `GlassView` already refracts what
+  // is behind it, so the veil above it only has to keep the surface inside the
+  // Sunbeam palette; at 0.55 it would erase the refraction that is the whole
+  // reason the rung exists. 0.35 is the smallest measured alpha clearing both
+  // bars on every ground in that derivation.
+  glassLens: withAlpha(pigment.surface, 0.35),
+  // GL1 residual (a), ruled: the 1pt white rim reads WEAKER on glass than on
+  // blur, because the glass body sits at 254-255 lum and white has no headroom
+  // left to brighten into. Raising the rim's alpha is a dead end — the fix is a
+  // hairline of ink UNDER the white, so the edge is defined by the dark line and
+  // the white reads as the specular gleam on top of it. 10%, the middle of the
+  // spec's 8-12% interval, to be re-measured on a device.
+  glassHairline: withAlpha(pigment.ink, 0.1),
 
   // --- Accent alphas ---
   // Marigold as an EDGE, not a fill — §4's "yellow never fills it" still holds.

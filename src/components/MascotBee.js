@@ -3,6 +3,12 @@ import { Animated, Easing, Image, PixelRatio, StyleSheet } from 'react-native';
 import {
   BREATH_BEAT_DEG,
   BREATH_CYCLE_MS,
+  BREATH_RISE_CYCLE_MS,
+  BREATH_RISE_FRACTION,
+  BREATH_RISE_SPLIT,
+  FLICK_BEATS,
+  FLICK_INTERVAL_MAX_MS,
+  FLICK_INTERVAL_MIN_MS,
   HINGE,
   MASCOT_ASPECT,
   MASCOT_BASE_PX,
@@ -98,20 +104,49 @@ try {
 // gesture, and the first time they were both live the wing would carry two
 // drivers on one value (R83's rule, and R46's).
 //
-// So the mode picks the sweep and the rhythm, and nothing else changes:
+// So the mode picks the RHYTHM, and the geometry never changes:
 //
-//     flutter   18deg   80ms out, 80ms back      airborne
-//     breath     2deg   2100ms out, 2100ms back  perched
+//     flutter   0 .. 1                80ms out, 80ms back        airborne
+//     breath    BREATH_LO .. _HI      2100ms out, 2100ms back    perched
+//     flick     0 .. 1, twice         80ms a half-beat           punctuation
+//
+// **The sweep is no longer a mode's property, and that is the change that lets
+// a perched bee flick.** It used to be: `sweepDeg` picked 2 or 18 and the
+// driven value always ran the full 0..1. One value cannot then carry two
+// amplitudes, so a breathing bee could not briefly do anything larger without
+// swapping its own transform mid-gesture. Now the rotation maps 0..1 onto the
+// FULL 18-degree beat once and for all, and Breath simply declines to use most
+// of it — it oscillates inside a band of `BREATH_BEAT_DEG / WING_BEAT_DEG` of
+// the range, centred, which renders exactly the same +/-1 degree it always did
+// (0.4444 -> -1.0000deg, 0.5556 -> +1.0000deg). Amplitude becomes a property of
+// the rhythm, which is the half this component already said the caller owns.
 //
 // `flutter` wins if both are passed. That is not a preference: an airborne bee
 // whose host also asked for breath is a host that has not noticed the bee took
 // off, and the wing that reads correctly there is the flying one.
+const BREATH_BAND = BREATH_BEAT_DEG / WING_BEAT_DEG;
+const BREATH_LO = 0.5 - BREATH_BAND / 2;
+const BREATH_HI = 0.5 + BREATH_BAND / 2;
+
 export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: driven, wingStyle }) => {
   const own = useRef(new Animated.Value(0)).current;
+  // The body's half of Breath (Colin, 2026-08-29). A SECOND value on a SECOND
+  // clock, and both halves of that are the point — see `BREATH_RISE_CYCLE_MS`.
+  // It is not a second driver on one value (R46/R83): the wing and the body are
+  // two gestures, and each has exactly one.
+  const rise = useRef(new Animated.Value(0)).current;
   const beat = driven ?? own;
   const breathing = breath && !flutter;
   const animated = flutter || breathing;
 
+  // The wing's conductor: a loop, and — while perched — a flick that
+  // interrupts it and hands it back.
+  //
+  // **One animation is running at a time and the callback is the only thing
+  // that advances the state**, which is `FlyingBee`'s own discipline for the
+  // same reason: an interrupt (unmount, a mode change, a screen leaving) stops
+  // exactly one thing and cannot leave a queued beat behind it. `current` is
+  // whichever of the two is live.
   useEffect(() => {
     if (!animated || driven) return undefined;
     // The doctrine asks Breath for "ease-in-out, symmetric (not a spring — a
@@ -123,15 +158,94 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
     // clarification's clothes if the two ever turn out not to be identical.
     const halfMs = breathing ? BREATH_CYCLE_MS / 2 : WING_BEAT_MS;
     const curve = breathing ? { easing: Easing.inOut(Easing.ease) } : null;
+    const lo = breathing ? BREATH_LO : 0;
+    const hi = breathing ? BREATH_HI : 1;
+    // The band is where the value LIVES now, so it also has to be where the
+    // value STARTS: leaving `own` at its constructed 0 would open a breathing
+    // bee on a full-down wing and ease it up over 2.1 seconds, which is a
+    // 9-degree entrance nobody asked for on a page whose quiet is a ruling.
+    own.setValue(lo);
+
+    let cancelled = false;
+    let current = null;
+    let timer = null;
+
+    const breathe = () => {
+      current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(own, { toValue: hi, duration: halfMs, ...curve, useNativeDriver: true }),
+          Animated.timing(own, { toValue: lo, duration: halfMs, ...curve, useNativeDriver: true }),
+        ])
+      );
+      current.start();
+      if (breathing) schedule();
+    };
+
+    // Punctuation. Re-rolled after every flick rather than run on a period,
+    // because a fixed interval is a metronome with a long arm — the one thing
+    // a character cannot afford is for you to learn when it will next move.
+    const schedule = () => {
+      const wait =
+        FLICK_INTERVAL_MIN_MS + Math.random() * (FLICK_INTERVAL_MAX_MS - FLICK_INTERVAL_MIN_MS);
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        current?.stop();
+        // `Array.from` rather than a counted `for`, and the reason is a gate:
+        // `check-bee-attitude` row E forbids a NAMED numeric literal anywhere in
+        // this file, so that neither register can quietly grow geometry of its
+        // own instead of importing `constants/mascot`. A loop counter is not
+        // geometry, but the rule is blunt on purpose — an invariant that has to
+        // decide what a number MEANS is an invariant with an argument in it —
+        // and writing the loop without a counter costs nothing.
+        const beats = [];
+        Array.from({ length: FLICK_BEATS }).forEach(() => {
+          beats.push(Animated.timing(own, { toValue: 1, duration: WING_BEAT_MS, useNativeDriver: true }));
+          beats.push(Animated.timing(own, { toValue: 0, duration: WING_BEAT_MS, useNativeDriver: true }));
+        });
+        // Back into the band before the loop resumes, at the flick's own pace.
+        // Without it the first breath half would travel 0 -> 0.5556 in 2100ms —
+        // half the sweep at a breath's speed, which reads as the wing sagging.
+        beats.push(Animated.timing(own, { toValue: lo, duration: WING_BEAT_MS, useNativeDriver: true }));
+        current = Animated.sequence(beats);
+        current.start(({ finished }) => {
+          if (finished && !cancelled) breathe();
+        });
+      }, wait);
+    };
+
+    breathe();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      current?.stop();
+    };
+  }, [animated, breathing, driven, own]);
+
+  // The body. Perched only: an airborne bee's position is the track's, and a
+  // rise composed onto a flight would be the hover the doctrine retires.
+  useEffect(() => {
+    if (!breathing) return undefined;
+    rise.setValue(0);
+    const up = BREATH_RISE_CYCLE_MS * BREATH_RISE_SPLIT;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(own, { toValue: 1, duration: halfMs, ...curve, useNativeDriver: true }),
-        Animated.timing(own, { toValue: 0, duration: halfMs, ...curve, useNativeDriver: true }),
+        Animated.timing(rise, {
+          toValue: 1,
+          duration: up,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rise, {
+          toValue: 0,
+          duration: BREATH_RISE_CYCLE_MS - up,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [animated, breathing, driven, own]);
+  }, [breathing, rise]);
 
   const width = size * MASCOT_WIDTH_FRACTION;
   const height = width / MASCOT_ASPECT;
@@ -164,10 +278,14 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
   // interpolate into a `useMemo` — the R89 pattern — silently freezes the wing
   // hinge at whatever `size` was on first commit.** If it ever needs
   // memoising, the offsets have to become nodes in the same change.
-  // The sweep is the mode's, and it is read here rather than at the top so the
-  // interpolation below is rebuilt on every render along with it — see the
-  // paragraph under this one, which is load-bearing.
-  const sweepDeg = breathing ? BREATH_BEAT_DEG : WING_BEAT_DEG;
+  //
+  // **The sweep used to be read here too, and its note said that was what
+  // rebuilt the interpolation. That was never the mechanism.** The `rotate`
+  // entry is CONSTRUCTED in this render body, so it is a new node on every
+  // render whatever its output range is made of; a mode-dependent term in the
+  // range was riding along, not doing the work. Now that the range is the
+  // constant 18-degree beat (see the header), nothing about this paragraph
+  // changes — which is the check that the paragraph was about the right thing.
   const beatStyle = animated || driven
     ? {
         transform: [
@@ -176,7 +294,7 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
           {
             rotate: beat.interpolate({
               inputRange: [0, 1],
-              outputRange: [`-${sweepDeg / 2}deg`, `${sweepDeg / 2}deg`],
+              outputRange: [`-${WING_BEAT_DEG / 2}deg`, `${WING_BEAT_DEG / 2}deg`],
             }),
           },
           { translateX: -offsetX },
@@ -185,8 +303,28 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
       }
     : null;
 
+  // The rise, symmetric about the perch point: the character sits at the
+  // anchor's own y at the midpoint of every cycle and its MEAN position is
+  // that point exactly. That is the amended State 2 invariant — zero NET
+  // translation — and it is what separates a breath from the hover the
+  // doctrine retires, in the mechanism rather than in the amplitude.
+  const riseStyle = breathing
+    ? {
+        transform: [
+          {
+            translateY: rise.interpolate({
+              inputRange: [0, 1],
+              outputRange: [(BREATH_RISE_FRACTION * height) / 2, (-BREATH_RISE_FRACTION * height) / 2],
+            }),
+          },
+        ],
+      }
+    : null;
+
   return (
-    <Animated.View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <Animated.View
+      style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, riseStyle]}
+    >
       <Animated.View style={{ width, height }}>
         {/* Wings first: they are behind the body in the render, and that is
             the whole reason the split is lossless. */}

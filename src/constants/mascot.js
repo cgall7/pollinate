@@ -161,3 +161,90 @@ export const MASCOT_CLEARANCE = [
   0.4536, 0.5264, 0.5208, 0.5208, 0.5264, 0.4536,
   0.4784, 0.5664, 0.5728, 0.5712, 0.4712, 0.496,
 ];
+
+// --- Presence: the body's half of Breath (Colin, 2026-08-29) ---------------
+//
+// Colin, on the shipped hero: *"could we have our bee mascot doing the motions
+// that make him look like he's living and breathing within the app? like what
+// I sent you the other day on the x link where the fox was moving slightly
+// within their app."*
+//
+// **He is right, and the arithmetic says how right.** Breath's entire visible
+// output is the wing tip travelling `2 * BREATH_FLAP_RADIUS * sin(1 degree)`
+// = 1.4346% of the box height. At the 132pt hero that is **1.3400pt
+// peak-to-peak over 2100ms — 0.638 pt/s, 0.0106pt per frame at 60fps.** The
+// character is, to the eye, a still image. The doctrine's bar is "you never
+// catch it performing; if you stare, it rewards you"; a stare is rewarded with
+// a hundredth of a point per frame, which is not a reward, it is a rounding
+// error. Nothing was mistuned — the mechanism was only ever asked to move a
+// wing tip, and a wing tip is the one part of the character the eye is not
+// tracking.
+//
+// So Breath gains a BODY term, and State 2's "zero positional change" is
+// amended rather than ignored — see `GUIDES/BEE_DOCTRINE_SPEC.md` §State-2.
+// The rule that survives is the one it was written for: **zero NET
+// translation.** A hover is unanchored — its centre is free, so the bee drifts
+// and the eye cannot tell where he belongs, which is why "hovering = still a
+// screensaver". A breath is defined BY its anchor: the excursion is symmetric
+// about the perch point, the mean position IS the perch point, and the perch
+// point never moves. That distinction is in the mechanism, not in the
+// amplitude, which is why it can be stated as an invariant instead of a dial.
+//
+// **Two clocks, deliberately.** The body does not breathe on the wing's 4.2s.
+// One thing moving on one clock reads as a metronome at any amplitude — the
+// eye locks the period inside two cycles and the character becomes a loop. Two
+// terms on incommensurate clocks never present the same pose twice inside a
+// glance: 4.2 and 6.5 coincide every 54.6s, which is longer than anyone looks
+// at a header. This is the whole reason the body term is worth building; the
+// displacement alone is not.
+export const BREATH_RISE_CYCLE_MS = 6500;
+
+// Peak-to-peak vertical travel of the whole character, as a fraction of its
+// drawn HEIGHT — 2.0553pt at the 132pt hero, 0.6851pt at chrome 44.
+//
+// **The doctrine's 1.5% ceiling is not available as the bound here, and saying
+// why is the point.** That figure was already converted into the wing's own
+// currency further up this file ("the bound is restated in the one the wing
+// actually has: the peak-to-peak travel of the wing TIP"). A constant only
+// means anything inside the frame it was measured in; re-spending a wing-tip
+// bound on a whole-silhouette displacement would be the same category error
+// that comment exists to prevent. A body term needs a body bound, written new.
+//
+// Bounded below by legibility and above by the performing bar:
+//   floor    the silhouette must travel at least as far as the wing tip does,
+//            or the term adds nothing the eye can find. 1.4346%.
+//   ceiling  at 6.5s, travel the eye can RESOLVE mid-glance reads as drift
+//            rather than as breathing. Measured against the wing, 2.2% is
+//            1.53x the tip's travel and still 0.63pt/s at the hero — an order
+//            of magnitude under the ~5pt/s where a slow move becomes a move.
+// 2.2% ships. It is a tuned number inside a stated interval, not a derived
+// one, and it is the first thing to re-measure on a device.
+export const BREATH_RISE_FRACTION = 0.022;
+
+// A breath is not a sine. The in-breath is quicker than the out-breath in
+// every animal that has one, and a symmetric curve is the second thing (after
+// a single clock) that makes a loop read as machinery. 42/58 of the cycle.
+export const BREATH_RISE_SPLIT = 0.42;
+
+// --- Punctuation ----------------------------------------------------------
+//
+// The third term, and the one that does the most work per byte. A character
+// reads as alive when it does something you did not predict; two continuous
+// terms, however well phased, are still two continuous terms. So rarely — and
+// at an interval that is itself unpredictable — the perched bee flicks its
+// wings twice and goes back to breathing.
+//
+// **This needs no new geometry, and that is not a coincidence.** `MascotBee`'s
+// own header has described this behaviour since it was written: *"a held bee
+// flicks twice and rests"* is the stated reason the `beat` prop exists. What
+// was missing was a rhythm to drive it. The flick therefore reuses
+// `WING_BEAT_DEG` at `WING_BEAT_MS` — the airborne beat, borrowed for four
+// half-beats — and the amplitude difference between Breath and a flick becomes
+// a property of the RHYTHM rather than of the transform, which is the split
+// `MascotBee` already declares between what it owns and what a caller owns.
+//
+// Interval bounds, not a period: a fixed 15s flick is a metronome with a long
+// arm. Re-rolled after every flick.
+export const FLICK_INTERVAL_MIN_MS = 11000;
+export const FLICK_INTERVAL_MAX_MS = 23000;
+export const FLICK_BEATS = 2;
