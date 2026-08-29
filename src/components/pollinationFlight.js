@@ -40,6 +40,30 @@
 // (D-LF §1) where 2 broke it.
 export const APPROACH_SPEED_RATIO = 1.15;
 
+// R-LF-10 (Living Flight §9), Colin's 2026-08-29 ruling ("let's implement
+// your recommendation on time to landing"): the approach SATURATES. An errand
+// is a commute, not a longer forage — past this ceiling, distance buys SPEED,
+// not time. The approach is the only distance-proportional term in the
+// flight, so this is the whole lever: the cruise rises to cover the chord in
+// the ceiling, and everything downstream is already derived from the cruise
+// (`R` grows with it, so the turn keeps its rate bound by construction; the
+// weave keeps its Hz — a faster walk still walks in rhythm; the descent
+// keeps its shape, which R-LF-2.1 ruled untouchable).
+//
+// The value: the ratified lattice's own worst approach is 1105.8ms
+// (320x568, seat 2->5 — the smallest box flies the slowest cruise over the
+// same comb). The ceiling clears it STRICTLY, with the same ~8% order of
+// headroom `LAUNCH_MS` carries over its own bound, so on the comb this
+// constant does not exist: all 336 seat-to-seat plans are bit-identical with
+// and without it (measured, max |delta| 0.0e+0 over path and duration). The
+// gate holds that ordering — the ceiling above the lattice's measured worst —
+// so a cruise retune that pushes a hop's approach past the ceiling reds
+// rather than silently re-timing ratified flights. What it buys: the far
+// corner of a Pro Max lands in 2112.7ms instead of 4429.3, and the worst
+// wait on any box is the SE's 2749.5ms — descent-dominated, which no
+// approach lever can or should compress.
+export const APPROACH_MS_CEILING = 1200;
+
 // §28.5 — the descent is a GESTURE, not a traverse, so it is specified as a
 // duration rather than derived from a speed.
 //
@@ -1115,6 +1139,11 @@ export const buildPollinationPlan = ({
     // be divided by a chord the bee does not fly and the flight would slow
     // down in proportion to how much turning it does.
     flatApproachMs = approachDurationMs(chordPx, approachSpeedPxS);
+    // R-LF-10 — the saturation lives HERE, inside the fixed point, because
+    // the cruise it raises is an input to `R` and the loop is what keeps the
+    // two consistent. Everything below this line already treats the cruise as
+    // the given and derives from it; nothing else changes.
+    flatApproachMs = Math.min(flatApproachMs, APPROACH_MS_CEILING);
     // `buildSpeedProfile`'s approach duration, spelled here because R-LF-8
     // needs it BEFORE the curve exists. It is weave-independent by
     // construction: `A/v` collapses to the flat chord's own time, so this is
