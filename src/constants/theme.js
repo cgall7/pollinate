@@ -199,10 +199,27 @@ const colors = {
   inkFaint: withAlpha(pigment.ink, 0.62),
   // The progress-rail track. §23.11 ruled this exact pair — `ink` fill on an
   // `ink@0.5` track — because the 3:1 floor for `ink` on `background` is alpha
-  // 0.4717. Re-measured here against every ground a rail actually lands on,
-  // including all four hive covers: track-vs-ground 3.19-3.29:1, fill-vs-track
-  // 4.58-5.02:1. Clears everywhere, with the thinnest margin on `washPeach`.
-  trackDim: withAlpha(pigment.ink, 0.5),
+  // 0.4717. Re-measured there against every ground a rail landed on at the
+  // time, including all four hive covers: track-vs-ground 3.19-3.29:1,
+  // fill-vs-track 4.58-5.02:1.
+  //
+  // 0.50 -> 0.52 (Lumen, MVP1 screen pass). Wrapped's beat progress adopts
+  // this pair, and Beat 0 fills the screen with `goldField` — a ground
+  // §23.11 never had to serve, and the only one where 0.50 misses: 2.8653:1,
+  // under the floor the token exists to hold. The alpha IS the floor's
+  // solution, so it re-solves against the worst ground rather than the
+  // original one: 3:1 on `goldField` needs 0.5185, and 0.52 is the first
+  // 2-decimal value above it.
+  //
+  // Nothing regresses. Raising the alpha only darkens the track, so
+  // track-vs-ground rises everywhere (3.38-3.49 on the covers, 3.0114 on
+  // gold) and the pair's other floor, fill-vs-track, stays clear on every
+  // ground (4.32-4.73 on the covers, 3.3229 on gold — the new thinnest
+  // margin, and it is the ground that forced the change). At the two shipped
+  // rails (PackageOpen, MemoryLane) the move is ΔE00 1.578-1.622 — measured
+  // with scripts/lib/color.mjs, below the threshold at which either rail
+  // reads as a different colour.
+  trackDim: withAlpha(pigment.ink, 0.52),
 
   // --- Glass (all `surface`) ---
   // One material, four ruled thicknesses. `glassFill` shipped byte-identical at
