@@ -4733,6 +4733,8 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
     // `TAU` is the module's, not this file's — spelled once here so the two
     // reconstructions below read the same as the source they cite.
     const TAU_N = Math.PI * 2;
+    // Read from the module rather than retyped — N12 reports against it.
+    const TURN_RADIUS_MAX_PASSES_READ = Number(/TURN_RADIUS_MAX_PASSES = (\d+)/.exec(flightSource)?.[1] ?? NaN);
     const turnBetween = (a, b) => Math.abs(Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y));
 
     // Every ordered seat pair x every declared container x both weave signs.
@@ -4882,7 +4884,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       if (missing) {
         bad('N1 no junction angle exists at either join', `${missing} of ${PLANS.length} plans produced no turn at all, so this row could not measure what it exists to measure`);
       } else if (joinA.v < BOUND_DEG && joinB.v < BOUND_DEG) {
-        ok(`N1 no junction angle exists, at either join, on any of ${PLANS.length} plans — weave->arc worst ${joinA.v.toExponential(4)}deg (${joinA.label}), arc->descent worst ${joinB.v.toExponential(4)}deg (${joinB.label}), against a bound of ${BOUND_DEG}deg. Closed-form derivatives throughout: at u=1 the weave's domain ENDS, so a one-sided difference would floor at h (0.116deg at h=1e-3) and would green a merely-approximate envelope`);
+        ok(`N1 no junction angle exists, at either join, on any of ${PLANS.length} SEAT-TO-SEAT plans (N11 carries the wide domain) — weave->arc worst ${joinA.v.toExponential(4)}deg (${joinA.label}), arc->descent worst ${joinB.v.toExponential(4)}deg (${joinB.label}), against a bound of ${BOUND_DEG}deg. Closed-form derivatives throughout: at u=1 the weave's domain ENDS, so a one-sided difference would floor at h (0.116deg at h=1e-3) and would green a merely-approximate envelope`);
       } else {
         bad('N1 no junction angle exists at either join', `weave->arc worst ${joinA.v.toExponential(4)}deg (${joinA.label}), arc->descent worst ${joinB.v.toExponential(4)}deg (${joinB.label}), bound ${BOUND_DEG}deg`);
       }
@@ -4963,7 +4965,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       }
       const bound = flight.MAX_FRAME_SPEED_STEP_FRACTION;
       if (worst.v <= bound + 1e-12) {
-        ok(`N2 the turn's own rate is under R-LF-2.1's ratified bound on every one of ${PLANS.length} plans: worst ${deg(worst.v).toFixed(4)}deg/frame (${worst.label}, cruise ${worst.cruise.toFixed(2)} px/s over R ${worst.R.toFixed(4)}pt) against ${RATE_BOUND_DEG.toFixed(4)}deg/frame. Continuous instrument (v/R), not a frame difference off the polyline — see N2b`);
+        ok(`N2 the turn's own rate is under R-LF-2.1's ratified bound on every one of ${PLANS.length} SEAT-TO-SEAT plans — a domain on which it CANNOT fail, because R's frame term never binds here; N12 is the row that gates it where it can: worst ${deg(worst.v).toFixed(4)}deg/frame (${worst.label}, cruise ${worst.cruise.toFixed(2)} px/s over R ${worst.R.toFixed(4)}pt) against ${RATE_BOUND_DEG.toFixed(4)}deg/frame. Continuous instrument (v/R), not a frame difference off the polyline — see N2b`);
       } else {
         bad('N2 the turn stays inside R-LF-2.1\'s rate bound', `worst ${deg(worst.v).toFixed(4)}deg/frame at ${worst.label} (cruise ${worst.cruise.toFixed(2)} px/s, R ${worst.R.toFixed(4)}pt) against ${RATE_BOUND_DEG.toFixed(4)}deg/frame — the radius is no longer solved against the bound it claims to come from`);
       }
@@ -5497,7 +5499,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       const joinRadius = (radius.L ** 2) / (2 * Math.PI * Math.PI * radius.A * Math.abs(Math.sin(TAU_N * radius.c)));
       ok(
         `N9 REPORTED in R-LF-7's own frame: max A/drawnSpan = ${shape.v.toFixed(5)} (${shape.label}, A ${shape.A.toFixed(4)}pt, L ${shape.L.toFixed(4)}pt, c ${shape.c.toFixed(4)}) against 0.18773..0.21503 in the fillet's frame — `
-        + `the two quantities MERGED: since R-LF-7 the amplitude's leg and the drawn span are both \`from -> T\`, so the ratio is WEAVE_LEG_AMPLITUDE_FRACTION (${flight.WEAVE_LEG_AMPLITUDE_FRACTION}) wherever the leg term binds and below it wherever the body term does. `
+        + `the two quantities MERGED: since R-LF-7 the amplitude's leg and the drawn span are both \`from -> T\`, so the ratio is WEAVE_LEG_AMPLITUDE_FRACTION (${flight.WEAVE_LEG_AMPLITUDE_FRACTION}) wherever the leg term binds and below it wherever the body term does — and seat-to-seat the body term binds NOWHERE, so 0.18 is not merely the max here but the value on all ${PLANS.length}. That degeneracy is the lattice's, not the build's: see N13. `
         + `Weave min radius ${radius.v.toFixed(4)}pt at u=${radius.u.toFixed(3)} (${radius.label}, A ${radius.A.toFixed(4)}, L ${radius.L.toFixed(4)}, c ${radius.c.toFixed(4)}), against 6.6722pt quoted in the fillet's frame. `
         + `AND IT HAS MOVED TO THE JOIN: u=${radius.u.toFixed(3)}, not the u~0.56 interior minimum the ruling scopes it to. Lumen's own closed form R_join = L^2 / (2 pi^2 A |sin 2 pi c|) gives ${joinRadius.toFixed(4)}pt there, which is the same number — so the weave's tightest point on this lattice IS the join, and R_join is not a curiosity of one plan but the quantity that governs`,
       );
@@ -5566,7 +5568,8 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       const TINY_BODY = BODY_LENGTH_PX / 3;
       let forcedPasses = 0;
       let forcedFrame = 0;
-      let residual = 0;
+      let residual = -Infinity;
+      let overshoot = 0;
       for (const p of PLANS) {
         const plan = flight.buildPollinationPlan({
           from: p.from, target: p.target, ringStep: lattice.ringStepFor(44), bodyLengthPx: TINY_BODY,
@@ -5575,16 +5578,183 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         forcedPasses = Math.max(forcedPasses, plan.turn.passes);
         if (plan.turn.radiusPx > TINY_BODY + 1e-9) forcedFrame += 1;
         const settled = flight.turnRadiusPx({ bodyLengthPx: TINY_BODY, cruisePxS: plan.profile.cruisePxS });
-        residual = Math.max(residual, Math.abs(settled - plan.turn.radiusPx));
+        // ONE-SIDED, matching the loop's own exit. The residual that matters
+        // is the SHORTFALL (`R` below what the cruise requires); an overshoot
+        // is a larger radius than needed, which cannot breach a rate bound.
+        // The old spelling here took `Math.abs`, which is the same mistake
+        // the loop itself was making — a two-sided reading of a one-sided
+        // quantity — and it is why this row could not have caught it either.
+        residual = Math.max(residual, settled - plan.turn.radiusPx);
+        overshoot = Math.max(overshoot, plan.turn.radiusPx - settled);
       }
-      if (forcedFrame > 0 && forcedPasses > 1 && residual <= 0.25 + 1e-9) {
+      if (forcedFrame > 0 && forcedPasses > 1 && residual <= 0) {
         ok(
           `N10 REPORTED + calibrated. On the shipped lattice R = bodyLength (${BODY_LENGTH_PX.toFixed(4)}pt) on ${bodyWins} of ${PLANS.length} plans — ALL of them: max cruise is ${maxCruise.toFixed(2)} px/s, so cruise/${flight.MAX_TURN_RATE_RAD_S} tops out at ${(maxCruise / flight.MAX_TURN_RATE_RAD_S).toFixed(4)}pt and the frame term never binds. `
           + `§5's table has it binding on 393x852 and 430x932; that table was measured with the fillet's weave, and R-LF-8 + R-LF-3.1 quiet the approach enough to take the cruise back under the floor. The FLOOR is the mechanism today; the frame bound is dormant, not wrong. `
-          + `Which makes the convergence claim pass-closed, so it is forced: at bodyLength/3 the frame term binds on ${forcedFrame} of ${PLANS.length} plans, the loop runs ${forcedPasses} passes, and the fixed point settles to ${residual.toExponential(3)}pt against its own ${0.25}pt tolerance`,
+          + `Which makes the convergence claim pass-closed, so it is forced: at bodyLength/3 the frame term binds on ${forcedFrame} of ${PLANS.length} plans, the loop runs ${forcedPasses} passes, and it exits with a SHORTFALL of ${residual.toExponential(3)}pt — at or below zero, which is the whole invariant — overshooting by at most ${overshoot.toFixed(4)}pt, which is free. N12 asserts the same thing on the wide domain, where it actually failed`,
         );
       } else {
-        bad('N10 the radius fixed point converges where it actually iterates', `forced-mode: frame term bound on ${forcedFrame} plans, ${forcedPasses} passes, residual ${residual.toExponential(3)}pt. If the frame term never binds even at a third of a bee, this row is no longer exercising the iteration it claims to`);
+        bad('N10 the radius fixed point converges where it actually iterates', `forced-mode: frame term bound on ${forcedFrame} plans, ${forcedPasses} passes, worst SHORTFALL ${residual.toExponential(3)}pt (must be <= 0). If the frame term never binds even at a third of a bee, this row is no longer exercising the iteration it claims to; if the shortfall is positive, the loop is exiting below the rate bound it is derived from`);
+      }
+    }
+
+    // ==================================================================
+    // THE WIDE DOMAIN — and it is here because the rows above could not
+    // see a live defect.
+    // ==================================================================
+    //
+    // Every row above samples SEAT TO SEAT. That is not the errand's domain.
+    // `FlyingBee.js` passes `from: { ...posRef.current }` — the bee's LIVE
+    // POSITION — and mounts itself `absoluteFill` over the whole window, so
+    // the approach is bounded by the CONTAINER, not by the comb. The first
+    // errand of any session starts wherever the resident was perched.
+    //
+    // The gap is not marginal. Seat to seat the approach chord spans
+    // 21.26..165.80pt; over the container it reaches 843.46pt. Three things
+    // are invisible in the smaller domain and all three are real:
+    //
+    //   - `R`'s frame term never binds seat-to-seat (N10), so the whole
+    //     `max(bodyLength, cruise/9)` mechanism went unexercised;
+    //   - `WEAVE_BODY_AMPLITUDE_MULTIPLE` never binds either, which is why
+    //     `A / drawnSpan` reads exactly 0.18 on 336 of 336 plans — a
+    //     property of the lattice, not of the build (it binds on 48% here);
+    //   - and **the turn rate breached its own ruled bound**, at
+    //     8.6658deg/frame against 8.5944, because the fixed point exited on
+    //     a TWO-SIDED tolerance. `R` is a floor, not an estimate. Fixed in
+    //     the same commit; N12 is the row that would have caught it.
+    //
+    // Written as a superset rather than a reachability argument on purpose:
+    // some container corners may not be reachable perches, and a BOUND is
+    // safe to assert on a superset while an ABSENCE is not. The rows below
+    // that report rather than bound say which they are.
+    {
+      const WIDE = [];
+      for (const device of DEVICES) {
+        const speed = sequencer.referenceSpeedPxS(device.width, device.height) * flight.APPROACH_SPEED_RATIO;
+        // The comb centred horizontally, at a plausible scroll position. The
+        // rows below do not depend on where it sits — they depend on `from`
+        // ranging over the window, which is the part the lattice was missing.
+        const combX = (device.width - 132) / 2;
+        const combY = 100;
+        for (let seat = 0; seat < seatCentres.length; seat += 1) {
+          const target = { x: combX + (seatCentres[seat].x - 44), y: combY + (seatCentres[seat].y - 44) };
+          for (let fx = 6; fx < device.width; fx += 26) {
+            for (let fy = 6; fy < device.height; fy += 34) {
+              const from = { x: fx, y: fy };
+              if (Math.hypot(from.x - target.x, from.y - target.y) < 8) continue;
+              const weaveSign = (fx + fy) % 2 === 0 ? 1 : -1;
+              WIDE.push({
+                label: `${device.label} ->seat${seat} from(${fx},${fy})`,
+                device, from, target, weaveSign, speed,
+                plan: flight.buildPollinationPlan({
+                  from, target, ringStep: lattice.ringStepFor(44), bodyLengthPx: BODY_LENGTH_PX,
+                  width: device.width, height: device.height, approachSpeedPxS: speed, weaveSign,
+                }),
+              });
+            }
+          }
+        }
+      }
+
+      // --- N11. N1's claim, on the domain the errand actually has ---------
+      {
+        const BOUND_DEG = 1e-9;
+        let joinA = { v: 0, label: '' };
+        let joinB = { v: 0, label: '' };
+        let noTurn = 0;
+        for (const p of WIDE) {
+          const t = flight.chooseTurn({
+            from: p.from, target: p.target, offsetPx: OFFSET_PX,
+            radiusPx: p.plan.turn.radiusPx, inboardSign: p.target.x * 2 < p.device.width ? 1 : -1,
+          });
+          if (!t) { noTurn += 1; continue; }
+          const chord = { x: t.tangent.x - p.from.x, y: t.tangent.y - p.from.y };
+          const L = Math.hypot(chord.x, chord.y);
+          if (!(L > 1e-9)) continue;
+          const n = { x: -chord.y / L, y: chord.x / L };
+          const slope = flight.weaveSlopeAt(1, p.plan.weaveAmplitudePx, p.plan.weaveCycles, p.weaveSign);
+          const approachTangent = { x: chord.x + n.x * slope, y: chord.y + n.y * slope };
+          const entryHeading = t.sweep > 0
+            ? { x: t.sigma * -(t.tangent.y - t.centre.y), y: t.sigma * (t.tangent.x - t.centre.x) }
+            : chord;
+          const a = deg(turnBetween(approachTangent, entryHeading));
+          if (a > joinA.v) joinA = { v: a, label: p.label };
+          const exitHeading = t.sweep > 0
+            ? { x: t.sigma * -(t.staging.y - t.centre.y), y: t.sigma * (t.staging.x - t.centre.x) }
+            : { x: p.target.x - t.staging.x, y: p.target.y - t.staging.y };
+          const b = deg(turnBetween(exitHeading, { x: p.target.x - t.staging.x, y: p.target.y - t.staging.y }));
+          if (b > joinB.v) joinB = { v: b, label: p.label };
+        }
+        if (noTurn === 0 && joinA.v < BOUND_DEG && joinB.v < BOUND_DEG) {
+          ok(`N11 the joins stay exact over the WIDE domain too — ${WIDE.length} plans with \`from\` swept across the whole container (${DEVICES.length} containers x ${seatCentres.length} seats), approach chords to 843pt against the lattice's 166: weave->arc worst ${joinA.v.toExponential(4)}deg (${joinA.label}), arc->descent worst ${joinB.v.toExponential(4)}deg. The tangency is structural, so widening the domain was never going to move it — but N1's "no junction angle on any of 336 plans" is a claim about 336 plans, and this is the one that covers the errand`);
+        } else {
+          bad('N11 the joins stay exact over the wide domain', `${noTurn} plans produced no turn; weave->arc worst ${joinA.v.toExponential(4)}deg (${joinA.label}), arc->descent worst ${joinB.v.toExponential(4)}deg (${joinB.label}), bound ${BOUND_DEG}deg`);
+        }
+      }
+
+      // --- N12. THE ROW THE DEFECT NEEDED, and it is an invariant not a
+      //     sweep: `R` may never be below what the cruise it produced
+      //     requires. Exact, one comparison per plan, no tolerance — because
+      //     a tolerance is what let the defect through in the first place.
+      {
+        let worstShort = { v: -Infinity, label: '' };
+        let worstRate = { v: 0, label: '' };
+        let maxPasses = 0;
+        let frameBinds = 0;
+        for (const p of WIDE) {
+          const t = p.plan.turn;
+          if (!t) continue;
+          maxPasses = Math.max(maxPasses, t.passes);
+          if (t.radiusPx > BODY_LENGTH_PX + 1e-9) frameBinds += 1;
+          const required = flight.turnRadiusPx({ bodyLengthPx: BODY_LENGTH_PX, cruisePxS: p.plan.profile.cruisePxS });
+          const shortfall = required - t.radiusPx;
+          if (shortfall > worstShort.v) worstShort = { v: shortfall, label: p.label };
+          const omega = p.plan.profile.cruisePxS / t.radiusPx / 60;
+          if (omega > worstRate.v) worstRate = { v: omega, label: p.label };
+        }
+        const bound = flight.MAX_FRAME_SPEED_STEP_FRACTION;
+        if (worstShort.v <= 0 && worstRate.v <= bound + 1e-9 && maxPasses < TURN_RADIUS_MAX_PASSES_READ) {
+          ok(
+            `N12 \`R\` is never below what the cruise it produced requires — worst shortfall ${worstShort.v.toExponential(3)}pt over ${WIDE.length} wide-domain plans, so the turn rate holds at ${deg(worstRate.v).toFixed(4)}deg/frame against ${RATE_BOUND_DEG.toFixed(4)} (${worstRate.label}). `
+            + `ASSERTED WITH NO TOLERANCE, because a tolerance is exactly what let this through: the fixed point used to exit on |next - R| <= 0.25pt, and at R ~ 30pt a 0.25pt shortfall IS 0.83% of rate — measured 8.6658deg/frame. \`R\` is a FLOOR, so the exit is one-sided now. `
+            + `The frame term binds on ${frameBinds} of ${WIDE.length} plans here and on 0 of 336 seat-to-seat, which is why N10 could only report it dormant and never exercise it. Fixed point converges in ${maxPasses} passes worst case, against a ${TURN_RADIUS_MAX_PASSES_READ}-pass ceiling`,
+          );
+        } else {
+          bad(
+            'N12 R is never below what the cruise it produced requires',
+            `worst shortfall ${worstShort.v.toExponential(3)}pt (${worstShort.label}), worst rate ${deg(worstRate.v).toFixed(4)}deg/frame against ${RATE_BOUND_DEG.toFixed(4)}, ${maxPasses} passes against a ${TURN_RADIUS_MAX_PASSES_READ} ceiling. `
+            + 'A positive shortfall means the radius is smaller than the rate bound it is derived from, so R-LF-2.1 is breached by the geometry that claims to enforce it.',
+          );
+        }
+      }
+
+      // --- N13. REPORTED: what the wide domain does to R-LF-8's numbers ----
+      //
+      //     Including the one that corrects a sentence this file used to
+      //     carry. R-LF-8's note said `c <= 1.5` everywhere, "an identity
+      //     rather than a hope". It is an identity of the LATTICE.
+      {
+        let maxC = { v: 0, label: '' };
+        let maxL = { v: 0, label: '' };
+        let bodyBinds = 0;
+        let minShape = Infinity;
+        let maxDur = { v: 0, label: '' };
+        for (const p of WIDE) {
+          const A = p.plan.weaveAmplitudePx;
+          const L = p.plan.weaveSpanPx;
+          if (p.plan.weaveCycles > maxC.v) maxC = { v: p.plan.weaveCycles, label: p.label };
+          if (L > maxL.v) maxL = { v: L, label: p.label };
+          if (A < flight.WEAVE_LEG_AMPLITUDE_FRACTION * L - 1e-9) bodyBinds += 1;
+          minShape = Math.min(minShape, A / L);
+          if (p.plan.durationMs > maxDur.v) maxDur = { v: p.plan.durationMs, label: p.label };
+        }
+        ok(
+          `N13 REPORTED — three lattice-scoped figures, restated on the errand's own domain. `
+          + `CYCLE COUNT reaches ${maxC.v.toFixed(4)} (${maxC.label}) against the lattice's 1.5000: R-LF-8's "c <= 1.5 everywhere, an identity rather than a hope" is an identity OF THE LATTICE, and on a long first errand R-LF-8 ADDS undulation rather than removing it — ~${(maxC.v / 1.5).toFixed(1)}x the count the fixed 1.5 ever produced. R-LF-3.1 does not care (the envelope closes the join at every c, which is why it was squared), but the reassurance was scoped to a probe and written as though scoped to the function. `
+          + `APPROACH CHORD reaches ${maxL.v.toFixed(2)}pt against 165.80. `
+          + `And WEAVE_BODY_AMPLITUDE_MULTIPLE binds on ${bodyBinds} of ${WIDE.length} plans (${((bodyBinds / WIDE.length) * 100).toFixed(0)}%, min A/L ${minShape.toFixed(5)}) where it binds on NONE of the 336 — so N9's "exactly 0.18000 on every plan" is the lattice speaking, not the build. The MAX is still 0.18 and that is domain-independent (A = min(0.18L, 1.5body), so A/L <= 0.18 always); the DEGENERACY is not. `
+          + `Worst flight over this domain ${maxDur.v.toFixed(1)}ms (${maxDur.label}) against N8's ${'2502.4'}ms — reported, not bounded, and Colin should see it`,
+        );
       }
     }
   }

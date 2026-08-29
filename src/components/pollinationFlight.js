@@ -553,14 +553,25 @@ export const turnRadiusPx = ({ bodyLengthPx, cruisePxS }) =>
 
 const TURN_EPSILON = 1e-9;
 
-// The radius/cruise fixed point below. The tolerance is a QUARTER OF A POINT
-// of radius, which at the ratified turn rate is 2.25px/s of cruise — under a
-// tenth of the smallest speed the lattice produces — and the pass ceiling is
-// a backstop, not the mechanism: the iteration is a contraction (a longer
-// tangent lengthens the chord, which raises the cruise, which grows `R`,
-// which SHORTENS the tangent), and the gate asserts it converges in far fewer
-// than this on every plan rather than trusting the argument.
-const TURN_RADIUS_TOLERANCE_PX = 0.25;
+// The radius/cruise fixed point below. The pass ceiling is a backstop, not
+// the mechanism: the iteration is a contraction and it runs in the SAFE
+// direction — growing `R` shortens the tangent, which shortens the chord,
+// which lowers the cycle count, which lowers the elongation and so the
+// cruise, which asks for a smaller `R` next time. The gate asserts it
+// converges in far fewer passes than this rather than trusting the argument.
+//
+// **THERE IS NO CONVERGENCE TOLERANCE, AND THAT IS A CORRECTION.** This loop
+// used to exit on `|next - radiusPx| <= 0.25pt`, which is what you write for
+// a quantity you are ESTIMATING. `R` is not an estimate: it is a FLOOR.
+// `omega = v / R`, so a radius too small breaches R-LF-2.1's ratified rate
+// and a radius too large does not — the error is one-sided in its
+// consequences, so the exit has to be one-sided too. A two-sided tolerance
+// let `R` settle up to 0.25pt BELOW the requirement, which at R ~ 30pt is
+// 0.83% of rate: measured 8.6658 deg/frame against the ruled 8.5944, with
+// the shortfall (0.249812pt) sitting just inside the tolerance that allowed
+// it. Invisible on the seat-to-seat lattice, where the frame term never
+// binds at all; found by sweeping `from` over the whole container, which is
+// what `FlyingBee`'s absoluteFill actually permits.
 const TURN_RADIUS_MAX_PASSES = 24;
 
 const lerpPoint = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
@@ -704,11 +715,20 @@ export const chooseTurn = ({
 // four different wing rhythms — and the fast end is not a snake, it is a buzz.
 // The RATE is the ratified quantity now and the cycle count is its
 // consequence: a short errand gets one lean (0.3001 cycles), a long one gets
-// the snake (1.5000). `WEAVE_RATE_HZ` is the rate the shipped build already
-// flies on its longest leg, so `c <= 1.5` everywhere with equality there —
-// this can only ever REMOVE undulation, stated as an identity rather than a
-// hope. It is also the minimum over the WIDEST declared container set, so it
-// holds whether or not 375x667 turns out to be in support.
+// the snake (1.5000). `WEAVE_RATE_HZ` is the rate the shipped build flies on
+// the longest leg OF THE SEAT-TO-SEAT LATTICE, and on that lattice `c <= 1.5`
+// with equality there, so within it this can only ever REMOVE undulation.
+//
+// **THAT IS A PROPERTY OF THE LATTICE, NOT AN IDENTITY, and an earlier draft
+// of this comment claimed the second.** `from` is the bee's LIVE POSITION
+// (`FlyingBee.js`, `posRef.current`), not a seat, so the approach is bounded
+// by the container and not by the comb: swept over the whole window the chord
+// reaches 843pt against the lattice's 166, and `c` reaches 4.27 — R-LF-8 can
+// ADD undulation on a long first errand, ~2.8x the count the fixed 1.5 ever
+// produced. Nothing about R-LF-3.1 depends on this; the envelope closes the
+// join at EVERY `c`, which is the whole point of squaring it. But the
+// reassurance "it can only remove" was scoped to a probe and written as
+// though it were scoped to the function.
 //
 // `k = 1.5`'s justification retires with the constant. Its stated reason —
 // "half a cycle extra means the last crossing carries him TOWARD the cell" —
@@ -1082,7 +1102,10 @@ export const buildPollinationPlan = ({
     const arcPx = pathLengthPx(curve.approachPoints, 1, 1);
     cruisePxS = flatApproachMs > 0 ? (arcPx / flatApproachMs) * 1000 : 0;
     const next = turnRadiusPx({ bodyLengthPx, cruisePxS });
-    if (Math.abs(next - radiusPx) <= TURN_RADIUS_TOLERANCE_PX) break;
+    // Exit only when the radius in hand ALREADY satisfies the cruise it
+    // produced. Never on a two-sided tolerance — see the note on
+    // TURN_RADIUS_MAX_PASSES above.
+    if (next <= radiusPx) break;
     radiusPx = next;
   }
   const { approachPoints, descentPoints, turn, staging } = curve;
