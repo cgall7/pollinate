@@ -331,50 +331,41 @@ walk(flyingBeeAst.program, (n) => {
   }
 });
 
-// §32.2 then the Bee Doctrine. `CRUISE_EASING` was deleted with the loop it
-// eased and replaced by `BEAT_EASINGS`, the three curves a sequenced beat was
-// flown on; the doctrine then retired the beats. What is left flying is the
-// ERRAND, whose curves live at the `buildPollinationPlan` call site, and the
-// preset arc.
+// §32.2, then the Bee Doctrine, then R-LF-2.1. `CRUISE_EASING` was deleted
+// with the loop it eased and replaced by `BEAT_EASINGS`, the three curves a
+// sequenced beat was flown on; the doctrine retired the beats; what was left
+// flying was the ERRAND, whose two curves lived at the `buildPollinationPlan`
+// call site, and the preset arc.
 //
-// So the easings are enumerated OFF THE CALL SITE now rather than off a named
-// object. That is the stronger place to read them from and always was: the
-// row exists so the turn-window rows below can convert a wall-time window into
-// `t`, and what has to be modelled is the curve the bee is ACTUALLY flown on,
-// not one an object claims. R82's own hole was exactly this — resolving a prop
-// to a default instead of to what the call site passes.
-const ERRAND_EASINGS = {};
-{
-  const visitCall = flyingBeeSource.match(/buildPollinationPlan\(\{[\s\S]*?\}\)/)?.[0] ?? '';
-  for (const [key, prop] of [['approach', 'easeApproach'], ['descent', 'easeDescent']]) {
-    const found = visitCall.match(new RegExp(`${prop}:\\s*([^,\\n]+)`))?.[1]?.trim();
-    if (found) ERRAND_EASINGS[key] = found;
-  }
-}
-
-const EASING_ROWS = [
-  ['PRESET_EASING', constants.PRESET_EASING],
-  ...Object.entries(ERRAND_EASINGS).map(([k, v]) => [`errand ${k}`, v]),
-];
-if (Object.keys(ERRAND_EASINGS).length !== 2) {
+// **The errand's two curves are RETIRED TOO, and this is their retirement
+// rather than a silent deletion.** The row here enumerated `easeApproach` and
+// `easeDescent` off the call site and failed CLOSED if it could not read both
+// — the right shape, for as long as the errand's shape was a pair of named
+// curves a caller passed in. R-LF-2.1 deletes them: the flight's speed is now
+// a continuous profile the builder owns (`buildSpeedProfile`), and the
+// composed easing is derived from it per segment, so there is no named curve
+// at the call site to read and no wall-time window to convert through one.
+//
+// A row whose subject is gone must be removed, not left green over nothing —
+// the same ruling applied to the sortie row immediately below. What it
+// protected is protected better, one level up: M4d samples the RENDERED arc
+// speed against `speedAtMs(plan.profile, t)` at every frame of every plan on
+// the lattice, which is the actual curve the bee is flown on rather than the
+// name of one. M6 asserts, in both directions, that no easing can cross that
+// call boundary again.
+//
+// `PRESET_EASING` is untouched and still modelled: a preset arc IS one named
+// curve, and the preset's turn-window row below converts through it — so the
+// fail-closed check moves to it alone rather than being deleted with the pair.
+if (EASINGS[constants.PRESET_EASING]) {
+  ok(`PRESET_EASING is an easing this gate models (${constants.PRESET_EASING})`);
+} else {
   bad(
-    'the errand easings are readable off the call site',
-    `read ${Object.keys(ERRAND_EASINGS).length} of 2 (${JSON.stringify(ERRAND_EASINGS)}) from FlyingBee's ` +
-      '`buildPollinationPlan({…})`. The errand is the only flight left, so a gate that cannot read its ' +
-      'two curves cannot tell you what turn window it produces — and cannot-tell is a failure.',
+    'PRESET_EASING is an easing this gate models',
+    `found ${constants.PRESET_EASING ?? '(missing)'}, modelled: ${Object.keys(EASINGS).join(' | ')}. ` +
+      'The turn window is specified in wall time and only the easing converts that into `t`, so an ' +
+      'unmodelled easing means this gate CANNOT TELL — which is a failure, not a pass.',
   );
-}
-for (const [name, found] of EASING_ROWS) {
-  if (EASINGS[found]) {
-    ok(`${name} is an easing this gate models (${found})`);
-  } else {
-    bad(
-      `${name} is an easing this gate models`,
-      `found ${found ?? '(missing)'}, modelled: ${Object.keys(EASINGS).join(' | ')}. ` +
-        'The turn window is specified in wall time and only the easing converts that into `t`, so an ' +
-        'unmodelled easing means this gate CANNOT TELL — which is a failure, not a pass.',
-    );
-  }
 }
 
 // §28.5 — **the sortie-vs-visit row is RETIRED, and its retirement is the
@@ -387,8 +378,9 @@ for (const [name, found] of EASING_ROWS) {
 // failure: an assertion that can no longer fail is not an assertion).
 //
 // What it protected is still protected, one level up: §28.5's contrast is now
-// between the errand and a bee at REST, checked by F6, and the errand's own
-// curves are the ones enumerated above.
+// between the errand and a bee at REST, checked by F6, and the errand no
+// longer has curves to enumerate at all (R-LF-2.1 — see the retirement
+// immediately above).
 
 // --- enumerate the call sites off disk ------------------------------------
 const jsFiles = async (dir) => {
@@ -1885,14 +1877,14 @@ const targetAxisProp = (axis) =>
     // longer ONE straight leg (a small quadratic-Bezier fillet now rounds
     // the corner at `staging` before the straight drop resumes — R-LF-1's
     // "no measurable corner" ruling), so its REAL flown length is measured
-    // by summing every segment from `stagingIndex` onward, not by reading
+    // by summing every segment from `descentStartIndex` onward, not by reading
     // a single leg at a fixed index. It is expected to run a little LONGER
     // than the pure chord `stagingOffsetFor` publishes — a fillet bulges
     // outward from the straight cut, it never shortens it — bounded by
     // `FILLET_LEG_FRACTION`'s own trim, not by an arbitrary tolerance.
     const plan = planFor({ x: layout.width / 2, y: layout.height / 2 });
     let descentPx = 0;
-    for (let i = plan.stagingIndex + 1; i < plan.path.length; i += 1) {
+    for (let i = plan.descentStartIndex + 1; i < plan.path.length; i += 1) {
       descentPx += Math.hypot(
         (plan.path[i].x - plan.path[i - 1].x) * layout.width,
         (plan.path[i].y - plan.path[i - 1].y) * layout.height,
@@ -4234,7 +4226,7 @@ const planFor = (legPx, dirDeg, weaveSign = 1) => {
   const plan = flight.buildPollinationPlan({
     from, target, ringStep: RING_STEP_PX, bodyLengthPx: BODY_LENGTH_PX,
     width: 4000, height: 4000, approachSpeedPxS: APPROACH_SPEED_PXS,
-    easeApproach: (w) => w, easeDescent: (w) => w, weaveSign,
+    weaveSign,
   });
   return { ...plan, path: plan.path.map((p) => ({ x: p.x * 4000, y: p.y * 4000 })) };
 };
@@ -4319,27 +4311,261 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
     }
   }
 
-  // --- M4. Acceptance test 2 — the composed easing's derivative is
-  //     strictly positive either side of the approach/descent split, at
-  //     every named hop. This is the row that would have caught the old
-  //     `composePhaseEasing(split, inOut(ease), out(cubic))`: both of those
-  //     reach EXACTLY zero derivative at the split, from opposite sides.
+  // --- M4. Acceptance test 2, AS REPLACED BY R-LF-2.1 -----------------------
+  //
+  //     The row this supersedes asserted the composed easing's DERIVATIVE was
+  //     strictly positive either side of the split, and it was green through
+  //     the entire lunge: strictly-positive is a claim about the value, and
+  //     the defect is in the derivative's CONTINUITY (Lumen's own note —
+  //     "the rationale names the mechanism, the assertion keys on the label").
+  //     A bee that brakes to half speed for five frames and then arrives 24%
+  //     faster than he flew never has a non-positive derivative anywhere.
+  //
+  //     The replacement is the ruling's: sample real GROUND SPEED at 60fps
+  //     across the whole flight and bound how much it may change per frame.
+  //
+  //     TWO DEVIATIONS FROM THE RULING'S LETTER, both measured, both named:
+  //
+  //     (a) the bound is ADDITIVE, not the ruling's [0.85, 1.15] RATIO. A
+  //         ratio bound cannot survive the ruling's own launch ramp: a
+  //         profile that starts from rest has an unbounded speed ratio in its
+  //         first frames (frame 1 -> frame 2 of a linear ramp is exactly
+  //         2.0x), so a multiplicative test either excludes the launch or
+  //         forbids departing from rest. `MAX_FRAME_SPEED_STEP_FRACTION`
+  //         carries the same 15% with nothing excluded.
+  //
+  //     (b) "descent peak strictly BELOW the approach cruise" is asserted as
+  //         `<=`, because R-LF-2.1's descent starts at EXACTLY the cruise
+  //         speed and decays — the junction has no step in it at all. Strict
+  //         inequality is satisfiable only by re-introducing one. Equality at
+  //         the junction and strictly decreasing after is the stronger
+  //         statement, and the unimodality row below is what says so.
+  //
+  //     THE CURRENCY IS ARC SPEED, and the difference is not cosmetic. A
+  //     frame that spans a corner covers less STRAIGHT-LINE distance than
+  //     path, so a displacement-difference instrument reads a dip at every
+  //     turn that is geometry rather than pacing — row M13 measures that
+  //     residual and reports it rather than folding it into this bound.
+  //
+  //     And the domain is THE LATTICE, not a chosen window (Finding 2: the
+  //     four 120.28° hops hid in the gap between M1's swept arc and M1b's
+  //     named point). Every ordered seat pair the shipped 7-seat comb can
+  //     produce, on every declared container, both weave signs.
   {
-    const EPS = 1e-4;
-    let worstHop = null;
-    let worstSlope = Infinity;
-    for (const [label, legPx] of [['first tap', 269.2], ['neighbour', 81.9], ['one-step', 66.5], ['two-across', 155.4]]) {
-      const plan = planFor(legPx, 0, 1);
-      const split = plan.split;
-      const before = (plan.easing(split) - plan.easing(Math.max(0, split - EPS))) / EPS;
-      const after = (plan.easing(Math.min(1, split + EPS)) - plan.easing(split)) / EPS;
-      const slope = Math.min(before, after);
-      if (slope < worstSlope) { worstSlope = slope; worstHop = label; }
+    const SPIRAL = lattice.hexSpiral(1);
+    const layout = lattice.buildCombLayout([], 44, SPIRAL);
+    const seatCentres = layout.cells.map((c) => lattice.cellCentre(c, 44));
+    const FRAME_MS = 1000 / 60;
+
+    // Arc covered along the plan's own polyline at time `t` — the currency
+    // the profile is written in, read back through the composed easing and
+    // the path, so this measures WHAT THE SCREEN DOES and not what the
+    // profile promised.
+    const arcTrace = (plan) => {
+      const pts = plan.path.map((q) => ({ x: q.x * 4000, y: q.y * 4000 }));
+      const cum = [0];
+      for (let i = 1; i < pts.length; i += 1) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      const at = (t) => {
+        const w = plan.easing(Math.min(1, Math.max(0, t / plan.durationMs)));
+        const n = plan.path.length - 1;
+        const f = w * n;
+        const i = Math.min(n - 1, Math.floor(f));
+        return cum[i] + (cum[i + 1] - cum[i]) * (f - i);
+      };
+      const frames = [];
+      for (let t = 0; t + FRAME_MS <= plan.durationMs + 1e-9; t += FRAME_MS) {
+        frames.push({ t, v: ((at(t + FRAME_MS) - at(t)) / FRAME_MS) * 1000 });
+      }
+      return frames;
+    };
+
+    const hopPlan = (device, from, to, weaveSign) => {
+      const speed = sequencer.referenceSpeedPxS(device.width, device.height) * flight.APPROACH_SPEED_RATIO;
+      const plan = flight.buildPollinationPlan({
+        from: { x: seatCentres[from].x + 2000, y: seatCentres[from].y + 2000 },
+        target: { x: seatCentres[to].x + 2000, y: seatCentres[to].y + 2000 },
+        ringStep: lattice.ringStepFor(44),
+        bodyLengthPx: BODY_LENGTH_PX,
+        width: 4000, height: 4000,
+        approachSpeedPxS: speed,
+        weaveSign,
+      });
+      return plan;
+    };
+
+    const plans = [];
+    for (const device of DEVICES) {
+      for (let a = 0; a < seatCentres.length; a += 1) {
+        for (let b = 0; b < seatCentres.length; b += 1) {
+          if (a === b) continue;
+          for (const weaveSign of [1, -1]) plans.push({ label: `${device.label} ${a}->${b} sign${weaveSign}`, plan: hopPlan(device, a, b, weaveSign) });
+        }
+      }
     }
-    if (worstSlope > 0) {
-      ok(`M4 the composed easing's derivative is strictly positive on both sides of the approach/descent split, at every named hop (worst ${worstSlope.toFixed(4)} at "${worstHop}") — no dead-stop survives`);
+
+    const BOUND = flight.MAX_FRAME_SPEED_STEP_FRACTION;
+    let worstStep = { v: 0, label: '' };
+    let worstPeak = { v: 0, label: '' };
+    let worstDip = { v: 0, label: '' };
+    let worstProfileError = { v: 0, label: '' };
+    for (const { label, plan } of plans) {
+      const frames = arcTrace(plan);
+      const cruise = plan.profile.cruisePxS;
+      // (i) no frame may change ground speed by more than the bound.
+      for (let i = 1; i < frames.length; i += 1) {
+        const step = Math.abs(frames[i].v - frames[i - 1].v) / cruise;
+        if (step > worstStep.v) worstStep = { v: step, label: `${label} @${frames[i].t.toFixed(0)}ms` };
+      }
+      // (ii) the descent never exceeds the cruise it came off.
+      for (const f of frames) {
+        if (f.t < plan.approachMs) continue;
+        if (f.v / cruise > worstPeak.v) worstPeak = { v: f.v / cruise, label: `${label} @${f.t.toFixed(0)}ms` };
+      }
+      // (iii) unimodal — rise, hold, fall. This is the row a mid-flight brake
+      //       dies on, and the one the superseded derivative test could not
+      //       see: an interior local minimum is exactly "he slowed down and
+      //       then sped up again", which is what a lurch IS.
+      let peakI = 0;
+      for (let i = 1; i < frames.length; i += 1) if (frames[i].v > frames[peakI].v) peakI = i;
+      for (let i = 1; i < frames.length; i += 1) {
+        const wrongWay = i <= peakI ? (frames[i - 1].v - frames[i].v) / cruise : (frames[i].v - frames[i - 1].v) / cruise;
+        if (wrongWay > worstDip.v) worstDip = { v: wrongWay, label: `${label} @${frames[i].t.toFixed(0)}ms` };
+      }
+      // (iv) the rendered arc speed IS `speedAtMs`. This is the row that
+      //      catches the identity-easing spelling of the ruling: with
+      //      identity easings and arc-proportional durations the straight
+      //      drop — ONE segment, because `adaptiveCurveSamples` refines on
+      //      deviation and a line has none — is flown at one constant speed
+      //      and stopped dead, and rows (i)-(iii) would all still pass it.
+      for (let i = 0; i < frames.length; i += 1) {
+        const analytic = flight.speedAtMs(plan.profile, frames[i].t + FRAME_MS / 2);
+        const err = Math.abs(analytic - frames[i].v) / cruise;
+        if (err > worstProfileError.v) worstProfileError = { v: err, label: `${label} @${frames[i].t.toFixed(0)}ms` };
+      }
+    }
+
+    if (worstStep.v <= BOUND) {
+      ok(`M4 acceptance test 2 (as replaced by R-LF-2.1): across ${plans.length} plans — every ordered seat pair of the shipped 7-seat comb, on all ${DEVICES.length} declared containers, both weave signs — no frame changes ground speed by more than ${(worstStep.v * 100).toFixed(2)}% of the cruise (bound ${(BOUND * 100).toFixed(0)}%, worst at ${worstStep.label}). The binding case is the launch ramp, by construction: a linear 0->v over LAUNCH_MS=${flight.LAUNCH_MS} changes speed by v*16.67/${flight.LAUNCH_MS} = ${((16.667 / flight.LAUNCH_MS) * 100).toFixed(2)}% per frame`);
     } else {
-      bad('M4 derivative strictly positive across the split', `"${worstHop}" reached derivative ${worstSlope} at the split — a dead stop is back`);
+      bad('M4 no frame changes ground speed by more than the bound', `${(worstStep.v * 100).toFixed(2)}% at ${worstStep.label} — a lurch. On main@960ec7b this row read 50.2% (271 -> 135 px/s entering the fillet) and 88.6% (135 -> 375 leaving it)`);
+    }
+
+    if (worstPeak.v <= 1 + 1e-9) {
+      ok(`M4b the descent never exceeds the cruise it came off (worst ${worstPeak.v.toFixed(4)}x at ${worstPeak.label}). Asserted as <=, not the ruling's "strictly below": R-LF-2.1's descent STARTS at exactly the cruise speed, so the junction has no step — on main this row read 1.402x, and every one of the 33 clean hops arrived faster than it travelled`);
+    } else {
+      bad('M4b the descent never exceeds the cruise', `${worstPeak.v.toFixed(4)}x at ${worstPeak.label} — the drop is a lunge again`);
+    }
+
+    if (worstDip.v <= 1e-6) {
+      ok(`M4c the speed profile is unimodal — rises, holds, falls, with no interior local minimum anywhere in ${plans.length} plans (worst counter-direction step ${worstDip.v.toExponential(2)} of cruise, at ${worstDip.label}). A brake mid-flight IS an interior minimum; this is the shape claim the superseded derivative row could not make`);
+    } else {
+      bad('M4c the speed profile is unimodal', `a counter-direction step of ${(worstDip.v * 100).toFixed(2)}% of cruise at ${worstDip.label} — he slowed and then sped up again`);
+    }
+
+    if (worstProfileError.v <= 0.01) {
+      ok(`M4d the RENDERED arc speed is \`speedAtMs(plan.profile, t)\` to within ${(worstProfileError.v * 100).toFixed(3)}% of cruise at every frame of every plan — the composed easing reproduces the profile EXACTLY rather than approximating it by segment count. This is the row the identity-easing spelling of R-LF-2.1 fails: the straight drop is one segment (a line has no deviation for \`adaptiveCurveSamples\` to refine on), so identity easings fly it at one constant speed and stop dead at the cell`);
+    } else {
+      bad('M4d rendered arc speed reproduces the profile', `${(worstProfileError.v * 100).toFixed(2)}% of cruise at ${worstProfileError.label} — the durations and the profile have drifted apart`);
+    }
+
+    // --- M11. The profile's own constants, and the two places it is a
+    //     FLOOR rather than a fixed quantity — both swept, both reported.
+    {
+      const derivedLaunchFloor = (1000 / 60) / flight.MAX_FRAME_SPEED_STEP_FRACTION;
+      let decay = { min: Infinity, max: -Infinity };
+      let descent = { min: Infinity, max: -Infinity };
+      let duration = { min: Infinity, max: -Infinity };
+      let extended = 0;
+      const shippedDuration = { min: Infinity, max: -Infinity };
+      for (const { label, plan } of plans) {
+        if (!/^320|^375/.test(label)) {
+          shippedDuration.min = Math.min(shippedDuration.min, plan.durationMs);
+          shippedDuration.max = Math.max(shippedDuration.max, plan.durationMs);
+        }
+        decay.min = Math.min(decay.min, plan.profile.decay);
+        decay.max = Math.max(decay.max, plan.profile.decay);
+        descent.min = Math.min(descent.min, plan.descentMs);
+        descent.max = Math.max(descent.max, plan.descentMs);
+        duration.min = Math.min(duration.min, plan.durationMs);
+        duration.max = Math.max(duration.max, plan.durationMs);
+        if (plan.descentMs > flight.DESCENT_MS + 1e-9) extended += 1;
+      }
+      const launchOk = flight.LAUNCH_MS >= derivedLaunchFloor;
+      const decayOk = decay.min >= flight.MIN_DESCENT_DECAY - 1e-9;
+      const floorOk = descent.min >= flight.DESCENT_MS - 1e-9;
+      if (launchOk && decayOk && floorOk) {
+        ok(`M11 LAUNCH_MS=${flight.LAUNCH_MS} clears its own derived floor of ${derivedLaunchFloor.toFixed(1)}ms (one frame / ${flight.MAX_FRAME_SPEED_STEP_FRACTION}), and the descent's decay exponent stays >= ${flight.MIN_DESCENT_DECAY} on every plan (swept ${decay.min.toFixed(3)}..${decay.max.toFixed(3)}). DESCENT_MS=${flight.DESCENT_MS} is a FLOOR: it binds on ${plans.length - extended} of ${plans.length} plans and the other ${extended} extend to ${descent.max.toFixed(1)}ms, because below p=1 there is no monotone v->0 profile over a fixed duration that does not hold high and stop hard (a 320x568 box would land p=0.229, whose last frame drops 102 px/s in one). Flight length ${duration.min.toFixed(1)}..${duration.max.toFixed(1)}ms over the whole sweep, ${shippedDuration.min.toFixed(1)}..${shippedDuration.max.toFixed(1)}ms on the 393x852-and-larger boxes this app actually ships to`);
+      } else {
+        bad('M11 the profile\'s floors hold', `LAUNCH_MS>=floor=${launchOk} (${flight.LAUNCH_MS} vs ${derivedLaunchFloor.toFixed(1)}), decay>=${flight.MIN_DESCENT_DECAY}=${decayOk} (min ${decay.min.toFixed(3)}), descentMs>=DESCENT_MS=${floorOk} (min ${descent.min.toFixed(1)})`);
+      }
+    }
+
+    // --- M12. The launch ramp's cost, stated rather than discovered. Holding
+    //     the ratified SPEED and letting the duration follow (rather than
+    //     redistributing inside a fixed `approachMs`, which would raise the
+    //     neighbour hop's cruise from 271 to 338 px/s in the ruling whose ask
+    //     was "slower") costs exactly LAUNCH_MS/2 per flight. Asserted
+    //     against the arithmetic, so a future ramp shape that quietly changes
+    //     the cost cannot land unreported.
+    {
+      let worst = 0;
+      let worstLabel = '';
+      for (const { label, plan } of plans) {
+        const flatMs = plan.profile.approachArcPx > 0 ? (plan.profile.approachArcPx / plan.profile.cruisePxS) * 1000 : 0;
+        const cost = plan.approachMs - flatMs;
+        const expected = plan.profile.launchMs / 2;
+        const err = Math.abs(cost - expected);
+        if (err > worst) { worst = err; worstLabel = label; }
+      }
+      if (worst < 1e-6) {
+        ok(`M12 the launch ramp costs exactly LAUNCH_MS/2 = ${(flight.LAUNCH_MS / 2).toFixed(1)}ms of extra flight time and nothing else — the cruise speed R-LF-4 ratified is held at every instant, and the DURATION is what moves (§28.5's own direction: the speed is the ruling, the duration is its consequence)`);
+      } else {
+        bad('M12 the launch ramp costs LAUNCH_MS/2', `${worstLabel} is off by ${worst.toFixed(4)}ms — the ramp is being paid for out of the cruise speed instead of out of the clock`);
+      }
+    }
+
+    // --- M13. REPORTED, NOT GATED: the corner's displacement residual.
+    //     Ground speed measured as straight-line displacement per frame —
+    //     which is how the ruling's own table was taken — dips at the fillet,
+    //     because a frame that spans a turn covers less chord than path. That
+    //     is geometry and not pacing: arc speed (M4) is flat through it. The
+    //     numbers are here so the next person to measure this beat with a
+    //     displacement instrument does not read the turn as a brake.
+    {
+    // Split by Finding 2's reversal class, because the two numbers have
+    // different causes and only one of them is the fillet: on an UPWARD hop
+    // the path folds back on itself (`staging` is unconditionally above the
+    // target, so the corner is a true 180°), and a frame spanning a cusp has
+    // almost no displacement at all. That is R-LF-7's geometry, not this
+    // ruling's pacing, and reporting one number for both would attribute it
+    // here.
+      let worst = { v: 0, label: '' };
+      let worstReversal = { v: 0, label: '' };
+      for (const { label, plan } of plans) {
+        const pts = plan.path.map((q) => ({ x: q.x * 4000, y: q.y * 4000 }));
+        const reversal = minInteriorAngleDeg(pts) < 150;
+        const pos = (t) => {
+          const w = plan.easing(Math.min(1, Math.max(0, t / plan.durationMs)));
+          const n = plan.path.length - 1;
+          const f = w * n;
+          const i = Math.min(n - 1, Math.floor(f));
+          const u = f - i;
+          const a = plan.path[i];
+          const b = plan.path[i + 1];
+          return { x: (a.x + (b.x - a.x) * u) * 4000, y: (a.y + (b.y - a.y) * u) * 4000 };
+        };
+        for (let t = 0; t + FRAME_MS <= plan.durationMs; t += FRAME_MS) {
+          const p0 = pos(t);
+          const p1 = pos(t + FRAME_MS);
+          const displacement = (Math.hypot(p1.x - p0.x, p1.y - p0.y) / FRAME_MS) * 1000;
+          const analytic = flight.speedAtMs(plan.profile, t + FRAME_MS / 2);
+          if (analytic <= 0) continue;
+          const dip = (analytic - displacement) / plan.profile.cruisePxS;
+          const bucket = reversal ? worstReversal : worst;
+          if (dip > bucket.v) { bucket.v = dip; bucket.label = `${label} @${t.toFixed(0)}ms`; }
+        }
+      }
+      ok(`M13 REPORTED, not gated: measured as straight-line DISPLACEMENT per frame — the instrument the ruling's own table was taken with — the worst dip below the profile's arc speed is ${(worst.v * 100).toFixed(1)}% of cruise on a corner-clearing hop (${worst.label}) and ${(worstReversal.v * 100).toFixed(1)}% on a Finding-2 REVERSAL hop (${worstReversal.label}), where the path folds and a frame spanning the cusp barely moves. Both are geometry, not pacing: arc speed (M4) is flat through both, and the reversal figure is R-LF-7's to close. The same instrument reads 50% on main@960ec7b, where it WAS pacing`);
     }
   }
 
@@ -4358,26 +4584,27 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
     }
   }
 
-  // --- M6. R-LF-2 — the launch is `Easing.out(Easing.quad)`, not the old
-  //     `Easing.inOut(Easing.ease)` that arrived at zero velocity; the
-  //     settle keeps `Easing.out(Easing.cubic)`, unchanged.
+  // --- M6. R-LF-2.1 — the builder takes NO easings, and the call site
+  //     passes none. The superseded form of this row asserted the call site
+  //     passed `Easing.out(Easing.quad)` and `Easing.out(Easing.cubic)`,
+  //     which is the exact configuration the lunge was made of: a caller that
+  //     can hand in a curve is a caller that can hand in a curve for one
+  //     SEGMENT of a leg, and a segment is not a leg (the launch's was 6ms,
+  //     the settle's was the whole drop).
+  //
+  //     Asserted in both directions — the parameter is gone from the
+  //     builder's own destructuring AND no call site passes it — because
+  //     either alone is satisfiable by the other half surviving.
   {
-    let approachEasing = null;
-    let descentEasing = null;
-    walk(flyingBeeAst.program, (n) => {
-      if (n.type !== 'ObjectProperty' || n.key?.name !== 'easeApproach') return;
-      approachEasing = flyingBeeSource.slice(n.value.start, n.value.end);
-    });
-    walk(flyingBeeAst.program, (n) => {
-      if (n.type !== 'ObjectProperty' || n.key?.name !== 'easeDescent') return;
-      descentEasing = flyingBeeSource.slice(n.value.start, n.value.end);
-    });
-    const approachOk = approachEasing === 'Easing.out(Easing.quad)';
-    const descentOk = descentEasing === 'Easing.out(Easing.cubic)';
-    if (approachOk && descentOk) {
-      ok('M6 FlyingBee.js flies the launch on Easing.out(Easing.quad) and the settle on Easing.out(Easing.cubic)');
+    const params = flight.buildPollinationPlan.toString().match(/\(\s*\{([\s\S]*?)\}\s*\)/)?.[1] ?? '';
+    const builderClean = !/easeApproach|easeDescent/.test(params);
+    const beeSource = await readFile(path.join(ROOT, 'src/components/FlyingBee.js'), 'utf8');
+    const callSiteClean = !/easeApproach\s*:|easeDescent\s*:/.test(beeSource);
+    const profileWired = /buildSpeedProfile/.test(await readFile(FLIGHT_MODULE, 'utf8'));
+    if (builderClean && callSiteClean && profileWired) {
+      ok('M6 buildPollinationPlan takes no easing arguments and FlyingBee.js passes none — the flight\'s shape is a property of the flight (`buildSpeedProfile`), not something a call site can spell');
     } else {
-      bad('M6 R-LF-2 easings at the call site', `easeApproach=${approachEasing} (want Easing.out(Easing.quad)), easeDescent=${descentEasing} (want Easing.out(Easing.cubic))`);
+      bad('M6 R-LF-2.1 — no easings cross the call boundary', `builder params clean=${builderClean} (read "${params.replace(/\s+/g, ' ').trim()}"), call site clean=${callSiteClean}, profile wired=${profileWired}`);
     }
   }
 

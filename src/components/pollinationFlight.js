@@ -140,6 +140,203 @@ export const stagingOffsetFor = ({ bodyLengthPx, ringStep }) =>
 // left 12%. `check-bee-attitude` asserts the realized product per fleck.
 export const POLLEN_GAP_FRACTION = 0.26;
 
+
+// R-LF-2.1 (Living Flight, Lumen's 2026-08-29 ruling against `960ec7b`) —
+// **shape the speed, not the segment easings.**
+//
+// R-LF-2 applied `Easing.out(quad)` to the FIRST segment and
+// `Easing.out(cubic)` to the LAST, and a segment is not a leg. Measured on
+// the merged tip, seat 1 -> seat 2, ground speed per frame at 60fps:
+//
+//   0:266 … 283:266 │ 300:139 317:135 333:134 350:134 367:135 │ 383:234 400:337 417:267 … 533:5
+//        approach   │          the fillet          │            the drop
+//
+// He cruises at 271, brakes to half for five frames, then lunges at the cell
+// at 337 — 1.24x the speed he flew — and stops. Colin asked for a gentle
+// land; every clean hop currently ARRIVES FASTER THAN IT TRAVELLED.
+//
+// **Why the identity-easing form of the ruling does not express a ramp.**
+// The ruling's own remedy — make every segment's easing the identity and let
+// each segment's duration carry the speed — is right about the mechanism and
+// silently wrong about the resolution, because `adaptiveCurveSamples`
+// refines on DEVIATION: a straight line has none, so the whole 23.6pt drop
+// is exactly ONE segment. Identity easings across it means one constant
+// speed for the entire drop and a dead stop at touchdown — the same defect
+// moved 100ms later. (It is also why the lunge is as large as it is: the
+// `out(cubic)` was being applied to one segment covering the whole drop, so
+// its 3x-mean opening velocity is a leg-scale event, not a sample-scale one.)
+//
+// So the speed profile is expressed EXACTLY instead of approximated by
+// segment count: one continuous v(t) over cumulative arc, inverted per
+// segment. Each segment gets the duration the profile takes to cover its own
+// arc, and an easing that is the profile's own arc-vs-time curve restricted
+// to that segment and renormalised. Where segments are short this is
+// indistinguishable from the identity; where a segment is a whole leg it is
+// the difference between a landing and a stop.
+//
+// The three phases, and every one of them is forced rather than chosen:
+//
+//   LAUNCH   0 -> v, linear, over `LAUNCH_MS`. §32.2 retired the cruise loop,
+//            so he departs FROM REST: today's step to full speed in one frame
+//            is the single largest velocity discontinuity in the beat (a full
+//            v, against the corner's 0.5v).
+//   CRUISE   constant v — R-LF-3's weave is what makes the approach read as
+//            alive; a speed change would be a second, competing signal.
+//   DESCENT  v -> 0. Starts at EXACTLY the cruise speed, so the junction the
+//            old profile lurched across has no step in it at all, and reaches
+//            zero AT the cell rather than before it.
+//
+// **The cruise speed is held and the duration follows, not the reverse.**
+// R-LF-4 ratified a SPEED (`APPROACH_SPEED_RATIO` x the reference); the
+// approach's duration is `distance / speed`, its consequence. Redistributing
+// a launch ramp inside a fixed `approachMs` inverts that — it holds the
+// consequence and moves the ruling — and measurably: on the neighbour hop it
+// would raise the cruise from 271 to 338 px/s, 25% FASTER, in the ruling
+// whose ask was "slower". So the ramp's cost is paid in time: exactly
+// `LAUNCH_MS / 2` on every flight, because a linear 0->v ramp covers half
+// the ground a cruise would in the same window. Ground speed at every
+// instant is <= today's; total flight length grows 60ms.
+export const LAUNCH_MS = 120;
+
+// The per-frame speed-change bound the whole profile is built to, and the
+// only number here that is a judgement rather than a derivation.
+//
+// Lumen's acceptance test is a RATIO — "every frame-to-frame ratio inside
+// [0.85, 1.15]". That bound cannot survive its own launch ramp: any profile
+// that starts at rest has an unbounded speed RATIO in its first frames
+// (0 -> 1 frame of speed is an infinite ratio, 1 -> 2 frames is 2.0), so a
+// multiplicative test either excludes the launch or forbids starting from
+// rest. The same intent expressed additively — no frame may change ground
+// speed by more than 0.15 of the cruise — applies to the WHOLE flight with
+// nothing excluded, and it is the same 15%.
+//
+// `LAUNCH_MS` is then a consequence of it, not a taste: a linear 0 -> v ramp
+// changes speed by `v * frame / LAUNCH_MS` every frame, so the bound reads
+// `LAUNCH_MS >= 16.67 / 0.15` = 111.1ms. 120 ships — 8% of headroom, and the
+// launch is the binding case by construction (the gate asserts it stays so).
+export const MAX_FRAME_SPEED_STEP_FRACTION = 0.15;
+
+// The descent's decay exponent is DERIVED — `v(tau) = v * (1 - tau)^p` with
+// `p` solved so the profile's own area is exactly the descent's arc:
+//
+//     D = v * T / (p + 1)      =>      p = v * T / D - 1
+//
+// which is what makes "starts at the cruise speed" and "ends at zero" and
+// "covers exactly this arc in exactly this long" simultaneously true rather
+// than two of three. At the shipped pair (402x874, cellSize 44) that solves
+// to p = 1.003 — Lumen's linear ramp, arrived at rather than assumed.
+//
+// **Her 11% step was an arc, not a disagreement.** The ruling computes the
+// linear ramp's start as `2 * arc / DESCENT_MS` = 242 px/s off a descent arc
+// of 31.5pt, against a 271 cruise. The descent's real arc is 35.12pt — the
+// fillet is part of the descent (`descentPoints` carries it, by this file's
+// own construction) and bulges past the 30.07pt staging chord. At 35.12 the
+// linear ramp starts at 270.2 against a cruise of 270.59: a 0.14% step, not
+// an 11% one. The ramp was right; the arc it was solved against was short.
+//
+// `DESCENT_MS` becomes a FLOOR rather than a fixed duration, and the floor
+// binds on small containers only. `p >= 1` requires `v >= 2D/T`, i.e. a
+// cruise at least twice the descent's mean; below that there is no monotone
+// v->0 profile over a FIXED T that does not hold high and then stop hard —
+// swept, a 320x568 box lands `p = 0.229`, whose last frame drops 102 px/s in
+// one frame, which is 75% of the corner defect this ruling exists to remove.
+// So where the floor cannot hold the shape, the descent takes the time the
+// shape needs: `T = max(DESCENT_MS, 2D/v)`, at which point `p = 1` exactly
+// and the landing is Lumen's linear ramp. On every box this app ships to
+// (393x852 and up) the extension is 0-34ms and `p` lands in [0.77, 1.79]
+// before it; the gate sweeps and reports both.
+export const MIN_DESCENT_DECAY = 1;
+
+/**
+ * The flight's speed as a function of time, and its exact inverse.
+ *
+ * Pure and dependency-free for the same reason as everything else in this
+ * file: `check-bee-attitude` imports and SAMPLES it. A speed profile
+ * asserted by reading source is a speed profile asserted by its name.
+ *
+ * @param approachArcPx  the real, weaved ground of the approach leg — not
+ *                       the straight chord it is timed off
+ * @param descentArcPx   fillet + drop, together, because that is what
+ *                       `descentPoints` is
+ * @param cruisePxS      the ground speed R-LF-4's ratio resolves to on THIS
+ *                       leg: `approachArcPx / approachDurationMs(chord)`.
+ *                       Passed in rather than derived here so the one place
+ *                       §28.5's `distance / speed` is spelled stays the one
+ *                       place.
+ */
+export const buildSpeedProfile = ({ approachArcPx, descentArcPx, cruisePxS }) => {
+  const v = cruisePxS > 0 ? cruisePxS : 0;
+  const A = Math.max(0, approachArcPx);
+  const D = Math.max(0, descentArcPx);
+  if (v <= 0) {
+    // Nothing to fly (`from` is the staging point). Degenerate, but it must
+    // return a usable profile rather than NaN: a zero-length approach and a
+    // descent flown on the floor duration.
+    const descentMs = DESCENT_MS;
+    return {
+      cruisePxS: 0, launchMs: 0, approachMs: 0, descentMs, decay: MIN_DESCENT_DECAY,
+      durationMs: descentMs, approachArcPx: 0, descentArcPx: D,
+      arcAtMs: (t) => (descentMs > 0 ? D * Math.min(1, Math.max(0, t / descentMs)) : D),
+      msAtArc: (s) => (D > 0 ? descentMs * Math.min(1, Math.max(0, s / D)) : 0),
+    };
+  }
+
+  // The ramp cannot be longer than the approach has ground for. If it is,
+  // the approach IS the ramp and he reaches `v` exactly at its end — the
+  // same family, at its boundary, with no separate case in the arithmetic
+  // below (`A / v + launchMs / 2` collapses to `launchMs` there).
+  const launchMs = Math.min(LAUNCH_MS, (2 * A * 1000) / v);
+  const approachMs = (A * 1000) / v + launchMs / 2;
+  const launchArc = (v * launchMs) / 2000;
+
+  const descentMs = D > 0 ? Math.max(DESCENT_MS, (2 * D * 1000) / v) : DESCENT_MS;
+  // p + 1, which is what every formula below actually wants.
+  const decayPlus1 = D > 0 ? Math.max(MIN_DESCENT_DECAY + 1, (v * descentMs) / (1000 * D)) : MIN_DESCENT_DECAY + 1;
+
+  const arcAtMs = (t) => {
+    if (t <= 0) return 0;
+    if (t <= launchMs) return launchMs > 0 ? (v * t * t) / (2000 * launchMs) : 0;
+    if (t <= approachMs) return launchArc + (v * (t - launchMs)) / 1000;
+    const tau = descentMs > 0 ? Math.min(1, (t - approachMs) / descentMs) : 1;
+    return A + D * (1 - Math.pow(1 - tau, decayPlus1));
+  };
+
+  const msAtArc = (s) => {
+    if (s <= 0) return 0;
+    if (s <= launchArc) return launchMs > 0 ? Math.sqrt((2000 * launchMs * s) / v) : 0;
+    if (s <= A) return launchMs + ((s - launchArc) * 1000) / v;
+    if (D <= 0) return approachMs;
+    const rest = Math.min(1, Math.max(0, (s - A) / D));
+    return approachMs + descentMs * (1 - Math.pow(1 - rest, 1 / decayPlus1));
+  };
+
+  return {
+    cruisePxS: v,
+    launchMs,
+    approachMs,
+    descentMs,
+    decay: decayPlus1 - 1,
+    durationMs: approachMs + descentMs,
+    approachArcPx: A,
+    descentArcPx: D,
+    arcAtMs,
+    msAtArc,
+  };
+};
+
+// Ground speed at time `t`, in px/s — the derivative of `arcAtMs`, spelled
+// rather than differenced so the gate samples the PROFILE and not a finite
+// difference of it. Exported because acceptance test 2 is written in this
+// currency and nothing else in the app is.
+export const speedAtMs = (profile, t) => {
+  const { cruisePxS: v, launchMs, approachMs, descentMs, decay } = profile;
+  if (t < 0 || t > profile.durationMs) return 0;
+  if (t <= launchMs) return launchMs > 0 ? (v * t) / launchMs : v;
+  if (t <= approachMs) return v;
+  const tau = descentMs > 0 ? Math.min(1, (t - approachMs) / descentMs) : 1;
+  return v * Math.pow(1 - tau, decay);
+};
+
 const TAU = Math.PI * 2;
 
 export const distancePx = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
@@ -499,15 +696,13 @@ export const buildFlightCurve = ({ from, staging, target, bodyLengthPx, weaveSig
  *                  target: each box owns its own measurements (§28.2).
  * @param width/height  the flight container, px
  * @param approachSpeedPxS  cruise speed x APPROACH_SPEED_RATIO
- * @param easeApproach/easeDescent  R-LF-2 — shape the LAUNCH (first approach
- *                  segment, off `Easing.out(quad)`) and the SETTLE (last
- *                  descent segment, off `Easing.out(cubic)`, unchanged from
- *                  before this ruling). Every interior segment between them
- *                  is flown level — constant speed along the curve, because
- *                  the weave (R-LF-3) is what makes the flight read as
- *                  alive, not a speed change — which is what keeps the
- *                  composed easing's derivative strictly positive across the
- *                  old dead-stop split (acceptance test 2).
+ * R-LF-2.1 — this builder takes NO easings. It used to take two, one for the
+ * launch and one for the settle, and a caller that can hand in a curve is a
+ * caller that can hand in a curve for one SEGMENT of a leg — which is how the
+ * lunge got here (see `buildSpeedProfile`). The shape of the flight is now a
+ * property of the flight, derived from `approachSpeedPxS` and the arcs, and
+ * there is no spelling of this call that can put a speed change anywhere the
+ * profile did not put one.
  * @param weaveSign  R-LF-3 — which side of the chord the weave's first
  *                  excursion swings toward; the caller alternates it per tap
  *                  so consecutive flights never draw the same figure.
@@ -520,8 +715,6 @@ export const buildPollinationPlan = ({
   width,
   height,
   approachSpeedPxS,
-  easeApproach,
-  easeDescent,
   weaveSign = 1,
 }) => {
   // §28.4 waypoint 1: DIRECTLY ABOVE the cell centre, by the bee's own length
@@ -543,33 +736,42 @@ export const buildPollinationPlan = ({
   const approachLen = approachLegs.reduce((a, b) => a + b, 0);
   const descentLen = descentLegs.reduce((a, b) => a + b, 0);
 
-  // §28.5's formula, unchanged in shape: distance / speed, on the STRAIGHT
-  // chord `from`→`staging` — the same currency R-LF-4's own worked table is
-  // in. The weave adds real ground he covers without adding to how long
-  // "he broke off to come here" is allowed to take; apportioning each
-  // segment's SHARE of `approachMs` by its own real arc length (below) is
-  // what keeps that honest — it flies him at one constant real speed for
-  // the whole leg, a fixed amount above `approachSpeedPxS` in exact
-  // proportion to how much longer the weave made the ground he covers,
-  // rather than lurching faster through the curve's tighter turns.
-  const approachMs = approachDurationMs(distancePx(from, staging), approachSpeedPxS);
-  // R-LF-4 — the descent stays a fixed GESTURE duration, not distance/speed;
-  // its per-segment durations below are apportioned across that fixed total.
-  const durationMs = approachMs + DESCENT_MS;
+  // §28.5's formula, still the only place `distance / speed` is spelled: the
+  // STRAIGHT chord `from`->`staging` over R-LF-4's ratified speed. What that
+  // yields is not the flight's approach DURATION any more, it is the approach
+  // SPEED — the real, weaved ground divided by it. R-LF-2.1: the ratified
+  // quantity is the speed, and the duration is what follows from it.
+  const flatApproachMs = approachDurationMs(distancePx(from, staging), approachSpeedPxS);
+  const cruisePxS = flatApproachMs > 0 ? (approachLen / flatApproachMs) * 1000 : 0;
+
+  // R-LF-2.1 — ONE continuous speed function over cumulative arc: a linear
+  // ramp off rest, a constant cruise, and a monotone decay to exactly zero at
+  // the cell. Every duration and every easing below is read off it; nothing
+  // in this builder picks a curve any more.
+  const profile = buildSpeedProfile({ approachArcPx: approachLen, descentArcPx: descentLen, cruisePxS });
+  const { approachMs, descentMs, durationMs } = profile;
   const split = durationMs > 0 ? approachMs / durationMs : 0;
 
-  // Each segment's own share of its leg's fixed total, proportional to its
-  // own arc length — the adaptive sampler doesn't produce equal-length
-  // segments (R-LF-1: it refines wherever the curve needs it, not on a
-  // fixed spacing), so this is what keeps speed WITHIN a leg constant
-  // rather than merely correct on average.
-  const approachDurations = approachLegs.map((legPx) => (approachLen > 0 ? (legPx / approachLen) * approachMs : 0));
-  const descentDurations = descentLegs.map((legPx) => (descentLen > 0 ? (legPx / descentLen) * DESCENT_MS : 0));
-  const durations = [...approachDurations, ...descentDurations];
-  const easings = durations.map((_, i) => {
-    if (i === 0) return easeApproach;
-    if (i === durations.length - 1) return easeDescent;
-    return (w) => w;
+  // Each segment's duration is the time the profile takes to cover ITS OWN
+  // ARC, and its easing is the profile's arc-vs-time curve over that same
+  // window, renormalised onto [0,1] — which is exactly what
+  // `composeSegmentEasing` needs, because a segment of the polyline is a
+  // straight lerp, so "fraction of this segment's arc covered" IS "fraction
+  // of this segment's index span". Composed, the two reproduce v(t) exactly,
+  // at every instant, for any sampling density the adaptive curve produces —
+  // including the straight drop, which is a single segment and would
+  // otherwise be flown at one constant speed and stopped dead. (M11.)
+  const segmentArcs = [...approachLegs, ...descentLegs];
+  const cumulative = [0];
+  for (let i = 0; i < segmentArcs.length; i += 1) cumulative.push(cumulative[i] + segmentArcs[i]);
+  const boundaryMs = cumulative.map((s) => profile.msAtArc(s));
+  const durations = segmentArcs.map((_, i) => Math.max(0, boundaryMs[i + 1] - boundaryMs[i]));
+  const easings = segmentArcs.map((arcPx, i) => {
+    if (arcPx <= 0 || durations[i] <= 0) return (w) => w;
+    const t0 = boundaryMs[i];
+    const d = durations[i];
+    const s0 = cumulative[i];
+    return (w) => Math.min(1, Math.max(0, (profile.arcAtMs(t0 + w * d) - s0) / arcPx));
   });
 
   // `descentPoints[0]` is `staging`, already the last point of
@@ -583,16 +785,28 @@ export const buildPollinationPlan = ({
     easing: composeSegmentEasing(durations, easings),
     durationMs,
     approachMs,
-    descentMs: DESCENT_MS,
+    descentMs,
     // The path no longer has a fixed length (R-LF-1's curve is resampled
-    // adaptively, not to a fixed 3-waypoint shape), so a reader that needs
-    // to find `staging` or measure "the descent" in `path` — a gate, or a
-    // future caller — has no index to assume. This is the one it can read
-    // instead: `path[stagingIndex]` is `staging`, exactly, and
-    // `path.slice(stagingIndex)` is the whole descent (fillet included).
-    stagingIndex: approachPoints.length - 1,
+    // adaptively, not to a fixed 3-waypoint shape), so a reader that needs to
+    // measure "the descent" in `path` — a gate, or a future caller — has no
+    // index to assume. This is the one it can read instead:
+    // `path.slice(descentStartIndex)` is the whole descent, fillet included.
+    //
+    // **It was called `stagingIndex` and the name was false by construction**
+    // (Lumen, 2026-08-29, Finding 3). `path[descentStartIndex]` is
+    // `approachEnd` — the fillet's trim point, `FILLET_LEG_FRACTION x
+    // min(chord, descentChord)` short of `staging` (7.5167pt at the shipped
+    // pair) — and it can never be `staging`, because the trim IS the fillet.
+    // Nothing read it wrongly; a name that claims what the mechanism
+    // guarantees false is a trap regardless. `plan.staging` already carries
+    // the point for anyone who wants it.
+    descentStartIndex: approachPoints.length - 1,
     staging: { x: staging.x / width, y: staging.y / height },
     split,
+    // R-LF-2.1 — the profile itself, so a caller or a gate reads the speed
+    // the flight is actually flown at rather than re-deriving it from the
+    // path. `speedAtMs(plan.profile, t)` is acceptance test 2's currency.
+    profile,
     landing: target,
     // §28 has always specified a honey trail on the approach, and it stopped
     // rendering the day 52c5d5c made the trail a property of the BEAT

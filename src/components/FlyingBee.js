@@ -689,14 +689,15 @@ export const FlyingBee = ({
         width: layout.width,
         height: layout.height,
         approachSpeedPxS: cruiseSpeed * APPROACH_SPEED_RATIO,
-        // R-LF-2 (Living Flight) — `inOut(ease)` arrived at zero velocity and
-        // `out(cubic)` on the descent departed from zero: the two together
-        // is the dead stop over the cell Colin read as "robot-like ways."
-        // `out(quad)` shapes the LAUNCH off cruise instead — no zero-velocity
-        // moment for the corner to inherit — and `easeDescent` keeps its own
-        // job on the settle, unchanged.
-        easeApproach: Easing.out(Easing.quad),
-        easeDescent: Easing.out(Easing.cubic),
+        // R-LF-2.1 — **there are no easings to pass any more.** R-LF-2 handed
+        // this builder `Easing.out(quad)` for the launch and
+        // `Easing.out(cubic)` for the settle; both landed on ONE SEGMENT
+        // rather than one leg, which made the launch unobservable (its
+        // segment is 6ms) and the settle a lunge (its segment is the whole
+        // drop, so `out(cubic)`'s 3x-mean opening velocity was a leg-scale
+        // event). The flight's speed is now a property of the flight —
+        // `buildSpeedProfile`, one continuous v(t) — and this call site's job
+        // is to name the SPEED, which it still does, one line up.
         // R-LF-3 — alternates the weave's first excursion so consecutive
         // taps never draw the same figure. Seeded off the pollination key
         // (an incrementing counter, never `Math.random()`) because
