@@ -462,9 +462,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  // Lumen's 08-26 audit: `top: 24` sits under the Dynamic Island on
+  // notch-class devices — the comment above (matching NotesInbox's scrim)
+  // was true of the overlay, not of this value. NotesInbox's own
+  // `detailClose` clears it at `top: 64`; matching that number, not just
+  // the claim that they match.
   detailClose: {
     position: 'absolute',
-    top: 24,
+    top: 64,
     right: 24,
   },
   detailCard: {
