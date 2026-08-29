@@ -77,7 +77,29 @@ const EPS = 1e-4;
 // folded onto the right half-plane: |dx| discards the direction of travel
 // (that's `facing`'s job) and keeps only the steepness. Bounded ±90 by
 // construction, which is what makes `bankFor` bounded without a clamp.
-export const pitchFor = (dxPx, dyPx) => Math.atan2(dyPx, Math.abs(dxPx)) * DEG;
+// R-LF-9.1 — A ZERO RETURNED FOR AN ABSENT QUANTITY IS INDISTINGUISHABLE FROM
+// A ZERO THAT WAS MEASURED. `atan2(0, 0)` does not fail; it ANSWERS, and its
+// answer is `0` — a legal pitch, which `bankFor` then draws as a real, level
+// roll. So a segment with no direction at all was rendered as a segment that
+// is definitely horizontal.
+//
+// `facingFor` already refuses this question: it HOLDS the facing it has
+// through travel too small to read a direction from. Bank had no equivalent.
+// It does now, and the two are deliberately not the same rule — facing's
+// deadband is a MAGNITUDE (one bee-box, because a short stretch of travel
+// still has a direction and it is just not worth mirroring the character
+// for), while this is a DEGENERACY (there is no direction to read at all).
+// A magnitude deadband here would be a tuned threshold on a quantity that has
+// no scale; exact zero is the only defensible test, and it is the only case
+// `atan2` fabricates an answer for.
+//
+// The base case is the same one facing has: the first segment of a track has
+// nothing to hold, so `heldPitchDeg` defaults to 0 and a track that opens on a
+// coincident pair is drawn level. That is a base case and not a licence — and
+// the guard in `pollinationFlight` means no plan in this app produces one.
+export const pitchFor = (dxPx, dyPx, heldPitchDeg = 0) => (
+  dxPx === 0 && dyPx === 0 ? heldPitchDeg : Math.atan2(dyPx, Math.abs(dxPx)) * DEG
+);
 
 // The one place attitude magnitude is decided. Proportional, not clamped:
 // a clamp at ±22 saturates on *every* segment of the live cruise loop
@@ -171,10 +193,15 @@ export const buildAttitude = (
   const n = path.length - 1;
   const waypointTs = path.map((_, i) => i / n);
 
+  // `heldPitch` threads exactly as `held` does below, and for the same reason:
+  // a segment with no direction inherits the attitude of the one before it
+  // rather than being answered with horizontal. See `pitchFor`.
+  let heldPitch = 0;
   const segments = path.slice(0, -1).map((p, i) => {
     const dx = (path[i + 1].x - p.x) * width;
     const dy = (path[i + 1].y - p.y) * height;
-    const pitch = pitchFor(dx, dy);
+    const pitch = pitchFor(dx, dy, heldPitch);
+    heldPitch = pitch;
     return { dx, dy, pitch, bank: bankFor(pitch), bodyWidths: Math.abs(dx) / size };
   });
 
