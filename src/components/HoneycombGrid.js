@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { View, Text, Animated, StyleSheet, Pressable, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Polygon, Path, Line, Circle, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
@@ -397,7 +397,15 @@ const HexCell = ({ member, size, x, y, delay, selected, held, reduced, pressDept
 // The hive's Today view: who in your circle has shared today. Seven seats,
 // you in the middle, one ring around you. Tap a face to read what they
 // wrote; tap a gap to invite someone into it.
-export const HoneycombGrid = ({
+//
+// `forwardRef` exists for exactly one thing: R-LF-5's landing light. The
+// bee lives in `FlyingBee`, a screen-level sibling of this grid, not a
+// child of it (§28.2 — no pixel constant crosses between the two boxes),
+// so `HoneycombTab` is the only place both are in scope. It calls
+// `igniteLanding()` from `FlyingBee`'s existing `onPollinateEnd` — the
+// "I landed" signal already crossed that boundary before this ruling;
+// nothing new does.
+export const HoneycombGrid = forwardRef(({
   members,
   cellSize = 44,
   onInvitePress,
@@ -412,7 +420,7 @@ export const HoneycombGrid = ({
   onPollinate,
   onPollinateCancel,
   activePollinationKey = null,
-}) => {
+}, ref) => {
   // HOLD THE KEY, DERIVE THE MEMBER (§28.9 correction 3, Sage's find). The
   // old shape put the whole member object in state at tap time and never
   // refreshed it, so the ring compared a captured share id against a live one
@@ -692,6 +700,46 @@ export const HoneycombGrid = ({
     ]).start();
   };
 
+  // R-LF-5 (Living Flight) — the landing light. Two lights, and they belong
+  // to different people: the ignition above is the FINGER's and never waits
+  // for the bee (§28.1 untouched — time-to-content is unchanged). This one
+  // is the BEE's, on the SAME `glowBloomOpacity` channel, fired by
+  // `HoneycombTab` from `FlyingBee`'s existing `onPollinateEnd` — the frame
+  // `burstPollen` and the sequencer's own settle already run on. By the time
+  // any hop lands under R-LF-4's new durations the ignition has long since
+  // reached 0 (out at 430ms; the fastest landing is 560ms), so reusing the
+  // channel needs no reconciliation with whatever the finger's envelope was
+  // doing. No cell reference crosses with it (§28.2) — this re-triggers
+  // whichever cell `glowBloomOpacity`/`tapCentre` already point at, and by
+  // §28.9 that is always the cell that just finished landing: an aborted
+  // flight never reaches `onPollinateEnd`, so a re-tap elsewhere always
+  // retargets to a NEW flight before this one could fire for the old cell.
+  //
+  // Peak deliberately UNDER the ignition's (0.45 of it) — a grace note, not
+  // a second announcement; matching it would read as the tap firing twice.
+  const LANDING_LIGHT_PEAK = 0.45;
+  const LANDING_LIGHT_RISE_MS = 120;
+  const LANDING_LIGHT_FALL_MS = 420;
+
+  const igniteLanding = () => {
+    Animated.sequence([
+      Animated.timing(glowBloomOpacity, {
+        toValue: LANDING_LIGHT_PEAK,
+        duration: LANDING_LIGHT_RISE_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(glowBloomOpacity, {
+        toValue: 0,
+        duration: LANDING_LIGHT_FALL_MS,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  useImperativeHandle(ref, () => ({ igniteLanding }));
+
   const requestPollination = (member, tap) => {
     // Under Reduce Motion there is no bee to break from — `FlyingBee` renders
     // the parked breathing pose — so the beat collapses to what the cell does
@@ -881,7 +929,9 @@ export const HoneycombGrid = ({
       )}
     </View>
   );
-};
+});
+
+HoneycombGrid.displayName = 'HoneycombGrid';
 
 const styles = StyleSheet.create({
   container: {

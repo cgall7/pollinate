@@ -689,8 +689,19 @@ export const FlyingBee = ({
         width: layout.width,
         height: layout.height,
         approachSpeedPxS: cruiseSpeed * APPROACH_SPEED_RATIO,
-        easeApproach: Easing.inOut(Easing.ease),
+        // R-LF-2 (Living Flight) — `inOut(ease)` arrived at zero velocity and
+        // `out(cubic)` on the descent departed from zero: the two together
+        // is the dead stop over the cell Colin read as "robot-like ways."
+        // `out(quad)` shapes the LAUNCH off cruise instead — no zero-velocity
+        // moment for the corner to inherit — and `easeDescent` keeps its own
+        // job on the settle, unchanged.
+        easeApproach: Easing.out(Easing.quad),
         easeDescent: Easing.out(Easing.cubic),
+        // R-LF-3 — alternates the weave's first excursion so consecutive
+        // taps never draw the same figure. Seeded off the pollination key
+        // (an incrementing counter, never `Math.random()`) because
+        // `buildPollinationPlan` is a pure function a gate can sample.
+        weaveSign: pollinate.key % 2 === 0 ? 1 : -1,
       }),
     });
   }, [pollinate, layout, flightSuppressed, sequenceHalted]);
