@@ -6290,15 +6290,29 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       //     A LATER RULING EXPIRES THE EARLIER TABLE, and the table does not
       //     announce it.
       //
-      //     GATED, not reported, and the distinction is deliberate. R-LF-9
-      //     carved the WEAVE out of the rate bound (channel 2, gait not
-      //     steering). It did NOT carve out the drawn bank — it measured the
-      //     bank comfortably inside and named the residual risk as "a fast
-      //     roll". A bound that was argued from a measurement should red when
-      //     the measurement stops holding, and R-LF-10 is proof that the
-      //     inputs move. If Lumen wants it demoted to REPORTED that is her
-      //     call; it is stated here so the choice is visible rather than
-      //     inherited.
+      //     GATED, and RULED SO — R-LF-9.3 (Lumen, 2026-08-29), which also
+      //     settles what KIND of gate this is. The criterion is that §5's
+      //     carve-out was scoped to a QUANTITY, never to a channel: R-LF-9
+      //     carved out the WEAVE because gait already has a ruled rate in its
+      //     own unit (Hz). The drawn bank was never carved out — its
+      //     ratification rested on a MEASUREMENT, and R-LF-10 is the proof
+      //     those inputs move.
+      //
+      //     AND THE STATUS MATTERS MORE THAN THE GREEN: THIS IS A
+      //     RATIONALE-HOLD, NOT A BANK BOUND. `MAX_FRAME_SPEED_STEP_FRACTION`
+      //     was derived for the VELOCITY VECTOR, not for the drawn roll. No
+      //     bank bound is ruled anywhere, and none may be inferred from this
+      //     row's existence — the comparison is a proxy chosen because it is
+      //     the only ratified number in the right units, not because 8.59 is
+      //     where a roll becomes wrong. What the row holds is THE MEASUREMENT
+      //     §7 ROW 2's CONCLUSION RESTS ON. If it reds, that conclusion has
+      //     expired: re-rule the channel, never loosen the number. The
+      //     failure text below says exactly that, and it is the row's real
+      //     output.
+      //
+      //     Margin, so the hold is not mistaken for a tight fit: `MAX_BANK_DEG`
+      //     absorbs 22 -> 60 without any row in the suite firing, so a taste
+      //     retune of the bank does not trip it.
       //     CALIBRATION, persisted per §7 row 3, and it took three tries to
       //     find one that tests THIS row. Reverting the emission guard and
       //     collapsing APPROACH_MS_CEILING both red the suite loudly — and
@@ -6369,13 +6383,13 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
         }
         if (over === 0 && worst.v > 0 && fractionIsRuled) {
           ok(
-            `N15 the DRAWN BANK stays inside the turn's bound on the ERRAND's domain, not just the lattice's — worst ${worst.v.toFixed(4)}deg/frame (${worst.label}) against §5's ratified ${BOUND_DEG_PINNED.toFixed(4)} (pinned here, not read from the module), ${(BOUND_DEG_PINNED / worst.v).toFixed(1)}x inside, over ${WIDE.length} plans and 0 exceedances. `
+            `N15 R-LF-9.3 RATIONALE-HOLD (not a bank bound — no bank bound is ruled, and none may be inferred from this row): the DRAWN BANK still clears the only ratified number in the right units on the ERRAND's domain, not just the lattice's — worst ${worst.v.toFixed(4)}deg/frame (${worst.label}) against §5's ${BOUND_DEG_PINNED.toFixed(4)}, which was derived for the VELOCITY VECTOR and is used here as a proxy (pinned, not read from the module), ${(BOUND_DEG_PINNED / worst.v).toFixed(1)}x clear, over ${WIDE.length} plans and 0 exceedances. `
             + `N2b measures ${'1.6070'}deg/frame seat-to-seat; this domain reaches a cruise of ${fastest.v.toFixed(1)} px/s against the lattice's 264.35, so R-LF-9's "the channel the user sees is not at risk" is now asserted where R-LF-10's ceiling actually binds rather than where it never does. `
             + `AND THE WORST BANK IS NOT THE FASTEST PLAN: the maximum sits at cruise ${worst.cruise.toFixed(1)} px/s, while the fastest plan (${fastest.label}) banks only ${fastest.bank.toFixed(4)}deg/frame. That is R-LF-10's own logic showing up in the rendered channel — the ceiling buys speed on LONG errands, whose approach is the straightest thing the bee ever flies, so the speed arrives exactly where the geometry has no turning left to amplify`,
           );
         } else {
           bad(
-            'N15 the drawn bank stays inside the turn\'s bound on the errand\'s domain',
+            'N15 R-LF-9.3 rationale-hold: §7 row 2\'s conclusion still holds on the errand\'s domain',
             !fractionIsRuled
               ? `MAX_FRAME_SPEED_STEP_FRACTION is ${flight.MAX_FRAME_SPEED_STEP_FRACTION}, not §5's ratified ${RULED_STEP_FRACTION}. Every rate figure in section N is denominated in it — re-derive the ruling, do not retype the constant`
               : `${over} of ${WIDE.length} wide-domain plans exceed ${BOUND_DEG_PINNED.toFixed(4)}deg/frame, worst ${worst.v.toFixed(4)} (${worst.label}, cruise ${worst.cruise.toFixed(1)} px/s). R-LF-9 measured this channel 5.3x inside the bound on the seat-to-seat lattice and named a fast roll as the residual risk; a speed ruling has now made that risk real. This is a design question for Lumen, not a number to loosen`,
