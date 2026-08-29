@@ -276,9 +276,11 @@ export const NECTAR_CONSENT_BOOTSTRAP_OBJECTS = ['nectar_consents', 'consent_to_
 // ============================================================================
 // THE HONEY LADDER'S INPUT — DES-24 §7 open inputs 1 and 2, ruled here
 // because ENG-65's second half cannot be built without them. The renderer
-// merged (HoneycombGrid's HoneyFill, `member.honeyRung`); NOTHING PRODUCES
-// THE RUNG. check-honey-fill.mjs says so in its own header: "no path sets
-// `member.honeyRung` today, and this gate does not invent one."
+// merged (HoneycombGrid's HoneyFill, `member.honeyRung`); NOTHING PRODUCED
+// THE RUNG at the time this section was written, and check-honey-fill.mjs
+// said so in its own header. Both halves have since landed: this file's
+// mapping below, and `HoneycombTab`'s balance read that feeds it. R-N2
+// replaced the rung with a continuous level; the rulings are unchanged.
 //
 // ---------------------------------------------------------------------------
 // RULING 1 — THE LADDER READS THE AVAILABLE BALANCE, NOT LIFETIME RECEIVED.
@@ -333,41 +335,107 @@ export const NECTAR_CONSENT_BOOTSTRAP_OBJECTS = ['nectar_consents', 'consent_to_
 // re-ratifying the grant re-derives it instead of silently breaking it.
 //
 // Equality is safe here and would not have been under the function's first
-// draft; see honeyRungForDrops below for why that changed.
+// draft; the anti-cliff correction that made it safe is now spelled as a
+// rendered-height floor (`honeyHeightForLevel`, hexGeometry.js) rather than
+// as "at least rung 1". `honeyRungForDrops` itself was retired by R-N2.
+//
+// ANNOTATION 2026-08-29 (R-N2), not an edit: everything above stands as
+// ratified, but the phrase "the LOWEST VISIBLE RUNG" no longer has a
+// referent — the ladder is continuous. The bound and its value are left
+// exactly as they are; see the open note beside `honeyLevelForDrops` below
+// for the arithmetic this build can offer and why the retune is Lumen's.
 //
 // NOT A TARGET, and the renderer is what keeps that honest: DES-24 §5 —
 // "never labelled, never captioned '4 of 5', never given progress
 // semantics." Nothing renders this number. It is a divisor.
 export const NECTAR_STARTER_GRANT_DROPS = 500;
 
-// Four visible rungs plus absent — HoneycombGrid gates on
-// `Boolean(member.isOwn && member.honeyRung)`, so rung 0 is not a low fill,
-// it is NO HONEYED STATE AT ALL. That is the correct reading of an empty
-// vessel and it is why the ladder is 0..4 rather than a percentage.
+// Four visible rungs plus absent — HoneycombGrid gated on
+// `Boolean(member.isOwn && member.honeyRung)`, so rung 0 was not a low fill,
+// it was NO HONEYED STATE AT ALL. That reading of an empty vessel SURVIVES
+// R-N2 verbatim (the gate is now `member.honeyLevel > 0`, and zero is still
+// the only dark case); what does not survive is "0..4 rather than a
+// percentage" — R-N2 measured that the steps were the defect. This constant
+// now has exactly one job, as the multiplier in the cap's derived bound
+// above, and that bound's own premise is flagged there.
 export const NECTAR_LADDER_RUNGS = 4;
 
 // PLACEHOLDER (DES-24 §7.2), bounded by Ruling 2 above rather than chosen.
 export const NECTAR_LADDER_CAP_DROPS = NECTAR_STARTER_GRANT_DROPS * NECTAR_LADDER_RUNGS;
 
-// Balance (drops) -> rung 0..NECTAR_LADDER_RUNGS.
+// THE PRESET AMOUNTS. Moved here from `NectarSendPanel` by R-N2: a preset is
+// a LEDGER quantity, not panel chrome — the honey ladder's resolution is a
+// statement about these three numbers against the cap, and check-honey-fill
+// cannot read them from a file with JSX in it. One list, two consumers (the
+// panel that offers them, the gate that measures them against the vessel).
+export const NECTAR_PRESETS = [10, 50, 100];
+
+// Balance (drops) -> the CONTINUOUS honey level, 0..1.
 //
-// RUNG 0 MEANS EMPTY, NOT "BELOW THE FIRST RUNG" — and that is a correction
-// to my own first cut of this function, caught before it landed. Written as
-// a plain `floor(drops / cap * rungs)`, the grant sits at EXACTLY 0.25 of
-// the cap, which is precisely the lower edge of rung 1. One drop spent — the
-// smallest gift the presets offer is ten — and the cell goes dark. That is
-// R65/R66's zero-headroom failure in a new costume: a value placed on a
-// boundary is a cliff edge, not a register, and here the cliff fires on the
-// first generous thing a new user ever does.
+// R-N2 (POLLINATE_NECTAR_LIVING_EXCHANGE §3) retires `honeyRungForDrops`.
+// This replaces it rather than joining it: two mappings from one balance to
+// one vessel is a second copy of a derivation, and the two would drift the
+// first time either is retuned.
 //
-// So the vessel reading is taken literally: a vessel with honey in it is not
-// an empty vessel. Any positive balance renders at least the lowest visible
-// rung, and the cell goes dark only at zero. That removes the cliff by
-// construction rather than by tuning the cap away from it — the same shape
-// as preferring a failing ground to a thin margin.
-export const honeyRungForDrops = (drops) => {
+// WHAT THE RUNGS WERE HIDING, measured by Lumen against `960ec7b`: at a cap
+// of 2000 and presets of 10/50/100, rung 1 spanned balances 1..999 — half
+// the entire cap — with the 500-drop starter grant dead in the middle of it.
+// From the state every consenting user starts in, NO single transaction this
+// product offers changed the level in either direction. Moving one rung took
+// 5 gifts at the largest preset or 50 at the smallest. That is not a
+// mistuned cap; it is a register whose resolution is 5x coarser than its own
+// biggest gesture, and no cap fixes it while the ladder is stepped.
+//
+// The floor is NOT applied here. "Any positive balance renders a visible
+// minimum" is a statement about a rendered height in points, derived from
+// the meniscus stroke it has to clear, and it lives with the geometry that
+// owns both (`honeyHeightForLevel`, hexGeometry.js). This function is ledger
+// arithmetic and stays free of the renderer's units — which is also what
+// keeps this file importable from a bare `node` script.
+export const honeyLevelForDrops = (drops) => {
   const n = Number(drops);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  const scaled = Math.floor((n / NECTAR_LADDER_CAP_DROPS) * NECTAR_LADDER_RUNGS);
-  return Math.max(1, Math.min(NECTAR_LADDER_RUNGS, scaled));
+  return Math.min(1, n / NECTAR_LADDER_CAP_DROPS);
 };
+
+// ---------------------------------------------------------------------------
+// OPEN, AND FLAGGED RATHER THAN RULED — the cap's premise moved underneath it.
+//
+// `NECTAR_LADDER_CAP_DROPS` is derived above as `grant x NECTAR_LADDER_RUNGS`,
+// and Ruling 2's argument for the multiplier was "the grant must land on the
+// LOWEST VISIBLE RUNG". Continuous, there are no rungs, so the number 4 has
+// lost the derivation that produced it. Its VALUE and its bound are
+// deliberately untouched here: retuning a placeholder whose reasoning has
+// moved is a design ruling, and it is Lumen's.
+//
+// What this build can contribute is the arithmetic she does not have yet,
+// because it turns out the two constraints on the cap are now INCOMPATIBLE:
+//
+//   * headroom  — a new user must not see a near-full cell, which wants a
+//     LARGE cap. At 2000 the grant renders at 25% and there are 1500 drops
+//     of room above it.
+//   * resolution — the smallest gift must move a rendered edge, which wants
+//     a SMALL cap. At `honeyHMax(44)` = 26.8180pt:
+//
+//         preset  10 -> 0.1341pt = 0.402 physical px @3x, 0.268 @2x
+//         preset  50 -> 0.6705pt = 2.011 physical px @3x, 1.341 @2x
+//         preset 100 -> 1.3409pt = 4.023 physical px @3x, 2.682 @2x
+//
+// So 50 and 100 clear a physical pixel comfortably on both densities and 10
+// does not, on either. And there is no cap that rescues it: 10 drops needs
+// cap <= 804 to move one physical pixel at @3x, at which point the grant
+// already renders at 62% of the vessel and saturates after three gifts —
+// DES-24 §5's progress bar, arrived at from the other side.
+//
+// THE SMALLEST PRESET CANNOT BE MADE LEGIBLE ON THE MENISCUS BY ANY CAP.
+// That is a finding, not a defect, and §2 of the spec is why: a level is a
+// STATE and a gift is an EVENT, so the meniscus was never the thing that had
+// to carry 10 drops — the drop that leaves your hand (R-N3) and the bee that
+// brings it (R-N4) are. The one line that disagrees is §6 acceptance row 1,
+// which asks every preset to produce a measurable change; it is measurable
+// in points and sub-pixel on glass, and only a device settles the gap
+// between those two. Routed to Lumen with the numbers rather than resolved
+// by quietly moving her constant.
+
+// Balance (drops) -> rung 0..NECTAR_LADDER_RUNGS.
+//

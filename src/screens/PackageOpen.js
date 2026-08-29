@@ -280,7 +280,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       // THE SENDER'S CONFIRMATION IS HERE, AND IT HAS TO BE. Deezine's spec
       // ends the flow with "entry shows new honeyed mark" — but the honeyed
       // cell is OWN-CELL-ONLY by construction (HoneycombGrid:199,
-      // `member.isOwn && member.honeyRung`, DES-24 §6.2's isOwn gate), so
+      // `member.isOwn && member.honeyLevel > 0`, DES-24 §6.2's isOwn gate), so
       // the mark that appears is on the RECIPIENT's cell in the RECIPIENT's
       // app and the sender never sees it. The only honeyed cell a sender
       // can see is their own, and after a zap it goes DOWN. So a success

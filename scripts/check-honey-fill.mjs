@@ -51,14 +51,45 @@
 //      marks, where `inkSoft` floors at 2.8399:1. That one is reachable
 //      today and `honeyed` still is not, so the row asserts the union.
 //
-// WHAT THIS GATE DOES NOT ASSERT: the mapping from a real drop balance to a
-// rung (0-4). DES-24 §7 names that its own open item — it wants 19a's drop
-// distribution, which does not exist in this repo yet. No production code
-// path sets `member.honeyRung` today, and this gate does not invent one.
+//   8. R-N2 (POLLINATE_NECTAR_LIVING_EXCHANGE §3/§6) — the ladder is
+//      CONTINUOUS and its floor is derived. Section 8 asserts the mapping
+//      (`honeyLevelForDrops`), the rendered floor (`honeyHeightForLevel`,
+//      derived from the meniscus stroke the renderer actually draws), and
+//      §6 acceptance row 1: every preset, sent AND received, moves the
+//      rendered height in points from the starter grant.
+//   9. R-N2's load-bearing clause and §6 acceptance row 2 — THE MENISCUS IS
+//      NEVER RENDERED AT ITS NEW HEIGHT. Source-level and structural: the
+//      rendered height must be the animated state, the tween must exist and
+//      be monotone, and the only direct set must sit under the Reduce Motion
+//      branch. Setting the height directly reds this section.
+//
+// WHAT THIS GATE DOES NOT ASSERT: that the smallest preset is PERCEPTIBLE.
+// Row 8c measures every preset's rendered displacement and prints the
+// physical-pixel figures at @2x and @3x; it asserts only that the movement
+// is non-zero, because at the shipped cap a 10-drop gift is 0.402 physical
+// px @3x and no legal cap fixes that (the arithmetic, and why it is routed
+// to Lumen rather than patched, is beside `honeyLevelForDrops`). A row that
+// asserted perceptibility would be asserting a device result from a
+// spreadsheet.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
-import { honeyHMax, HONEY_RUNGS, hexHoneyPoints, hexHoneyMeniscus, HEX_HEIGHT_RATIO } from '../src/components/hexGeometry.js';
+import {
+  honeyHMax,
+  HONEY_MENISCUS_STROKE,
+  HONEY_MIN_HEIGHT,
+  honeyHeightForLevel,
+  hexHoneyPoints,
+  hexHoneyMeniscus,
+  HEX_HEIGHT_RATIO,
+} from '../src/components/hexGeometry.js';
+import {
+  NECTAR_LADDER_CAP_DROPS,
+  NECTAR_PRESETS,
+  NECTAR_STARTER_GRANT_DROPS,
+  honeyLevelForDrops,
+} from '../src/constants/nectar.js';
+import { parse } from '@babel/parser';
 import { BLOOM_FLOOR_OPACITY } from '../src/constants/bloomRing.js';
 import { theme } from '../src/constants/theme.js';
 import { parseColor, over, contrastRatio } from './lib/color.mjs';
@@ -85,11 +116,15 @@ if (near(hmax, 26.82, 0.01)) {
 } else {
   bad('honeyHMax ceiling', `got ${hmax.toFixed(4)}pt, expected 26.82pt (§6.4 correction)`);
 }
-const step = hmax / 4;
-if (near(step, 6.70, 0.01)) {
-  ok(`rung step = ${step.toFixed(4)}pt, matches §6.4's corrected 6.70pt`);
+// The old ladder's step, kept as a REFERENCE POINT rather than as a rung:
+// R-N2 retired the four rungs, but 6.70pt is still the height the starter
+// grant renders at (500/2000 of the ceiling), so §6.4's corrected figure is
+// still checkable against something the screen actually draws.
+const grantHeight = honeyHeightForLevel(SIZE, honeyLevelForDrops(NECTAR_STARTER_GRANT_DROPS));
+if (near(grantHeight, 6.70, 0.01)) {
+  ok(`starter grant renders at ${grantHeight.toFixed(4)}pt, matching §6.4's corrected quarter-ceiling 6.70pt`);
 } else {
-  bad('rung step', `got ${step.toFixed(4)}pt, expected 6.70pt`);
+  bad('grant height', `got ${grantHeight.toFixed(4)}pt, expected 6.70pt`);
 }
 
 // --- 2. Every rung stays in the linear (two-straight-edges) region -----
@@ -99,16 +134,23 @@ if (hmax < vertexSpan) {
 } else {
   bad('rung region', `ceiling ${hmax.toFixed(2)}pt reaches or exceeds the side-vertex span ${vertexSpan.toFixed(2)}pt — hexHoneyPoints' linear half-width no longer holds at the top rungs`);
 }
-HONEY_RUNGS.forEach((r) => {
-  const h = hmax * r;
-  const pts = hexHoneyPoints(SIZE, h);
-  const coords = pts.split(' ').map((p) => p.split(',').map(Number));
-  if (coords.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))) {
-    ok(`rung ${r} (h=${h.toFixed(2)}pt) produces a finite region`);
-  } else {
-    bad(`rung ${r} region`, `non-finite coordinates: ${pts}`);
-  }
+// R-N2: the domain is now CONTINUOUS, so a four-member sweep is no longer a
+// sweep of it. 201 samples across [0,1] plus the floor — the check is the
+// same one (a finite trapezoid at every reachable height) against a domain
+// that actually is the reachable one.
+const LEVEL_SAMPLES = Array.from({ length: 201 }, (_, i) => i / 200);
+const badLevels = LEVEL_SAMPLES.filter((r) => {
+  const pts = hexHoneyPoints(SIZE, honeyHeightForLevel(SIZE, r));
+  return !pts
+    .split(' ')
+    .map((pt) => pt.split(',').map(Number))
+    .every(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
 });
+if (badLevels.length === 0) {
+  ok(`all ${LEVEL_SAMPLES.length} sampled levels across [0,1] produce a finite region`);
+} else {
+  bad('level region', `non-finite coordinates at levels ${badLevels.slice(0, 5).join(', ')}`);
+}
 
 // --- 3. Honey body composite matches the device-measured RGB -----------
 // Tolerance of 1/255 per channel: accentDeep@0.5 over white lands exactly on
@@ -166,11 +208,15 @@ if (inkSoftFloorOnHoney < 3.0) {
 // --- 6 & 7. Source-level: the isOwn gate and the draw order ------------
 const gridSrc = await readFile(path.join(ROOT, 'src/components/HoneycombGrid.js'), 'utf8');
 
-const gateMatch = /const honeyed = Boolean\(member\.isOwn && member\.honeyRung\)/.exec(gridSrc);
+// R-N2: the level replaced the rung index, so the pinned expression moved.
+// Pinned by SHAPE rather than by the exact literal — `isOwn` conjoined with
+// a positive level — so a rename of the level prop reads as a rename and not
+// as a removed gate, while dropping `isOwn` still reds.
+const gateMatch = /const honeyed = Boolean\(member\.isOwn && member\.honey\w*\s*>\s*0\)/.exec(gridSrc);
 if (gateMatch) {
   ok('honey renderer gates on member.isOwn (§6.2/§6.4 row 4)');
 } else {
-  bad('isOwn gate', 'HoneycombGrid.js no longer computes `honeyed` as `Boolean(member.isOwn && member.honeyRung)` — the own-cell gate may have been weakened or removed');
+  bad('isOwn gate', 'HoneycombGrid.js no longer computes `honeyed` as `Boolean(member.isOwn && member.honey<level> > 0)` — the own-cell gate may have been weakened or removed');
 }
 
 const honeyIdx = gridSrc.indexOf('<HoneyFill');
@@ -224,6 +270,184 @@ if (inkFloorOnSelection >= 3.0 && inkSoftFloorOnSelection < 3.0) {
   ok(`BloomRing over the held selection fill: ink ${inkFloorOnSelection.toFixed(4)}:1 clears 3:1, inkSoft ${inkSoftFloorOnSelection.toFixed(4)}:1 does not — the same swap, on the ground MB-D2b added`);
 } else {
   bad('BloomRing selection floor', `ink ${inkFloorOnSelection.toFixed(4)}:1 / inkSoft ${inkSoftFloorOnSelection.toFixed(4)}:1 over \`accent\` — expected ink to clear 3:1 and inkSoft to fail it; if inkSoft now clears, the \`selected\` half of the honeyGround condition should be re-ruled, not silently kept`);
+}
+
+// --- 8. R-N2: the continuous ladder, its floor, and its resolution -----
+//
+// 8a. THE MAPPING. Zero is the only dark case; the level is monotone
+// non-decreasing in drops and saturates at 1 rather than exceeding it.
+{
+  const zeroCases = [0, -1, -1000, NaN, null, undefined, 'x'];
+  const zeroWrong = zeroCases.filter((d) => honeyLevelForDrops(d) !== 0);
+  if (zeroWrong.length === 0) {
+    ok('honeyLevelForDrops: every non-positive / unreadable balance is level 0 (§23.1 — a failed read is not an empty wallet, and both render dark)');
+  } else {
+    bad('level zero cases', `non-zero level for ${zeroWrong.map(String).join(', ')}`);
+  }
+
+  const sweep = Array.from({ length: 400 }, (_, i) => i * 12 + 1);
+  const nonMonotone = sweep.filter((d, i) => i > 0 && honeyLevelForDrops(d) < honeyLevelForDrops(sweep[i - 1]));
+  const overCap = sweep.filter((d) => honeyLevelForDrops(d) > 1);
+  if (nonMonotone.length === 0 && overCap.length === 0) {
+    ok(`honeyLevelForDrops is monotone non-decreasing and clamps at 1 across 1..${sweep[sweep.length - 1]} drops`);
+  } else {
+    bad('level monotonicity', `${nonMonotone.length} non-monotone step(s), ${overCap.length} sample(s) above 1`);
+  }
+}
+
+// 8b. THE FLOOR IS DERIVED, AND THE DERIVATION IS COUPLED IN BOTH
+// DIRECTIONS. `HONEY_MIN_HEIGHT` is the meniscus stroke width, because below
+// that the honey region is entirely inside the line that bounds it. Two
+// things can break that independently: the constant could be edited away
+// from the stroke, or the RENDERER could stop drawing the meniscus at
+// `HONEY_MENISCUS_STROKE` and pin a literal. Both are checked — a coupling
+// asserted in one direction only is half a coupling.
+{
+  if (HONEY_MIN_HEIGHT === HONEY_MENISCUS_STROKE) {
+    ok(`floor ${HONEY_MIN_HEIGHT}pt equals the meniscus stroke ${HONEY_MENISCUS_STROKE}pt — a region shorter than its own boundary is a rule, not a vessel`);
+  } else {
+    bad('floor derivation', `HONEY_MIN_HEIGHT ${HONEY_MIN_HEIGHT} != HONEY_MENISCUS_STROKE ${HONEY_MENISCUS_STROKE}`);
+  }
+
+  const tiny = [1, 2, 5, 9];
+  const dark = tiny.filter((d) => honeyHeightForLevel(SIZE, honeyLevelForDrops(d)) < HONEY_MIN_HEIGHT);
+  if (honeyHeightForLevel(SIZE, 0) === 0 && dark.length === 0) {
+    ok(`DES-24's anti-cliff rule survives R-N2: level 0 renders nothing, and balances ${tiny.join('/')} all render at least the ${HONEY_MIN_HEIGHT}pt floor`);
+  } else {
+    bad('anti-cliff floor', `level 0 renders ${honeyHeightForLevel(SIZE, 0)}pt; sub-floor balances: ${dark.join(', ')}`);
+  }
+}
+
+// 8c. §6 ACCEPTANCE ROW 1 — resolution, asserted on the RENDERED HEIGHT IN
+// POINTS and never on a level or an index, because an index is exactly what
+// hid the defect. Every preset, in BOTH directions, from the starter grant.
+//
+// This row ASSERTS non-zero movement and REPORTS perceptibility. It does not
+// assert perceptibility: at the shipped cap the 10-drop preset moves 0.402
+// physical px @3x, which is rendered (antialiased) but is not something a
+// spreadsheet can call visible. See this file's header and the open note
+// beside `honeyLevelForDrops`.
+{
+  const heightAt = (drops) => honeyHeightForLevel(SIZE, honeyLevelForDrops(drops));
+  const base = heightAt(NECTAR_STARTER_GRANT_DROPS);
+  const flat = [];
+  const report = [];
+  NECTAR_PRESETS.forEach((amount) => {
+    const up = heightAt(NECTAR_STARTER_GRANT_DROPS + amount) - base;
+    const down = base - heightAt(NECTAR_STARTER_GRANT_DROPS - amount);
+    if (up <= 0) flat.push(`+${amount}`);
+    if (down <= 0) flat.push(`-${amount}`);
+    report.push(`${amount}: ${up.toFixed(4)}pt (${(up * 3).toFixed(3)}px @3x, ${(up * 2).toFixed(3)}px @2x)`);
+  });
+  if (flat.length === 0) {
+    ok(`every preset moves the rendered meniscus from the grant, both directions — ${report.join('; ')}`);
+  } else {
+    bad('preset resolution', `these presets produce NO rendered movement from the ${NECTAR_STARTER_GRANT_DROPS}-drop grant: ${flat.join(', ')} — this is D1's defect, which is what R-N2 exists to remove`);
+  }
+
+  // The residue, printed on every green run so it cannot be quoted as clean.
+  // Same shape as check-text-pigment's owed list: a number with an owner.
+  const subPixel = NECTAR_PRESETS.filter(
+    (a) => (heightAt(NECTAR_STARTER_GRANT_DROPS + a) - base) * 3 < 1
+  );
+  if (subPixel.length) {
+    console.log(
+      `  note R-N2 residue: preset(s) ${subPixel.join('/')} move under one physical pixel at @3x from the grant ` +
+        `(cap ${NECTAR_LADDER_CAP_DROPS}). No legal cap fixes it — 10 drops needs cap <= 804 for 1px @3x, at which ` +
+        `the grant already renders at 62% of the vessel. OWNER: Lumen (the cap is a placeholder whose premise moved; ` +
+        `see the open note in src/constants/nectar.js). The event's legibility is R-N3's drop and R-N4's bee, not this edge.`
+    );
+  }
+}
+
+// --- 9. R-N2 / §6 acceptance row 2 — never rendered at its new height --
+//
+// STRUCTURAL, not lexical. The failure this guards is a one-line
+// regression — someone replaces the animated state with the target and the
+// picture is "correct" in every still frame while the information the beat
+// carries is gone. So the row reconstructs `HoneyFill` from the AST and
+// asserts three things that a direct set breaks:
+//
+//   (a) the height the GEOMETRY is built from is the animated state, not the
+//       computed target;
+//   (b) a tween exists, runs `NECTAR.settle`, and is monotone (an easing
+//       from `HONEY_EASING`, never a spring — a spring on a QUANTITY renders
+//       a level nobody holds);
+//   (c) every direct set of the height sits under the `reduced` branch. §5
+//       requires exactly one such path and R-N2 forbids any other.
+{
+  const gridSource = await readFile(path.join(ROOT, 'src/components/HoneycombGrid.js'), 'utf8');
+  const ast = parse(gridSource, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+
+  // Find HoneyFill by DECLARATION, never by a name+position lookup into the
+  // text — a nested lookalike is what makes that fall through.
+  let honeyFillNode = null;
+  for (const node of ast.program.body) {
+    if (node.type !== 'VariableDeclaration') continue;
+    for (const d of node.declarations) {
+      if (d.id.type === 'Identifier' && d.id.name === 'HoneyFill') honeyFillNode = d.init;
+    }
+  }
+  if (!honeyFillNode) {
+    bad('HoneyFill declaration', 'no top-level `const HoneyFill = …` in HoneycombGrid.js — R-N2 row 2 cannot be checked, which is not the same as it holding');
+  } else {
+    const body = gridSource.slice(honeyFillNode.start, honeyFillNode.end);
+
+    // (a) the geometry reads the animated state.
+    const geomArgs = [...body.matchAll(/hexHoney(?:Points|Meniscus)\(\s*size\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g)].map((m) => m[1]);
+    const setterFor = (name) => new RegExp(`useState\\(\\s*[^)]*\\)[\\s\\S]{0,40}`).test(body) && new RegExp(`const\\s*\\[\\s*${name}\\s*,`).test(body);
+    if (geomArgs.length === 2 && geomArgs.every((a) => a === geomArgs[0]) && setterFor(geomArgs[0])) {
+      ok(`HoneyFill builds both the region and the meniscus from \`${geomArgs[0]}\`, which is component state — the rendered height is the animated one, not the target`);
+    } else {
+      bad('rendered height source', `hexHoney*() is called with [${geomArgs.join(', ')}] — expected one identifier, used by both, declared by useState. Building the geometry from the computed target IS the snap this row exists to catch`);
+    }
+
+    // (b) the tween, its clock, and its monotonicity.
+    const hasTiming = /Animated\.timing\(\s*anim\s*,/.test(body);
+    const usesSettle = /duration:\s*NECTAR\.settle/.test(body);
+    const usesSpring = /Animated\.spring\(/.test(body);
+    const monotoneEasing = /easing:\s*HONEY_EASING\.\w+/.test(body);
+    if (hasTiming && usesSettle && !usesSpring && monotoneEasing) {
+      ok('HoneyFill tweens with Animated.timing over NECTAR.settle under a HONEY_EASING curve — one clock shared with the balance count, and no spring on a quantity');
+    } else {
+      bad(
+        'meniscus tween',
+        `timing=${hasTiming} settle=${usesSettle} spring=${usesSpring} easing=${monotoneEasing} — R-N2 requires a monotone tween on the shared settle clock; a spring would render a level the balance never held`
+      );
+    }
+
+    // (c) the only direct set is the Reduce Motion branch. Counted by
+    // BRACE-MATCHED region, not by a lookalike-delimited regex.
+    // EVERY direct write of the height, not just the animated value's:
+    // `setH(target)` next to `anim.setValue(target)` is the same defect, and
+    // a rule that named only one of them would go green on the other. The
+    // listener's own `setH(value)` is excluded by argument, which is what
+    // makes this a check on WHO SETS IT rather than on how many calls exist.
+    const directSets = [...body.matchAll(/(?:anim\.setValue|setH)\(\s*([A-Za-z_$][\w$]*)\s*\)/g)]
+      .filter((m) => m[1] !== 'value')
+      .map((m) => m.index);
+    const rmIdx = body.indexOf('if (reduced) {');
+    let rmEnd = -1;
+    if (rmIdx > -1) {
+      let depth = 0;
+      for (let i = body.indexOf('{', rmIdx); i < body.length; i += 1) {
+        if (body[i] === '{') depth += 1;
+        else if (body[i] === '}') {
+          depth -= 1;
+          if (depth === 0) { rmEnd = i; break; }
+        }
+      }
+    }
+    const outside = directSets.filter((i) => !(rmIdx > -1 && i > rmIdx && i < rmEnd));
+    if (directSets.length > 0 && rmEnd > -1 && outside.length === 0) {
+      ok(`HoneyFill's ${directSets.length} direct height set(s) all sit inside the \`reduced\` branch — §5's one no-tween path, and the only one`);
+    } else {
+      bad(
+        'direct height set',
+        `${directSets.length} direct set(s), ${outside.length} outside the reduced branch (branch found: ${rmEnd > -1}) — every other path must animate from the previous height`
+      );
+    }
+  }
 }
 
 console.log(`\ncheck-honey-fill: ${pass} passed, ${failures.length} failed`);

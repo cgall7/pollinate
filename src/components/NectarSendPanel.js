@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TextInput } from 'react-native';
 import { theme } from '../constants/theme';
+import { NECTAR_PRESETS } from '../constants/nectar';
 import { PressableScale } from './PressableScale';
 import { PrimaryButton } from './PrimaryButton';
 import { PillButton } from './PillButton';
@@ -42,7 +43,11 @@ import { PillButton } from './PillButton';
 // it — `isUnderGuard` is a within-file ancestor walk and cannot see a guard
 // spelled in the caller (NectarConsentSheet's header, same shape). B8
 // requires the prop be fed by an identifier of the same name.
-export const NECTAR_PRESETS = [10, 50, 100];
+// R-N2 moved the list itself to `constants/nectar.js` (a preset is a ledger
+// quantity, and check-honey-fill measures these three numbers against the
+// vessel from a bare `node` script, which cannot import a file with JSX).
+// Re-exported here so every existing import of this module keeps working.
+export { NECTAR_PRESETS };
 
 // THE MAXIMUM IS THE SERVER'S, quoted rather than re-chosen: `record_zap`
 // raises on anything outside 1..1000 drops

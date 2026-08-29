@@ -23,7 +23,7 @@ import { DEMO_CONTENT } from '../constants/demoMode';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { isBlooming } from '../utils/hiveState';
 import { NectarStore } from '../services/NectarStore';
-import { hasNectarConsent, honeyRungForDrops } from '../constants/nectar';
+import { hasNectarConsent, honeyLevelForDrops } from '../constants/nectar';
 
 // Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
 // button and carries it up toward the grid it just joined.
@@ -251,10 +251,14 @@ const HoneycombFeed = () => {
   const [sharing, setSharing] = useState(false);
 
   // ENG-65's producer half. The renderer for `honeyed` merged with ENG-65's
-  // first half; nothing set `member.honeyRung` — check-honey-fill.mjs says
-  // so in its own header. This is that path.
+  // first half; nothing set the cell's level — check-honey-fill.mjs said so
+  // in its own header. This is that path. R-N2 changed what it carries (a
+  // continuous 0..1 level, not a 0..4 rung) and not that it exists.
   const [nectarConsentRow, setNectarConsentRow] = useState(null);
-  const [honeyRung, setHoneyRung] = useState(0);
+  // R-N2: the CONTINUOUS level, 0..1, not a rung index. Held as the level
+  // rather than as the raw balance because that is what the cell consumes,
+  // and a screen that held drops would be a second place the cap is applied.
+  const [honeyLevel, setHoneyLevel] = useState(0);
   const nectarConsent = hasNectarConsent(nectarConsentRow);
 
   const [addEmail, setAddEmail] = useState('');
@@ -292,7 +296,7 @@ const HoneycombFeed = () => {
   // together mean the same thing a `{nectarConsent && …}` means and are what
   // rule E3 recognises (check-nectar-consent.mjs).
   //
-  // A FAILED READ IS NOT AN EMPTY WALLET (§23.1): `honeyRung` stays 0 and the
+  // A FAILED READ IS NOT AN EMPTY WALLET (§23.1): `honeyLevel` stays 0 and the
   // cell shows no honeyed state, which is the same pixels as a real zero —
   // and that is acceptable here for the reason §23.2's tier test gives, that
   // absence changes nothing the cell ASSERTS about the user. It is not
@@ -304,12 +308,12 @@ const HoneycombFeed = () => {
     let cancelled = false;
     NectarStore.getBalanceDrops()
       .then((drops) => {
-        if (!cancelled) setHoneyRung(honeyRungForDrops(drops));
+        if (!cancelled) setHoneyLevel(honeyLevelForDrops(drops));
       })
       .catch((err) => {
         if (cancelled) return;
         console.warn('HoneycombTab: failed to load nectar balance', err);
-        setHoneyRung(0);
+        setHoneyLevel(0);
       });
     return () => {
       cancelled = true;
@@ -507,13 +511,13 @@ const HoneycombFeed = () => {
   // stays a projection of a share.
   //
   // `isOwn` is the same flag HoneycombGrid's own gate reads
-  // (`member.isOwn && member.honeyRung`), so the two agree on which seat is
-  // yours by construction rather than by convention. Pre-consent `honeyRung`
-  // is 0, and 0 is not a low fill — it is no honeyed state at all, which is
-  // D1's `preConsent` ("no honeyed mark anywhere in the hive") holding
-  // without a second flag to keep in step.
-  const combMembers = honeyRung
-    ? todayMembers.map((m) => (m.isOwn ? { ...m, honeyRung } : m))
+  // (`member.isOwn && member.honeyLevel > 0`), so the two agree on which seat
+  // is yours by construction rather than by convention. Pre-consent
+  // `honeyLevel` is 0, and 0 is not a low fill — it is no honeyed state at
+  // all, which is D1's `preConsent` ("no honeyed mark anywhere in the hive")
+  // holding without a second flag to keep in step.
+  const combMembers = honeyLevel
+    ? todayMembers.map((m) => (m.isOwn ? { ...m, honeyLevel } : m))
     : todayMembers;
 
   // 8b.7 — shares and send events are two separate queries against two

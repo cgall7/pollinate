@@ -6,7 +6,8 @@ import {
   hexEdgeMarks,
   hexSealPath,
   honeyHMax,
-  HONEY_RUNGS,
+  HONEY_MENISCUS_STROKE,
+  honeyHeightForLevel,
   hexHoneyPoints,
   hexHoneyMeniscus,
 } from './hexGeometry';
@@ -14,7 +15,7 @@ import {
 // The pure hex math lives in `./hexGeometry` (no JSX, importable from a bare
 // `node` script) — re-exported here so every existing import of this file
 // keeps working unchanged. See that file's header for why the split exists.
-export { hexPoints, HEX_HEIGHT_RATIO, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_RUNGS, hexHoneyPoints, hexHoneyMeniscus };
+export { hexPoints, HEX_HEIGHT_RATIO, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_MENISCUS_STROKE, honeyHeightForLevel, hexHoneyPoints, hexHoneyMeniscus };
 
 // A single hexagon, sized to its own box. Used for the mini hex that marks
 // a day in the week feed and for the empty seats in the comb.

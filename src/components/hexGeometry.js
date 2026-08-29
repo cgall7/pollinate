@@ -120,12 +120,48 @@ const HONEY_BOTTOM_EDGE_RATIO = 1.8660; // HexShape: flat bottom edge, size*(1+s
 export const honeyHMax = (size) =>
   (HONEY_BOTTOM_EDGE_RATIO - (HONEY_GLYPH_BOTTOM_RATIO + HONEY_GLYPH_CLEARANCE_RATIO)) * size;
 
-// Five rungs, never labelled (§4/§6.1) — the ladder is a register of how
-// honeyed the cell looks, not a readout; the exact balance is a numeral
-// elsewhere. The cap this maps real drops onto is DES-24 §7's open item
-// (wants 19a's drop distribution) — nothing in this repo computes a rung
-// from a balance yet, so no real member carries one.
-export const HONEY_RUNGS = [0, 0.25, 0.5, 0.75, 1];
+// R-N2 (POLLINATE_NECTAR_LIVING_EXCHANGE §3) RETIRES `HONEY_RUNGS`.
+//
+// The ladder was `[0, 0.25, 0.5, 0.75, 1]` — four visible rungs over a cap
+// of 2000 drops, which made rung 1 span balances 1..999 and put the starter
+// grant dead in the middle of it. Measured by Lumen: NO single transaction
+// this product offers moves the level in either direction, because the
+// register's resolution is 5x coarser than its own largest gesture. The
+// level is now the continuous fraction `min(1, drops / cap)` and the caller
+// hands it in place of a rung index (`honeyLevelForDrops`, nectar.js).
+//
+// This is not a relaxation of §4/§6.1's "never a readout". A CONTINUOUS
+// quantity is LESS of a scoreboard than a stepped one, not more — a stepped
+// register invites you to count its steps, and there is nothing here to
+// count. The two rules that made the ladder a register rather than a
+// progress bar are both properties of `honeyHMax` and are untouched: the
+// ceiling still clears the glyph, and the meniscus is still the signal.
+//
+// THE FLOOR MOVES WITH IT, and it is now derived rather than inherited.
+// DES-24's anti-cliff rule survives verbatim — "any positive balance renders
+// a visible minimum, and only zero goes dark" — but its old spelling was
+// "at least rung 1", i.e. 6.7045pt at a 44pt cell, a quarter of the whole
+// vessel drawn for a single drop. Continuous, the floor can say what it
+// actually means: the smallest height at which the honey is a REGION and not
+// its own boundary. The meniscus is a 1.5pt stroke centred on the top edge,
+// so 0.75pt of it hangs down INTO the region; at `h = HONEY_MENISCUS_STROKE`
+// exactly 0.75pt of honey body is visible below the line's lower edge, and
+// below that the "region" is entirely inside the line that bounds it — a
+// vessel drawn as a rule, not as a vessel.
+//
+// The floor is in POINTS, not in level, and that is forced: it is derived
+// from a stroke width, which does not scale with `size`. Expressed as a
+// fraction it would be correct at exactly one cell size.
+export const HONEY_MENISCUS_STROKE = 1.5;
+export const HONEY_MIN_HEIGHT = HONEY_MENISCUS_STROKE;
+
+// level (0..1) -> the meniscus height in points, floor applied. ZERO IS THE
+// ONLY DARK CASE: any positive level renders at least `HONEY_MIN_HEIGHT`.
+export const honeyHeightForLevel = (size, level) => {
+  const n = Number(level);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(HONEY_MIN_HEIGHT, honeyHMax(size) * Math.min(1, n));
+};
 
 // The honey region: the cell clipped below the meniscus at height `h`. Every
 // rung sits below the hex's widest point (h_max 0.6096*size < 0.866*size,

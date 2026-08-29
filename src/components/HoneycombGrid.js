@@ -10,9 +10,9 @@ import {
   BLOOM_FLOOR_OPACITY,
 } from '../constants/bloomRing';
 import { hexTintFor } from './Avatar';
-import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_RUNGS, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
+import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_MENISCUS_STROKE, honeyHeightForLevel, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
 import { useSvgId } from '../utils/svgId';
-import { DURATIONS, HONEY, HONEY_EASING, PRESS, STAGGER_MS, useReducedMotion } from '../constants/motion';
+import { DURATIONS, HONEY, HONEY_EASING, NECTAR, PRESS, STAGGER_MS, useReducedMotion } from '../constants/motion';
 import { hexTap as hexTapHaptics } from '../constants/haptics';
 import { HexTapOverlay } from './HexTapOverlay';
 import {
@@ -127,11 +127,17 @@ const BLOOM_BREATHE_MS = 2400;
 // there — under the same 3:1 bar, by the same mechanism, on a pair
 // (`blooming` + `selected`) that has a live producer on both sides
 // (`HoneycombTab.js:378` sets `blooming` off `last_note_received_at`; any
-// tap sets `selected`). `honeyed` is still latent — nothing writes
-// `honeyRung` — so naming the prop after it would have named the case that
-// CANNOT happen while missing the one that can. `ink` measures 6.0937 at
-// the same floor. The condition is "is my ground an accent-family fill",
-// and it now has two writers.
+// tap sets `selected`). `honeyed` was still latent when this was written —
+// nothing wrote `honeyRung` — so naming the prop after it would have named
+// the case that CANNOT happen while missing the one that can. `ink` measures
+// 6.0937 at the same floor. The condition is "is my ground an accent-family
+// fill", and it now has two writers.
+//
+// R-N2 UPDATE 2026-08-29: `honeyed` is no longer latent —
+// `HoneycombTab.honeyLevel` writes `member.honeyLevel` off the real balance,
+// so the third writer arrived. The ruling is unaffected and the reason it is
+// unaffected is the point: the prop was named after the CONDITION rather
+// than after one of its cases, so a new writer joins it without a rename.
 const BloomRing = ({ size, reduced, honeyGround }) => {
   const pulse = useRef(new Animated.Value(1)).current;
   const marks = useMemo(() => hexEdgeMarks(size, BLOOM_RING_INSET, BLOOM_MARK_EDGE_FRACTION), [size]);
@@ -183,11 +189,70 @@ const BloomRing = ({ size, reduced, honeyGround }) => {
 // on washSky) and §6.5(a) (a photo-backed own cell needs the same backing,
 // drawn above the photo, not the unconditional `surface` polygon at the
 // bottom of the stack, which sits BENEATH the photo).
-const HoneyFill = ({ size, rung }) => {
-  const h = honeyHMax(size) * HONEY_RUNGS[rung];
+const HoneyFill = ({ size, level, reduced }) => {
+  const target = honeyHeightForLevel(size, level);
+  // THE HEIGHT IS ANIMATED FROM THE PREVIOUS ONE AND NEVER RENDERED AT THE
+  // NEW ONE — R-N2's load-bearing clause, and the whole reason the ladder
+  // could go continuous. At `honeyHMax(44)` = 26.8180pt a 100-drop gift is
+  // 5% of the cap = 1.3409pt of rise, which is 4.02 physical px at @3x:
+  // small as a static edge, unmistakable as a moving one. Motion is what
+  // makes a small quantity legible, so a snap does not merely look worse
+  // here, it destroys the information.
+  //
+  // DRIVEN BY A LISTENER, NOT BY AN ANIMATED PROP, and that is forced by the
+  // geometry rather than chosen. The honey region is a TRAPEZOID whose top
+  // edge narrows with height (`hexHoneyPoints`), so its `points` is a string
+  // and there is no numeric prop for `Animated` to interpolate — unlike
+  // `SelectionFill` below, whose circle has a single animatable `r`. The
+  // alternatives were both worse: a clipped rect would animate natively but
+  // would re-derive DES-24 §6.4's device-corrected construction through a
+  // different mechanism, and a stepped fallback is the defect this ruling
+  // exists to remove. The cost is bounded and is not an ambient loop — one
+  // cell's subtree, re-rendered for the 400ms of a transition that fires
+  // only when a balance actually changes. The animated value and the state
+  // both live INSIDE this component, so the other six cells never re-render.
+  const anim = useRef(new Animated.Value(target)).current;
+  const [h, setH] = useState(target);
+  const prev = useRef(target);
+
+  useEffect(() => {
+    const sub = anim.addListener(({ value }) => setH(value));
+    return () => anim.removeListener(sub);
+  }, [anim]);
+
+  useEffect(() => {
+    if (prev.current === target) return;
+    prev.current = target;
+    // §5: under Reduce Motion the meniscus moves to its new height with no
+    // tween — the gift still arrives, it simply does not travel.
+    if (reduced) {
+      anim.setValue(target);
+      setH(target);
+      return undefined;
+    }
+    const a = Animated.timing(anim, {
+      toValue: target,
+      // R-N3's Settle clock, shared rather than re-chosen: the balance
+      // numeral counts over 400ms and "your own meniscus falls by the drop's
+      // worth ON THE SAME CLOCK". A second duration here would be two
+      // clocks for one event.
+      duration: NECTAR.settle,
+      // MONOTONE, deliberately, and this is the one easing constraint the
+      // beat has: the meniscus is a QUANTITY. A spring or any curve with
+      // overshoot renders a height the balance never held — briefly
+      // asserting a level nobody has, which is the §23.1 class wearing a
+      // tween. `inOut(quad)` is HONEY_EASING.fill's own curve; one material,
+      // one curve family (motion.js's HONEY note).
+      easing: HONEY_EASING.fill,
+      useNativeDriver: false,
+    });
+    a.start();
+    return () => a.stop();
+  }, [anim, target, reduced]);
+
   const points = useMemo(() => hexHoneyPoints(size, h), [size, h]);
   const meniscus = useMemo(() => hexHoneyMeniscus(size, h), [size, h]);
-  if (!h) return null;
+  if (h <= 0) return null;
   return (
     <>
       <Polygon points={points} fill={theme.colors.surface} />
@@ -198,7 +263,7 @@ const HoneyFill = ({ size, rung }) => {
         x2={meniscus.x2}
         y2={meniscus.y2}
         stroke={theme.colors.ink}
-        strokeWidth={1.5}
+        strokeWidth={HONEY_MENISCUS_STROKE}
       />
     </>
   );
@@ -225,8 +290,10 @@ const HoneyFill = ({ size, rung }) => {
 // level on a tapped NEIGHBOUR broadcasts an amount that does not exist. The
 // two never argue, because this one is opaque and is drawn over that one:
 // while a cell is open, selection is the only register its fill carries, and
-// the amount returns intact the moment it closes. (Unreachable today either
-// way — nothing writes `honeyRung`.)
+// the amount returns intact the moment it closes. (That collision was
+// unreachable when this was written — nothing wrote the level. R-N2 gave it
+// a producer, so the overlap is live now and this paragraph is the ruling
+// that governs it, not a note about a case that cannot occur.)
 //
 // `accent`, and no `accentDeep` edge. MB-D2b offers the edge as optional and
 // it is declined: the cell already HAS an edge in the selected state — Beat
@@ -253,10 +320,11 @@ const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => 
   const sealPath = useMemo(() => hexSealPath(size), [size]);
   const tint = hexTintFor(member.name);
   const register = member.isDemo && !selected ? DEMO_OPACITY : 1;
-  // Rung mapping from a real balance is DES-24 §7's open item — it wants
-  // 19a's drop distribution, which doesn't exist yet. No producer sets this
-  // today; it stays 0 (no visible fill) until that mapping is built.
-  const honeyed = Boolean(member.isOwn && member.honeyRung);
+  // R-N2: `honeyLevel` is the continuous 0..1 fraction (`honeyLevelForDrops`,
+  // nectar.js), replacing the 0..4 rung index. The gate is unchanged in
+  // meaning — own cell, positive level — and 0 is still NO HONEYED STATE AT
+  // ALL rather than a low fill.
+  const honeyed = Boolean(member.isOwn && member.honeyLevel > 0);
 
   return (
     <View>
@@ -293,7 +361,7 @@ const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => 
         {/* Honey enters above the tint/avatar and below the seal (§6.4: the
             blooming ring's ink-vs-inkSoft ruling measures the ring drawn
             OVER the honey body — the other order is a different picture). */}
-        {honeyed && <HoneyFill size={size} rung={member.honeyRung} />}
+        {honeyed && <HoneyFill size={size} level={member.honeyLevel} reduced={reduced} />}
         {/* Selection's held honey enters above the amount register and below
             the seal/ring/stroke — the same slot, and the same reason: §6.4
             measured the ring drawn OVER the honey body, and both of this
