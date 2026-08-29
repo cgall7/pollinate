@@ -1,15 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View, Text, Pressable, useWindowDimensions } from 'react-native';
-import Svg, { Defs, Polygon } from 'react-native-svg';
+import Svg, { Polygon } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
-import { DURATIONS, staggerDelay, useReducedMotion } from '../constants/motion';
-import { StaggeredItem } from '../components/StaggeredItem';
+import { DURATIONS, useReducedMotion } from '../constants/motion';
 import { PressableScale } from '../components/PressableScale';
 import { ThemeCardFlip } from '../components/ThemeCardFlip';
-import { StripePattern } from '../components/StripeTexture';
+import { MonthGrid } from '../components/MonthGrid';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
-import { useSvgId } from '../utils/svgId';
 import { tagEntry } from '../utils/themeTagger';
 import { COLS, HEX_ASPECT, combLayout, hexAt, hexPoints } from '../utils/combGeometry';
 
@@ -28,87 +26,9 @@ const REVEAL_HEX_H = REVEAL_HEX_W * HEX_ASPECT;
 // what its `Polygon` props look like — prop identity was ruled out (variant
 // E), and the trigger is cardinality of Svg-root configs in the group, not
 // color. The only census that rule can't punish is one: the whole comb, the
-// selection ring, and every day's fill/stroke now paint from a SINGLE
-// shared `<Svg>` (below, in the main render), so this file never mounts a
-// second Svg-root config near the grid. Everything below is plain RN views
-// animated on the native driver — no SVG, so nothing here can trigger it.
-
-// Only ever mounted when `!reduced` (see DayCell below) — accentBurst is
-// "motion only" per its own theme token comment, and Reduce Motion's flat
-// fade already lives on the numeral's StaggeredItem.
-const CellGlow = ({ index, count, cascade, w, h }) => {
-  // Same motif as StreakHexTrail's ignite glow (`StreakHexTrail.js:89`) —
-  // one ramp 0→1, read through a bloom-then-fade interpolation, rather than
-  // an explicit up/down animation.
-  const glow = useRef(new Animated.Value(0)).current;
-  const lastCascade = useRef(cascade);
-
-  useEffect(() => {
-    if (lastCascade.current !== cascade) {
-      lastCascade.current = cascade;
-      glow.setValue(0);
-    }
-    // Same R18 hazard `StaggeredItem` guards against: a second month swipe
-    // inside the 700ms cascade re-fires this effect while the previous
-    // glow is still animating. Stop it first so the loser can't strand the
-    // value mid-fade.
-    Animated.timing(glow, {
-      toValue: 1,
-      duration: DURATIONS.arrival,
-      delay: staggerDelay(index, count),
-      useNativeDriver: true,
-    }).start();
-    return () => glow.stopAnimation();
-  }, [cascade]);
-
-  const opacity = glow.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.6, 0] });
-  // Deezine (2026-08-11): at [0.6, 1.3] the bloom peaks (glow=0.3) at scale
-  // 0.81 — still inside the hex, so max brightness is accentBurst painted
-  // over accent, a 14/255 shift nobody sees. StreakHexTrail's version reads
-  // outside the hex, against cream; ours has to clear the hex's own edge
-  // before it's visible. [0.95, 1.6] puts scale at ~1.145 when opacity
-  // peaks, so the halo is outside the hex right when it's brightest.
-  const scale = glow.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.6] });
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[styles.cellGlow, { width: w, height: h, borderRadius: w / 2, opacity, transform: [{ scale }] }]}
-    />
-  );
-};
-
-// The comb's paint (fill, stroke, hatch, selection ring) lives entirely in
-// the shared `<Svg>` in the main render now. This is only the stuff that
-// sits ON TOP of that paint: the day numeral (plain RN `<Text>`, always
-// was) and, for a filled day, its ignite glow — the streak trail's motif
-// (`StreakHexTrail.js:163`) applied to a calendar, since a filled cell IS a
-// streak hex igniting (`StaggeredItem.js:10` already said so for the pop).
-// Only the days you actually earned animate; empty days are scenery.
-const DayCell = ({ day, filled, index, filledCount, cascade, reduced, w, h, x, y }) => (
-  <View style={[styles.cellPosition, { left: x, top: y, width: w, height: h }]} pointerEvents="none">
-    {/* Deezine (2026-08-11): accentBurst is motion-only by its own token
-        comment. Gated on `filled` alone, Reduce Motion still ran every
-        filled cell's glow as a simultaneous flat flash — the scale pins to
-        1 but the flash itself isn't motion-free. StreakHexTrail's own
-        Reduce Motion path only glows once, for its last hex, inside a
-        celebration the user opened; thirty-one at once on arrival isn't
-        that. §12.5 Rule 4 wants a flat fade here, which the numeral's
-        StaggeredItem already carries alone. */}
-    {filled && !reduced && (
-      <CellGlow index={index} count={filledCount} cascade={cascade} w={w} h={h} />
-    )}
-    {filled ? (
-      <StaggeredItem index={index} count={filledCount} replayKey={cascade} pop style={styles.dayNumberOverlay}>
-        <Text style={[styles.dateText, styles.dateTextFilled]}>{day}</Text>
-      </StaggeredItem>
-    ) : (
-      <View style={styles.dayNumberOverlay} pointerEvents="none">
-        <Text style={styles.dateText}>{day}</Text>
-      </View>
-    )}
-  </View>
-);
+// selection ring, and every day's fill/stroke paint from a SINGLE shared
+// `<Svg>` root, now inside `MonthGrid` (R15's extraction) — this file never
+// mounts a second Svg-root config near the grid.
 
 // R35: the day opens IN PLACE, directly under the comb — not a modal, not a
 // navigation push. The card is the hive's reveal card
@@ -195,12 +115,6 @@ export const MonthlyRecap = ({
     () => combLayout(daysInMonth, cellW, cellH),
     [daysInMonth, cellW, cellH]
   );
-  const points = useMemo(() => hexPoints(cellW, cellH), [cellW, cellH]);
-  // One hatch pattern per mounted MonthlyRecap, not per cell: R38's shared
-  // root paints every empty cell's hatch from the same `<Defs>` entry, and
-  // the pager keeps several months' combs mounted at once (Pixel's variant
-  // I, 2026-08-11), so the id still has to be unique per screen instance.
-  const hatchId = useSvgId('recapHatch');
 
   // Index entries by day-of-month so each one lands on its real date. The
   // grid used to render every filled day first and then pad with empties,
@@ -278,21 +192,11 @@ export const MonthlyRecap = ({
     openDay(cell.day);
   };
 
-  const selectedCell = selectedDay === null ? null : cells.find((c) => c.day === selectedDay);
   const selectedEntries = selectedDay === null ? [] : entriesByDay.get(selectedDay) || [];
-
-  // One pass, shared by the Svg paint layer, the numeral/glow overlay and
-  // the accessibility layer below — all three walk the same cells in the
-  // same order, so the stagger index a filled day gets for its glow is the
-  // same one it gets for its numeral pop.
-  const cellRenderData = useMemo(() => {
-    let filledSoFar = 0;
-    return cells.map((cell) => {
-      const dayEntries = entriesByDay.get(cell.day) || [];
-      const filled = dayEntries.length > 0;
-      return { cell, dayEntries, filled, index: filled ? filledSoFar++ : 0 };
-    });
-  }, [cells, entriesByDay]);
+  // MonthGrid takes the filled set directly — its own render pass derives
+  // the stagger index each filled day needs from this and `cells`, so it
+  // isn't duplicated here.
+  const filledDays = useMemo(() => new Set(entriesByDay.keys()), [entriesByDay]);
 
   return (
     <View style={styles.content}>
@@ -336,76 +240,21 @@ export const MonthlyRecap = ({
         </View>
       )}
 
-      {/* The comb — one hexagon per calendar day, in date order. Every
-          cell's fill, stroke, hatch, AND the selection ring paint from this
-          one shared `<Svg>` root — see R38 above. 1pt of bleed on every
-          side (root sized w+2/h+2, contents translated +1,+1, positioned at
-          -1,-1) so a full-strength 2pt selection ring on an edge cell has
-          somewhere to paint instead of clipping against the root's own
-          edge — the same trick the old per-cell SelectionRing used, now
-          applied once instead of on every tap. */}
+      {/* The comb — one hexagon per calendar day, in date order. Painting
+          (Svg root, hatch, selection ring, per-day numeral/glow) lives in
+          `MonthGrid` now (R15's extraction) — this wraps it with the
+          interactive layer that stays Recap-specific: the whole-comb
+          Pressable and the per-day VoiceOver targets. */}
       <View style={[styles.comb, { width: cellW * COLS, height }]}>
-        <Svg width={cellW * COLS + 2} height={height + 2} style={styles.combSvg}>
-          <Defs>
-            <StripePattern id={hatchId} />
-          </Defs>
-          {/* Deezine (2026-08-11): a 1pt stroke on a shared wall paints
-              twice in one root, and the later element wins — so painting
-              in date order let a later empty day eat a filled day's wall.
-              Empties first, then every filled cell, so a filled hex always
-              owns its complete outline regardless of date. Order within
-              a group doesn't matter: every member of it strokes the same
-              color, so whichever paints second is a no-op repaint. */}
-          {cellRenderData
-            .filter(({ filled }) => !filled)
-            .map(({ cell }) => (
-              <Polygon
-                key={cell.day}
-                points={points}
-                transform={`translate(${cell.x + 1} ${cell.y + 1})`}
-                fill={`url(#${hatchId})`}
-                stroke={theme.colors.surfaceBorderStrong}
-                strokeWidth={1}
-              />
-            ))}
-          {cellRenderData
-            .filter(({ filled }) => filled)
-            .map(({ cell }) => (
-              <Polygon
-                key={cell.day}
-                points={points}
-                transform={`translate(${cell.x + 1} ${cell.y + 1})`}
-                fill={theme.colors.accent}
-                stroke={theme.colors.accentDeep}
-                strokeWidth={1}
-              />
-            ))}
-          {selectedCell && (
-            <Polygon
-              points={points}
-              transform={`translate(${selectedCell.x + 1} ${selectedCell.y + 1})`}
-              fill="none"
-              stroke={theme.colors.ink}
-              strokeWidth={2}
-            />
-          )}
-        </Svg>
-
-        {cellRenderData.map(({ cell, filled, index }) => (
-          <DayCell
-            key={cell.day}
-            day={cell.day}
-            filled={filled}
-            index={index}
-            filledCount={entriesByDay.size}
-            cascade={cascade}
-            reduced={reduced}
-            w={cellW}
-            h={cellH}
-            x={cell.x}
-            y={cell.y}
-          />
-        ))}
+        <MonthGrid
+          cells={cells}
+          height={height}
+          cellW={cellW}
+          cellH={cellH}
+          filledDays={filledDays}
+          cascade={cascade}
+          selectedDay={selectedDay}
+        />
 
         {/* R33: exactly one Pressable for the whole comb. */}
         <Pressable
@@ -421,20 +270,24 @@ export const MonthlyRecap = ({
             is UNVERIFIED on device — it is the mechanism half of R34's
             ratified requirement and is on the device-pass list. */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {cellRenderData.map(({ cell, dayEntries, filled }) => (
-            <View
-              key={cell.day}
-              accessible
-              accessibilityRole={filled ? 'button' : undefined}
-              accessibilityLabel={
-                filled
-                  ? `${monthName} ${cell.day}, ${dayEntries.length} ${dayEntries.length === 1 ? 'entry' : 'entries'}`
-                  : `${monthName} ${cell.day}, no entry`
-              }
-              onAccessibilityTap={filled ? () => openDay(cell.day) : undefined}
-              style={[styles.cellPosition, { left: cell.x, top: cell.y, width: cellW, height: cellH }]}
-            />
-          ))}
+          {cells.map((cell) => {
+            const dayEntries = entriesByDay.get(cell.day) || [];
+            const filled = dayEntries.length > 0;
+            return (
+              <View
+                key={cell.day}
+                accessible
+                accessibilityRole={filled ? 'button' : undefined}
+                accessibilityLabel={
+                  filled
+                    ? `${monthName} ${cell.day}, ${dayEntries.length} ${dayEntries.length === 1 ? 'entry' : 'entries'}`
+                    : `${monthName} ${cell.day}, no entry`
+                }
+                onAccessibilityTap={filled ? () => openDay(cell.day) : undefined}
+                style={[styles.cellPosition, { left: cell.x, top: cell.y, width: cellW, height: cellH }]}
+              />
+            );
+          })}
         </View>
       </View>
 
@@ -494,39 +347,10 @@ const styles = StyleSheet.create({
   comb: {
     position: 'relative',
   },
+  // Also positions the a11y overlay's per-day targets over MonthGrid's own
+  // cells — both need the same coordinates, one for touch, one for VoiceOver.
   cellPosition: {
     position: 'absolute',
-  },
-  // R38: 1pt bleed on every side so the selection ring's outer 1pt (of its
-  // 2pt stroke, centred on the path) has room to paint on an edge cell
-  // instead of clipping against the root's own bounds.
-  combSvg: {
-    position: 'absolute',
-    left: -1,
-    top: -1,
-  },
-  // Deezine (2026-08-11, R43 FAIL 2): `StyleSheet.absoluteFillObject`
-  // doesn't exist in RN 0.86.2 — the export is `absoluteFill` now, and
-  // `{...undefined}` spreads nothing. This was a plain in-flow View sized
-  // to its own text, which is why centring it did nothing: the numeral
-  // rode wherever its content-sized box landed at the cell's top edge.
-  dayNumberOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cellGlow: {
-    position: 'absolute',
-    backgroundColor: theme.colors.accentBurst,
-  },
-  dateText: {
-    fontSize: 11,
-    color: theme.colors.inkSoft,
-    fontFamily: theme.fonts.bodyMedium,
-  },
-  dateTextFilled: {
-    color: theme.colors.ink,
-    fontFamily: theme.fonts.bodySemiBold,
   },
   // R35 — the hive's `revealCard` treatment, matched deliberately: white
   // surface, hairline border, card shadow. `alignSelf: stretch` because this

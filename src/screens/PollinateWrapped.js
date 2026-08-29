@@ -1,5 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  TouchableOpacity,
+  Animated,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -7,124 +16,106 @@ import { theme } from '../constants/theme';
 import { AnimatedStat } from '../components/AnimatedStat';
 import { GlowOrb } from '../components/GlowOrb';
 import { LoadState, LOAD_STATES } from '../components/LoadState';
+import { SealCrack } from '../components/SealCrack';
+import { StreakHexTrail } from '../components/StreakHexTrail';
+import { ThemeCardFlip } from '../components/ThemeCardFlip';
+import { MonthGrid } from '../components/MonthGrid';
+import { YearCard } from '../components/YearCard';
+import { HoneyDropProgress } from '../components/HoneyDropProgress';
+import { CelebrationRays } from '../components/CelebrationRays';
 import { EntryStore } from '../services/EntryStore';
-import { dominantTheme } from '../utils/themeTagger';
-import { startOfYear, endOfYear, longestStreak } from '../utils/dateRanges';
+import { dominantTheme, tagEntry } from '../utils/themeTagger';
+import { startOfMonth, endOfMonth, monthName, longestStreak } from '../utils/dateRanges';
+import { COLS, HEX_ASPECT, combLayout } from '../utils/combGeometry';
 import { DURATIONS, SPRINGS, useReducedMotion } from '../constants/motion';
 
 const DISMISS_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
-// Beats are grounded on the warm wash, with the closer on sky — washes
-// behind the card instead of a flat 12% tint over the whole screen,
-// which just muddied the cream.
-const SLIDE_WASHES = [
-  theme.colors.washYellow,
-  theme.colors.washYellow,
-  theme.colors.washYellow,
-  theme.colors.washSky,
-];
+// §14.2 respec (2026-08-28) — the recurring edition. §0: none of §14.2's
+// seven annual beats were ever built; this is the first build of any
+// Wrapped screen, re-scoped to the previous calendar month. The annual
+// "Your Golden Year" special (§1: December only) is a separate, later
+// build — this file no longer carries the four-slide deck §0 found
+// reachable, or its DEMO_SLIDES fabrication (§4.3: "Wrapped fabricates
+// you" — dies with the deck, no replacement).
 
-// Shown the first time someone opens Wrapped before they have a year of
-// real entries, so the screen still demonstrates what it becomes.
-const DEMO_SLIDES = [
-  {
-    title: "Your Year in Gratitude",
-    subtitle: "Preview",
-    value: "312",
-    label: "Moments of reflection",
-    glow: theme.colors.accent
-  },
-  {
-    title: "Your North Star",
-    subtitle: "Top Theme",
-    value: "Family",
-    label: "The heart of your year",
-    glow: theme.colors.accentDeep
-  },
-  {
-    title: "Pure Consistency",
-    subtitle: "Longest Streak",
-    value: "42 Days",
-    label: "Unstoppable positivity",
-    glow: theme.colors.accentDeep
-  },
-  {
-    title: "A Random Memory",
-    subtitle: "October 12th",
-    value: '"The way the sunlight hit the trees during my morning walk."',
-    label: "A spark of joy",
-    glow: theme.colors.accent
-  }
-];
+// The beat a month with a confident dominant theme gets. §4.2: a plurality
+// of one entry is not a finding, so a month whose top theme is a tie
+// broken by insertion order (`count === 1`) skips this beat rather than
+// assert a "North Star" from a single line.
+const hasThemeBeat = (insight) => !!insight && insight.count > 1;
 
-const buildSlidesFromEntries = (entries, year) => {
-  if (entries.length === 0) return null;
+// §4.3's own floor example draws the line for this beat too: "a month with
+// two entries has an honest, thin Wrapped... no run beat (§4.1 gives 1)."
+// A run of exactly one day isn't a run — `longestStreak` returns 1 for any
+// non-empty month with no two consecutive dates in it, and a beat built to
+// celebrate consecutive days has nothing to celebrate at that floor.
+const hasRunBeat = (run) => run > 1;
+
+// The sentence a theme card under it wants — §17.5's shape, reused rather
+// than re-derived (`RecapTab.js`'s own `describeTheme` is the same idea,
+// scoped to whatever period label its caller passes).
+const describeTheme = (insight) => {
+  if (!insight) return null;
+  const { theme: themeName, count, total } = insight;
+  return `You leaned into "${themeName}" ${count} of ${total} days this month.`;
+};
+
+const buildWrappedData = (entries, monthDate) => {
+  const now = new Date();
+  const label = monthName(monthDate);
+  const title = monthDate.getFullYear() === now.getFullYear() ? label : `${label} ${monthDate.getFullYear()}`;
+  const daysInMonth = endOfMonth(monthDate).getDate();
   const insight = dominantTheme(entries);
-  const streak = longestStreak(entries);
-  const memory = entries[Math.floor(Math.random() * entries.length)];
+  const themeSnippet = insight
+    ? (entries.find((entry) => (entry.theme || tagEntry(entry.text)) === insight.theme) || entries[0])?.text
+    : null;
+  const filledDays = new Set(entries.map((entry) => parseInt(entry.date.split('-')[2], 10)));
 
-  return [
-    {
-      title: "Your Year in Gratitude",
-      subtitle: String(year),
-      value: String(entries.length),
-      label: "Moments of reflection",
-      glow: theme.colors.accent
-    },
-    {
-      title: "Your North Star",
-      subtitle: "Top Theme",
-      value: insight.theme,
-      label: "The heart of your year",
-      glow: theme.colors.accentDeep
-    },
-    {
-      title: "Pure Consistency",
-      subtitle: "Longest Streak",
-      value: `${streak} Day${streak === 1 ? '' : 's'}`,
-      label: "Unstoppable positivity",
-      glow: theme.colors.accentDeep
-    },
-    {
-      title: "A Random Memory",
-      subtitle: new Date(memory.date).toLocaleDateString('default', { month: 'long', day: 'numeric' }),
-      value: `"${memory.text}"`,
-      label: "A spark of joy",
-      glow: theme.colors.accent
-    }
-  ];
+  return {
+    label,
+    title,
+    daysInMonth,
+    entryCount: entries.length,
+    // §4.1: handed only this month's entries, `longestStreak` already
+    // reports the longest run WHOLLY inside them — a run that crossed in
+    // from January never gets counted, because January's dates aren't in
+    // the set it's searching. The copy still has to name the window
+    // (below): the number alone reads as the unscoped, all-time streak
+    // `RecapTab:281` shows one tap away.
+    longestRun: longestStreak(entries),
+    insight,
+    themeSnippet,
+    filledDays,
+  };
 };
 
 export const PollinateWrapped = ({ onComplete }) => {
-  // The read is a Supabase call behind an auth check (P0-2), so it can throw
-  // — signed out, offline, a hiccup. `readState` tracks how it ended;
-  // `slides` only ever holds a real or demo deck, never a stand-in for
-  // failure. Conflating the two was the bug: a rejection left `slides` null
-  // forever and the loading spinner never resolved.
   const [readState, setReadState] = useState(LOAD_STATES.LOADING);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [slides, setSlides] = useState(null);
+  const [data, setData] = useState(null);
+  const [beatIndex, setBeatIndex] = useState(0);
   const reduced = useReducedMotion();
-  // Slides used to hard-cut. This drives a fade + rise on every beat change
-  // so Wrapped reads as a sequence rather than a stack of static cards.
-  const beat = useRef(new Animated.Value(1)).current;
+  // Cross-beat transition — fade + rise on every beat change, same
+  // treatment the four-slide deck used, now driving five (or four) beats
+  // instead of a uniform card.
+  const beatAnim = useRef(new Animated.Value(1)).current;
 
-  // A ref, not the effect's closure `let` — the retry button below calls
-  // `load` outside any focus cycle (RecapTab.js:171 is the same shape).
   const cancelledRef = useRef(false);
   const load = useCallback(async () => {
     setReadState(LOAD_STATES.LOADING);
     try {
       const now = new Date();
-      const yearEntries = await EntryStore.getEntriesBetween(startOfYear(now), endOfYear(now));
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      // §1: the window is the previous calendar month, not a rolling 30
+      // days — this is the first line the respec changes from the old
+      // `getEntriesBetween(startOfYear(now), endOfYear(now))` read.
+      const entries = await EntryStore.getEntriesBetween(startOfMonth(prevMonth), endOfMonth(prevMonth));
       if (cancelledRef.current) return;
-      setSlides(buildSlidesFromEntries(yearEntries, now.getFullYear()) || DEMO_SLIDES);
-      setCurrentSlide(0);
+      setData(buildWrappedData(entries, prevMonth));
+      setBeatIndex(0);
       setReadState(LOAD_STATES.READY);
     } catch (err) {
       if (cancelledRef.current) return;
-      // Not DEMO_SLIDES: a tester with a real year would be shown a fabricated
-      // one in their own voice (§26.5). A failed Wrapped has to say it failed.
       setReadState(LOAD_STATES.UNKNOWN);
       console.warn('Failed to load entries for Wrapped', err);
     }
@@ -140,32 +131,53 @@ export const PollinateWrapped = ({ onComplete }) => {
     }, [load])
   );
 
+  // §2: five beats, four when the theme beat's own condition (§4.2) isn't
+  // met. The hook's drop count is this list's length, not a literal —
+  // it never promises a beat it won't deliver.
+  const beats = useMemo(() => {
+    if (!data) return [];
+    const list = ['seal', 'count'];
+    if (hasRunBeat(data.longestRun)) list.push('run');
+    if (hasThemeBeat(data.insight)) list.push('loved');
+    list.push('card');
+    return list;
+  }, [data]);
+
   useEffect(() => {
-    if (!slides) return;
-    beat.setValue(0);
+    if (!data) return;
+    beatAnim.setValue(0);
     if (reduced) {
-      Animated.timing(beat, {
-        toValue: 1,
-        duration: DURATIONS.reducedMotionFade,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(beatAnim, { toValue: 1, duration: DURATIONS.reducedMotionFade, useNativeDriver: true }).start();
       return;
     }
-    Animated.spring(beat, { toValue: 1, ...SPRINGS.reveal, useNativeDriver: true }).start();
-  }, [currentSlide, slides, reduced]);
+    Animated.spring(beatAnim, { toValue: 1, ...SPRINGS.reveal, useNativeDriver: true }).start();
+  }, [beatIndex, data, reduced]);
+
+  // §7 build pin 6: `onComplete` is wired (App.js passes
+  // `navigation.goBack()`) and load-bearing — no `setBeatIndex(0)`
+  // fallback on the last beat. §26.3's loop stays fixed.
+  const nextBeat = useCallback(() => {
+    setBeatIndex((i) => (i < beats.length - 1 ? i + 1 : i));
+  }, [beats.length]);
+
+  // The generic "tap to continue" gesture carries its own light haptic.
+  // Beat 0 doesn't route through this — `SealCrack` already fires a
+  // Medium haptic on the crack itself, and stacking this on top of it
+  // would read as two taps registering instead of one.
+  const advance = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    nextBeat();
+  }, [nextBeat]);
+
+  const finish = useCallback(() => {
+    onComplete?.();
+  }, [onComplete]);
 
   if (readState === LOAD_STATES.UNKNOWN) {
     return (
       <View style={styles.loadingContainer}>
-        {/* Sage's finding on the first pass: the happy path's only exit is
-            advancing past the last slide, which this branch has none of —
-            iOS swipe-down / Android back still dismiss, but neither is
-            visible. Seeds/Notes' idiom (chevron-down, promoted from
-            Account.js) is the ratified visible exit for a modal under the
-            global headerShown:false; no ScreenHeader here, so placed
-            directly rather than through its left slot. */}
         <TouchableOpacity
-          onPress={onComplete}
+          onPress={finish}
           hitSlop={DISMISS_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel="Close"
@@ -176,7 +188,7 @@ export const PollinateWrapped = ({ onComplete }) => {
         <LoadState
           state={LOAD_STATES.UNKNOWN}
           onRetry={load}
-          title="Couldn't reach your year"
+          title="Couldn't reach your month"
           body="Something went wrong on the way to the hive."
           actionLabel="Try again"
           retryAccessibilityLabel="Try loading your Wrapped again"
@@ -185,7 +197,7 @@ export const PollinateWrapped = ({ onComplete }) => {
     );
   }
 
-  if (!slides) {
+  if (!data) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={theme.colors.accent} size="large" />
@@ -193,81 +205,169 @@ export const PollinateWrapped = ({ onComplete }) => {
     );
   }
 
-  const nextSlide = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (currentSlide < slides.length - 1) {
-      setCurrentSlide(s => s + 1);
-    } else if (onComplete) {
-      onComplete();
-    } else {
-      setCurrentSlide(0);
-    }
-  };
-
-  const slide = slides[currentSlide];
-  const rise = beat.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+  const beatKey = beats[beatIndex];
+  const isLastBeat = beatIndex === beats.length - 1;
+  const onAdvance = isLastBeat ? finish : advance;
+  const rise = beatAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
 
   return (
-    <Pressable style={styles.container} onPress={nextSlide}>
+    <View style={styles.container}>
       <View style={styles.progressContainer}>
-        {slides.map((_, i) => (
-          <ProgressSegment key={i} filled={i <= currentSlide} />
-        ))}
+        <HoneyDropProgress filled={beatIndex + 1} total={beats.length} />
       </View>
 
-      <View style={styles.slideContent}>
-        {/* The beat's own light, keyed to its accent — replaces the flat
-            whole-screen tint that used to sit over the cream. */}
-        <GlowOrb size={340} color={slide.glow} intensity={0.5} style={styles.slideGlow} />
-
-        <Animated.View style={{ opacity: beat, transform: [{ translateY: rise }] }}>
-          <Text style={styles.subtitle}>{slide.subtitle}</Text>
-          <Text style={styles.title}>{slide.title}</Text>
-
-          <View style={[styles.valueContainer, { backgroundColor: SLIDE_WASHES[currentSlide % SLIDE_WASHES.length] }]}>
-            <AnimatedStat
-              key={currentSlide}
-              value={slide.value}
-              style={styles.value}
-            />
-            <Text style={styles.label}>{slide.label}</Text>
-          </View>
-        </Animated.View>
-
-        <Text style={styles.tapHint}>
-          {currentSlide === slides.length - 1 ? 'Tap to replay' : 'Tap to continue →'}
-        </Text>
-      </View>
-    </Pressable>
+      <Animated.View style={[styles.beatFill, { opacity: beatAnim, transform: [{ translateY: rise }] }]}>
+        {beatKey === 'seal' && (
+          <SealCrack copy={`${data.label}, poured.`} onCracked={nextBeat} />
+        )}
+        {beatKey === 'count' && <CountBeat monthLabel={data.label} count={data.entryCount} onAdvance={onAdvance} />}
+        {beatKey === 'run' && <RunBeat monthLabel={data.label} run={data.longestRun} onAdvance={onAdvance} />}
+        {beatKey === 'loved' && (
+          <LovedBeat insight={data.insight} snippet={data.themeSnippet} onAdvance={onAdvance} />
+        )}
+        {beatKey === 'card' && <CardBeat data={data} onAdvance={onAdvance} />}
+      </Animated.View>
+    </View>
   );
 };
 
-// Progress segments fill rather than snap, so the story-format bar actually
-// tracks the beat you're on.
-const ProgressSegment = ({ filled }) => {
+// Beat 1 — "One number, comically big" (§3.1). Pigment is `ink`, not a
+// choice: `AnimatedStat`'s own numeral is baked to `ink` (R127/
+// numeral-pigment); the beat's own hue lives in `GlowOrb` only, the one
+// consumer §2 still allows it to have.
+const CountBeat = ({ monthLabel, count, onAdvance }) => (
+  <Pressable style={styles.beatFill} onPress={onAdvance}>
+    <View style={styles.slideContent}>
+      <GlowOrb size={340} color={theme.colors.accent} intensity={0.5} style={styles.slideGlow} />
+      <Text style={styles.subtitle}>{monthLabel}</Text>
+      <Text style={styles.title}>Your Month in Gratitude</Text>
+      <View style={[styles.valueContainer, { backgroundColor: theme.colors.washYellow }]}>
+        <AnimatedStat value={String(count)} style={styles.value} />
+        <Text style={styles.label}>Moments of reflection</Text>
+      </View>
+      <Text style={styles.tapHint}>Tap to continue →</Text>
+    </View>
+  </Pressable>
+);
+
+// Beat 2 — "The Run" (§3.2/§4.1). The copy names the window — the ruled
+// fix for a windowed stat next to `RecapTab`'s unscoped all-time one.
+const RunBeat = ({ monthLabel, run, onAdvance }) => (
+  <Pressable style={styles.beatFill} onPress={onAdvance}>
+    <View style={styles.slideContent}>
+      <Text style={styles.subtitle}>Best Run</Text>
+      <Text style={styles.title}>{`${run} Day${run === 1 ? '' : 's'}`}</Text>
+      <StreakHexTrail count={run} />
+      <Text style={[styles.label, styles.runLabel]}>{`Your best run in ${monthLabel}.`}</Text>
+      <Text style={styles.tapHint}>Tap to continue →</Text>
+    </View>
+  </Pressable>
+);
+
+// Beat 3 — "What You Loved" (§3.3), one card, only mounted when §4.2's
+// condition holds — `beats` never includes `'loved'` otherwise.
+const LovedBeat = ({ insight, snippet, onAdvance }) => (
+  <Pressable style={styles.beatFill} onPress={onAdvance}>
+    <View style={styles.slideContent}>
+      <Text style={styles.subtitle}>What You Loved</Text>
+      <View style={styles.themeCardSlot}>
+        <ThemeCardFlip themeWord={insight.theme} snippet={snippet} caption={describeTheme(insight)} />
+      </View>
+      <Text style={styles.tapHint}>Tap to continue →</Text>
+    </View>
+  </Pressable>
+);
+
+// Beat 4 — "The Month Card" (§3.4/§2): the annual edition's Beat 4
+// "Brightest Month" grid-fill promoted to finale position, one grid
+// instead of twelve. Assembles, detonates, resolves into `YearCard`'s
+// frame with a month's content rather than a second component.
+//
+// Crop safety (1:1 and 9:16, on device) is unchanged and still owed — see
+// `YearCard.js`'s own header. Nothing below has been on a device either.
+const CARD_WIDTH = 320;
+const WATERMARK_SCALE = 0.35;
+
+const CardBeat = ({ data, onAdvance }) => {
   const reduced = useReducedMotion();
-  const fill = useRef(new Animated.Value(filled ? 1 : 0)).current;
+  const { width } = useWindowDimensions();
+  const cellW = Math.floor((width - 80) / COLS);
+  const cellH = cellW * HEX_ASPECT;
+  const { cells, height } = useMemo(
+    () => combLayout(data.daysInMonth, cellW, cellH),
+    [data.daysInMonth, cellW, cellH]
+  );
 
-  useEffect(() => {
-    Animated.timing(fill, {
-      toValue: filled ? 1 : 0,
-      duration: reduced ? DURATIONS.reducedMotionFade : DURATIONS.quick,
-      useNativeDriver: false,
-    }).start();
-  }, [filled, reduced]);
+  const wCellW = Math.floor((CARD_WIDTH * 0.7) / COLS) * WATERMARK_SCALE;
+  const wCellH = wCellW * HEX_ASPECT;
+  const watermarkLayout = useMemo(
+    () => combLayout(data.daysInMonth, wCellW, wCellH),
+    [data.daysInMonth, wCellW, wCellH]
+  );
 
-  // The unfilled track is `trackDim`, not the 0.15 this shipped with. §23.11
-  // ruled this exact component — a progress track on `background` — and ruled
-  // 0.15 a DEFECT: it measures 1.36:1 against its own ground where the floor is
-  // 3:1, i.e. very nearly invisible. `trackDim` is the ratified 0.5 (3.25:1).
-  // A progress indicator is a fraction; without a visible denominator it is a
-  // different component.
-  const backgroundColor = fill.interpolate({
-    inputRange: [0, 1],
-    outputRange: [theme.colors.trackDim, theme.colors.ink],
-  });
+  const [detonating, setDetonating] = useState(false);
+  const [resolved, setResolved] = useState(false);
+  const gridOpacity = useRef(new Animated.Value(1)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const resolveTimer = useRef(null);
 
-  return <Animated.View style={[styles.progressBar, { backgroundColor }]} />;
+  const handleSettled = useCallback(() => {
+    setDetonating(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const delay = reduced ? DURATIONS.reducedMotionFade : DURATIONS.celebrate;
+    resolveTimer.current = setTimeout(() => {
+      setResolved(true);
+      Animated.parallel([
+        Animated.timing(gridOpacity, { toValue: 0, duration: DURATIONS.quick, useNativeDriver: true }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: DURATIONS.quick, useNativeDriver: true }),
+      ]).start();
+    }, delay);
+  }, [reduced]);
+
+  useEffect(() => () => resolveTimer.current && clearTimeout(resolveTimer.current), []);
+
+  return (
+    <Pressable style={styles.beatFill} onPress={onAdvance}>
+      <View style={styles.cardStage}>
+        {!resolved && (
+          <Animated.View pointerEvents="none" style={{ opacity: gridOpacity }}>
+            <MonthGrid
+              cells={cells}
+              height={height}
+              cellW={cellW}
+              cellH={cellH}
+              filledDays={data.filledDays}
+              cascade={1}
+              onSettled={handleSettled}
+            />
+            {detonating && (
+              <View pointerEvents="none" style={styles.cardBurstStage}>
+                <CelebrationRays />
+              </View>
+            )}
+          </Animated.View>
+        )}
+        <Animated.View pointerEvents="none" style={[styles.resolvedCard, { opacity: cardOpacity }]}>
+          <YearCard
+            totalEntries={data.entryCount}
+            subtitle={data.title}
+            themeWord={hasThemeBeat(data.insight) ? data.insight.theme : ''}
+            width={CARD_WIDTH}
+            watermark={
+              <MonthGrid
+                cells={watermarkLayout.cells}
+                height={watermarkLayout.height}
+                cellW={wCellW}
+                cellH={wCellH}
+                filledDays={data.filledDays}
+              />
+            }
+          />
+        </Animated.View>
+      </View>
+      <Text style={styles.tapHint}>Tap to finish</Text>
+    </Pressable>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -281,26 +381,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Same top/left the beat progress bar uses (progressContainer, below) —
-  // this screen has no ScreenHeader to hang a left slot on.
   unknownDismiss: {
     position: 'absolute',
     top: 60,
     left: 20,
   },
   progressContainer: {
-    flexDirection: 'row',
     position: 'absolute',
     top: 60,
     left: 20,
     right: 20,
-    height: 4,
-    gap: 8,
     zIndex: 10,
   },
-  progressBar: {
+  beatFill: {
     flex: 1,
-    borderRadius: 2,
   },
   slideContent: {
     flex: 1,
@@ -325,6 +419,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 48,
   },
+  themeCardSlot: {
+    alignSelf: 'stretch',
+    marginBottom: 32,
+  },
   valueContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -333,20 +431,6 @@ const styles = StyleSheet.create({
     width: '100%',
     ...theme.shadows.card,
   },
-  // `ink`, baked in rather than passed — R15 made this exact call for the Year
-  // Card's numeral ("no `numeralColor` prop — bake ink in, so the keepsake frame
-  // cannot be built unreadable") and this is the same frame one screen earlier.
-  //
-  // What shipped before was `slide.color`, i.e. the beat's LIGHT spent as its
-  // TEXT. One key served two roles and was named after neither, so every value
-  // on the screen rendered under the large-text floor: the count at 1.3040:1 and
-  // the user's own entry at 1.2710:1 (`accent` on washSky), the theme word and
-  // the streak at 2.3482:1 (`accentDeep` on washYellow), against a 3:1 bar. Ink
-  // on the same two washes is 15.3897 / 15.0009.
-  //
-  // The hue did not go anywhere — `slide.glow` still carries it, to the one
-  // consumer §2 allows it to have. The renaming is the fix's durable half: a key
-  // called `color` invites exactly the re-spend that caused this.
   value: {
     ...theme.type.display,
     color: theme.colors.ink,
@@ -359,11 +443,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
   },
+  runLabel: {
+    marginTop: 32,
+  },
   tapHint: {
     position: 'absolute',
-    bottom: 120,
+    bottom: 60,
+    alignSelf: 'center',
     ...theme.type.bodySm,
     color: theme.colors.textSecondary,
     opacity: 0.6,
+  },
+  cardStage: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBurstStage: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resolvedCard: {
+    position: 'absolute',
   },
 });

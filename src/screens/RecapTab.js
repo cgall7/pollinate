@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,7 +15,8 @@ import { hexPoints, HEX_ASPECT } from '../utils/combGeometry';
 import { MonthlyRecap } from './MonthlyRecap';
 import { EntryStore } from '../services/EntryStore';
 import { dominantTheme } from '../utils/themeTagger';
-import { recentMonths, currentStreak, longestStreak } from '../utils/dateRanges';
+import { recentMonths, currentStreak, longestStreak, monthName } from '../utils/dateRanges';
+import { WrappedSeenState } from '../services/wrappedSeenState';
 import { DevVersionTag } from '../components/DevVersionTag';
 import { DEMO_CONTENT } from '../constants/demoMode';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -121,25 +122,118 @@ const MonthRail = ({ count, activeIndex }) => (
 // a screenshot. Sage cleared Garden to nest at 9771f9d and I repeated it in
 // the commit that added this call, which is the moment it stopped being
 // true. `npm run check:nav-depth` is the reader that sentence needed.
-const WrappedCard = () => {
-  const navigation = useNavigation();
+//
+// §14.2 respec §5 (Colin's 2026-08-12 cadence redirect): the card used to be
+// permanent chrome — always lit, always "your year, wrapped" — which §26.2
+// ruled a lie in three ways at once: wrong noun (year vs. the recurring
+// month), an always-available claim for content that isn't always there,
+// and no way to say a month came up empty. Five states now: READY, SEEN,
+// NONE and UNKNOWN below; ANNUAL (§1, December) isn't built — the annual
+// seven-beat special is its own future build (§6/§9), not this one, and a
+// card that opened onto nothing would be exactly what this respec exists
+// to stop shipping.
+const WrappedShell = ({ icon, title, subtitle, badge, onPress, accessibilityLabel }) => {
+  const content = (
+    <>
+      {/* NONE/UNKNOWN mute the roundel — `accent` reads as "something's
+          ready", which neither state is claiming. */}
+      <View style={[styles.wrappedIcon, !onPress && styles.wrappedIconMuted]}>
+        <Ionicons name={icon} size={22} color={onPress ? theme.colors.ink : theme.colors.inkSoft} />
+      </View>
+      <View style={styles.wrappedText}>
+        <Text style={styles.wrappedTitle}>{title}</Text>
+        <Text style={styles.wrappedSubtitle}>{subtitle}</Text>
+      </View>
+      {badge && <View style={styles.wrappedBadge} />}
+      {onPress && <Ionicons name="chevron-forward" size={20} color={theme.colors.inkSoft} />}
+    </>
+  );
+
+  if (!onPress) {
+    // NONE and UNKNOWN: "not a door — a statement... with no tap target"
+    // (§5). Not a PressableScale wearing a no-op — a different element,
+    // so VoiceOver doesn't announce it as a button that does nothing.
+    return (
+      <View style={styles.wrappedOuter}>
+        <View style={[styles.wrappedCard, styles.wrappedCardStatic]} accessibilityLabel={accessibilityLabel}>
+          {content}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <PressableScale
       containerStyle={styles.wrappedOuter}
       style={styles.wrappedCard}
-      onPress={() => navigation.getParent()?.navigate('Wrapped')}
-      accessibilityLabel="Your year, wrapped"
+      onPress={onPress}
+      accessibilityLabel={accessibilityLabel}
     >
-      <View style={styles.wrappedIcon}>
-        <Ionicons name="gift" size={22} color={theme.colors.ink} />
-      </View>
-      <View style={styles.wrappedText}>
-        <Text style={styles.wrappedTitle}>Your year, wrapped</Text>
-        <Text style={styles.wrappedSubtitle}>Every month, in one sitting</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={theme.colors.inkSoft} />
+      {content}
     </PressableScale>
+  );
+};
+
+// `monthLabel`/`monthKey` — the recurring window's previous-calendar-month
+// (§1), computed once by `RecapTab` from the same `allEntries` read
+// everything else on this screen already has, rather than a second query.
+// `unknown` — RecapTab's own `readState`, so a failed read reaches NONE and
+// UNKNOWN through one signal instead of two that could disagree (§5's own
+// note: "the door is currently downstream of RecapTab's own readState").
+const WrappedCard = ({ monthLabel, monthKey, entryCount, unknown }) => {
+  const navigation = useNavigation();
+  // `undefined` until the read resolves — held rather than defaulting to
+  // "not seen", so a month already opened doesn't flash its READY badge
+  // for one frame before AsyncStorage answers.
+  const [seenMonthKey, setSeenMonthKey] = useState(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    WrappedSeenState.getSeenMonthKey().then((key) => {
+      if (!cancelled) setSeenMonthKey(key);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [monthKey]);
+
+  if (unknown) {
+    return (
+      <WrappedShell
+        icon="alert-circle-outline"
+        title="Couldn't check Wrapped"
+        subtitle="Something went wrong on the way to the hive."
+        accessibilityLabel="Wrapped is temporarily unavailable"
+      />
+    );
+  }
+
+  if (entryCount === 0) {
+    return (
+      <WrappedShell
+        icon="gift-outline"
+        title={`Nothing from ${monthLabel} yet`}
+        subtitle="Write something and it'll be here next time."
+        accessibilityLabel={`No Wrapped for ${monthLabel} — no entries yet`}
+      />
+    );
+  }
+
+  const isSeen = seenMonthKey === monthKey;
+  const openWrapped = () => {
+    WrappedSeenState.markSeen(monthKey);
+    navigation.getParent()?.navigate('Wrapped');
+  };
+
+  return (
+    <WrappedShell
+      icon="gift"
+      title={`${monthLabel}, wrapped`}
+      subtitle={isSeen ? 'Open it again' : 'Ready to open'}
+      badge={!isSeen}
+      onPress={openWrapped}
+      accessibilityLabel={isSeen ? `${monthLabel}, wrapped — open again` : `${monthLabel}, wrapped — new`}
+    />
   );
 };
 
@@ -214,6 +308,17 @@ export const RecapTab = () => {
   const currentYear = String(new Date().getFullYear());
   const thisYear = allEntries.filter((entry) => entry.date.startsWith(currentYear));
   const streak = currentStreak(allEntries);
+
+  // §14.2 respec §1: the Wrapped door's window is the previous calendar
+  // month, sliced from the same `allEntries` read everything else on this
+  // screen uses — a second query for one card's badge would be the thing
+  // `buildMonths`'s own comment (`EntryStore.getAllEntries` reloads and
+  // re-sorts the whole store per call) exists to avoid.
+  const now = new Date();
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  const prevMonthLabel = monthName(prevMonthDate);
+  const prevMonthEntryCount = allEntries.filter((entry) => entry.date.startsWith(prevMonthKey)).length;
 
   const listView = resolveListView(readState, allEntries.length);
   // EMPTY is not branched on, and that is a decision rather than an omission:
@@ -329,7 +434,12 @@ export const RecapTab = () => {
         </>
       )}
 
-      <WrappedCard />
+      <WrappedCard
+        monthLabel={prevMonthLabel}
+        monthKey={prevMonthKey}
+        entryCount={prevMonthEntryCount}
+        unknown={unknown}
+      />
 
       {/* Dev/pitch builds only. The version label itself is harmless, but
           five taps on it opens the onboarding flow picker — the fifth demo
@@ -397,6 +507,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // `surfaceShade` is reserved for a gradient's far stop only (theme.js) —
+  // this reuses the same muted fill the month rail's own inactive dot uses
+  // (`surfaceBorderStrong`, below at `RAIL_W`'s `MonthRail`).
+  wrappedIconMuted: {
+    backgroundColor: theme.colors.surfaceBorderStrong,
+  },
   wrappedText: {
     flex: 1,
   },
@@ -408,6 +524,19 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     marginTop: 2,
+  },
+  // The whole READY/SEEN distinction (§5's "new" signal), fill-only — R127
+  // bars accentDeep from text, never from a dot.
+  wrappedBadge: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.accentDeep,
+  },
+  // NONE/UNKNOWN: same shape, no tap target — a hairline dash instead of a
+  // solid border is the one visual tell that this card doesn't respond.
+  wrappedCardStatic: {
+    borderStyle: 'dashed',
   },
   statsCard: {
     flexDirection: 'row',

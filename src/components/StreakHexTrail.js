@@ -15,11 +15,17 @@ import { SPRINGS, DURATIONS, useReducedMotionState } from '../constants/motion';
 const IGNITE_STAGGER_MS = 40;
 const HEX_SIZE = 14;
 // Pacing budget, not a display limit on the real number: at the 40ms
-// cadence, 30 hexes ≈ 1.2s, which keeps the beat from running long (and
+// cadence, 31 hexes ≈ 1.24s, which keeps the beat from running long (and
 // firing 300+ haptic ticks) on a real year-long streak. The trail is a
 // motif, not a literal tally — the wiring's copy/numeral carries the true
 // count alongside it.
-const MAX_HEXES = 30;
+//
+// §14.2 respec §7 build pin 4: was 30, derived against year-scale streaks
+// of 300+, where one hex either way is noise. A month has up to 31 days,
+// and the single case the old cap clipped was a perfect month — the one
+// month you least want under-rendered. Raised to 31 rather than made a
+// prop: the annual edition's own streaks are unaffected at this scale.
+const MAX_HEXES = 31;
 // R16 item 1 (Pixel): the visual cap doesn't bound the haptic rate — 30
 // ticks at the 40ms cadence is 25Hz, which reads as one continuous buzz
 // instead of discrete ticks. Cap ignite haptics at 12 regardless of hex

@@ -158,6 +158,7 @@ export const TEXT_ATTRS = new Set([
   'title',
   'label',
   'eyebrow',
+  'subtitle',
   'body',
   'actionLabel',
   'staleLabel',
