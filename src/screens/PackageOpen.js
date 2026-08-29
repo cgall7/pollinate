@@ -370,7 +370,8 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       <View style={[styles.container, styles.centered, { backgroundColor: cover.base }]}>
         <PressableScale
           onPress={() => navigation.goBack()}
-          style={styles.closeButton}
+          containerStyle={styles.closeButtonAnchor}
+        style={styles.closeButton}
           accessibilityLabel="Close"
         >
           <Ionicons name="close" size={22} color={cover.textColor} />
@@ -390,6 +391,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     <View style={[styles.container, { backgroundColor: cover.base }]}>
       <PressableScale
         onPress={() => navigation.goBack()}
+        containerStyle={styles.closeButtonAnchor}
         style={styles.closeButton}
         accessibilityLabel="Close package"
       >
@@ -606,11 +608,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  closeButton: {
+  // R43 CHANNEL (Lumen, 2026-08-29, MVP1 screen pass): positioning belongs on
+  // `containerStyle`, never `style`. `PressableScale` puts `style` on its inner
+  // Animated.View and `containerStyle` on the outer Pressable — so an absolute
+  // inset written to `style` is resolved against the Pressable's own collapsed
+  // box instead of this screen, and the control renders wherever flow drops it.
+  // Photographed mid-screen on PackageOpen and MemoryLane before this split.
+  closeButtonAnchor: {
     position: 'absolute',
     top: 60,
     right: 24,
     zIndex: 1,
+  },
+  closeButton: {
     width: 40,
     height: 40,
     borderRadius: theme.borderRadius.full,

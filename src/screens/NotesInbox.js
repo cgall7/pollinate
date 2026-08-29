@@ -47,7 +47,7 @@ const NoteDetail = ({ note, direction, onClose }) => {
   const person = direction === 'received' ? note.sender : note.recipient;
   return (
     <View style={styles.detailOverlay}>
-      <PressableScale onPress={onClose} style={styles.detailClose} haptic={null}>
+      <PressableScale onPress={onClose} containerStyle={styles.detailCloseAnchor} haptic={null}>
         <Ionicons name="close" size={24} color={theme.colors.inkSoft} />
       </PressableScale>
       <View style={styles.detailCard}>
@@ -254,7 +254,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  detailClose: {
+  // R43 CHANNEL (Lumen, 2026-08-29, MVP1 screen pass): positioning belongs on
+  // `containerStyle`, never `style`. `PressableScale` puts `style` on its inner
+  // Animated.View and `containerStyle` on the outer Pressable — so an absolute
+  // inset written to `style` is resolved against the Pressable's own collapsed
+  // box instead of this screen, and the control renders wherever flow drops it.
+  // Photographed mid-screen on PackageOpen and MemoryLane before this split.
+  detailCloseAnchor: {
     position: 'absolute',
     top: 64,
     right: 24,
