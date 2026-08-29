@@ -56,14 +56,16 @@ const files = [];
 const fileText = new Map(files.map((f) => [f, fs.readFileSync(f, 'utf8')]));
 const rel = (f) => path.relative(ROOT, f);
 
-// A React functional component defined as `const Name = ({ props }) => {`.
-// The destructure can and does span many lines with `//` comments inside
-// it (HoneycombGrid's `cellSize` block) — one of those comments contains a
-// stray `)`, which broke a first version of this scan that looked for the
-// nearest `)` rather than balancing braces. Braces are balanced with
-// line-comments stripped instead, so a parenthetical aside in a comment
-// can't be mistaken for the destructure's own close.
-const COMPONENT_START_RE = /^(?:export\s+)?const\s+([A-Z]\w*)\s*=\s*\(\{/gm;
+// A React functional component defined as `const Name = ({ props }) => {`
+// — or, since R-LF-5 wrapped `HoneycombGrid` for a landing-light ref,
+// `const Name = forwardRef(({ props }, ref) => {`. The destructure can and
+// does span many lines with `//` comments inside it (HoneycombGrid's
+// `cellSize` block) — one of those comments contains a stray `)`, which
+// broke a first version of this scan that looked for the nearest `)`
+// rather than balancing braces. Braces are balanced with line-comments
+// stripped instead, so a parenthetical aside in a comment can't be
+// mistaken for the destructure's own close.
+const COMPONENT_START_RE = /^(?:export\s+)?const\s+([A-Z]\w*)\s*=\s*(?:forwardRef\()?\(\{/gm;
 
 function componentsIn(text) {
   const out = [];
@@ -85,7 +87,9 @@ function componentsIn(text) {
     }
     if (depth !== 0) continue; // unbalanced — not a shape this gate can read
     const after = text.slice(i + 1, i + 20);
-    if (!/^\s*\)\s*=>/.test(after)) continue; // not `}) => {` — some other brace
+    // `}) => {` for a plain component, or `}, ref) => {` for one wrapped in
+    // `forwardRef` — the second parameter is never anything but `ref`.
+    if (!/^\s*(?:,\s*ref\s*)?\)\s*=>/.test(after)) continue; // not either shape — some other brace
     out.push({ name: m[1], propsText: text.slice(braceStart + 1, i), index: m.index });
   }
   return out;

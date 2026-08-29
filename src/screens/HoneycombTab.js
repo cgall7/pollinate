@@ -326,6 +326,10 @@ const HoneycombFeed = () => {
   const [pollination, setPollination] = useState(null);
   const pollinationRef = useRef(null);
   pollinationRef.current = pollination;
+  // R-LF-5 — the only reason this ref exists: `FlyingBee`'s landing needs to
+  // fire the comb's own landing light, and the two are screen-level siblings
+  // (§28.2), so this is the one place both are in scope.
+  const combRef = useRef(null);
   // The live scroll offset (read by value by the abort predicate) and a tick
   // that carries no information and exists only to re-run it. §28.9: put
   // completeness in the trigger and correctness in the predicate.
@@ -548,7 +552,12 @@ const HoneycombFeed = () => {
           active
           perches={hiveView === 'week' ? null : perches}
           pollinate={pollination}
-          onPollinateEnd={() => setPollination(null)}
+          onPollinateEnd={() => {
+            // R-LF-5 — "I landed" is the only thing that crosses back; the
+            // comb already knows which cell that means (§28.2).
+            combRef.current?.igniteLanding();
+            setPollination(null);
+          }}
         />
       )}
       <PerchField perches={perches}>
@@ -689,6 +698,7 @@ const HoneycombFeed = () => {
         // as a place on this screen; its cells are seats, not destinations.
         <PerchAnchor id="comb" on="right" at={0.4}>
         <HoneycombGrid
+          ref={combRef}
           members={combMembers}
           onInvitePress={() => setAddOpen(true)}
           scrollYRef={scrollYRef}

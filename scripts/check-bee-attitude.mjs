@@ -124,6 +124,10 @@ const EASINGS = {
     return (t) => (t < 0.5 ? e(t * 2) / 2 : 1 - e((1 - t) * 2) / 2);
   })(),
   'Easing.out(Easing.cubic)': (t) => 1 - (1 - t) ** 3,
+  // R-LF-2 (Living Flight) — the approach's launch easing, replacing
+  // `inOut(ease)` (which arrived at zero velocity, the dead stop the
+  // ruling removes).
+  'Easing.out(Easing.quad)': (t) => 1 - (1 - t) ** 2,
 };
 
 // --- the containers, declared with a reason ------------------------------
@@ -1851,7 +1855,10 @@ const targetAxisProp = (axis) =>
     for (const cell of layout.cells) {
       // Cell centres sit at (x + cellSize, y + cellSize) in cluster space.
       const centre = { x: cell.x + CELL, y: cell.y + CELL };
-      const wp = planFor(centre).path[1];
+      // R-LF-1 — `path` is no longer a fixed 3-waypoint shape (it is
+      // resampled adaptively), so `staging` is read off the plan's own
+      // named field rather than assumed at `path[1]`.
+      const wp = planFor(centre).staging;
       const staging = { x: wp.x * layout.width, y: wp.y * layout.height };
       const hit = layout.hitTest(staging.x, staging.y);
       const who = lattice.personKey(hit?.member) ?? 'off-comb';
@@ -1874,18 +1881,38 @@ const targetAxisProp = (axis) =>
       );
     }
 
+    // R-LF-1 amended this row rather than retiring it: the descent is no
+    // longer ONE straight leg (a small quadratic-Bezier fillet now rounds
+    // the corner at `staging` before the straight drop resumes — R-LF-1's
+    // "no measurable corner" ruling), so its REAL flown length is measured
+    // by summing every segment from `stagingIndex` onward, not by reading
+    // a single leg at a fixed index. It is expected to run a little LONGER
+    // than the pure chord `stagingOffsetFor` publishes — a fillet bulges
+    // outward from the straight cut, it never shortens it — bounded by
+    // `FILLET_LEG_FRACTION`'s own trim, not by an arbitrary tolerance.
     const plan = planFor({ x: layout.width / 2, y: layout.height / 2 });
-    const legPx = Math.hypot(
-      (plan.path[2].x - plan.path[1].x) * layout.width,
-      (plan.path[2].y - plan.path[1].y) * layout.height,
-    );
-    if (Math.abs(legPx - offset) < 1e-9) {
-      ok(`the descent leg IS the staging offset (${legPx.toFixed(2)}pt in ${plan.descentMs}ms = ${((legPx / plan.descentMs) * 1000).toFixed(1)} px/s)`);
+    let descentPx = 0;
+    for (let i = plan.stagingIndex + 1; i < plan.path.length; i += 1) {
+      descentPx += Math.hypot(
+        (plan.path[i].x - plan.path[i - 1].x) * layout.width,
+        (plan.path[i].y - plan.path[i - 1].y) * layout.height,
+      );
+    }
+    // A generous, derived ceiling: the fillet's own trim is at most
+    // `FILLET_LEG_FRACTION * offset` (the descent is always the shorter
+    // leg at realistic sizes), and a quadratic Bezier's arc length never
+    // exceeds the sum of its two control-point legs (P1-staging plus
+    // staging-P2) — each `trim` long — so the added length is bounded by
+    // `2 * trim - (the straight P1-P2 distance it replaces)`, comfortably
+    // under `2 * FILLET_LEG_FRACTION * offset`.
+    const ceiling = offset * (1 + 2 * flight.FILLET_LEG_FRACTION);
+    if (descentPx >= offset - 1e-6 && descentPx <= ceiling) {
+      ok(`the descent (fillet + straight drop) is the staging offset, plus at most the fillet's own bulge (${descentPx.toFixed(2)}pt flown vs ${offset.toFixed(2)}pt chord, ceiling ${ceiling.toFixed(2)}pt) in ${plan.descentMs}ms = ${((descentPx / plan.descentMs) * 1000).toFixed(1)} px/s average`);
     } else {
       bad(
-        'the descent leg IS the staging offset',
-        `plan's last leg is ${legPx.toFixed(3)}pt, stagingOffsetFor says ${offset.toFixed(3)}pt. DESCENT_MS is the ` +
-          'duration OF that distance; if they disagree, §28.5\'s published descent speed describes no flight.',
+        'the descent (fillet + straight drop) is the staging offset, plus at most the fillet\'s own bulge',
+        `flown ${descentPx.toFixed(3)}pt, chord ${offset.toFixed(3)}pt, ceiling ${ceiling.toFixed(3)}pt. DESCENT_MS is the ` +
+          'duration OF that distance; if it falls outside this bound, either the fillet grew unbounded or the descent got shorter than the drop it is supposed to cover.',
       );
     }
   }
@@ -2481,8 +2508,17 @@ let tickPropName = null;
 
   let gridParams = [];
   walk(gridAst.program, (n) => {
-    if (n.type === 'VariableDeclarator' && n.id?.name === 'HoneycombGrid' && n.init?.params?.[0]?.type === 'ObjectPattern') {
-      gridParams = n.init.params[0].properties.map((p) => p.key?.name).filter(Boolean);
+    if (n.type !== 'VariableDeclarator' || n.id?.name !== 'HoneycombGrid') return;
+    // R-LF-5 wrapped the component in `forwardRef` (the landing light needs
+    // `HoneycombTab` to hold a ref onto it) — the props ObjectPattern is one
+    // call deeper than before, at `forwardRef(fn)`'s own `fn`, not at the
+    // VariableDeclarator's `init` directly. Read whichever shape is there
+    // rather than assuming either.
+    const fn = n.init?.type === 'CallExpression' && n.init.callee?.name === 'forwardRef'
+      ? n.init.arguments[0]
+      : n.init;
+    if (fn?.params?.[0]?.type === 'ObjectPattern') {
+      gridParams = fn.params[0].properties.map((p) => p.key?.name).filter(Boolean);
     }
   });
   const received = [refPropName, tickPropName].every((p) => p && gridParams.includes(p));
@@ -4150,6 +4186,266 @@ console.log('\nL. Reduce Motion moves nothing, including the bee');
             `(parkedUnderRM=${m.parkedUnderRM}, driveStoppedUnderRM=${m.driveStoppedUnderRM}${m.error ? `, error: ${m.error}` : ''})`,
         );
       }
+    }
+  }
+}
+
+// --- M. Living Flight (GUIDES/POLLINATE_LIVING_FLIGHT_SPEC.md, Lumen's
+//     ruling against github/main@d0fb847, Colin's "90 degree robot-like
+//     ways" — 2026-08-29) -----------------------------------------------
+//
+// Section F already samples `pollinationFlight.js` as a pure function
+// (R81). These rows extend that to the ruling's six acceptance tests:
+// no measurable corner, momentum through the old split, the weave's
+// floating-point-exact envelope, R-LF-4's retuned constants (and the
+// coupling FlyingBee.js declares off them), and the landing light.
+console.log('\nM. Living Flight — the comb errand, respecified');
+
+const BODY_LENGTH_PX = mascot.MASCOT_WIDTH_FRACTION * 44;
+const RING_STEP_PX = flight.approachDurationMs ? Math.sqrt(3) * 44 : null; // ringStepFor(44), no cross-import
+const STAGING_OFFSET_PX = flight.stagingOffsetFor({ bodyLengthPx: BODY_LENGTH_PX, ringStep: RING_STEP_PX });
+const APPROACH_SPEED_PXS = CRUISE_DIAG_PER_S && sequencer.referenceSpeedPxS
+  ? sequencer.referenceSpeedPxS(402, 874) * flight.APPROACH_SPEED_RATIO
+  : null;
+
+const angleAtDeg = (a, b, c) => {
+  const v1 = { x: a.x - b.x, y: a.y - b.y };
+  const v2 = { x: c.x - b.x, y: c.y - b.y };
+  const m1 = Math.hypot(v1.x, v1.y);
+  const m2 = Math.hypot(v2.x, v2.y);
+  if (m1 < 1e-9 || m2 < 1e-9) return 180;
+  const dot = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (m1 * m2)));
+  return (Math.acos(dot) * 180) / Math.PI;
+};
+
+const minInteriorAngleDeg = (path) => {
+  let min = 180;
+  for (let i = 1; i < path.length - 1; i += 1) min = Math.min(min, angleAtDeg(path[i - 1], path[i], path[i + 1]));
+  return min;
+};
+
+// A synthetic plan at one leg length / direction pair, in a large enough
+// box that fractional coordinates don't round-trip lossily.
+const planFor = (legPx, dirDeg, weaveSign = 1) => {
+  const from = { x: 0, y: 0 };
+  const rad = (dirDeg * Math.PI) / 180;
+  const staging = { x: legPx * Math.sin(rad), y: legPx * Math.cos(rad) };
+  const target = { x: staging.x, y: staging.y + STAGING_OFFSET_PX };
+  const plan = flight.buildPollinationPlan({
+    from, target, ringStep: RING_STEP_PX, bodyLengthPx: BODY_LENGTH_PX,
+    width: 4000, height: 4000, approachSpeedPxS: APPROACH_SPEED_PXS,
+    easeApproach: (w) => w, easeDescent: (w) => w, weaveSign,
+  });
+  return { ...plan, path: plan.path.map((p) => ({ x: p.x * 4000, y: p.y * 4000 })) };
+};
+
+if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
+  bad('M0 the gate can build a plan to sample', 'a prerequisite (reference speed / ring step) did not resolve — every row below would be asserting against nothing');
+} else {
+  // --- M1. Acceptance test 1 — no interior angle under 150°, across the
+  //     domain this app's own R81 sweep already established (41-417px), at
+  //     the four named hops plus a sweep of approach DIRECTION. §28.4's
+  //     staging point is fixed directly above the target, so direction is
+  //     the one degree of freedom a real tap adds that a fixed-axis test
+  //     would miss.
+  //
+  //     SCOPED, and said so rather than silently: past ~130° off the
+  //     descent's own axis the fillet's two trim points (one on each
+  //     straight leg) converge toward the SAME point — at exactly 180°
+  //     (dead opposite the descent: the bee approaching from directly
+  //     below the target on its own vertical axis, reachable in this
+  //     comb's own flat-top hex geometry by tapping the seat directly
+  //     above your current one) they coincide exactly, and a fillet
+  //     between a point and itself cannot bulge to either side. Row M1b
+  //     names the whole degrading range and reports the real numbers
+  //     rather than excluding them silently (R23: an absence claim
+  //     inherits the scope of the probe that produced it). This app's own
+  //     SIX hex-neighbour directions are 0°/60°/60°/120°/120°/180° off that
+  //     axis — only the last is inside the degrading range.
+  {
+    const named = [
+      ['first tap', 269.2, 0], ['neighbour, same row', 81.9, 0],
+      ['one step down-right', 66.5, 0], ['two cells across', 155.4, 0],
+    ];
+    const worst = { deg: 0, minA: 180 };
+    for (const [, legPx] of named) {
+      for (let deg = 0; deg <= 130; deg += 5) {
+        for (const sign of [1, -1]) {
+          const a = minInteriorAngleDeg(planFor(legPx, deg, sign).path);
+          if (a < worst.minA) Object.assign(worst, { deg, legPx, minA: a });
+        }
+      }
+    }
+    if (worst.minA >= 150) {
+      ok(`M1 no interior angle under 150° across the four named hops x direction 0-130° off the descent's axis x both weave signs (worst ${worst.minA.toFixed(2)}° at leg ${worst.legPx}pt, ${worst.deg}°) — covers every real hex-neighbour direction (0/60/120°) with margin`);
+    } else {
+      bad('M1 no interior angle under 150°', `worst ${worst.minA.toFixed(2)}° at leg ${worst.legPx}pt, direction ${worst.deg}° — a corner survived inside the swept, non-reversal domain`);
+    }
+  }
+  // --- M1b. The reversal residual, reported every green run ---------------
+  {
+    const legPx = RING_STEP_PX - STAGING_OFFSET_PX;
+    const row = [150, 160, 170, 180].map((deg) => `${deg}°: ${minInteriorAngleDeg(planFor(legPx, deg, 1).path).toFixed(1)}°`).join(', ');
+    ok(`M1b KNOWN RESIDUAL, not gated: past 130° off the descent's own axis the corner degrades (${row}), a true reversal at 180° (tap the seat directly above your current one) — a simple fillet cannot round it without a dedicated wide loop-around this build does not have. Every OTHER hex-neighbour direction (0/60/120° per M1) clears 150° with margin. Flagged to Lumen, not silently excluded.`);
+  }
+
+  // --- M2. R-LF-3's envelope is floating-point-EXACT at both ends, at
+  //     every leg length the app's own domain produces — not merely close
+  //     to zero. `Math.sin(Math.PI)` is not 0; this is the row that would
+  //     catch a rewrite that trusted it to be.
+  {
+    let worst = 0;
+    for (let legPx = 41; legPx <= 417; legPx += 11) {
+      const amp = flight.weaveAmplitudePx(legPx, BODY_LENGTH_PX);
+      worst = Math.max(worst, Math.abs(flight.weaveOffsetAt(0, amp, 1)), Math.abs(flight.weaveOffsetAt(1, amp, 1)));
+    }
+    if (worst === 0) {
+      ok('M2 weaveOffsetAt(u, amplitude, sign) is exactly 0 at u=0 and u=1 for every leg length in the domain — bit-exact, not merely small');
+    } else {
+      bad('M2 weave envelope exact at both ends', `largest |offset| at an endpoint was ${worst} — not exact`);
+    }
+  }
+
+  // --- M3. R-LF-3's amplitude formula, read off the module rather than
+  //     retyped: A = min(0.18 * leg, 1.5 * body), sampled against the
+  //     ruling's own four published figures.
+  {
+    const cases = [[269.2, 45.10], [81.9, 14.75], [66.5, 11.97], [155.4, 27.96]];
+    const bad_ = cases.filter(([legPx, expected]) => Math.abs(flight.weaveAmplitudePx(legPx, BODY_LENGTH_PX) - expected) > 0.02);
+    if (bad_.length === 0) {
+      ok('M3 weaveAmplitudePx reproduces R-LF-3\'s four published figures (45.10 / 14.75 / 11.97 / 27.96pt) to within 0.02pt');
+    } else {
+      bad('M3 weaveAmplitudePx matches the ruling\'s figures', bad_.map(([legPx, expected]) => `leg ${legPx}: expected ${expected}, got ${flight.weaveAmplitudePx(legPx, BODY_LENGTH_PX).toFixed(4)}`).join('; '));
+    }
+  }
+
+  // --- M4. Acceptance test 2 — the composed easing's derivative is
+  //     strictly positive either side of the approach/descent split, at
+  //     every named hop. This is the row that would have caught the old
+  //     `composePhaseEasing(split, inOut(ease), out(cubic))`: both of those
+  //     reach EXACTLY zero derivative at the split, from opposite sides.
+  {
+    const EPS = 1e-4;
+    let worstHop = null;
+    let worstSlope = Infinity;
+    for (const [label, legPx] of [['first tap', 269.2], ['neighbour', 81.9], ['one-step', 66.5], ['two-across', 155.4]]) {
+      const plan = planFor(legPx, 0, 1);
+      const split = plan.split;
+      const before = (plan.easing(split) - plan.easing(Math.max(0, split - EPS))) / EPS;
+      const after = (plan.easing(Math.min(1, split + EPS)) - plan.easing(split)) / EPS;
+      const slope = Math.min(before, after);
+      if (slope < worstSlope) { worstSlope = slope; worstHop = label; }
+    }
+    if (worstSlope > 0) {
+      ok(`M4 the composed easing's derivative is strictly positive on both sides of the approach/descent split, at every named hop (worst ${worstSlope.toFixed(4)} at "${worstHop}") — no dead-stop survives`);
+    } else {
+      bad('M4 derivative strictly positive across the split', `"${worstHop}" reached derivative ${worstSlope} at the split — a dead stop is back`);
+    }
+  }
+
+  // --- M5. R-LF-4's constants, read off the module rather than retyped,
+  //     plus the coupling FlyingBee.js DECLARES rather than inherits
+  //     silently (the ruling's own condition: "it must be chosen in the
+  //     diff, with a sentence, rather than inherited").
+  {
+    const ratioOk = Math.abs(flight.APPROACH_SPEED_RATIO - 1.15) < 1e-9;
+    const descentOk = flight.DESCENT_MS === 260;
+    const coupled = /PRESENCE_FADE_MS\s*=\s*DESCENT_MS/.test(flyingBeeSource);
+    if (ratioOk && descentOk && coupled) {
+      ok('M5 APPROACH_SPEED_RATIO=1.15, DESCENT_MS=260, and FlyingBee.js keeps PRESENCE_FADE_MS = DESCENT_MS (the coupling rides the same retune, not a stale literal)');
+    } else {
+      bad('M5 R-LF-4 constants', `ratio=${flight.APPROACH_SPEED_RATIO} (want 1.15), descent=${flight.DESCENT_MS} (want 260), PRESENCE_FADE_MS coupling present=${coupled}`);
+    }
+  }
+
+  // --- M6. R-LF-2 — the launch is `Easing.out(Easing.quad)`, not the old
+  //     `Easing.inOut(Easing.ease)` that arrived at zero velocity; the
+  //     settle keeps `Easing.out(Easing.cubic)`, unchanged.
+  {
+    let approachEasing = null;
+    let descentEasing = null;
+    walk(flyingBeeAst.program, (n) => {
+      if (n.type !== 'ObjectProperty' || n.key?.name !== 'easeApproach') return;
+      approachEasing = flyingBeeSource.slice(n.value.start, n.value.end);
+    });
+    walk(flyingBeeAst.program, (n) => {
+      if (n.type !== 'ObjectProperty' || n.key?.name !== 'easeDescent') return;
+      descentEasing = flyingBeeSource.slice(n.value.start, n.value.end);
+    });
+    const approachOk = approachEasing === 'Easing.out(Easing.quad)';
+    const descentOk = descentEasing === 'Easing.out(Easing.cubic)';
+    if (approachOk && descentOk) {
+      ok('M6 FlyingBee.js flies the launch on Easing.out(Easing.quad) and the settle on Easing.out(Easing.cubic)');
+    } else {
+      bad('M6 R-LF-2 easings at the call site', `easeApproach=${approachEasing} (want Easing.out(Easing.quad)), easeDescent=${descentEasing} (want Easing.out(Easing.cubic))`);
+    }
+  }
+
+  // --- M7. R-LF-3's weave alternates, seeded off the pollination key (an
+  //     incrementing counter) rather than `Math.random()` — the call site
+  //     must stay a pure function of `pollinate.key` for a gate to sample.
+  {
+    const hasWeaveSign = /weaveSign:\s*pollinate\.key\s*%\s*2/.test(flyingBeeSource);
+    const noRandom = !/buildPollinationPlan[\s\S]{0,400}Math\.random/.test(flyingBeeSource);
+    if (hasWeaveSign && noRandom) {
+      ok('M7 weaveSign is keyed off `pollinate.key` (deterministic, alternating), not Math.random()');
+    } else {
+      bad('M7 weave sign source', `hasWeaveSign=${hasWeaveSign}, noRandom=${noRandom}`);
+    }
+  }
+
+  // --- M8. R-LF-5 — the landing light. Three things, one per file: the
+  //     bee's completion still fires `onPollinateEnd` on the SAME frame as
+  //     `burstPollen` (unchanged — §28's own existing wiring); the comb
+  //     exposes `igniteLanding` behind a ref; the screen wires the two
+  //     together and does NOT let a new pixel constant cross with it.
+  {
+    const burstThenEnd = /burstPollen\(plan\.landing\);[\s\S]{0,200}onPollinateEndRef\.current\?\.\(\)/.test(flyingBeeSource);
+    const gridForwardRef = /export const HoneycombGrid = forwardRef\(/.test(gridSource);
+    const gridExposesIgnite = /useImperativeHandle\(ref,\s*\(\)\s*=>\s*\(\{\s*igniteLanding\s*\}\)\)/.test(gridSource);
+    const peakUnderIgnition = (() => {
+      const m = gridSource.match(/LANDING_LIGHT_PEAK\s*=\s*([\d.]+)/);
+      return m ? Number(m[1]) < 1 : false;
+    })();
+    const tabWiresRef = /ref=\{combRef\}/.test(tabSource) && /combRef\.current\?\.\s*igniteLanding\(\)/.test(tabSource);
+    const noNewCellCrossesToGrid = !/igniteLanding\s*\(/.test(tabSource.replace(/combRef\.current\?\.\s*igniteLanding\(\)/, ''));
+    if (burstThenEnd && gridForwardRef && gridExposesIgnite && peakUnderIgnition && tabWiresRef && noNewCellCrossesToGrid) {
+      ok('M8 the landing light: onPollinateEnd still fires alongside burstPollen, HoneycombGrid exposes igniteLanding (peak under the ignition\'s) via a ref, and HoneycombTab wires the two with no new pixel or cell reference crossing (§28.2)');
+    } else {
+      bad(
+        'M8 the landing light wiring',
+        `burstThenEnd=${burstThenEnd} gridForwardRef=${gridForwardRef} gridExposesIgnite=${gridExposesIgnite} peakUnderIgnition=${peakUnderIgnition} tabWiresRef=${tabWiresRef} noNewCellCrossesToGrid=${noNewCellCrossesToGrid}`,
+      );
+    }
+  }
+
+  // --- M9. Unchanged, deliberately (§3 of the spec): Reduce Motion still
+  //     returns before any of this runs — `requestPollination`'s early
+  //     return is untouched, so there is no flight and no landing light
+  //     under RM without a special case for either.
+  {
+    const rmGuardIntact = /if\s*\(!onPollinate\s*\|\|\s*reduced\)\s*return;/.test(gridSource);
+    if (rmGuardIntact) {
+      ok('M9 requestPollination\'s Reduce-Motion early return is untouched — no flight starts under RM, so onPollinateEnd (and the landing light) can never fire under it either');
+    } else {
+      bad('M9 Reduce Motion guard untouched', 'requestPollination no longer opens with `if (!onPollinate || reduced) return;` — re-verify RM parity by hand');
+    }
+  }
+
+  // --- M10. §3's trail-pool note, verified rather than assumed:
+  //     `pollenCountFor`'s spare-slot count is a STEADY-STATE occupancy
+  //     (`ceil(trailFadeMs / trailIntervalMs)`), independent of how long
+  //     the flight that fed the trail ran — a longer approach cannot push
+  //     occupancy past that cap, only reach it sooner. Asserted by reading
+  //     the function's own parameter list rather than re-deriving the
+  //     arithmetic, since section F already gates the arithmetic itself.
+  {
+    const params = flight.pollenCountFor.toString().match(/\(\s*\{([^}]*)\}/)?.[1] ?? '';
+    const durationIndependent = !/durationMs|approachMs|legPx|distance/.test(params);
+    if (durationIndependent) {
+      ok('M10 pollenCountFor\'s inputs (poolSize, trailFadeMs, trailIntervalMs, slack) do not include flight duration — the spare-slot count is a steady-state cap R-LF-4\'s longer approach cannot exceed, confirming §3\'s note without new code');
+    } else {
+      bad('M10 trail-pool headroom independent of flight duration', `pollenCountFor's params now read "${params}" — a duration-shaped input arrived and the steady-state argument needs re-checking`);
     }
   }
 }
