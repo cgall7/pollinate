@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
+import { HoneycombStore } from '../services/HoneycombStore';
 import { NectarStore } from '../services/NectarStore';
 import { hasNectarConsent } from '../constants/nectar';
 import { randomUUID } from '../utils/uuid';
@@ -69,6 +70,12 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   const [nectarConsentError, setNectarConsentError] = useState(false);
   const nectarConsent = hasNectarConsent(nectarConsentRow);
 
+  // DES-21 §9 — the set of authors whose entries may show a nectar door.
+  // `null` (not yet loaded) intentionally renders no door on any entry
+  // rather than a flash of one that then disappears — same "we never render
+  // authority someone doesn't have" ground the gate itself rests on.
+  const [connectedAuthorIds, setConnectedAuthorIds] = useState(null);
+
   // ENG-63/ENG-64 — the send surfaces. ONE set of controls, two targets:
   // the per-entry affordance sends to the entry, the ending slot sends to
   // the hive. Only the entry one needs an open/closed bit; the ending
@@ -131,6 +138,26 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       })
       .catch((err) => {
         if (!cancelled) console.warn('PackageOpenScreen: failed to load nectar consent', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // DES-21 §9 — one read, on mount, same shape as the consent read above.
+  // `listConnections()` is already the self-scoped, RLS-reachable query
+  // `profiles_select_connections` proves out; the gate is membership of
+  // `step.authorId` in the returned set, no new query shape.
+  useEffect(() => {
+    let cancelled = false;
+    HoneycombStore.listConnections()
+      .then((rows) => {
+        if (!cancelled) setConnectedAuthorIds(new Set((rows ?? []).map((r) => r.id)));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('PackageOpenScreen: failed to load connections', err);
+        setConnectedAuthorIds(new Set());
       });
     return () => {
       cancelled = true;
@@ -355,6 +382,9 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   }
 
   const step = sequence && revealState && !revealState.done ? sequence[revealState.index] : null;
+  // DES-21 §9 — `connectedAuthorIds === null` (not loaded yet) fails closed
+  // to no door, matching the state's own comment.
+  const authorReachable = !!(step && connectedAuthorIds && connectedAuthorIds.has(step.authorId));
 
   return (
     <View style={[styles.container, { backgroundColor: cover.base }]}>
@@ -385,33 +415,64 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                 <ScrollView style={styles.entryScrollView} contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
                   <PaperBlock paper={step.paper}>
                     <Text style={[styles.entryText, { color: paperInk(step.paper) }]}>{step.text}</Text>
+                    {/* DES-21 §4 — a SIGNATURE, not a byline: inside PaperBlock,
+                        after the body, trailing-aligned, on the entry's own
+                        `bloomOpacity`/`bloomScale` (no arrival of its own).
+                        Condition is per-VOLUME (`pkg.isCollective`), never
+                        per-entry (§4's scope note, §14.3's is_collective
+                        ruling) — a collective volume signs every entry, a
+                        solo one signs none. `— {name}` only; never "by". */}
+                    {pkg.isCollective && step.authorName && (
+                      <Text style={[styles.entrySignature, { color: paperInk(step.paper) }]}>
+                        {`— ${step.authorName}`}
+                      </Text>
+                    )}
                   </PaperBlock>
                 </ScrollView>
+                {/* DES-21 §9 — the door is ABSENT, never disabled, on an
+                    entry whose author is not an accepted connection of the
+                    subject (§14.5). Applies uniformly, not just to collective
+                    volumes: a solo hive's only writer is its owner, who
+                    send_hive already required to be a connected friend, so
+                    the gate is a no-op there and costs nothing to apply.
+                    NESTED, NOT `!nectarConsent && authorReachable && …` —
+                    same load-bearing-parens shape as the `entrySendOpen`
+                    block below, for the same reason (check-nectar-consent
+                    .mjs's B4: `isUnderGuard` reads only a bare Identifier as
+                    the DIRECT `left` of the guarding `&&`; a flat 3-term
+                    chain parses `(!nectarConsent && authorReachable)` as
+                    that left, which is a LogicalExpression, not an
+                    Identifier). */}
                 {!nectarConsent && (
-                  <PressableScale
-                    onPress={() => setNectarConsentSheetOpen(true)}
-                    haptic={null}
-                    containerStyle={styles.nectarDoor}
-                    accessibilityLabel="Give a gift"
-                  >
-                    <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
-                  </PressableScale>
+                  authorReachable && (
+                    <PressableScale
+                      onPress={() => setNectarConsentSheetOpen(true)}
+                      haptic={null}
+                      containerStyle={styles.nectarDoor}
+                      accessibilityLabel="Give a gift"
+                    >
+                      <Ionicons name="enter-outline" size={16} color={theme.colors.ink} />
+                    </PressableScale>
+                  )
                 )}
                 {/* ENG-64 — the same slot, post-consent. The door and the
                     affordance never coexist: pre-consent the tap opens the
                     sheet, post-consent it opens the panel, and the consent
                     sheet has no audience once `nectarConsent` is true.
                     Pigment is `ink` (§7.2: `accentDeep` on this card's
-                    `surface` ground is 2.613 against a 3:1 non-text bar). */}
+                    `surface` ground is 2.613 against a 3:1 non-text bar).
+                    NESTED for the same B4 reason as the door above. */}
                 {nectarConsent && (
-                  <PressableScale
-                    onPress={handleOpenEntrySend}
-                    haptic={null}
-                    containerStyle={styles.nectarDoor}
-                    accessibilityLabel="Send nectar for this memory"
-                  >
-                    <Ionicons name="water-outline" size={16} color={theme.colors.ink} />
-                  </PressableScale>
+                  authorReachable && (
+                    <PressableScale
+                      onPress={handleOpenEntrySend}
+                      haptic={null}
+                      containerStyle={styles.nectarDoor}
+                      accessibilityLabel="Send nectar for this memory"
+                    >
+                      <Ionicons name="water-outline" size={16} color={theme.colors.ink} />
+                    </PressableScale>
+                  )
                 )}
               </Animated.View>
               <View style={styles.railTrack}>
@@ -422,11 +483,35 @@ export const PackageOpenScreen = ({ navigation, route }) => {
         </>
       ) : (
         <View style={styles.ending}>
+          {/* DES-21 §6 — the colophon: the one beat about the volume rather
+              than an entry, and the only moment the writers exist as a
+              group. `contributor_names` is the single source (§14.2/§14.4),
+              already distinct-per-author in first-appearance order, so no
+              second ordering is derived here. */}
           <Text style={[styles.endingTitle, { color: cover.textColor }]}>
             {sequence && sequence.length > 0
-              ? `That's everything ${pkg.senderName} sent.`
+              ? pkg.isCollective
+                ? // Row 17's bijection: this count is `contributorNames.length`,
+                  // the exact array the names below render from — never a
+                  // separately-derived number. A people-count is permitted
+                  // presence (§5's "Four of you are writing" precedent);
+                  // entry counts stay banned everywhere else in this doc.
+                  `${pkg.contributorNames.length} ${pkg.contributorNames.length === 1 ? 'person' : 'people'} wrote this for you.`
+                : `That's everything ${pkg.senderName} sent.`
               : 'This package has nothing in it yet.'}
           </Text>
+          {sequence && sequence.length > 0 && pkg.isCollective && pkg.contributorNames.length > 0 && (
+            <View style={styles.colophon}>
+              {pkg.contributorNames.map((name, i) => (
+                <Text
+                  key={`${name}-${i}`}
+                  style={[styles.colophonName, { color: cover.textColor }]}
+                >
+                  {name}
+                </Text>
+              ))}
+            </View>
+          )}
           {/* ENG-63 / DES-28 D2. The slot Deezine's spec fills was carved
               out by DES-17 when reply/react deferred to Slice 1.1 — this
               is filling a hole, not adding a step. Pre-consent the ending
@@ -572,6 +657,17 @@ const styles = StyleSheet.create({
     ...theme.type.bodyLg,
     color: theme.colors.ink,
   },
+  // DES-21 §4 — the signature. `theme.type.bodySm`, full-strength `paperInk`
+  // (never alpha — §2.1 of the contrast tables: dimming an ink token INVERTS
+  // on a dark paper), trailing-aligned. This app has no RTL surface anywhere
+  // yet (no `I18nManager` usage in `src/`), so "follows writing direction"
+  // is `textAlign: 'right'` today; mirroring is future work this screen
+  // isn't inventing infrastructure for.
+  entrySignature: {
+    ...theme.type.bodySm,
+    textAlign: 'right',
+    marginTop: theme.spacing.sm,
+  },
   // DES-28 D3, corrected per Pixel's review (2026-08-26): the door used to
   // float `position: absolute` over the card, which let a full-width line
   // of entry text pass under it undetected — a float can't respect content.
@@ -619,6 +715,16 @@ const styles = StyleSheet.create({
     ...theme.type.h2,
     textAlign: 'center',
     marginBottom: theme.spacing.xl,
+  },
+  // DES-21 §6 — the colophon. Book grammar: signed pages, then a plain list
+  // of who wrote them, one per line, in the order the subject actually met
+  // them (the array's own order — see `contributor_names`' comment).
+  colophon: {
+    marginBottom: theme.spacing.xl,
+  },
+  colophonName: {
+    ...theme.type.body,
+    textAlign: 'center',
   },
   emptyTitle: {
     ...theme.type.h2,

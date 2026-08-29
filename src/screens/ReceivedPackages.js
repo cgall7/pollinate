@@ -24,11 +24,28 @@ import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState
 // migration lands.
 const DISMISS_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
+// DES-21 §5 — the roster IS the frame; no badge restates it. Joined with
+// list-grammar ("Mum, Dad and Nana Rose") rather than left as an array, so
+// the row reads as who wrote it, not as data. Full list every time — the
+// device pass (row 12) owns the "and N others" overflow shape at 20+
+// writers; `numberOfLines` below truncates on the NAMES themselves in the
+// meantime (never on a count, which row 12 explicitly forbids).
+const formatRoster = (names) => {
+  if (names.length <= 1) return names[0] || '';
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+};
+
 const PackageRow = ({ pkg, onPress }) => (
   <PressableScale onPress={() => onPress(pkg)} style={styles.row}>
-    <Avatar name={pkg.senderName} size={40} />
+    {/* One face cannot stand for five, and a substitute mark would be the
+        badge §5 forbids — the avatar is simply absent on a collective row.
+        A solo row is byte-identical to today: this is the only branch. */}
+    {!pkg.isCollective && <Avatar name={pkg.senderName} size={40} />}
     <View style={styles.rowText}>
-      <Text style={styles.rowName}>{pkg.senderName}</Text>
+      <Text style={styles.rowName} numberOfLines={1}>
+        {pkg.isCollective ? formatRoster(pkg.contributorNames) : pkg.senderName}
+      </Text>
       <Text style={styles.rowSubject} numberOfLines={1}>
         A hive for {pkg.subjectName}
       </Text>

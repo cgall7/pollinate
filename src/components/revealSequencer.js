@@ -239,6 +239,13 @@ export const buildRevealSequence = (entries) => {
     // length, so the quantity the floor is computed from is a property OF THE
     // STEP, counted once here, rather than re-derived from `text` on every
     // frame the rail redraws.
+    //
+    // `authorId`/`authorName` ride along the same way (DES-21 §3: attribution
+    // rides the ENTRY, not the beat, because the flow-layout web keepsake has
+    // no beat to carry it and a keepsake outlives its sequence). Not a fifth
+    // ruling — no author TERM enters the sort below, so ruling 5 (no
+    // author/recipient mode) and ruling 7's "chronological, unchanged" both
+    // hold; the fields are carried, not consulted.
     return {
       id: entry.id,
       at,
@@ -247,6 +254,8 @@ export const buildRevealSequence = (entries) => {
       words: countWords(entry.text),
       savedAt: entry.savedAt,
       paper: entry.paper,
+      authorId: entry.authorId,
+      authorName: entry.authorName,
     };
   });
   return steps.sort((a, b) => {
