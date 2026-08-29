@@ -35,7 +35,7 @@ const REVEAL_HEX_H = REVEAL_HEX_W * HEX_ASPECT;
 // (`HoneycombGrid.js:187-207`) in the same component language, because
 // tapping a day here and tapping a person there are the same gesture
 // answered the same way; the rhyme is the point.
-const DayRevealCard = ({ monthName, day, entries, progress, reduced, w, h }) => (
+const DayRevealCard = ({ monthName, day, entries, progress, reduced, w, h, isToday }) => (
   <Animated.View
     style={[
       styles.revealCard,
@@ -54,14 +54,23 @@ const DayRevealCard = ({ monthName, day, entries, progress, reduced, w, h }) => 
   >
     <View style={styles.revealHeader}>
       {/* The cell's own fill state, shrunk — the card wears the motif it
-          came from instead of a generic icon roundel. */}
+          came from instead of a generic icon roundel. G2: "its own fill
+          state" is the load-bearing half of that sentence, so this follows
+          the comb rather than restating a literal — a kept day is
+          `goldField`, today (still being authored) is `accent`, and the
+          `accentDeep` separator stroke retires here for the same reason it
+          retired on the grid.
+
+          Second ground, measured rather than inherited: the grid's cells sit
+          on the page (`background`, ΔE00 21.1352) and this one sits on the
+          reveal card (`surface`, ΔE00 30.8167). Same token, two grounds, both
+          clear — which is the only reason one fill is allowed to travel from
+          the comb into the card. */}
       <View style={styles.revealHex}>
         <Svg width={w} height={h}>
           <Polygon
             points={hexPoints(w, h)}
-            fill={theme.colors.accent}
-            stroke={theme.colors.accentDeep}
-            strokeWidth={1}
+            fill={isToday ? theme.colors.accent : theme.colors.goldField}
           />
         </Svg>
         <View style={styles.revealHexNumeral} pointerEvents="none">
@@ -100,6 +109,12 @@ export const MonthlyRecap = ({
   // False for the pages either side of the one you're looking at. Defaults
   // true so a lone MonthlyRecap behaves exactly as it did before the pager.
   active = true,
+  // Day-of-month that is actually today, or null on every page that is not
+  // the current month. Derived once by RecapTab from the same month list the
+  // pager is built from, rather than re-read from a clock here: two readings
+  // of "now" in one render is how a page ends up disagreeing with its own
+  // header at midnight.
+  todayDay = null,
 }) => {
   // entries = [{ date: '2026-07-01', text: '...', theme: 'Family' }, ...]
   const hasEntries = entries.length > 0;
@@ -254,6 +269,7 @@ export const MonthlyRecap = ({
           filledDays={filledDays}
           cascade={cascade}
           selectedDay={selectedDay}
+          todayDay={todayDay}
         />
 
         {/* R33: exactly one Pressable for the whole comb. */}
@@ -303,6 +319,7 @@ export const MonthlyRecap = ({
           reduced={reduced}
           w={REVEAL_HEX_W}
           h={REVEAL_HEX_H}
+          isToday={selectedDay === todayDay}
         />
       )}
 

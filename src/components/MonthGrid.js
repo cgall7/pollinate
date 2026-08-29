@@ -5,7 +5,7 @@ import { theme } from '../constants/theme';
 import { DURATIONS, staggerDelay, useReducedMotion } from '../constants/motion';
 import { StaggeredItem } from './StaggeredItem';
 import { StripePattern } from './StripeTexture';
-import { COLS, hexPoints } from '../utils/combGeometry';
+import { COLS, HEX_ASPECT, hexPoints } from '../utils/combGeometry';
 import { useSvgId } from '../utils/svgId';
 
 // R15's extraction: the month comb's shared paint (one `<Svg>` root, every
@@ -20,6 +20,24 @@ import { useSvgId } from '../utils/svgId';
 // caller that also needs to hit-test taps against the same cells (Recap's
 // Pressable overlay) would otherwise carry a second, driftable copy of the
 // same derivation.
+
+// G3 (Lumen, 2026-08-29): PAINT is inset inside the lattice box, so the month
+// comb reads as one keepsake per day rather than one fused field — the same
+// register the Hive's comb speaks in, and the geometry half of §29.1's
+// SINGULAR test. Two things this is NOT:
+//
+//   - It is not a return of the defect `combGeometry`'s own comment names.
+//     That gap was an unnamed artifact of inscribing the hexagon in an
+//     ellipse, which also made the drawn shape irregular and scaled with `w`.
+//     This is a stated constant applied to a correct hexagon.
+//   - It does not touch the LATTICE. `combLayout`'s pitch and `hexAt`'s hit
+//     test still tile the full box edge to edge, so every tap target keeps
+//     its full area and R33 is untouched — only the ink pulls in.
+//
+// Consequence that earns it: no two cells share a wall any more, so the
+// filled cell's `accentDeep` separator stroke has nothing left to separate
+// and retires with the emphasis register (G2).
+const CELL_GAP = 2;
 
 // Same motif as StreakHexTrail's ignite glow (`StreakHexTrail.js:89`) —
 // one ramp 0→1, read through a bloom-then-fade interpolation.
@@ -86,9 +104,15 @@ const DayCell = ({ day, filled, index, filledCount, cascade, reduced, w, h, x, y
 // is driven by two independent animations per filled cell (the pop and the
 // glow) and only the slower one, the glow's `DURATIONS.arrival` bloom,
 // decides when the LAST cell is actually done.
-export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0, selectedDay = null, onSettled }) => {
+export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0, selectedDay = null, todayDay = null, onSettled }) => {
   const reduced = useReducedMotion();
-  const points = useMemo(() => hexPoints(cellW, cellH), [cellW, cellH]);
+  // Height is re-derived from the inset width rather than taken off `cellH`,
+  // so the drawn hexagon stays regular: shrinking only the width would leave
+  // a hexagon that is no longer the shape `hexPoints` promises.
+  const drawW = Math.max(cellW - CELL_GAP, 1);
+  const drawH = drawW * HEX_ASPECT;
+  const inset = { x: (cellW - drawW) / 2, y: (cellH - drawH) / 2 };
+  const points = useMemo(() => hexPoints(drawW, drawH), [drawW, drawH]);
   const onSettledRef = useRef(onSettled);
   onSettledRef.current = onSettled;
   // One hatch pattern per mounted MonthGrid, not per cell — R38's shared
@@ -135,16 +159,30 @@ export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0
         <Defs>
           <StripePattern id={hatchId} />
         </Defs>
-        {/* Empties first, then every filled cell, so a filled hex always
-            owns its complete outline regardless of date (a later element
-            wins on a shared-wall stroke). */}
+        {/* Two passes, empties first. The reason used to be stroke
+            arbitration on a shared wall — under CELL_GAP no two cells touch,
+            so nothing is being arbitrated and the order is now only a
+            painter's habit. Kept because it is still the order that reads
+            correctly if the gap is ever tuned back toward zero.
+
+            G2 (Colin's ruling, 2026-08-26): a kept day is a KEEPSAKE and
+            wears the keepsake material — `goldField`, §29.1, ΔE00 21.1352
+            from the page it sits on. `accent` survives on exactly one cell,
+            today's, and only when today has already been written: that day
+            fails §29.1's FINISHED test because it is still being authored,
+            and the accent-vs-gold pair separates at ΔE00 4.9290 (measured
+            here with the repo's own `scripts/lib/color.mjs`; the 1.179
+            figure in GARDEN_LUXURY_REDESIGN.md G2 was a contrast RATIO,
+            which is the wrong instrument for two grounds — §20.7). An
+            unwritten today stays hatch, because painting it would be the
+            screen claiming an entry that does not exist. */}
         {cellRenderData
           .filter(({ filled }) => !filled)
           .map(({ cell }) => (
             <Polygon
               key={cell.day}
               points={points}
-              transform={`translate(${cell.x + 1} ${cell.y + 1})`}
+              transform={`translate(${cell.x + 1 + inset.x} ${cell.y + 1 + inset.y})`}
               fill={`url(#${hatchId})`}
               stroke={theme.colors.surfaceBorderStrong}
               strokeWidth={1}
@@ -156,16 +194,14 @@ export const MonthGrid = ({ cells, height, cellW, cellH, filledDays, cascade = 0
             <Polygon
               key={cell.day}
               points={points}
-              transform={`translate(${cell.x + 1} ${cell.y + 1})`}
-              fill={theme.colors.accent}
-              stroke={theme.colors.accentDeep}
-              strokeWidth={1}
+              transform={`translate(${cell.x + 1 + inset.x} ${cell.y + 1 + inset.y})`}
+              fill={cell.day === todayDay ? theme.colors.accent : theme.colors.goldField}
             />
           ))}
         {selectedCell && (
           <Polygon
             points={points}
-            transform={`translate(${selectedCell.x + 1} ${selectedCell.y + 1})`}
+            transform={`translate(${selectedCell.x + 1 + inset.x} ${selectedCell.y + 1 + inset.y})`}
             fill="none"
             stroke={theme.colors.ink}
             strokeWidth={2}

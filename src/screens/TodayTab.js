@@ -18,7 +18,7 @@ import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { Avatar } from '../components/Avatar';
 import { PressableScale } from '../components/PressableScale';
-import { TAB_CLEARANCE } from '../navigation/tabBarLayout';
+import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 
 // --- P1a, the greeting's staging (Pixel, 2026-08-28) ---------------------
@@ -318,25 +318,44 @@ export const TodayTab = ({ navigation }) => {
                the anchor below means the GREETING's vertical centre and not
                the centre of the greeting plus its margin.
 
-            2. The reserve. `paddingRight: HERO_CHAR_WIDTH` shrinks the text
-               box by exactly the column the character occupies, so "hero in
-               negative space, never over text" (the register's acceptance
-               line for this lane) is a property of the LAYOUT rather than of
-               today's three greeting strings. It changes nothing on screen
-               today — measured from the shipped TTFs at 402pt, the widest
-               greeting "Good afternoon" sets 232.39pt into the 263.80pt the
-               reserve leaves, so no wrap moves and 31.41pt of clear gutter
-               falls out of the greeting's own length. If Lane P3's copy ever
-               grows past that, the line wraps instead of running under the
-               bee, which is the layout telling the truth.
+            2. The reserve. `paddingRight: HERO_CHAR_WIDTH + DOOR_RESERVE`
+               shrinks the text box by the column the character occupies AND
+               the column the account door owns, so "hero in negative space,
+               never over text" (the register's acceptance line for this lane)
+               is a property of the LAYOUT rather than of today's three
+               greeting strings.
+
+               The door term is the correction of 2026-08-29 (Lumen, found on
+               a device). The original placement ruling measured the top-right
+               void against the GREETING alone — 121.61pt of clear width at
+               402pt — and the door is not in this screen's layout tree to be
+               measured: `MainTabs` mounts it as an absolute overlay over every
+               tab. So the void was never 121.61pt; it was that less the door's
+               52pt disc and its gap. The hero shipped with the door sitting on
+               its head. A void is only clear of what you measured it against,
+               and `tabBarLayout.js` states the property this restores in
+               writing: the door owns a fixed column at the trailing content
+               edge and every tab keeps that column clear.
+
+               What it costs, measured from the shipped TTFs at 402pt: the
+               reserve now leaves 195.80pt, and all three greetings set wider
+               than that ("Good evening" 202.45, "Good morning" 210.70, "Good
+               afternoon" 232.39). So the greeting wraps to two lines in every
+               state — the same shape at every hour rather than a header whose
+               height changes at noon, with the hero standing in the gap the
+               second line opens. The row cannot hold greeting, hero and door
+               on one line at this width; that is a fact about the width, and
+               the layout says it out loud instead of stacking the objects.
 
             3. The perch. Its RIGHT EDGE is the character's centre, because
                §32.2 draws the bee centred on the resolved point: offsetting
-               the box by half a character puts the character's right edge on
-               the content edge exactly (x 287.80..378.00 at 402pt), rather
-               than hanging 45.10pt of him off the screen. `top: 0, bottom: 0`
-               makes the vertical a consequence of the row's own height, so a
-               font change or a wrapped greeting moves the hero with it.
+               the box by half a character plus the door's column lands the
+               character's trailing edge exactly where `DOOR_RESERVE` begins
+               (x 219.80..310.00 at 402pt, the door at 326.00..378.00), so the
+               16pt between them is that constant's own `spacing.md` term and
+               not a number chosen here. `top: 0, bottom: 0` makes the vertical
+               a consequence of the row's own height, so a font change or a
+               wrapped greeting moves the hero with it.
 
             THE LIGHT ARRIVES, NOT THE BEE. MB-D1 offers "glances, breathes,
             or lands into this light"; the doctrine retires the fly-in, and
@@ -366,9 +385,13 @@ export const TodayTab = ({ navigation }) => {
             R122a: he rests AT the anchor (the hover that displaced him by one
             17.3pt radius is retired with the rest of it), drawn centred on it,
             spanning 30.07pt at size 44. On a left-aligned full-width block
-            `on: 'left'` is where the glyphs BEGIN — that is the live defect
-            this pass fixes, the streak caption reading "2 ays to 3." under a
-            resting bee — and `on: 'right'` is the trailing gutter. */}
+            `on: 'left'` is where the glyphs BEGIN — the defect that pass
+            fixed was a resting bee clipping the line beneath him into "2 ays
+            to 3." That line has since retired with the streak register (T2,
+            below), so the example is history rather than a live defect; the
+            geometry it proved is why every anchor on this screen is `right`,
+            and that outlives the sentence it was found on. `on: 'right'` is
+            the trailing gutter. */}
 
         {/* T2 (Lumen, 2026-08-26): the streak whisper that lived here — a
             live countdown toward the next milestone, spoken instead of
@@ -507,7 +530,7 @@ const styles = StyleSheet.create({
   // The hero's column, reserved structurally. Derived from the character, not
   // the flight box — the box's empty margin reserves space against nothing.
   greetingReserve: {
-    paddingRight: HERO_CHAR_WIDTH,
+    paddingRight: HERO_CHAR_WIDTH + DOOR_RESERVE,
   },
   // §32.2 resolves `on: 'right'` to the box's RIGHT EDGE and the bee is drawn
   // centred on it, so this box's right edge has to be the character's centre:
@@ -521,7 +544,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    right: HERO_CHAR_WIDTH / 2,
+    right: HERO_CHAR_WIDTH / 2 + DOOR_RESERVE,
     width: 1,
   },
   emptyCard: {

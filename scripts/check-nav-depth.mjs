@@ -37,8 +37,11 @@
 //   2. The root stack registers the tab navigator directly.
 //   3. Every getParent site is reached by a direct tab screen — computed by
 //      walking the import graph up from the site, so a site inside a
-//      *component* (DevVersionTag) is attributed to the screen that renders
-//      it rather than skipped for not being a screen itself.
+//      *component* rather than a screen is attributed to the screen that
+//      renders it rather than skipped for not being a screen itself.
+//      (DevVersionTag/RecapTab was the worked example until G5 deleted it,
+//      2026-08-29; the walk it demonstrated is unchanged, and naming a file
+//      that is no longer on disk would send the next reader looking for it.)
 //   4. Every route those sites name is registered on the root stack.
 //
 // An unattributable site is a FAILURE, not a skip. The way this gate would
@@ -304,8 +307,9 @@ if (tabMod) {
 // --- 3. Every getParent site is reached by a direct tab screen -----------
 // Walk the import graph *upward*: who imports the file the call lives in,
 // and who imports them, stopping at anything registered as a screen. A call
-// inside DevVersionTag is the Garden tab's call, because Garden is the only
-// screen that renders it.
+// inside a shared component belongs to whichever screen renders it — which
+// is the only reason a component that no screen renders would be a failure
+// here rather than a skip.
 const importedBy = new Map(); // absolute path -> Set of importers
 for (const [file, m] of modules) {
   for (const dep of m.importPaths) {

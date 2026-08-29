@@ -111,33 +111,44 @@ invariant('gapped real-world history', gapped);
   }
 }
 
-// Sage (thread 19e90cf8, mutation-testing this file): the previous version
-// of this block asserted `currentStreak(yearFilteredCopy) <= currentStreak(
-// fullArray)` against fixtures built here, in this file — which is
-// arithmetic on the fixture, not a property of the app. The within-year
-// case filtered nothing (every date already started with the anchor's
-// year), so it compared an array to a byte-identical copy of itself:
-// `currentStreak(X) === currentStreak(X)`, true for any implementation.
-// Nothing about it could go red when `TodayTab.js:50` — three directories
-// away — actually calls `currentStreak(yearEntries, now)`. Same fix as
-// buildMonths below: read the real source instead of asserting on a
-// fixture that can't reach the call site.
-// T2 (Lumen, GUIDES/GARDEN_LUXURY_REDESIGN.md, 2026-08-26): the streak
-// whisper this gate used to guard retired with Garden's scoreboard — Today
-// no longer reads a streak at all, so the live regression to watch for
-// is the year-windowed query coming BACK in a re-add that skips this
-// history (Pixel, thread 19e90cf8). A bare `currentStreak(` call is fine
-// on its own; it is `getEntriesBetween(startOfYear` feeding one that
-// reintroduces the Jan-1 understatement.
+// RETIRED AND REPLACED (Lumen, 2026-08-29). This row used to assert that
+// TodayTab fed `currentStreak` the WHOLE store rather than a year-windowed
+// query — Sage's fix (thread 19e90cf8) for a row that had been doing
+// arithmetic on its own fixture and could never go red on the real call site.
+// That assertion had a subject: a streak rendered on Today. Colin retired the
+// streak register on 2026-08-26 ("the streak board is no longer needed with
+// our new direction of the app"), the caption went with the scoreboard, and a
+// row whose subject no longer exists cannot be repaired by fixing its input.
+//
+// The interim repair (T2, 2026-08-28) kept the year-window pattern test on a
+// file that no longer contains a streak: green by construction, and nothing
+// about it could ever go red for the ruling it now sat under. So the row is
+// replaced rather than repaired, and the replacement keys on the RULING
+// rather than on the mechanism the ruling removed: Today renders no streak.
+//
+// It SUBSUMES the pattern test it replaces rather than dropping it — the
+// Jan-1 understatement needs `currentStreak` to be understated, and this row
+// is red the moment that identifier reappears at all, windowed input or not.
+// Deleting the row outright would have left the retirement unenforced, which
+// is the state that let the caption survive on screen for three days after it
+// was ruled out of existence.
 {
   const todaySource = await readFile(path.join(ROOT, 'src/screens/TodayTab.js'), 'utf8');
-  if (/EntryStore\.getEntriesBetween\(\s*startOfYear/.test(todaySource)) {
+  // Code only — the comments in that file deliberately record what retired
+  // and why, and a naive substring search would read the epitaph as the body.
+  const todayCode = todaySource
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  const revived = ['currentStreak', 'nextMilestone', 'streakCaption'].filter((name) =>
+    new RegExp(`\\b${name}\\b`).test(todayCode)
+  );
+  if (revived.length) {
     bad(
-      'TodayTab static check',
-      'fetches a year-windowed entry set for a streak — currentStreak(yearEntries, now) understates any run crossing Jan 1 (Pixel, thread 19e90cf8)'
+      'TodayTab streak retirement',
+      `${revived.join(', ')} is back in TodayTab's code — the streak register was retired by ruling (Colin, 2026-08-26), and Today states no count of an unbroken run`
     );
   } else {
-    ok('TodayTab static check: no year-windowed streak query (Today reads no streak — T2)');
+    ok('TodayTab streak retirement: no streak call survives in code (comments excepted)');
   }
 }
 

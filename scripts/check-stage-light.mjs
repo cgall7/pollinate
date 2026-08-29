@@ -744,6 +744,36 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
     MASCOT_BASE_PX: mascotConst('MASCOT_BASE_PX'),
   };
 
+  // The door's column, read live from the two files that own it rather than
+  // restated here. `DOOR_RESERVE` is written `DOOR_SIZE + theme.spacing.md`,
+  // so it is evaluated in a scope holding both — same shape as `mascotConst`,
+  // and for the same reason (R12: adopt the source's own expression; a copy
+  // stays self-consistent while the app drifts).
+  const doorSrc = await readFile(path.join(SRC, 'navigation', 'AccountDoor.js'), 'utf8');
+  const layoutSrc = await readFile(path.join(SRC, 'navigation', 'tabBarLayout.js'), 'utf8');
+  const spacingScale = (() => {
+    const m = /spacing:\s*\{([^}]*)\}/.exec(themeSrc);
+    if (!m) return null;
+    const out = {};
+    for (const [, k, v] of m[1].matchAll(/(\w+):\s*(\d+)/g)) out[k] = Number(v);
+    return out;
+  })();
+  const DOOR = (() => {
+    const sizeM = /export const DOOR_SIZE = ([^;]+);/.exec(doorSrc);
+    const reserveM = /export const DOOR_RESERVE = ([^;]+);/.exec(layoutSrc);
+    if (!sizeM || !reserveM || !spacingScale) return { DOOR_SIZE: null, DOOR_RESERVE: null };
+    let DOOR_SIZE = null;
+    try { DOOR_SIZE = Function(`"use strict"; return (${sizeM[1]});`)(); } catch { DOOR_SIZE = null; }
+    let DOOR_RESERVE = null;
+    try {
+      // eslint-disable-next-line no-new-func
+      DOOR_RESERVE = Function('DOOR_SIZE', 'theme', `"use strict"; return (${reserveM[1]});`)(
+        DOOR_SIZE, { spacing: spacingScale },
+      );
+    } catch { DOOR_RESERVE = null; }
+    return { DOOR_SIZE, DOOR_RESERVE };
+  })();
+
   // The screen's module-level numeric constants, evaluated in a scope holding
   // the mascot ones. Only arithmetic declarators are admitted — a component or
   // a `StyleSheet.create` would need React to evaluate, and admitting it would
@@ -769,7 +799,8 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
   const evalInScope = (expr) => {
     const body = `${decls.join('\n')}\nreturn (${expr});`;
     // eslint-disable-next-line no-new-func
-    return Function(...Object.keys(MASCOT), body)(...Object.values(MASCOT));
+    const scope = { ...MASCOT, ...DOOR };
+    return Function(...Object.keys(scope), body)(...Object.values(scope));
   };
 
   // A style property's expression, by name — the same resolver, so a style
@@ -895,30 +926,55 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
       }
     }
 
-    // H4 — "never over text" is a property of the LAYOUT. The acceptance line
-    // for this lane (PRESENCE_PASS_REGISTER.md, P1a) is "hero in negative
-    // space never over text", and today's three greeting strings happen to be
-    // short enough. That is not the same claim: the reserve has to be the
-    // character's own width, derived, so the invariant survives Lane P3's copy
-    // and any type retune.
+    // H4 — the hero's column, and what it is measured AGAINST. Two claims
+    // live here, and the second one was missing until it was found on a
+    // device (Lumen, 2026-08-29).
+    //
+    //   1. "never over text" is a property of the LAYOUT. The acceptance line
+    //      for this lane (PRESENCE_PASS_REGISTER.md, P1a) is "hero in
+    //      negative space never over text", and today's three greeting
+    //      strings happen to be short enough. That is not the same claim: the
+    //      reserve has to be derived from the character's own width, so the
+    //      invariant survives Lane P3's copy and any type retune.
+    //
+    //   2. THE HERO KEEPS THE DOOR'S COLUMN CLEAR. `tabBarLayout.js` states
+    //      the safety property in writing — "the door owns a fixed column at
+    //      the trailing content edge, and every tab keeps that column clear"
+    //      — and P1a right-aligned a 132pt hero to that same content edge.
+    //      The register's placement ruling computed the top-right void from
+    //      the GREETING only (121.61pt of clear width at 402pt) and never
+    //      subtracted the door, which is not in this screen's layout tree at
+    //      all: `MainTabs` mounts it as an absolute overlay. The result shipped
+    //      with the door's 52pt disc sitting on the character's head. A void
+    //      is only clear of what you measured it against.
+    //
+    // So the reserve is character + door column, and the perch offset is half
+    // a character + door column: the character's trailing edge lands exactly
+    // where `DOOR_RESERVE` begins, and the gap between them is that constant's
+    // own `spacing.md` term rather than a number chosen here.
     {
       const reserve = styleExpr('greetingReserve', 'paddingRight');
       const perch = styleExpr('heroPerch', 'right');
       if (!reserve || !perch) {
         bad('H4 the hero column is reserved structurally', `could not read greetingReserve.paddingRight (${!!reserve}) / heroPerch.right (${!!perch}).`);
+      } else if (DOOR.DOOR_RESERVE === null || DOOR.DOOR_SIZE === null) {
+        bad('H4 the hero column is reserved structurally', 'DOOR_SIZE / DOOR_RESERVE did not resolve from AccountDoor.js + tabBarLayout.js, so claim 2 cannot be decided.');
       } else {
         let r = null, q = null;
         try { r = evalInScope(reserve.src); q = evalInScope(perch.src); } catch { /* fall through */ }
         const size = (() => { try { return evalInScope('HERO_SIZE'); } catch { return null; } })();
         const charW = size === null ? null : size * MASCOT.MASCOT_WIDTH_FRACTION;
+        const wantReserve = charW === null ? null : charW + DOOR.DOOR_RESERVE;
+        const wantPerch = charW === null ? null : charW / 2 + DOOR.DOOR_RESERVE;
         if (r === null || q === null || charW === null) {
-          bad('H4 the hero column is reserved structurally', 'the reserve or the perch offset did not resolve against the live mascot constants.');
-        } else if (Math.abs(r - charW) > 1e-9) {
+          bad('H4 the hero column is reserved structurally', 'the reserve or the perch offset did not resolve against the live mascot and door constants.');
+        } else if (Math.abs(r - wantReserve) > 1e-9) {
           bad(
             'H4 the hero column is reserved structurally',
-            `the text reserve is ${r.toFixed(4)}pt but the character is ${charW.toFixed(4)}pt wide. ` +
-              'A reserve that is not derived from the character goes stale the moment either the hero size or ' +
-              'MASCOT_WIDTH_FRACTION moves, and it goes stale silently — the greeting simply starts running under the bee.',
+            `the text reserve is ${r.toFixed(4)}pt but the character (${charW.toFixed(4)}pt) plus the door's ` +
+              `column (${DOOR.DOOR_RESERVE}pt) is ${wantReserve.toFixed(4)}pt. A reserve that is not derived from ` +
+              'both goes stale the moment the hero size, MASCOT_WIDTH_FRACTION or the door size moves, and it goes ' +
+              'stale silently — the greeting simply starts running under the bee.',
           );
         } else if (!/[A-Za-z_$]/.test(reserve.src) || !/[A-Za-z_$]/.test(perch.src)) {
           // A VALUE CHECK CANNOT SEE A FROZEN DERIVATION. Found by mutation:
@@ -934,15 +990,25 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
               'It agrees with the character width today and would stop agreeing, without failing, the next time ' +
               'the hero size or MASCOT_WIDTH_FRACTION moves.',
           );
-        } else if (Math.abs(q - charW / 2) > 1e-9) {
+        } else if (Math.abs(q - wantPerch) > 1e-9) {
+          // The failure this row exists for: an offset of half a character
+          // alone puts the character's trailing edge on the content edge,
+          // which is the middle of the door.
+          const trailing = charW / 2 - q + DOOR.DOOR_RESERVE; // how far the char's right edge sits inside the door column
           bad(
             'H4 the hero column is reserved structurally',
             `the perch box is offset ${q.toFixed(4)}pt from the content edge; §32.2 draws the bee CENTRED on the ` +
-              `resolved point, so the offset must be half a character (${(charW / 2).toFixed(4)}pt) or ` +
-              `${(charW / 2).toFixed(2)}pt of him hangs off the screen.`,
+              `resolved point, so the offset must be half a character plus the door's column ` +
+              `(${(charW / 2).toFixed(4)} + ${DOOR.DOOR_RESERVE} = ${wantPerch.toFixed(4)}pt). At ${q.toFixed(4)}pt the ` +
+              `character's trailing edge runs ${trailing.toFixed(2)}pt into the column tabBarLayout.js reserves for ` +
+              `the ${DOOR.DOOR_SIZE}pt account door — which on this pose is the bee's head.`,
           );
         } else {
-          ok(`H4 the reserve is the character (${charW.toFixed(2)}pt) and the perch is offset half of it (${q.toFixed(2)}pt) — "never over text" is layout, not string length`);
+          const gap = DOOR.DOOR_RESERVE - DOOR.DOOR_SIZE;
+          ok(
+            `H4 the reserve is the character plus the door's column (${charW.toFixed(2)} + ${DOOR.DOOR_RESERVE} = ${r.toFixed(2)}pt) and the perch is offset half a character into it (${q.toFixed(2)}pt) — ` +
+              `the greeting never runs under the bee, and the bee's trailing edge stops ${gap}pt clear of the ${DOOR.DOOR_SIZE}pt door`,
+          );
         }
       }
     }
