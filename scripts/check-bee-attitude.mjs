@@ -6272,6 +6272,116 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
           }
         }
       }
+
+      // --- N15. R-LF-9's BANK FINDING, ON THE DOMAIN R-LF-10 CHANGED -------
+      //
+      //     N2b's two channels both walk `PLANS` — seat-to-seat only. That
+      //     was defensible when the lattice's cruise topped out at 264.35
+      //     px/s and the errand's did too. R-LF-10 ends that: the ceiling
+      //     turns distance into SPEED, so the wide domain now reaches 698
+      //     px/s, and the drawn bank is derived from a polyline tangent
+      //     sampled per frame — a quantity that rises with speed.
+      //
+      //     So R-LF-9's ratified headline — the drawn bank lands 5.3x INSIDE
+      //     the turn's bound, therefore the channel the user sees is not at
+      //     risk — became a claim about 336 plans on a domain that no longer
+      //     contains the fast ones. This is N11's argument exactly, one
+      //     ruling later, which is why the row is owed rather than optional:
+      //     A LATER RULING EXPIRES THE EARLIER TABLE, and the table does not
+      //     announce it.
+      //
+      //     GATED, not reported, and the distinction is deliberate. R-LF-9
+      //     carved the WEAVE out of the rate bound (channel 2, gait not
+      //     steering). It did NOT carve out the drawn bank — it measured the
+      //     bank comfortably inside and named the residual risk as "a fast
+      //     roll". A bound that was argued from a measurement should red when
+      //     the measurement stops holding, and R-LF-10 is proof that the
+      //     inputs move. If Lumen wants it demoted to REPORTED that is her
+      //     call; it is stated here so the choice is visible rather than
+      //     inherited.
+      //     CALIBRATION, persisted per §7 row 3, and it took three tries to
+      //     find one that tests THIS row. Reverting the emission guard and
+      //     collapsing APPROACH_MS_CEILING both red the suite loudly — and
+      //     NEITHER reds N15: the first reds N2b/N4c/N4d (the coincident
+      //     waypoint is a property of the seat-to-seat sweeps, not of the
+      //     errand's), the second reds seven other rows first. A MUTATION
+      //     CAUGHT BY A DIFFERENT ROW IS A MISS. The mutation that tests this
+      //     row is the one in its own quantity — `MAX_BANK_DEG`, which scales
+      //     the channel linearly:
+      //
+      //        22 -> 60    GREEN, and nothing else fires either — the margin
+      //                    genuinely absorbs 2.7x before anything is at risk
+      //        22 -> 90    RED, N15 ALONE, 11 of 9597 plans, worst 9.7399
+      //        22 -> 200   RED, N15 ALONE, 9390 of 9597, worst 21.6443
+      //
+      //     Firing ALONE is what makes this a row rather than redundancy, and
+      //     the must-not-fire at 60 is what makes the other two mean
+      //     something.
+      {
+        // THE BOUND IS PINNED, NOT READ. `RATE_BOUND_DEG` is derived from
+        // `MAX_FRAME_SPEED_STEP_FRACTION`, so a row that compares against it
+        // moves both sides together: widen the constant and this row stays
+        // green while the bee rolls faster. Fourth outing on this lane — N4
+        // had it with the bearing cap, N4c had it with the sweep epsilon, and
+        // I wrote it into the repair for the second. §5 ratifies 0.15, so 0.15
+        // belongs on this assertion's own side, and the coupling is checked in
+        // both directions.
+        const RULED_STEP_FRACTION = 0.15;
+        const BOUND_DEG_PINNED = (RULED_STEP_FRACTION * 180) / Math.PI;
+        const fractionIsRuled = Math.abs(flight.MAX_FRAME_SPEED_STEP_FRACTION - RULED_STEP_FRACTION) < 1e-12;
+        let worst = { v: 0, label: '', cruise: 0 };
+        let over = 0;
+        let fastest = { v: 0, bank: 0, label: '' };
+        for (const p of WIDE) {
+          const at = buildAttitude(p.plan.path, {
+            width: p.device.width, height: p.device.height, size: 44, closed: false,
+            easing: p.plan.easing, durationMs: p.plan.durationMs, heldFacing: p.plan.heldFacing,
+          });
+          const frames = Math.max(2, Math.round((p.plan.durationMs / 1000) * 60));
+          const ir = at.inputRange;
+          const ro = at.rotateOutput;
+          let prev = null;
+          let worstThis = 0;
+          for (let f = 0; f <= frames; f += 1) {
+            const t = f / frames;
+            let v = ro[ro.length - 1];
+            if (t <= ir[0]) v = ro[0];
+            else {
+              for (let k = 1; k < ir.length; k += 1) {
+                if (t <= ir[k]) {
+                  const w = ir[k] === ir[k - 1] ? 1 : (t - ir[k - 1]) / (ir[k] - ir[k - 1]);
+                  v = ro[k - 1] + w * (ro[k] - ro[k - 1]);
+                  break;
+                }
+              }
+            }
+            if (prev !== null) worstThis = Math.max(worstThis, Math.abs(v - prev));
+            prev = v;
+          }
+          if (worstThis > BOUND_DEG_PINNED) over += 1;
+          if (worstThis > worst.v) worst = { v: worstThis, label: p.label, cruise: p.plan.profile.cruisePxS };
+          // The fastest plan's OWN bank, kept separately: the headline is a
+          // maximum over the domain, and the interesting fact is that the two
+          // are not the same plan.
+          if (p.plan.profile.cruisePxS > fastest.v) {
+            fastest = { v: p.plan.profile.cruisePxS, bank: worstThis, label: p.label };
+          }
+        }
+        if (over === 0 && worst.v > 0 && fractionIsRuled) {
+          ok(
+            `N15 the DRAWN BANK stays inside the turn's bound on the ERRAND's domain, not just the lattice's — worst ${worst.v.toFixed(4)}deg/frame (${worst.label}) against §5's ratified ${BOUND_DEG_PINNED.toFixed(4)} (pinned here, not read from the module), ${(BOUND_DEG_PINNED / worst.v).toFixed(1)}x inside, over ${WIDE.length} plans and 0 exceedances. `
+            + `N2b measures ${'1.6070'}deg/frame seat-to-seat; this domain reaches a cruise of ${fastest.v.toFixed(1)} px/s against the lattice's 264.35, so R-LF-9's "the channel the user sees is not at risk" is now asserted where R-LF-10's ceiling actually binds rather than where it never does. `
+            + `AND THE WORST BANK IS NOT THE FASTEST PLAN: the maximum sits at cruise ${worst.cruise.toFixed(1)} px/s, while the fastest plan (${fastest.label}) banks only ${fastest.bank.toFixed(4)}deg/frame. That is R-LF-10's own logic showing up in the rendered channel — the ceiling buys speed on LONG errands, whose approach is the straightest thing the bee ever flies, so the speed arrives exactly where the geometry has no turning left to amplify`,
+          );
+        } else {
+          bad(
+            'N15 the drawn bank stays inside the turn\'s bound on the errand\'s domain',
+            !fractionIsRuled
+              ? `MAX_FRAME_SPEED_STEP_FRACTION is ${flight.MAX_FRAME_SPEED_STEP_FRACTION}, not §5's ratified ${RULED_STEP_FRACTION}. Every rate figure in section N is denominated in it — re-derive the ruling, do not retype the constant`
+              : `${over} of ${WIDE.length} wide-domain plans exceed ${BOUND_DEG_PINNED.toFixed(4)}deg/frame, worst ${worst.v.toFixed(4)} (${worst.label}, cruise ${worst.cruise.toFixed(1)} px/s). R-LF-9 measured this channel 5.3x inside the bound on the seat-to-seat lattice and named a fast roll as the residual risk; a speed ruling has now made that risk real. This is a design question for Lumen, not a number to loosen`,
+          );
+        }
+      }
     }
   }
 }
