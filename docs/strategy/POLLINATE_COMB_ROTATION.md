@@ -121,7 +121,7 @@ MVP-Comb is not done.**
 
 ## 1B. Amendments — 2026-08-30, after the #Collab handoff
 
-Fifteen corrections. Seven came from the builders reading the encoding against the
+Seventeen corrections. Seven came from the builders reading the encoding against the
 tree; one is a ruling Colin made after this doc was written; two are rulings the
 builders asked me for (§1B.8) or made themselves and I have upheld (§1B.9). **Verified against
 `github/main@cdb07a1`** — the tip moved from `080edd5` while the brief was being
@@ -653,6 +653,181 @@ open the **denominator** does not move, so the comb reads as less participatory
 than it was. `removed_at` moves both. Two independent reasons for one column —
 same test §1B.9 applied to `DES-31`, same verdict: not a preference.
 
+### 1B.16 — `ENG-91`'s semantics, ruled: **seal-and-send, one event, owned by the clock.** Plus two preconditions it cannot inherit.
+
+Lumen asked the right question at the right moment (`2e3d8d10…`): is the
+window-close trigger **seal-and-send**, **seal-only**, or **arm-for-send**? The
+countdown copy, the organizer's affordance and `OPS-9`'s tick all read
+differently under each, and it is far cheaper pinned here than discovered in
+`DES-33`'s mockups. **Ruled: seal-and-send.**
+
+**Why not the other two.**
+
+- **Seal-only is the worst of the three, not the safe middle.** It freezes
+  content at day zero — nobody can add — while the subject still has nothing.
+  It manufactures a state where the gift exists, is finished, and is
+  undeliverable, and **neither side can see it**: the writers think they gave,
+  the subject was never given. That is a strictly worse failure than the one
+  `ENG-91` exists to fix.
+- **Arm-for-send is today's behaviour with a flag on it.** The organizer's thumb
+  is still the verb. It fails the same test that produced this row.
+
+**The countdown is the argument.** §1A's ratified sentence and `DES-33`'s tense
+both say *"6 days left."* **A countdown is a promise about what happens at
+zero.** Only seal-and-send makes that sentence true; under the other two the app
+is counting down to a reminder, which is Lumen's own demo-gate blocker class —
+the app stating something false about time.
+
+**This does not cost Colin's "hold sealed until the moment" pillar — it
+strengthens it.** The moment is `closes_at`: **chosen at rotation-open, by the
+schedule, not by whoever happens to open the app.** If it should land on Sarah's
+birthday, the window ends on Sarah's birthday. **A date cannot be forgotten; a
+tap can.**
+
+**Organizer affordance in a rotation comb: none in MVP-Comb.** No "seal early,"
+no "send now." One verb, owned by the clock. `seal_hive`'s existing tap stays
+exactly as shipped for the 1:1 hive flow — untouched, not deprecated. If an
+early-delivery affordance is ever added, the invariant is **asymmetric on
+purpose: you may accelerate a gift, never delay one.** Not in MVP-Comb — it is
+new surface, and §8.5's discipline applies: build the mechanism, defer the
+consequence.
+
+**@Bumble — this does not break "a clock is not a cause," and here is the
+implementation form of your invariant.** The cause is *the rotation window
+having closed* — a real domain event with a stored `closes_at`. **The tick is
+the detector, not the cause.** So `ENG-91` derives its decision from
+`comb_rotations` state (`closes_at <= now()` **and** the rotation still open),
+is **idempotent**, and is correct when the tick misbehaves: **a missed cron run
+must not skip a month, and a double-fire must not double-send.** If the seal
+only happens because the job ran, the clock has become the cause.
+
+Half of that already exists and it is the wrong half. `send_hive` **raises** on
+a second call (`'send_hive: hive has already been sent'`,
+`20260828000001:148-150`), backed by the `private_hives_sent_at_immutable`
+trigger (`20260819000001`). That is correct for a human tapping twice and wrong
+for a scheduler: a double-fire becomes an **exception**, and an exception in a
+`pg_cron` job is a red run and a page for something that is in fact the
+**desired** end state. **`ENG-91` must treat already-sent as a no-op success,
+not an error** — check-then-act inside the definer function, so `OPS-9` only
+alarms on months that genuinely did not deliver.
+
+---
+
+**Two preconditions `ENG-91` cannot inherit from `send_hive`. Both verified at
+`github/main@cdb07a1`.**
+
+**1. The friend-connection check makes a comb undeliverable.** `send_hive`'s live
+body raises `'send_hive: owner and subject are not a connected friend'` unless an
+**accepted `honeycomb_connections` row** exists between owner and subject
+(`20260828000001:158-165`). That requirement is correct for the 1:1 hive it was
+written for. **In a comb it is fatal, and the reason is bigger than one raise.**
+
+**Every social edge in the shipped app is a friendship, and there is exactly one
+way to make one.** An accepted `honeycomb_connections` row has two authors in
+the entire system — `sendConnectionRequest` and `respondToRequest`
+(`HoneycombStore.js:66-88`), the explicit request-then-accept flow. **No
+migration inserts one.** And the shipped multi-writer invite path does not mint
+them because it **presupposes** them: `InviteContributor.js:103-105` builds its
+candidate list by filtering `HoneycombStore.listConnections()`. You can only
+invite a friend to write. `send_hive` then re-checks the same graph on the way
+out. Contributors are friends, subjects are friends, all the way down.
+
+**`ENG-59`'s invite link is the first path in this product that puts two
+non-friends in the same writing surface** — that is what a run club *is*. So a
+comb is a second social graph, not a subset of the first, and a run club of
+twelve has **zero** pairwise connections. On today's function bodies its
+rotation would refuse to deliver to eleven of its own members.
+
+**`ENG-91` therefore cannot be a definer wrapper around `send_hive`.** The
+authorization for a rotation delivery is **comb membership, not friendship** —
+a new predicate, reading `comb_members`. @Sage, this is the substance of the
+row. @Fizz — **`ENG-59` must not be widened to mint friend connections as a side
+effect of joining a comb.** That would quietly fuse two different social graphs
+to satisfy a precondition that should simply not apply here.
+
+**2. An empty rotation must not deliver.** A zero-entry hive is reachable —
+`20260828000001`'s own comment states that none of
+`seal_hive`/`seal_volume`/`send_hive` row-count-check the entries side of their
+UPDATEs. Under seal-and-send that becomes automatic: a month where nobody wrote
+would deliver an empty keepsake, on a schedule, to someone expecting a gift.
+**Rule: window closes with zero entries → void and advance, notify no one, and
+record it as a zero-participation rotation.** That month is a **`C1` signal, not
+a delivery** — and §6's response table needs it recorded, not hidden by an empty
+send. **The clock delivers a gift, not an empty box.**
+
+**@Deezine — `DES-33`'s dependency, stated so you do not meet it on device.**
+Lumen is right that the before-seal tense is only honest once `ENG-91` exists.
+The spec can be written now; the countdown copy ships **with or after** `ENG-91`
+(Phase 1 row 1.8a). And under this ruling the after-seal half gets simpler, not
+harder: **there is no organizer step to draw.** The reveal is something that
+arrives, not something someone triggered.
+
+### 1B.17 — A comb of strangers cannot read its own roster. The `'Someone'` fallback stops being an edge case and becomes the default render.
+
+This is the same finding as §1B.16's precondition 1, pushed one step further —
+**and it lands on `DES-22`, which is the design longest pole and is being
+specced right now.**
+
+`profiles` has exactly two live SELECT policies. `profiles_select_own`
+(`20260808000001:25-28`) is `auth.uid() = id`. `profiles_select_connections`
+(live version `20260809000005:7-17`) admits a row only if a **pending or
+accepted `honeycomb_connections` row** joins you to it. **There is no third
+policy, and `20260827000001` added none** — being on someone's hive roster
+grants no profile visibility.
+
+**The team already knows this and shipped a graceful fallback for it.**
+`getHiveContributors` (`HiveStore.js:286-299`) batch-joins names and falls back
+to `'Someone'`, with the reason written in the comment above it: *"a contributor
+is not necessarily connected to every other contributor on the same hive (this
+table's roster is a hive-scoped graph, not the honeycomb connection graph), so
+`profiles_select_connections` can drop a row silently."* That was **correct and
+well-scoped for the world it was written in** — today every contributor is
+invited from the owner's connection list (`InviteContributor.js:103-105`), so
+the owner sees every name and only contributor-to-contributor views degrade.
+Rare, graceful, fine.
+
+**`ENG-59` inverts the ratio.** A comb formed by invite link has zero pairwise
+connections, so **every member sees `'Someone'` for every other member,
+including the organizer.** A design that says *"who's here, who's written"*
+(`DES-22`, §1B.8) renders as a column of identical placeholders. **The fallback
+did not break; the case it was a fallback for became the whole population.**
+
+**Two things are already safe, and I want them off the worry list:**
+
+- **`"Writing for Sarah"` is fine.** `private_hives.subject_name` is a plain
+  `text` label typed at creation, explicitly *"a plain label, not an identity"*
+  (`20260815000001:10-11`) — no profile read, no policy in the path.
+- **The reveal is fine.** Post-seal names come from the
+  `author_name_at_seal` / `contributor_names` snapshots, not a live join
+  (`HiveStore.js:59`, `:471`). The snapshot pattern Sage extended with
+  `writer_count_at_seal` already covers this.
+
+**So the gap is strictly pre-seal and strictly the live roster** — which is
+exactly `DES-22`'s subject matter.
+
+**Ruling, and it is a product position, not only a mechanism.** **Joining a comb
+discloses your display name to that comb's members.** A roster that cannot name
+its members is not a roster, and "you are writing for someone, alongside people
+we won't name" is not the ritual. The mechanism is already precedented in this
+schema: `20260828000001:204-215` documents this exact class of bug — an inline
+`profiles` subquery collapsing under the caller's RLS — and its fix, a
+`SECURITY DEFINER` helper that reads the fact directly, the same shape as
+`is_hive_contributor()` and `profile_has_display_name()`. **`ENG-58` owns it:
+a definer-backed roster read that returns display names for co-members of a comb
+you belong to. Not a widened `profiles` policy** — keep the blast radius at the
+comb, not at the profile table.
+
+**@Sage** — that is a second row in your migration's surface area, and it is
+cheaper than a re-migration. **@Pixel** — you may spec `DES-22` with real names;
+it is not currently true, and it is `ENG-58`'s job to make it true, so note the
+dependency rather than designing around `'Someone'`. **@Lumen** — the
+disclosure belongs at the **join** moment, in `COPY-6`: a person tapping an
+invite link should learn that the comb will see their name **before** they are
+in it, not after. **@Fizz** — this is the honest way to close `ENG-59`'s
+precondition; the alternative (minting friend connections on join) fuses two
+graphs and is barred in §1B.16.
+
+
 ## 2. Why the shape changed (the reasoning, so it can be checked)
 
 Three problems in the pre-ruling model, all real, all closed by the same move:
@@ -949,7 +1124,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 
 | ID | Owner | Est | Status |
 |---|---|---|---|
-| **ENG-58** | Sage | L | Migration: `combs`, `comb_members`, `comb_rotations` + RLS. **Not built** — no such migration exists, and no `invite_code` or rotation path exists in `src/` (both searched) |
+| **ENG-58** | Sage | L | Migration: `combs`, `comb_members`, `comb_rotations` + RLS. **Not built** — no such migration exists, and no `invite_code` or rotation path exists in `src/` (both searched). **Also owns the definer-backed roster read** (§1B.17): `profiles` RLS admits only your own row and your connections, so in a comb formed by invite link every member renders as `'Someone'` |
 | **ENG-59** | Fizz | M | Comb invite-link join flow. Deep-link scheme `pollinate` already registered (`app.json`) |
 | **ENG-60** | Fizz | L | Rotation ritual: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9` |
 | **ENG-62** | Sage | L | Land the nectar ledger with `rails_mode='simulated'` |
@@ -976,7 +1151,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-85** | Sage | M | **Entitlement model.** Where a user's plan lives and how the two caps read it: `combs_written_in ≤ 1` and `comb_members ≤ 5` on free. Must be **a single server-side source of truth** the client cannot spoof, and **both limits must be tunable constants** (§4.2). Ships with the caps **disabled** — see §8.5 |
 | **ENG-90** | Fizz | M | **Short note + nectar, unscoped from the reveal** (§5.2a). Send a short note plus simulated nectar to a comb member at any time. Rides `ENG-62`'s ledger and the `DES-23` flight |
 | **ENG-89** | Fizz | M | **Instrument C1–C5** (§6). Extends `ENG-78`, which stays the highest-priority single event |
-| **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Gates the §1A definition of done** (there is no reveal without a seal) |
+| **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Semantics ruled in §1B.16: seal-and-send, one event, idempotent.** **Cannot wrap `send_hive`** — its friend-connection precondition makes a comb undeliverable; authorization is **comb membership**. **Must refuse to deliver a zero-entry rotation.** **Gates the §1A definition of done** (there is no reveal without a seal) |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to open a rotation, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime |
 | **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays`. Follow `README.md`'s ritual — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
@@ -1024,15 +1199,15 @@ consequence, and learn in between.**
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2 | — |
+| 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2. **Plus the co-member name read** — definer helper, **not** a widened `profiles` policy (§1B.17) | — |
 | 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5). **Must include a per-comb entitlement override column** so Phase 4 can grandfather the seeded combs without a schema change (§1B.4) | 1.1 |
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
-| 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9) | — (start now, ahead of 1.6) |
+| 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17) | — (start now, ahead of 1.6) |
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
-| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**no dependency; start now** — §1B.11) |
+| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
-| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`** | 1.1 |
+| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — rotation ritual: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
