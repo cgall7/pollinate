@@ -60,20 +60,44 @@
 -- session at all) is exactly that. Re-expressed as triggers -- which fire
 -- regardless of privilege -- so the invariant holds no matter which path
 -- inserts the row.
+--
+-- Branched on TG_OP rather than an `OR` short-circuit: `OLD` is UNASSIGNED
+-- in a row-level INSERT trigger, and Postgres's Expression Evaluation Rules
+-- explicitly decline to guarantee AND/OR subexpression order ("when it is
+-- essential to force evaluation order, a CASE construct can be used").
+-- Verified empirically (thread b57ad406, 2026-08-30) that today's executor
+-- evaluates left-to-right and never fetches `old.subject_profile_id` once
+-- `tg_op = 'INSERT'` is true -- so the OR form does not crash today -- but
+-- nothing in the contract promises that for the next major version, and the
+-- failure mode if it ever reorders is every rotation mint raising `record
+-- "old" is not assigned yet"`. This form never references `old` in the
+-- INSERT arm, so there is no evaluation order to depend on.
 create or replace function public.private_hives_subject_not_active_contributor()
 returns trigger
 language plpgsql
 as $$
 begin
-  if new.subject_profile_id is not null
-    and (tg_op = 'INSERT' or new.subject_profile_id is distinct from old.subject_profile_id)
-    and exists (
-      select 1 from public.hive_contributors c
-      where c.hive_id = new.id
-        and c.profile_id = new.subject_profile_id
-        and c.removed_at is null
-    ) then
-    raise exception 'private_hives: subject_profile_id cannot be an active contributor';
+  if tg_op = 'INSERT' then
+    if new.subject_profile_id is not null
+      and exists (
+        select 1 from public.hive_contributors c
+        where c.hive_id = new.id
+          and c.profile_id = new.subject_profile_id
+          and c.removed_at is null
+      ) then
+      raise exception 'private_hives: subject_profile_id cannot be an active contributor';
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if new.subject_profile_id is not null
+      and new.subject_profile_id is distinct from old.subject_profile_id
+      and exists (
+        select 1 from public.hive_contributors c
+        where c.hive_id = new.id
+          and c.profile_id = new.subject_profile_id
+          and c.removed_at is null
+      ) then
+      raise exception 'private_hives: subject_profile_id cannot be an active contributor';
+    end if;
   end if;
   return new;
 end;
