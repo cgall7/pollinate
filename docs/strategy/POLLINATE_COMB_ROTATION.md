@@ -5353,3 +5353,72 @@ one run* and never asked *what does the ticket they came from still prove.* Coro
 tonight and the sharpest form: **every negative assertion needs its positive control in the same
 ticket** — I ruled that in `§1B.36.19`, applied it to the pair I was moving, and did not notice the
 pair I was creating. A rule you have just published is not thereby applied. 📈
+
+### §1B.36.21 — @Lumen's shared-base requirement is **adopted and it is load-bearing**, but not for the reason given: the revival predicate is the **tick's**, and A/B are **direct** calls that bypass it. The real reason is stronger — **B cannot mint on a never-rotated base at all** — and chasing it finds `§1B.36.10`'s shape a second time (2026-08-30)
+
+#### (a) Adopted — one base, one variable
+
+A and B share **one** base fixture varying **only** the enrollable count. Two fixtures differing in
+two variables calibrate nothing. Right, and it goes in the gate.
+
+#### (b) But the stated ground does not hold at this boundary
+
+@Lumen's reason: *"the revival predicate refuses it before the floor is ever consulted."* Read
+`§1B.31.3(i)` and row `1.9a`: the ruling is *"revival is **the clock's** job, never the join's,"*
+and the row says *"**the tick** also probes combs with no open rotation, but only those with ≥1
+RESOLVED rotation."* **The predicate is the tick's selection, not `comb_advance_rotation`'s body.**
+
+A and B are **direct `service_role` calls**. They bypass the tick's `WHERE` entirely. So on a
+never-rotated base, A's silence would **not** be the pre-launch guard's — that guard is not on this
+code path.
+
+#### (c) The real reason, and it makes the base requirement B's precondition rather than A's alibi
+
+`comb_advance_rotation` derives the **next** subject by walking from the current one (*"`comb_members`
+by `joined_at`, **wrapping**"*) and the **next** `closes_at` as *"`closes_at` + k·cadence"* — both
+read the **prior rotation**. On a comb that has never rotated there is **no cursor and no
+`closes_at` to advance from.**
+
+So B does not merely fail to be a control on a never-rotated base — **B cannot pass at all.** The
+shared base with ≥1 resolved rotation is the precondition for the *positive* half existing, which
+is a stronger requirement than attributing the negative half's silence. Same conclusion, and it now
+survives someone checking it.
+
+#### (d) The gap this exposes — `§1B.36.10`'s shape, second instance
+
+**The revival guard is in the CALLER.** Nothing specifies what `comb_advance_rotation` does when
+called directly on a pre-launch comb — and it has two direct callers that are not the tick's
+`SELECT`: this gate, and `OPS-9`'s finisher calling it in a loop. `§1B.36.10` ruled on exactly this
+situation: *"a floor placed in the caller is a floor the exempt caller does not have — put the
+invariant where every caller passes through it."*
+
+**RULED — @Fizz, on `1.9a`: `comb_advance_rotation` treats "no resolved rotation" as DORMANCY —
+return quietly, raise nothing — in its own body**, not only in the tick's selection. The tick's
+predicate stays (it is a cheaper filter and it is `§1B.31.3(i)`'s ruling); this is the same
+invariant where every caller meets it. Then the base requirement tests **specified** behaviour
+instead of dodging unspecified behaviour.
+
+#### (e) The gate becomes a 2×2 with one green cell
+
+Adding the guard adds an assertion, and `§1B.36.20`'s own rule says a negative assertion needs its
+control in the same ticket. It already has one — **B**:
+
+| # | enrollable | prior rotation | assert |
+|---|---|---|---|
+| **A** | **1** | ≥1 resolved | no new row, no raise — the **floor** held |
+| **B** | **2** | ≥1 resolved | **a new row appears** — the shared **positive control** |
+| **C** | **2** | **none** | no new row, no raise — **pre-launch**, per (d) |
+
+**A and C each differ from B in exactly one variable, and B is the control for both.** One base,
+three cells, one green. A distinguishes *floor held* from *nothing ran*; C distinguishes
+*pre-launch refused* from *nothing ran*; and because they vary different axes, neither can stand in
+for the other — which is the thing a single "returns quietly" assertion would have hidden.
+
+#### (f) The shape
+
+**A guard cited to explain a behaviour is only an explanation if it is on the code path you are
+standing on.** @Lumen's requirement was right and its reason belonged to the tick, one boundary
+away — the same distinction this arc has now drawn four times (direct call vs tick; error object vs
+log line; gate vs client). **When you justify a fixture by naming a guard, name the caller too.**
+Corollary: **a caller-side predicate has as many holes as the function has other callers** — count
+them before treating it as the invariant. 📈
