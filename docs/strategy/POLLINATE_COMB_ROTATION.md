@@ -1416,10 +1416,159 @@ when they disagree, they disagree forever.**
 
 #### Scope
 
-(1) and (2b) are `ENG-58`, both small, both ride the rebase Fizz already
-required. (3) is `ENG-58` and is one trigger. (2a) is `ENG-89`'s definition and
-is corrected in §6 above. The `C2` question and `send_hive`'s connection
-requirement are **Colin's**, then `ENG-91`'s.
+**SUPERSEDED ON SCOPE, UPHELD ON SUBSTANCE — see §1B.24.0.** `ENG-58` merged at
+`e99936d` before this section was published, so (1), (2b) and (3) did **not**
+ride Fizz's rebase. All three findings stand unchanged; they are now post-merge
+work on `main` and carry as **`ENG-92`** (Sage, S). The original scope line,
+true when written, read:
+
+> (1) and (2b) are `ENG-58`, both small, both ride the rebase Fizz already
+> required. (3) is `ENG-58` and is one trigger.
+
+(2a) is `ENG-89`'s definition and is corrected in §6 above. The `C2` question and
+`send_hive`'s connection requirement are **Colin's**, then `ENG-91`'s.
+
+---
+
+### §1B.24 — `ENG-58` merged before §1B.23 was published, and `deleted_at` is a public contract with zero consumers
+
+Read at `github/main@e99936d` (`ls-remote` confirmed) — Fizz's `--no-ff` merge of
+`ae39cf1`, two files, `+621`.
+
+#### 0. The scope line in §1B.23 is void, and that is mine
+
+§1B.23 closes with *"both ride the rebase Fizz already required."* **The rebase
+happened; they did not.** I committed §1B.23 at `bdfb1df` and never posted it, so
+`ENG-58` merged with all three items outstanding. They are no longer edits to a
+branch in review — they are post-merge work on `main` with no owner. **They get a
+row: `ENG-92`** (Sage, S), Phase 1, carrying §1B.23 (1), (2b), (3) and §1 below.
+
+**The lesson is not "review faster."** A finding committed to a strategy branch is
+invisible to the person who merges — it is not in the PR, not in the migration,
+not in the channel. *A ruling exists when it is published, not when it is
+committed.* Same failure mode as `sage/eng58-comb-schema` two hours earlier,
+different direction: that was a report with no artifact, this was an artifact
+with no report.
+
+#### 1. `ENG-84` declared `deleted_at` a public contract and named `ENG-58` as its reader. `ENG-58` never reads it
+
+`20260830000001:55-63` states it in the column comment itself:
+
+> *"**PUBLIC CONTRACT:** other features (`ENG-58`/comb rotation, `OPS-9`) read
+> this column to detect a tombstoned subject/member: name is exactly
+> `deleted_at`, non-null is the single signal."*
+
+`git grep -lnw deleted_at github/main` returns **exactly two files** — the
+sentinels list and `ENG-84`'s own migration. Zero hits in
+`20260830000002_comb_rotation_schema.sql`, zero in `src/`. **The contract has no
+consumers.**
+
+And the comb migration's own deletion paragraph (`:266-272`) states the fix in
+the present tense as though it were shipped:
+
+> *"1. Non-owner member, tombstoned: `ENG-84` sets this row's `removed_at`, same
+> 'end memberships' contract already shipped for `hive_contributors`."*
+
+`delete_own_account()` ends `hive_contributors` at `:160-162` and contains **no
+reference to `combs`, `comb_members`, or `comb_rotations`** — it could not, it
+merged one commit before those tables existed. So a tombstoned profile stays an
+**active `comb_members` row forever**. Four consequences, each verified against
+the merged text:
+
+**(a) `comb_member_count()` counts deleted accounts.** `:426-438` filters
+`removed_at is null` and nothing else. That is the number §1B.21 ruled the legal
+source and §1B.23 (2c) preserved for *"your comb has six members."* It now
+overcounts by every member who has ever deleted their account. **The asymmetry is
+the tell:** §1B.23 (2b)'s `comb_rotation_writer_count` reads `hive_contributors`,
+which `ENG-84` **does** end — so the hive-scoped read self-heals through a
+deletion and the comb-scoped one does not. Two rosters, two clocks, and now two
+deletion behaviours.
+
+**(b) `comb_co_member_names()` renders a blank row.** `:391-404` live-joins
+`profiles.display_name`; `ENG-84:181` sets it to `''` (the column is `not null`,
+so empty string is as close to nothing as it gets). `ENG-84:173-179` **predicted
+exactly this** — *"Downstream UI that live-joins `profiles.display_name`… will
+render a blank name for a tombstoned user until it's taught to branch on
+`deleted_at`"* — and named it a deliberate scope boundary for others to fix on
+their own schedule. `ENG-58` is the first new live-join to ship since, and it
+inherited the boundary without noticing there was one.
+
+**(c) A tombstone is still eligible to be next month's subject.**
+`comb_rotations_insert_owner`'s `WITH CHECK` (`:526-531`) requires the subject be
+a `comb_members` row with `removed_at is null` — which a tombstone satisfies. The
+organizer picks a deleted account, Part 0's triggers pass (a tombstone is not a
+contributor), the hive mints, **eleven people write a month of letters into it.**
+
+**This interacts with my own §1B.23 (1) and the interaction matters:** that
+section rules the `comb_members` clause **dropped** from this `WITH CHECK`, which
+removes the only place a `deleted_at` gate could hang. **So the subject-side gate
+is `ENG-91`'s, not the policy's** — mint refuses a tombstoned subject, and a
+subject tombstoned mid-month is void-and-advance (§1B.15, already `ENG-91`'s per
+the migration's own item 3). Do not add the check to the policy on the way past;
+it is about to be deleted.
+
+**(d) `send_hive` still delivers into the tombstone.** Re-verified at
+`20260828000001:153-166`: the only subject-side guards are
+`subject_profile_id is null` and an accepted `honeycomb_connections` row.
+`ENG-84` leaves `subject_profile_id` non-null (no delete ever fires) and **does
+not touch `honeycomb_connections` at all** (`grep`: no hits). All three guards
+pass. §1B.15's hole is not merely still open — combs are now a second door into
+it, on a schedule, with no human in the loop.
+
+#### 2. And item 1 and item 2 of that same paragraph cannot both be satisfied — this one is a submission blocker
+
+The migration flags the tombstoned comb **owner** as unresolved (`:273-283`) and
+adds `comb_members_owner_seat_permanent_trigger` (`:238-253`), which raises on
+any attempt to set `removed_at` on the organizer's own row. Correct on its own
+terms. **But item 1 requires `ENG-84` to end comb memberships**, and the natural
+implementation is a copy of the line already sitting eleven lines above it:
+
+```sql
+update public.comb_members set removed_at = now()
+  where profile_id = v_uid and removed_at is null;
+```
+
+For anyone who has ever created a comb, that statement **raises**, and it raises
+inside `delete_own_account()` — so the whole transaction aborts and **the
+organizer of a comb cannot delete their account.** `ENG-84` is the App Store
+**5.1.1(v)** compliance ticket. An unruled product question is now sitting on a
+submission blocker, and it will not surface until someone implements item 1,
+because today `delete_own_account()` does not touch the table at all.
+
+**Ruled for `ENG-92`:** whatever `ENG-84` grows for `comb_members` is written
+`and not exists (select 1 from combs c where c.id = comb_id and c.owner_id =
+v_uid)` — the organizer's seat is skipped, never attempted, so deletion never
+depends on the ruling below landing first. Compliance does not wait on product.
+
+**Open for Colin — `O8`: what happens to a comb when its organizer deletes their
+account?** Three live options, and my recommendation is the first:
+
+1. **Auto-transfer to the earliest-joined remaining active member**, void only if
+   there is none. A comb is a durable group that outlives any one rotation
+   (§18.2) — killing eleven people's club because one person left is the worst
+   outcome available, and it is the one that happens by default if nobody rules.
+   No UI is required.
+2. **Void the comb.** Honest, cheap, and wrong for the same reason.
+3. **A tombstone-specific bypass of the owner-seat trigger**, leaving the comb
+   ownerless. Rejected: every downstream read (`is_comb_member`,
+   `comb_rotations_insert_owner`) assumes a present organizer, exactly as the
+   migration says.
+
+**Why this is Colin's and not mine:** auto-transfer moves a comb onto the new
+owner's **create-cap**, and under the ruled model the cap is a function of that
+person's tier (§3.1). Handing a free user a comb of twelve is §3.2 rule B's
+promise — *"an invitee never sees 'sorry, the comb is full'"* — walking in
+through a new door. **It does not bite in MVP-Comb**, because §8.5 ships the caps
+**disabled**; it makes the transfer default a **Phase 4** decision wearing a
+Phase 1 costume. The Phase 1 half (skip the owner's seat, never raise) needs no
+ruling and ships now.
+
+#### Scope
+
+§1 (a) and (b) are `ENG-92`, one `deleted_at is null` predicate each, joined to
+`profiles`. §1 (c) and (d) are `ENG-91` and were already its work — this names
+the trigger. §2's skip-clause is `ENG-92`. `O8` is Colin's, and nothing in
+MVP-Comb is blocked waiting for it.
 
 ---
 
@@ -1929,6 +2078,7 @@ Recorded so no one over-reads this ruling:
 | ~~**O2**~~ | ~~Free tier keeps unlimited personal hives?~~ **CLOSED** — yes, unchanged (§3.1) | — |
 | **O3** | Carried from V2: §5.5(4) rules *"no projected returns, ever"* while §5.2(e) pitches *"$50 in 2026 versus 50,000 sats in 2044."* Apple 3.1.1 and FTC-adjacent risk both bite | 19d marketing copy, `COPY-8` |
 | **O4** | **The price.** Ceiling ~$39/yr, annual preferred. Deliberately unruled until C1 and C5 return (§4) | Phase 4 only |
+| **O8** | **What happens to a comb when its organizer deletes their account?** Auto-transfer to the earliest-joined remaining member (recommended), void the comb, or leave it ownerless. Raised §1B.24.2. Not blocking: `ENG-92` ships the compliance half (skip the owner's seat, never raise) with no ruling | `ENG-92` now, transfer default is Phase 4 |
 | ~~**O5**~~ | ~~One release or two?~~ **CLOSED `a11aa144…` — one release.** The in-flight Slice 1 / MVP1 work folds into MVP-Comb | — |
 | ~~**O6**~~ | ~~Does `ENG-89` come into MVP-Comb?~~ **CLOSED `a11aa144…` — yes.** Instrumentation is in the MVP, moved to Phase 2.7 | — |
 | ~~**O7**~~ | ~~Distribution for the seeded combs?~~ **CLOSED `a11aa144…` — EAS internal distribution (`OPS-10`, Bumble).** TestFlight (`11.1`) stays MVP2 | — |
