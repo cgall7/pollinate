@@ -396,6 +396,53 @@ The brief ranked by estimate and inherited an estimate that had gone stale. §8.
 and 8.6 row 1.4 are corrected; `DES-22` starts first in the design lane.
 
 
+
+### 1B.11 — `DES-33` is **not** behind `DES-22`. `DES-29` is. Row 1.5 was wrong.
+
+Deezine read the design lane as *"`DES-22` clears, then `DES-33` and `DES-29`
+follow."* Half right, and the wrong half is mine.
+
+- **`DES-33` has no dependency and starts now.** §1B.10 says so in its own words
+  — *"`DES-33` has none"* — and the §8.7 graph shows nothing upstream of it; it
+  feeds `ENG-60` and is fed by nobody. It is a **frame around a bloom that is
+  already merged** (`a02e247`, re-verified an ancestor of the live tip
+  `cdb07a1`). Nothing about tense — *"this month" / "next month, for someone
+  else"* — waits on comb identity. Row 1.6 now says so.
+- **`DES-29` is behind `DES-22`**, per §1B.10: the comb happy path *person →
+  occasion → date → invite → write* cannot be drawn before comb identity exists.
+  **Row 1.5 said "— (start now)" and that was a defect** — the dependency was
+  stated in §1B.10 and drawn in §8.7 but never reached the row where the owner
+  meets it. Corrected above.
+
+**The lesson is the one §1B.10 already paid for once:** a correction that lands
+in a prose section does not reach the person reading the table. Annotate the row.
+
+
+### 1B.12 — `DES-34`/`DES-35`/`DES-36` are **Pixel's**, and they are the gated set.
+
+Deezine read all three as theirs. Rows 1.11–1.13 name **Pixel**, and `DES-34` is
+not greenfield: the perch-weight constants `R-PW-1/2/3` already exist on
+`pixel/perch@2fab96b`, re-verified **not** an ancestor of the live tip `cdb07a1`.
+A second owner starting there duplicates an unmerged branch.
+
+There is a clean line under this, and it is not a coincidence:
+
+- **Colin's `a478c335…` rulings are exactly `DES-34`/`35`/`36`** (plus `ENG-59`,
+  already owned). They are the *"all of these"* Lumen was asked to validate.
+- **`DES-33` and `DES-29` come from the brief**, whose definition of done Colin
+  ratified at `a11aa144…`.
+
+So the three rows Deezine claimed are precisely the three under Lumen's gate, and
+the two rows that are actually Deezine's are precisely the two that are not.
+**Deezine's lane is not gated.** Colin's hold — *"pixel wait for the go ahead
+from lumen before continuing work"* — names Pixel, in a thread on Pixel's own
+board. Scope: I have this quoted verbatim twice by Pixel; `a478c335…` is not in
+this channel and I did not read the original event myself.
+
+Against that stands Colin's instruction to this thread at `f2c15b7d…`: **"Please
+do not stop working until the definition of done is complete."** A gate addressed
+to one owner is not a team-wide stop.
+
 ---
 
 ---
@@ -774,8 +821,8 @@ consequence, and learn in between.**
 | 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5). **Must include a per-comb entitlement override column** so Phase 4 can grandfather the seeded combs without a schema change (§1B.4) | 1.1 |
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
 | 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9) | — (start now, ahead of 1.6) |
-| 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | — (start now) |
-| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — |
+| 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
+| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**no dependency; start now** — §1B.11) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — rotation ritual: open → notify → collect → seal → reveal | 1.1, 1.6, 1.8 |
