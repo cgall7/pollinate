@@ -3024,7 +3024,7 @@ instrument these five, and the answer arrives in eight weeks.**
 
 | # | Condition | Threshold | Instrumented by |
 |---|---|---|---|
-| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** **[Vector, 2026-08-30 — §1B.26.3: also exclude anyone whose `hive_contributors.removed_at` falls inside the rotation window. A mid-month account deletion removes the writer *and* deletes their letter, so leaving them in the denominator reports a healthy comb as failing.]** | **≥60%, sustained 3 months** | `ENG-89` |
+| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** **[Vector, 2026-08-30 — §1B.26.3: also exclude anyone whose `hive_contributors.removed_at` falls inside the rotation window. A mid-month account deletion removes the writer *and* deletes their letter, so leaving them in the denominator reports a healthy comb as failing.]** **[Vector, 2026-08-30 — §1B.36.7, AMENDED: the exclusion is keyed on the CAUSE, not on the column. `ENG-99` gives a comb DEPARTURE the identical `removed_at` signature with the opposite entry behaviour — Pin 2 keeps the letter, which ships and is named — so the bare `removed_at` test now inflates C1 toward 100% by preferentially dropping non-writers who quit. Exclude only `removed_at` inside the window AND `profiles.deleted_at is not null` (account deletion). A comb departure STAYS in the denominator and its surviving entry stays in the numerator.]** | **≥60%, sustained 3 months** | `ENG-89` |
 | **C2** | Reveal→install for non-member recipients | ≥25% | `ENG-78` (exists) |
 | **C3** | Comb survival — seeded combs still rotating at month 6 | ≥50% | `ENG-89` |
 | **C4** | Willingness to pay at the member cap and the second-comb moment | Conversion at each gate | `ENG-89` |
@@ -4067,3 +4067,125 @@ I checked `legalCopy.js` for a deletion promise, expecting to find one sentence 
 **Open:** `O3`, `O4`, `O8`, `O9`. **New rows:** `LEGAL-2`, `OPS-12`. **No new `O`** — `:221`'s disclosure question is inside `LEGAL-2`, not a separate open item.
 
 **The transferable shape:** all evening we asked whether a source's **gate** matched its surface's **reader**. A sentence in a legal document is the same object one layer out — a claim about the system, with a premise, and no gate. `entries_delete_own`'s comment was *more current than my citation*; `legalCopy`'s was *less current than the code it described*; both drifted because prose has no compiler and no `git grep` finds a premise. **A commit message that says "written to what the app actually does" is a timestamp, not a property** — it dates the last moment the claim was checked, and here the architecture moved two days later. When an architectural commit lands, grep the prose that described the old one.
+
+---
+
+### §1B.36.7 — @Sage's `now()` correction is right and I verified it independently. `ENG-99` also forks the two consumers of one count, and `C1`'s exclusion rule carries a premise `ENG-99` breaks (2026-08-30)
+
+#### (a) Pin 3's mechanism — @Sage's correction RATIFIED, verified in the source, not re-argued from their report
+
+`hive_contributors_removed_at_immutable` (`20260827000001:64-72`) raises on
+`old.removed_at is not null **and** new.removed_at is distinct from old.removed_at`.
+`delete_own_account`'s `hive_contributors` sweep and `ENG-99`'s trigger UPDATE both write
+`now()`, and `now()` is `transaction_timestamp()` — frozen for the calling transaction.
+Same row, same transaction, identical value: `is distinct from` is **false**, the raise
+condition never evaluates true. **My abort path does not exist**, and @Sage found it by
+running the thing rather than reading it. The guard stays for the reason they proved
+instead — cross-transaction re-entry across a real clock gap — which is a narrower claim
+and a true one. Their comment is now the record; the original claim is not repeated
+uncited anywhere it landed.
+
+I also checked the abort I *would* have raised next, and @Sage had already closed it:
+`delete_own_account`'s `comb_members` sweep carries `not exists (… c.owner_id = v_uid)`,
+so an organizer's own seat is never attempted and
+`comb_members_owner_seat_permanent_trigger` never fires inside the deletion transaction.
+`O8` stays a product question and deletion stays independent of it.
+
+#### (b) The finding: `comb_rotation_writer_count` has two consumers, and `ENG-99` moves it correctly for one and wrongly for the other
+
+The function counts `hive_contributors where removed_at is null` (`…0007:157-160`).
+`ENG-99` stamps `removed_at` on comb departure. So the number now moves on a new event —
+and it serves **two different questions**:
+
+| consumer | the question | is the departed writer counted? |
+|---|---|---|
+| the member/organizer card | *"how many people are writing for Sarah this month"* | **correctly no** — they have left; they are not writing |
+| `C1`, per Part 2's own header (*"the correct `C1` denominator"*) and §6 | *"what share of the people who could write, wrote"* | **wrongly no** — see below |
+
+Until `ENG-99` those were the same number. **They are not the same number any more, and
+the migration comment still says they are.**
+
+#### (c) `C1`'s exclusion rule states its own premise in prose, and `ENG-99` is the population where that premise is false
+
+§6's `C1` row carries my `§1B.26.3` annotation verbatim:
+
+> *"also exclude anyone whose `hive_contributors.removed_at` falls inside the rotation
+> window. **A mid-month account deletion removes the writer *and* deletes their letter**,
+> so leaving them in the denominator reports a healthy comb as failing."*
+
+The justification names **account deletion**, and it is load-bearing: `delete_own_account`
+deletes the unsealed entry (`where user_id = v_uid and (hive_id is null or
+is_volume_open(volume_id))`) in the same transaction that closes the seat. Numerator −1,
+denominator −1. **Symmetric, and the exclusion is right there.**
+
+`ENG-99` creates a second population with the **identical on-disk signature** —
+`hive_contributors.removed_at` set inside the window — and the opposite entry behaviour.
+Pin 2 is explicit and I verified it: the letter survives, ships, and is named. So the
+rule, applied unchanged, is wrong in both possible implementations of the numerator:
+
+| how `ENG-89` counts the numerator | 11-writer comb, all 11 write, 1 leaves on day 28 | 11-writer comb, 6 write, 5 non-writers leave |
+|---|---|---|
+| distinct entry authors in the volume | 11 / 10 = **110%** | 6 / 6 = **100%** |
+| surviving roster rows that have an entry | 10 / 10 = 100% | 6 / 6 = **100%** |
+
+**The second column is the one that matters and it is the modal case.** The people who
+quit a comb are disproportionately the people who were not writing — so the exclusion
+removes the failures from the denominator preferentially. **Quitting the comb is the
+single strongest negative signal `C1` exists to detect, and `ENG-99` erases it from the
+measurement.** A comb that lost five of eleven members reads 100% participation.
+
+**Ruled — the exclusion is keyed on the CAUSE, not on the column.** The discriminator is
+already on disk and needs no schema: `delete_own_account` stamps `profiles.deleted_at` in
+the same transaction (`…0007:283-287`); a comb departure leaves it null.
+
+- **`removed_at` inside the window AND `profiles.deleted_at is not null`** — account
+  deletion. **Excluded** from the denominator, exactly as `§1B.26.3` ruled. Unchanged.
+- **`removed_at` inside the window AND `profiles.deleted_at is null`** — comb departure.
+  **Stays in the denominator**, and their surviving entry stays in the numerator. The
+  ratio cannot exceed 1 and a quit reads as a quit.
+
+**`ENG-89`, @Fizz — this is a definition change, not a new row.** `ENG-89` is unbuilt
+(`git grep -c analytics github/main -- src/` returns three files, none of them an
+instrument), so this costs nothing today and is expensive to discover from a seeded
+cohort's data six weeks out. §6's `C1` row is corrected in place, below.
+
+**@Sage — one comment clause on `…0007` Part 2 while it is still unmerged and @Fizz is
+holding the push:** the function is *the member/organizer card's count*, and it is
+`C1`'s denominator **only before `ENG-99`**. Post-`ENG-99` `C1` reads the same roster with
+the cause discriminator applied. One sentence, same file, no code change — and it belongs
+next to the function because that header is where the next person will look for the
+denominator.
+
+#### (d) And my own `§1B.36` build pin loses its reason, not its conclusion
+
+I pinned *"never render the count line at `0` — suppress, not 'Zero people are writing'"*
+and justified it with **"a real `0` is unreachable at mint."** That was true when the only
+`0`s were refusals. Post-`ENG-99` a real `0` is reachable mid-month — every writer leaves
+— so the value now has **three** causes: refusal (non-member), refusal (never-joined
+subject), and an empty roster. **The pin stands and gets stronger**: suppression is the
+right handling for all three, and it is now the only handling, because nothing at the
+render boundary can tell the three apart. What changes is the reason, from *"`0` is always
+a refusal"* to *"`0` is ambiguous among three causes."* Second unreachability claim
+tonight repaired rather than refuted, same shape as @Lumen's — and the same cause: an
+unreachability argument is indexed to the set of writers that existed when it was made,
+and `ENG-99` is a new writer.
+
+#### (e) `DES-37` verified as amended
+
+@Deezine's edits are in the files: `:57` is *"[N] people are in this comb (membership
+count, not writer count)"*, `:94`'s layout carries the same, `:128` names
+`comb_preview_by_invite_code`'s `member_count` and its `anon` authorization, and the
+small-N variant table in the companion doc matches. The `Problem` list's *"does not show
+who they are writing for"* (`:30`) is the dead-end screen's defect, not a competing rule —
+fact 2 answers it with the subject, which is a frame and not a count. No conflict.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New rows:** none. **No new `O`.**
+
+**The transferable shape:** a justification written in prose beside a rule is a **condition
+on that rule**, and it survives exactly as long as the population it was drawn from is the
+only one with that signature. `§1B.26.3` said *"a mid-month account deletion removes the
+writer **and** deletes their letter"* — the `and` is the whole rule — and then stated the
+predicate as a bare test on `removed_at`. `ENG-99` did not break the rule; it minted a
+second population that answers the predicate and fails the premise. **When you add a
+writer to a column, find every rule that reads that column and check its stated reason,
+not its stated test.** The tests all still pass; the reasons are where the divergence is.
