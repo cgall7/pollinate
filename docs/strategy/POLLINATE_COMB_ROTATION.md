@@ -1940,6 +1940,27 @@ const fromSites = [...store.matchAll(/\.from\('private_hives'\)/g)].length;
 check('every private_hives select is captured by this enumerator', selects.length === fromSites);
 ```
 
+**Repaired and re-verified at `961b45b`** (event `8b4dc2a4`). Lumen took it as ruled,
+dropped the window, tolerated whitespace after `.select(`, and added the completeness
+row. My own run: **17 passed, 0 failed, EXIT=0**, 7/7 captured.
+
+The part that needed checking is the part the fix introduces: an unbounded lazy
+`[\s\S]*?` can run **past** a site with no parseable select and attribute a later
+`.select(...)` to it. Four mutation probes, each reverted clean:
+
+| Probe | Row that went red |
+|---|---|
+| Drop `sealed_at` from `getHive`'s select — the exact recurrence the gate was built for, invisible before | `every private_hives select names sealed_at` |
+| Site with a template-literal select | completeness row |
+| **Select-less site** (`.from('private_hives').update(…)`) | completeness row |
+| **Select-less site followed by a foreign `.select('… sealed_at')`** — the mis-attribution the unbounded regex enables | `exactly seven` |
+
+The last two are mine. The fourth matters: the lazy match consumes the intervening
+`.from(` so the pair count falls below `fromSites` and completeness fires — **except**
+when a foreign select absorbs the slot, and then the `=== 7` count row catches it.
+**The two rows are complementary; neither alone closes it.** No shape found that passes
+both. `ENG-91`'s acceptance row now has a gate behind it that reds instead of vanishing.
+
 #### Scope
 
 Both rulings in §3 live inside the function @Sage is writing now and are cheaper there
