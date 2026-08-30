@@ -1977,6 +1977,119 @@ one cell to it and one acceptance row to `ENG-91`. No new `O`. Nothing gates any
 
 ---
 
+### §1B.28 — `display_name` is `'New user'` for every account `ENG-83` creates, and it defeats §1B.17's fix one layer down
+
+*Vector, 2026-08-30. Published `37295f91…` before this commit. Verified at
+`github/main@8864a12`. Raised while answering @Deezine's `DES-37` question —
+does `COPY-6`'s disclosure sit pre-auth or post-auth. The answer is neither,
+and the reason is a bigger finding than the seat.*
+
+**The chain, four links, each independently checkable:**
+
+1. `handle_new_user` reads exactly one key —
+   `coalesce(new.raw_user_meta_data ->> 'display_name', 'New user')`
+   (`20260808000001:45-46`), into a `not null` column (`:16`).
+2. **The only site in the tree that writes that key is the password sign-up.**
+   `git grep 'display_name:' github/main -- src/ App.js` returns two hits:
+   `HoneycombStore.js:38` (`options: { data: { display_name: displayName } }`)
+   and `demoHive.js:91`, a demo literal.
+3. **Neither passwordless path writes it.** `signInWithOtp` (`:87-94`) sends
+   `options: { emailRedirectTo, shouldCreateUser: true }` — no `data`, and
+   `shouldCreateUser: true`, so it creates the account. `signInWithApple`
+   (`:138-147`) sends `provider`/`token`/`nonce` and no `options.data`.
+   Whatever GoTrue stores under its own provider keys, `->>'display_name'`
+   is absent and the coalesce falls through.
+4. **Nothing ever rewrites it.** `git grep -c updateUser github/main -- src/
+   App.js` → **zero hits.** There is no path in the app to change a display
+   name after creation. Not "the name arrives later" — there is no later.
+
+Not a discarded-input bug: the name field renders under `{isSignUp && …}`
+(`Onboarding.js:823`), so the magic-link branch never shows one. Nothing is
+collected and thrown away. It is never asked.
+
+#### 1. The disclosure seat is a third seat, not one of the two on offer
+
+§1B.17 ruled *"the comb will see your name **before** they are in it."* That is
+a promise about a name. **Pre-auth** there is no account and no name, so it
+cannot be true. **Post-magic-link** there is an account whose name is
+`'New user'`, so it still cannot be true. **The disclosure attaches to the
+moment the name is collected, and on the merged path that moment does not
+exist.**
+
+`ENG-59` creates it: a **name-collection step between authentication and the
+join RPC.** That is where `COPY-6`'s sentence sits, it is a screen, and it is
+inside `DES-37`'s frame rather than beside it. §1B.17's requirement was
+**pre-join**, not pre-auth; "pre-auth" was Vector's shorthand in `81b3a72e…`
+and it was the wrong axis. Corrected here.
+
+#### 2. §1B.17's fix is defeated one layer down — this is the load-bearing half
+
+`comb_co_member_names` (`20260830000002:391-403`) was the ruled fix for the
+`'Someone'` problem and it reads `p.display_name` raw. **`C1`'s entire seeded
+population joins by invite link, which per `ENG-83` means magic link, which
+means `'New user'`.** A seeded run club of twelve renders a roster of
+*'New user', 'New user', 'New user'*, and `DES-22`'s *"who's here, who's
+written"* is a column of identical placeholders again.
+
+**Strictly worse than what §1B.17 fixed.** `'Someone'` was a privacy fallback
+that degraded gracefully and only in contributor-to-contributor views.
+`'New user'` is uniform across the whole comb **including the organizer**, it
+reads as a defect rather than a discretion, and it is the first thing a
+stranger sees on the surface `C1` is seeded against. The `'Someone'` hole was
+closed and the population walked into a second one underneath it — same
+failure, different table.
+
+Two riders:
+
+- **`ENG-91`'s ruled backstop does not catch it.**
+  `coalesce(nullif(display_name, ''), 'A writer')` (§1B.25.2 as amended by
+  §1B.26.1) tests null and empty. `'New user'` is neither. That backstop was
+  scoped to the **tombstone** case, is still correct for it, and is not a net
+  under this.
+- **Do not fix this in `comb_co_member_names`.** A second coalesce there papers
+  a real empty-profile problem into a prettier string and leaves the profile
+  empty everywhere else — Account, the feed, the reveal snapshot. **The fix is
+  collecting the name**, which is the same step the disclosure needs. One
+  screen closes both.
+
+#### 3. §1B.18's first bullet is partly stale, in `ENG-59`'s favour
+
+Annotated so it is not re-derived. `expo-linking` **is** imported now
+(`authLinking.js`, `ENG-83`), and `AuthContext.js:93-101` already registers
+`getInitialURL()` plus a live `url` listener. It early-returns on
+`!isAuthCallbackUrl(url)` (`:94`), so an invite URL today is **received and
+dropped**, not unreachable. `ENG-59` extends `handleUrl`; it does not build the
+listener. `NavigationContainer` still has no `linking` prop, so route-level
+linking config is still genuinely absent — **the extension point is the
+service, not React Navigation.** §1B.18's conclusion (the landing is nobody's
+row → `DES-37`) is unaffected.
+
+#### 4. `DES-37` choice (a) is settled, and it adds a property to `ENG-59`'s row
+
+@Deezine ruled (a) independently in `#Collab` — the anon landing shows *who
+asked you* and *how many are writing*, with **possession of the invite code as
+the authorization**. Same call Vector recommended in `81b3a72e…`; treat it as
+settled unless @Lumen or @Colin reads it otherwise.
+
+@Fizz's function shape — *membership count only, `invite_code`-keyed, no
+entries anywhere in its body, `comb_member_count` minus the session auth* — is
+right and not quite sufficient. **Under (a) the invite code becomes an
+unauthenticated lookup key, so the code's entropy is the entire access control
+for that read.** Under session auth it needed none; possession-based auth means
+the token carries what the session used to. Concretely: generate it with enough
+entropy that enumeration is not a strategy, and do not let the function's shape
+or timing distinguish *nonexistent code* from *valid code* more than it must.
+Not a design decision — a property the generator must have, and it belongs in
+`ENG-59`'s row rather than nobody's.
+
+**Consequences.** One new requirement on `ENG-59` (§1B.28.1, the
+name-collection step, which is also the disclosure seat and the `'New user'`
+fix), one property on its invite-code generator (§1B.28.4), one screen inside
+`DES-37` (@Deezine), one sentence in `COPY-6` (@Lumen). No new `O`. Nothing
+gates a merge; `OPS-9` remains the critical row.
+
+---
+
 ---
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
@@ -2279,7 +2392,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | ID | Owner | Est | Status |
 |---|---|---|---|
 | **ENG-58** | Sage | L | Migration: `combs`, `comb_members`, `comb_rotations` + RLS. **Not built** — no such migration exists, and no `invite_code` or rotation path exists in `src/` (both searched). **Also owns the definer-backed roster read** (§1B.17): `profiles` RLS admits only your own row and your connections, so in a comb formed by invite link every member renders as `'Someone'` |
-| **ENG-59** | Fizz | M | Comb invite-link join flow. Deep-link scheme `pollinate` already registered (`app.json`) |
+| **ENG-59** | Fizz | M | Comb invite-link join flow. Deep-link scheme `pollinate` already registered (`app.json`); `AuthContext.js:93-101` already listens and drops non-auth URLs (§1B.28.3). **Three additions:** (a) the anon landing preview is a **new** definer, not `comb_member_count`, whose WHERE-clause auth returns `0` rather than refusing (§1B.28.4); (b) its invite code carries the access control, so it needs enumeration-resistant entropy (§1B.28.4); (c) a **name-collection step between auth and join** — without it every account `ENG-83` creates is `'New user'` and the comb roster is a column of placeholders (§1B.28.2). **Must not mint friend connections on join** (§1B.16) |
 | **ENG-60** | Fizz | L | The rotation loop: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9` |
 | **ENG-62** | Sage | L | Land the nectar ledger with `rails_mode='simulated'` |
 | **ENG-66** | Fizz | M | Comb pot. **G2 binding:** direct-to-recipient, never pooled |
@@ -2359,7 +2472,7 @@ consequence, and learn in between.**
 | 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17) | — (start now, ahead of 1.6) |
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
-| 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
+| 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
