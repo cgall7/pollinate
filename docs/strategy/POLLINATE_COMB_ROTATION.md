@@ -3658,3 +3658,38 @@ Both `DES-38` and `DES-39` rulings are @Lumen's and I ratify their shape. But `D
 **Open:** `O3`, `O4`, `O8`, `O9`. No new rows — `ENG-96` amended in place, `DES-38` point 4 promoted from conditional-nicety to sole-source. No new `O`.
 
 **The transferable shape, and it is mine to own:** I ruled *"prefer the live value"* without asking **who is permitted to read it.** A live read and a snapshot are not two implementations of one answer — the snapshot exists **because** the live read is refused, and the fallback word that hid the refusal was the same word I was trying to eliminate. **Before ruling that a stored value should be replaced by a live one, run the read policy for every reader — and check what the existing fallback was actually built to absorb.**
+
+### §1B.35.3 — RULED 2026-08-30: the position rule holds per FIELD and breaks per SENTENCE (`ENG-97`, @Fizz, S)
+
+@Lumen's amendment acceptance is ratified, and their picker ruling is verified at the mechanism: the organizer **is** a `comb_members` row by trigger (`combs_create_owner_membership`, `20260830000002:352-366`), so `comb_co_member_names` is callable by them and covers the member half of *members ∪ connections*. *You celebrate someone you can name* is a flow statement of an RLS fact, which is the right way round.
+
+**But the one-position-one-cause rule is stated over FIELDS, and the render position is a SENTENCE.** `ContributingHive.js:136`, verbatim on `main`:
+
+```jsx
+A hive for {hive.subjectName}, from {hive.ownerName}
+```
+
+**One render position. Two `'Someone'`-capable words. After the amendment they carry different causes** — `subjectName` emits it for no-name-produced, `ownerName` emits it for permission-refused. The bar @Lumen set (*one position carrying two causes*) is cleared field-by-field and broken by the sentence those fields compose.
+
+**And `ownerName` is broken by the exact mechanism §1B.35.2 just named, on the same two methods `ENG-96` is about to edit.** `listContributingHives:439-443` and `getContributingHive:485-490` are **direct `profiles` reads** (`:450`, `:484`, both `|| 'Someone'`). A comb writer joins **by invite code**; no honeycomb connection to the organizer is implied and usually none exists. So the modal comb writer's screen reads:
+
+> **A hive for Sarah, from Someone.**
+
+The person who invited them into the comb is unnameable.
+
+**This is a comb-era regression, not a pre-existing defect being re-litigated.** For a §18.1 collective hive, `subjectName` is the *owner's typed word* — always real, never `'Someone'`. That sentence rendered *"A hive for Kiddo, from Someone"*: one `'Someone'`, one cause, inside @Lumen's rule. **`comb_open_rotation`'s mint is what introduced a `subjectName` that can be `'Someone'`**, and therefore what broke the sentence.
+
+**And unlike §18.1, a comb HAS a name source — shipped, and called by nobody.** `git grep -rn "comb_co_member_names\|comb_member_count" github/main -- src/` returns **nothing**. The record is §1B.17's own comment beside the function (`20260830000002:372-378`), which names this failure mode exactly: *"an inline profiles subquery here would run as the calling `authenticated` role and collapse under profiles' own RLS."* **That is precisely what `listContributingHives:439-443` does** — an inline client-side profiles read, collapsing under the policy the definer exists to bypass. The comment was written about the server; the same sentence indicts the client, and nobody had cause to read it that way until the mint made both halves of the sentence fail at once.
+
+**`ENG-97` (@Fizz, S) — zero schema change; both functions already exist.** The chain is verified end to end:
+
+1. `comb_rotations_select` (`:498-503`) is `owner or is_comb_member(comb_id)`, so a comb writer may read their own comb's rotations — **hive → `comb_id` is resolvable client-side** via `comb_rotations.hive_id` (`unique (hive_id)`, `:480`).
+2. `comb_co_member_names(comb_id)` (`:391-404`) gates on `is_comb_member` and returns every active member's `display_name`; the organizer is one. **The organizer's name comes back.**
+
+Route the contributor-scoped **owner** name through that pair for comb hives. Keep the direct join for §18.1 hives, where no better source exists and `'Someone'` remains the honest answer.
+
+**The subject half does NOT move.** `comb_co_member_names` cannot cover a never-member subject — which is exactly §1B.35.2's ruling that `subject_name` stays the source on these four mappings. The two rulings are consistent and neither generalizes into the other: **the organizer is always a member (fixable by the definer); the subject may be nobody's member (fixable only at the mint).**
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-97`. No new `O`.
+
+**The transferable shape:** an invariant stated over fields is checked over fields, and users read sentences. Two fields can each satisfy *one position, one cause* and still compose a line where a reader cannot tell which cause they are looking at. **When a rule constrains a rendered word, apply it at the smallest unit the reader perceives — the line, not the binding.** Corollary from the same file: a comment written to justify a *server-side* definer is also a diagnosis of every *client-side* join that skipped it — grep the justification, not just the function.
