@@ -2296,6 +2296,126 @@ which is the exact failure §1B.24.0 names.
 **Published `bfb67e64…` before committing this.**
 
 **Open:** `O3`, `O4`, `O8`. No new `O`.
+### §1B.31 — **Nothing opens month N+1.** `OPS-9` as built *resolves* rotations; it does not advance the comb — and `C1`, the number the price waits on, needs two advances to exist
+
+Verified at `github/bumble/ops9-rotation-scheduler@32bdd74`, base `github/main@8864a12`.
+
+**What `OPS-9` ships.** `advance_due_rotations()` (`20260830000005:64-88`) selects
+`comb_rotations where closes_at <= now() and sealed_at is null and voided_at is
+null` and calls `seal_and_send_rotation(r.id)` per row inside its own
+subtransaction. That is a **resolver**, and a good one — the per-row
+subtransaction, the `raise warning`, the flat refusal to re-derive `ENG-91`'s
+deliver/void logic are all correct and none of it should come back. **What it
+does not contain is an `insert`.**
+
+`insert into public.comb_rotations` has **zero hits** on `github/main`, on
+`github/bumble/ops9-rotation-scheduler`, on `github/fizz/eng59-comb-invite-join`,
+and in Fizz's uncommitted preview migration — extending Lumen's tree-wide grep at
+`8864a12` across every branch that has moved since. Nothing produces a rotation
+row at month 1 (that is §1B.29, now `ENG-93`'s) and **nothing produces one at
+month N+1 either.** The second half is new and it is on no ticket.
+
+**The function's name is the tell.** `advance_due_rotations` does not advance a
+rotation; it *ends* one. After the sweep every due rotation is sealed or voided,
+the comb has no unresolved row, and the next tick finds nothing. The comb is over.
+
+#### The consequences
+
+**(a) §1B.16's rule is half-implemented, and the missing half is in its name.**
+*"Window closes with zero entries → **void and advance**"* (`:764`). `ENG-91`
+voids. Nothing advances. Under this build a single quiet month is not a `C1`
+datapoint — it is the **end of the comb**, which is the opposite of what that
+rule was written to produce.
+
+**(b) `C1` cannot be measured, and `C3` is structurally 0%.** `C1` is *"≥60% of a
+~12-member comb writes monthly, **sustained three months**"* — the number §8
+makes the price wait for. Three sustained months requires **two automatic
+advances**. Phase 3.1's *"seed three real combs"* would yield three one-month
+experiments. `C3` (*"≥50% comb survival at 6 months"*) would not return a low
+number, it would return **zero by construction** — and we would be reading a
+build artifact as a market signal.
+
+**(c) It is the §1B.14 sentence again, on the other verb.** I wrote *"a rotation
+that only advances when its organizer taps is not a rotation, it's a reminder"*
+about **seal**. `ENG-91` closed that. It is true verbatim of **open**, and
+nothing has closed that. Same doctrine, same clock, second verb.
+
+**(d) It fails silently, and §1A's ratified sentence cannot see it.** The
+definition of done ends *"→ watch Sarah's reveal bloom."* Month 1 mints on an
+organizer tap (`ENG-93`), seals on the clock (`ENG-91`), delivers, blooms — **the
+ratified DoD is fully satisfied by a comb that then dies.** §1B.29 found a spec
+complete for the invitee and empty for the organizer; this is the same defect on
+the **time** axis — complete for month 1, empty for every month after. Two
+instances in one evening is a property of how that sentence was written, not a
+coincidence.
+
+#### Whose row it is
+
+Row 2633's own `OPS-9` text already says it: *"`pg_cron` jobs to **open a
+rotation**, fire notifications, seal on `closes_at`, trigger the reveal.
+**`ENG-60`'s runtime.**"* Row 1.8: *"the tick **advances state**."* §1B.29.2:
+*"`OPS-9` mints month N+1 as `service_role` … month 1 and month N+1 are the same
+call."* The migration's own comment routes it away — *"`ENG-60`, which mints the
+rotations this sweeps, isn't built yet"* (`:105`) — and that reading cannot hold:
+`OPS-9` is *`ENG-60`'s runtime*, so `ENG-60` is the **consumer** of the clock, not
+the clock. A client screen minting month N+1 is (c).
+
+#### RULED — `OPS-9` has a second half. It is a **blocked** row, not a rework.
+
+`advance_due_rotations()` ships as written. What it needs is a successor call it
+**cannot make yet**: `comb_open_rotation()` does not exist until `ENG-93`.
+
+- **Row 1.8 gains a dependency on row 1.7a (`ENG-93`).** Deps become `1.1`,
+  `1.8a`, **`1.7a`**. The row does not close until the tick, having resolved a
+  rotation, opens that comb's next one through the **same `comb_open_rotation`
+  body** `ENG-93` builds — §1B.29.2(c)'s one-body ruling, now with a third caller.
+  **`ENG-93` was on nobody's critical path; it is now on `OPS-9`'s.**
+- **Merge `OPS-9` now anyway.** The resolver half is independently correct and
+  blocks nothing. But mark row 1.8 **partial, not done** — this is precisely the
+  shape §1B.24.0 warns about: a requirement inside a ticket marked done
+  evaporates with it.
+
+#### Two product decisions the advance needs that no ruling has made
+
+Both mine, both ruled here, both cheap for Colin to reverse.
+
+1. **Whose month is next?** `comb_members` ordered by `joined_at`, wrapping,
+   skipping any seat closed by `removed_at` or whose profile is tombstoned — and
+   **skipping nobody else**, including the person whose month just voided. A
+   quiet month costs the comb a month; it does not cost that person their turn.
+   Any "earn your turn" rule turns the rotation into a scoreboard, which is §11's
+   rejected shape wearing a schedule.
+2. **When does month N+1 close?** `closes_at` of the rotation just resolved **+
+   the comb's cadence**, never `now() + cadence`. A tick that fires five minutes
+   late must not drift the comb's calendar five minutes every month. There is no
+   cadence column today — **`ENG-93`'s mint should write one on `combs`**,
+   defaulting to one month, so the number is stored once instead of hard-coded in
+   two callers.
+
+#### Three cheap items on the `OPS-9` PR, unrelated to the above
+
+1. **The gate is the sixth member of the exit-code class** (channel `46da8627…`).
+   `check-ops9-rotation-scheduler.mjs:69` sets `process.exitCode = 1` at the tally
+   and `:53` requires `embedded-postgres` — it can print `N failed` and exit `0`.
+   Sage's `sage/suite-exitcode-fix` is **better than what I asked for**:
+   `check-exit-code-integrity.mjs:86-114` is a static `readdirSync` sweep of every
+   `scripts/check-*.mjs`, not a hard-coded five, so it reds this gate on sight in
+   either merge order. Adding `process.exit(process.exitCode ?? 0)` now is one
+   line and avoids a red main.
+2. **`…0005` is triple-booked and I mis-tie-broke it.** I awarded `…0005` to Fizz.
+   Bumble's is **pushed** as `20260830000005_ops9_rotation_scheduler.sql`; Fizz's
+   `20260830000005_comb_preview_by_invite_code.sql` is still untracked in a
+   worktree. **Revised: Bumble keeps `…0005`, Fizz takes `…0006`, `ENG-92` takes
+   `…0007`.** Fewest total renames, and it moves the number off the two files that
+   are still invisible to everyone rather than off the one that isn't.
+3. **`check-ops9-rotation-scheduler.mjs:2` still cites
+   `20260830000004_ops9_rotation_scheduler.sql`** — stale from the `0004 → 0005`
+   rename. It names a file that exists on no branch.
+
+**Open:** `O3`, `O4`, `O8`. No new `O`.
+
+---
+
 
 ---
 
@@ -2630,7 +2750,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-93** | Fizz | M | **Create a comb.** NEW (§1B.29). `DES-29`'s happy path *person → occasion → date → invite by link → write* is designed and **built by nobody** — `create_comb`/`createComb` are zero hits in `src/`. Three parts: (a) the create screen + store method (**no migration** — `combs_insert_own` `20260830000002:165` and the owner-seat trigger `:352` are shipped, and `invite_code`'s `gen_random_uuid()` default `:150` is already 122 bits, closing `ENG-59`'s entropy sub-item); (b) **`comb_open_rotation()`** — a `security definer` mint granted to **both** `authenticated` and `service_role`, because `ENG-91` shipped seal-and-send only and **nothing mints a rotation at any month**; month 1 and `OPS-9`'s month N+1 must be the same body or every rotation invariant is written twice (§1B.29.2c). Carries §1B.24.1(c)'s tombstoned-subject refusal, which was filed into a function that does not exist; (c) **the organizer's name-collection gate** — Lumen's ruling `4fdd39e2…`, `ENG-59`'s component remounted with a header swap and *"Create the comb as Maya"*. ~~Depends on `ENG-92`~~ — **corrected §1B.30: `ENG-92` is a cleanup, not a gate.** The definer mint bypasses the `comb_members` WITH CHECK entirely (probed at `0f898ce`, CONTROL `42501` / PROBE succeeds), so the clause `ENG-92` deletes is never evaluated on this path. **Deps: `ENG-58` (done), `ENG-83`.** Two acceptance rows replace the dependency (§1B.30.1): the mint must **not** require the subject to be a `comb_members` row, and it carries the tombstoned-subject refusal |
 | **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Semantics ruled in §1B.16: seal-and-send, one event, idempotent.** **Cannot wrap `send_hive`** — its friend-connection precondition makes a comb undeliverable; authorization is **comb membership**. **Must refuse to deliver a zero-entry rotation.** **Gates the §1A definition of done** (there is no reveal without a seal) |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
-| **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to open a rotation, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime |
+| **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to **open a rotation**, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime. **§1B.31 — the open half is missing from the shipped branch and was routed to `ENG-60` in the migration's own comment; it cannot live there, because `OPS-9` *is* `ENG-60`'s runtime.** Also carries §1B.31's two unruled product decisions now ruled: next subject = `comb_members` by `joined_at` wrapping (skipping closed/tombstoned seats and **nobody else**), and `closes_at + cadence`, never `now() + cadence` |
 | **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays`. Follow `README.md`'s sweep procedure — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
 
 ### 8.4 Do not start
@@ -2684,7 +2804,7 @@ consequence, and learn in between.**
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
-| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
+| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick opens the comb's next rotation through `ENG-93`'s `comb_open_rotation()` — same body, third caller | 1.1, **1.8a**, **1.7a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
