@@ -26,6 +26,14 @@
 // which arm fired, matching seal_and_send_rotation's own undifferentiated
 // 'subject_gone' void reason -- the predicate answers one question.
 //
+// Plus ENG-100 (row 1.7b, §1B.36.9/.18/.19, same migration `...0010`): a
+// comb-of-one minting with the organizer as subject produces an empty
+// writing roster -- month 1 is exempt from §1B.31.3's floor, so this is
+// the only place it's observable. Asserted directly (SQLSTATE 23514 +
+// `constraint = 'comb_open_rotation_enrollable_floor'`) -- the
+// clock-boundary pair (§1B.36.11's rows 2/3) is unrunnable here
+// (comb_advance_rotation doesn't exist yet) and moved to row 1.8.
+//
 // Modeled on check-comb-preview.mjs for the harness shape (embedded
 // Postgres, SUPABASE_ENV fixture, asUser/asPostgres/asAnon helpers) and its
 // exit-code discipline (process.exit(1) directly, not process.exitCode).
@@ -409,6 +417,40 @@ async function main() {
           ok('Row 2 (departure arm): mint for a departed (non-tombstoned) subject is refused');
         } else {
           bad('Row 2 (departure arm): mint for a departed (non-tombstoned) subject is refused', `got: ${e.message}`);
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // ENG-100 (row 1.7b, §1B.36.9/.18/.19): a comb-of-one — organizer mints
+    // for THEMSELVES as subject, no other comb_members row — produces an
+    // empty writing roster (the subject excludes themselves from their own
+    // snapshot; combs_create_owner_membership_trigger is the only member
+    // this fresh comb has). Month 1 is exempt from §1B.31.3's floor, so
+    // this direct-mint assertion is ENG-100's entire acceptance — the
+    // clock-boundary pair (rows 2/3) moved to row 1.8, OPS-9's finisher,
+    // per §1B.36.19: unrunnable here since comb_advance_rotation doesn't
+    // exist yet.
+    {
+      const { rows: soloComb } = await asUser(OWNER, () =>
+        client.query("insert into public.combs (owner_id, name) values ($1, 'Solo Comb') returning id", [OWNER])
+      );
+      try {
+        await asUser(OWNER, () =>
+          client.query('select public.comb_open_rotation($1, $2, now() + interval \'30 days\')', [
+            soloComb[0].id,
+            OWNER,
+          ])
+        );
+        bad('ENG-100: comb-of-one, self-subject mint is refused — empty roster floor', 'mint succeeded');
+      } catch (e) {
+        if (e.code === '23514' && e.constraint === 'comb_open_rotation_enrollable_floor') {
+          ok('ENG-100: comb-of-one, self-subject mint is refused — empty roster floor');
+        } else {
+          bad(
+            'ENG-100: comb-of-one, self-subject mint is refused — empty roster floor',
+            `got code=${e.code} constraint=${e.constraint} message=${e.message}`
+          );
         }
       }
     }

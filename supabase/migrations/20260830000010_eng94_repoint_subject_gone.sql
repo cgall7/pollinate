@@ -32,6 +32,32 @@
 -- seal via ENG-91's own comb_subject_gone check. An invitee holding a
 -- live link to a doomed rotation should not be told the month is active
 -- only to have it void silently later.
+--
+-- ENG-100 (row 1.7b, §1B.36.9/.18/.19, riding this migration per
+-- §1B.36.18's routing): comb_open_rotation gains the empty-writing-roster
+-- floor. Month 1 is exempt from §1B.31.3's ≥2-ENROLLABLE floor by ruling,
+-- so the mint is the ONLY place an organizer minting themselves as
+-- subject in a comb of one (or a comb whose only other members are
+-- tombstoned) is observable -- zero contributor rows, a guaranteed-quiet
+-- void with no raise. Two changes: (1) the roster snapshot now excludes
+-- tombstoned contributors too, not just departed ones -- the general
+-- ENROLLABLE predicate (§1B.36.9: comb_members.removed_at is null AND
+-- profiles.deleted_at is null), never "exclude the organizer" (§1B.36.18
+-- Correction 1: on `main` today the tombstoned-non-owner class is empty
+-- by construction -- delete_own_account closes every non-owner seat in
+-- the same transaction -- so the predicate's ground is §1B.32's naming
+-- discipline plus future writers inheriting the filter, not today's one
+-- member). (2) `get diagnostics` the snapshot's row_count; at zero, raise.
+-- Per §1B.36.13/.14: `using errcode = 'check_violation'` (SQLSTATE 23514
+-- on the wire -- the condition name itself never crosses), plus
+-- `using constraint = 'comb_open_rotation_enrollable_floor'` (required --
+-- 23514 alone aliases six native CHECK producers on this write path,
+-- §1B.36.13 §2). Deliberately no `using table` -- the refusal is over the
+-- roster, not any one relation, and Vector's probe (§1B.36.14) confirmed
+-- omitting it leaves the genuine-CHECK-violation case still distinguishable
+-- via the `schema` field, which a hand-written raise can never populate.
+-- The constraint name is function-scoped, not a `pg_constraint` row --
+-- there is no real constraint by this name to look up.
 create or replace function public.comb_open_rotation(
   p_comb_id uuid,
   p_subject_profile_id uuid,
@@ -48,6 +74,7 @@ declare
   v_hive_id uuid;
   v_ordinal int;
   v_rotation_id uuid;
+  v_contributor_count int;
 begin
   select c.owner_id into v_owner_id
   from public.combs c
@@ -84,13 +111,30 @@ begin
   )
   returning id into v_hive_id;
 
-  -- Roster snapshot: every active comb member except the subject.
+  -- Roster snapshot: every ENROLLABLE comb member except the subject --
+  -- active (removed_at is null) AND not tombstoned (ENG-100, §1B.36.9/.18).
   insert into public.hive_contributors (hive_id, profile_id, invited_by)
   select v_hive_id, m.profile_id, v_owner_id
   from public.comb_members m
   where m.comb_id = p_comb_id
     and m.removed_at is null
-    and m.profile_id <> p_subject_profile_id;
+    and m.profile_id <> p_subject_profile_id
+    and not exists (
+      select 1
+      from public.profiles p
+      where p.id = m.profile_id
+        and p.deleted_at is not null
+    );
+
+  get diagnostics v_contributor_count = row_count;
+
+  -- ENG-100 (row 1.7b): month 1 is exempt from §1B.31.3's ≥2-ENROLLABLE
+  -- floor, so this is the only place an empty writing roster is
+  -- observable. See migration header for the errcode/constraint reasoning.
+  if v_contributor_count = 0 then
+    raise exception 'comb_open_rotation: no enrollable contributors for this rotation'
+      using errcode = 'check_violation', constraint = 'comb_open_rotation_enrollable_floor';
+  end if;
 
   select coalesce(max(r.ordinal), 0) + 1 into v_ordinal
   from public.comb_rotations r
