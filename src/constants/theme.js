@@ -243,9 +243,31 @@ const colors = {
   // blur, because the glass body sits at 254-255 lum and white has no headroom
   // left to brighten into. Raising the rim's alpha is a dead end — the fix is a
   // hairline of ink UNDER the white, so the edge is defined by the dark line and
-  // the white reads as the specular gleam on top of it. 10%, the middle of the
-  // spec's 8-12% interval, to be re-measured on a device.
-  glassHairline: withAlpha(pigment.ink, 0.1),
+  // the white reads as the specular gleam on top of it.
+  //
+  // GL7(a), 2026-08-30 — 0.10 -> 0.18. The 10% was "the middle of the spec's
+  // 8-12% interval, to be re-measured on a device"; it was never derived, and
+  // its interval was guessed before anyone computed what the rim above it does
+  // to it. `glassRim` is `surface`@0.65, so an ink hairline on a COINCIDENT
+  // frame is attenuated to its transmission through that rim — a factor of
+  // 1 - 0.65 = 0.35. At 0.10 the composite carries 0.035 of ink: the hairline
+  // spends two-thirds of itself on the layer above it, and the white rim ALONE
+  // is ΔE00 0.1287 from the body (an order of magnitude under JND), so the
+  // hairline is not an enhancement here — it is the entire edge.
+  //
+  // 0.18 lands ΔE00 3.0125/2.9407 on the derivation's carriers, mid-band of the
+  // blur rung's own measured rim (2.88/1.67/3.19), which is what keeps the two
+  // rungs reading as one material. Re-measured for GL7(d) on all four hive
+  // cover grounds — the covers the borrower circles sit on — and it holds
+  // there too: 2.8658/2.8704/2.9902/2.9292, within 0.15 of the derivation's
+  // figure, so this is one token and not a per-ground tuning.
+  //
+  // Derivation: GUIDES/POLLINATE_GL1_HAIRLINE_DERIVATION.md §3-§4. The
+  // alternative (widen the hairline to 2pt so 1pt shows inboard at full
+  // strength, ΔE00 4.99) was declined there: it doubles the chrome edge's
+  // visual weight on the one rung the material is meant to be lightest on.
+  // Move the quantity that is under-specified, not the one that was ruled.
+  glassHairline: withAlpha(pigment.ink, 0.18),
 
   // --- Accent alphas ---
   // Marigold as an EDGE, not a fill — §4's "yellow never fills it" still holds.

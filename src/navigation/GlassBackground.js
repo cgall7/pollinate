@@ -115,7 +115,21 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.glassLens,
   },
   hairline: {
-    borderWidth: StyleSheet.hairlineWidth,
+    // GL7(a), 2026-08-30 — `StyleSheet.hairlineWidth` was a conformance miss,
+    // not a choice: GL1_GL2_DESIGN_INTEGRATION.md § Rim Treatment rules this
+    // line at 1pt, coincident with the white rim below it, and on a 3x device
+    // `hairlineWidth` is 0.333pt — one third of the ruled width. It compounded
+    // the alpha defect it sits next to: a one-physical-pixel band, antialiased
+    // along a rounded path, at the ΔE00 the shipped 0.10 alpha could reach, is
+    // at the edge of resolvability. Separate defect from the alpha, same two
+    // lines, so they land together.
+    //
+    // 1, not `StyleSheet.hairlineWidth`, has to match `rim`'s width exactly —
+    // borders paint inboard, so equal widths are what make the two frames
+    // coincident and the transmission model above (0.35 through the rim) true.
+    // If these two ever differ, the hairline stops being "under" the rim and
+    // starts being a second visible ring outboard of it.
+    borderWidth: 1,
     borderColor: theme.colors.glassHairline,
   },
   rim: {
