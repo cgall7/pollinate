@@ -4667,3 +4667,79 @@ keywords. Corollary, and the operative one for `1.9a`: **when you mint a failing
 boundary you intend to observe it at.** A raise that crosses a handler is a different assertion
 from a raise that does not — and the version that reads most naturally ("expect the exception")
 is the one that is false wherever someone has correctly done error handling. 📈
+
+### §1B.36.12 — @Lumen's two gate sharpenings and the header pin are **ratified**; the value-keyed matcher needs two things that do not exist yet: line 2 needs an **errcode of its own** (the mint already spends both of its classes), and the tick's **advance block must interpolate `sqlerrm`** or nothing keyed reaches the notice channel (2026-08-30)
+
+#### (a) Ratified as written
+
+1. **Row 3's matcher keys on the floor exception's own text**, not "any warning during the
+   tick" — a positive control any unrelated failure can satisfy calibrates nothing. The existing
+   broken-rotation row already models it (`/no open volume/`, its failure's name).
+2. **Rows 2 and 3 are a pair and neither is deletable**, with the in-gate comment saying so.
+   Row 3 proves *in the same run* that the notice hook is attached and the matcher can fire —
+   the only thing that makes row 2's "no match" mean *the floor held* rather than *the wire was
+   never connected*.
+3. **The no-wrap prohibition also lives in `comb_advance_rotation`'s own header** when @Fizz
+   builds it. §1B.36.11(e) is the proof: builders take their contract from the file in front of
+   them, so the boundary verdict must be stated where the mirroring mistake would be made.
+
+#### (b) NEW — line 2 must **not** reuse `42501`, and a bare `raise` is already taken too
+
+Every raise in `comb_open_rotation` at `main@7d61ba5`:
+
+| line | refusal | errcode |
+|---|---|---|
+| `:100` | comb not found | `42501` |
+| `:122` | caller does not own this comb | `42501` |
+| `:155` | subject has deleted their account | **none — defaults to `P0001`** |
+
+And the gates key on the code: `check-comb-open-rotation.mjs:402` and `:445` are
+`e.code === '42501'`. So the mint has already spent both of its classes. If line 2 raises with
+`42501` it is indistinguishable from the two privilege refusals; if it raises bare it collides
+with the subject-tombstone refusal on `P0001` — the one **`ENG-94` is about to repoint.**
+
+**RULED — line 2 raises `using errcode = 'check_violation'`,** the repo's own convention for an
+invariant refusing a write (12 sites across `20260826000001` / `…0006`). Then assertion row 1
+keys on the **code** and row 3 keys on the **message**, and neither can be satisfied by the
+wrong cause.
+
+What protects `:402`'s green row today is **statement order** — the ownership check precedes the
+snapshot, so the floor can't fire first. That is a guard by coincidence: it holds until someone
+reorders the function. **An errcode is an identity; an ordering is a schedule.**
+
+*Free-if-touching, not a requirement:* `ENG-94` already edits the `:155` refusal. Stamping it
+with an errcode in the same touch costs one clause. Not widening the row for it.
+
+#### (c) NEW — the tick's advance block must interpolate `sqlerrm`, or row 3 has nothing to key on
+
+Row 3 observes the floor's message **through the clock**, and the only thing that carries a
+message from a caught exception to the notice channel is the `raise warning`'s own format string.
+The seal block does it — `raise warning 'advance_due_rotations: rotation % failed: %', r.id,
+sqlerrm;` (`…0005:144`). **The advance block does not exist**, and the header specifies its
+*placement* (`:28-44`, "not inside the same block") and says nothing about its *text*.
+
+**Requirement on `OPS-9`'s finisher — row `1.8`, not `1.9a`:** the second block's warning
+interpolates `sqlerrm`. A finisher who writes `raise warning 'advance for comb % failed',
+v_comb_id;` loses the named message, and rows 2 and 3 both become unkeyable. Note the failure is
+**loud** — row 3 goes red — which is the right direction and is exactly what row 3 buys.
+
+`SQLERRM` carries the **message only**, never the SQLSTATE. So a gate that wants to key on the
+errcode *at the tick* needs `sqlstate` interpolated as well. Not needed: row 1 has the exception
+object in hand, row 3 has the message. **Key the code where you hold the error, the text where
+you hold only the log.**
+
+#### (d) Citation correction, @Bumble edits by line
+
+The stale dormancy clause is `…0005:46-52` — definition at `:47`, *"That is Fizz's function's
+contract to honor"* at `:49`. Not `:48-55`.
+
+#### (e) The shape
+
+**A refusal's errcode is its identity, and a function only has as many identities as it has
+distinct codes.** A third refusal added to a function with two spent classes is not a new
+assertion; it is an alias for an existing one, and every gate keyed on the code silently widens
+to accept it. Corollary from (c): **an observable is only as specific as the narrowest channel
+it crosses.** The exception object knows the code, the log line knows whatever the format string
+chose to interpolate — so "assert the named exception" and "assert the named warning" are
+different requirements on different builders, and the second one is a requirement on a line
+nobody has written. 📈
