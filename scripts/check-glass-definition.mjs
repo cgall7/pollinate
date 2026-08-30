@@ -39,6 +39,19 @@
 //   D5  DERIVATION, recomputed from theme.js's live tokens: on the spec's own
 //       composite carrier, the hairline's contribution (rim alone vs rim over
 //       hairline) lands inside the blur rung's measured rim band.
+//   E1  the stack is declared in exactly ONE file — keyed on its two border
+//       COLOURS, so a copy under new style names is still caught
+//   E2  the tab capsule CONSUMES that shared stack rather than owning it
+//   E3  every mount painted `glassFill` carries the stack — the borrower
+//       population is derived from the fill token, never listed, so a borrower
+//       added later joins the row by existing
+//   E4  BackButton's fill and rim ride ONE predicate (its glass variant is the
+//       only conditional consumer)
+//   E5  each mount's rim radius equals its host's declared borderRadius
+//   E6  `glassLens` stays inside the material — the ratified (d) decline
+//   E7  lone `glassRim` rings (the specular half with no substrate) are exactly
+//       the ratified set — a new one needs its own ruling, not a silent list
+//
 //   D6  the same, live-enumerated over EVERY cover theme — the four grounds
 //       the borrower circles sit on (GL7(d)). This is what licenses ONE token
 //       rather than a per-ground tuning, and it expires correctly when the
@@ -86,7 +99,11 @@ import { over, deltaE00, parseColor } from './lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
-const GLASS = path.join(SRC, 'navigation/GlassBackground.js');
+// GL7(d′) moved the stack into its own module: it is now worn by the tab
+// capsule, the account door, and the six borrower circles, so it cannot live
+// inside any one of them. D1-D4 follow it — they assert the stack itself.
+const GLASS = path.join(SRC, 'components/GlassRim.js');
+const CAPSULE = path.join(SRC, 'navigation/GlassBackground.js');
 
 let pass = 0;
 const failures = [];
@@ -129,9 +146,9 @@ const glassSrc = fs.readFileSync(GLASS, 'utf8');
 let ast = null;
 try {
   ast = parse(glassSrc, { sourceType: 'module', plugins: ['jsx'] });
-  ok('GlassBackground.js parses');
+  ok('GlassRim.js parses');
 } catch (err) {
-  bad('GlassBackground.js parses', err.message);
+  bad('GlassRim.js parses', err.message);
 }
 
 const walk = (node, visit) => {
@@ -327,6 +344,322 @@ if (!hairTok || !rimTok) {
         `single ruled alpha does not serve. This row does NOT say the alpha is wrong: it ` +
         `says the population changed and the token has to be re-solved against it`);
     }
+  }
+}
+
+// ── E — GL7(d′): ONE stack, worn by a population this gate DERIVES ──────────
+//
+// GL7(d) asked whether the surfaces wearing `glass*` token names as flat fills
+// should convert to the real material. Measured, no: nothing moves under any
+// of them (the through-material term is identically zero), and the lens veil
+// is FAINTER than the flat fill they already have. What they were missing was
+// the edge, so (d′) gives them the edge — the same stack, imported, not a
+// copy. These rows are what keeps "the same stack" true a month from now.
+const listFiles = (dir) => {
+  const out = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...listFiles(full));
+    else if (e.name.endsWith('.js')) out.push(full);
+  }
+  return out;
+};
+const rel = (f) => path.relative(ROOT, f);
+const srcFiles = listFiles(SRC);
+const parsed = new Map();
+for (const f of srcFiles) {
+  const text = fs.readFileSync(f, 'utf8');
+  let fileAst = null;
+  try {
+    fileAst = parse(text, { sourceType: 'module', plugins: ['jsx'] });
+  } catch {
+    fileAst = null;
+  }
+  // A token NAMED in a comment is not a token USED. E6 is a text search, so it
+  // gets a copy with every comment range blanked — otherwise the row fires on
+  // prose explaining why a surface does NOT use the lens, which is exactly the
+  // prose this change adds to three files.
+  let codeOnly = text;
+  if (fileAst?.comments?.length) {
+    const chars = [...text];
+    for (const c of fileAst.comments) {
+      for (let i = c.start; i < c.end; i += 1) if (chars[i] !== '\n') chars[i] = ' ';
+    }
+    codeOnly = chars.join('');
+  }
+  parsed.set(f, { text, codeOnly, ast: fileAst });
+}
+
+// Every `StyleSheet.create` entry in src/, as { file, name, props: Map<key, text> }.
+const allStyles = [];
+for (const [f, { text, ast: fileAst }] of parsed) {
+  if (!fileAst) continue;
+  walk(fileAst.program, (node) => {
+    if (
+      node.type !== 'CallExpression' ||
+      node.callee?.type !== 'MemberExpression' ||
+      node.callee.object?.name !== 'StyleSheet' ||
+      node.callee.property?.name !== 'create'
+    ) return;
+    const obj = node.arguments?.[0];
+    if (obj?.type !== 'ObjectExpression') return;
+    for (const prop of obj.properties) {
+      const name = prop.key?.name;
+      if (!name || prop.value?.type !== 'ObjectExpression') continue;
+      const props = new Map();
+      for (const inner of prop.value.properties) {
+        if (!inner.key?.name || !inner.value) continue;
+        props.set(inner.key.name, text.slice(inner.value.start, inner.value.end));
+      }
+      allStyles.push({ file: f, name, props, line: prop.loc?.start?.line });
+    }
+  });
+}
+
+// ── E1 — the stack is declared in exactly ONE file ──────────────────────────
+// Keyed on the HAIRLINE, not on the style names: a copy pasted under different
+// names is the same defect and is the likely shape of it, and the hairline is
+// the half that has no other legitimate consumer. It exists only as the
+// substrate the rim gleams against — a second file holding one is a second
+// stack. (`glassRim` alone is NOT that; it is a token borrow, and E7 handles
+// it, because a lone specular ring is a different treatment with a different
+// verdict.)
+const declarers = new Set();
+for (const st of allStyles) {
+  if (st.props.get('borderColor') === 'theme.colors.glassHairline') declarers.add(st.file);
+}
+if (declarers.size === 1 && declarers.has(GLASS)) {
+  ok(`E1 the hairline — and so the stack — is declared in exactly one file (${rel(GLASS)}) — capsule and ` +
+     `borrowers share it, so neither alpha can drift out from under the other`);
+} else {
+  bad('E1 the hairline — and so the stack — is declared in exactly one file',
+    `declared in [${[...declarers].map(rel).join(', ') || 'nowhere'}] — expected only ` +
+    `${rel(GLASS)}. A second copy is how this population split into two materials the ` +
+    `first time (C2: four back buttons, four looks); the whole point of (d′) is that ` +
+    `there is one stack to retune, not one per surface`);
+}
+
+// ── E2 — the capsule consumes the shared stack ──────────────────────────────
+const capsuleSrc = fs.readFileSync(CAPSULE, 'utf8');
+const capsuleImports = /import\s*\{[^}]*\bGlassRim\b[^}]*\}\s*from\s*'[^']*GlassRim'/.test(capsuleSrc);
+const capsuleRenders = /<GlassRim\b/.test(capsuleSrc);
+if (capsuleImports && capsuleRenders) {
+  ok('E2 GlassBackground imports and renders the shared <GlassRim> — the capsule is a ' +
+     'consumer of the stack, not its owner');
+} else {
+  bad('E2 GlassBackground imports and renders the shared <GlassRim>',
+    `import=${capsuleImports}, render=${capsuleRenders} — if the capsule stops consuming ` +
+    `the shared stack, E1 can still pass while the two rungs and the borrowers quietly ` +
+    `wear different edges`);
+}
+
+// ── E3 / E5 — the borrower population, derived from the FILL token ──────────
+// Not a list of files. Any style that paints `glassFill` is a borrower by
+// definition, and every element that wears one must carry the stack — so a
+// borrower added later joins this row by existing.
+const fillStyles = allStyles.filter((st) => st.props.get('backgroundColor') === 'theme.colors.glassFill');
+const hasDescendant = (node, elementName) => {
+  let found = false;
+  walk(node, (n) => {
+    if (n.type === 'JSXOpeningElement' && n.name?.name === elementName) found = true;
+  });
+  return found;
+};
+
+if (fillStyles.length === 0) {
+  bad('E3 the borrower population is non-empty',
+    'no style in src/ paints `theme.colors.glassFill` — either the borrowers were ' +
+    'retired (in which case retire this row) or the enumerator broke, and those are ' +
+    'not the same thing. Fails closed rather than reporting an empty population green');
+} else {
+  const byFile = new Map();
+  for (const st of fillStyles) {
+    if (!byFile.has(st.file)) byFile.set(st.file, new Set());
+    byFile.get(st.file).add(st.name);
+  }
+  const mounts = [];
+  for (const [f, names] of byFile) {
+    const { text, ast: fileAst } = parsed.get(f);
+    if (!fileAst) { mounts.push({ file: f, name: '(unparsed)', ok: false, why: 'file did not parse' }); continue; }
+    walk(fileAst.program, (node) => {
+      if (node.type !== 'JSXElement') return;
+      const styleAttr = node.openingElement?.attributes?.find((a) => a.name?.name === 'style');
+      if (!styleAttr) return;
+      const attrText = text.slice(styleAttr.start, styleAttr.end);
+      const worn = [...names].filter((n) => new RegExp(`\\bstyles\\.${n}\\b`).test(attrText));
+      if (worn.length === 0) return;
+      mounts.push({
+        file: f,
+        name: worn.join('+'),
+        line: node.loc?.start?.line,
+        node,
+        attrText,
+        rimmed: hasDescendant(node, 'GlassRim'),
+      });
+    });
+  }
+
+  const bare = mounts.filter((m) => !m.rimmed);
+  if (bare.length === 0 && mounts.length > 0) {
+    ok(`E3 all ${mounts.length} glassFill mounts carry <GlassRim> ` +
+       `(${mounts.map((m) => `${path.basename(m.file)}:${m.line}`).join(', ')}) — the ` +
+       `population is derived from the fill token, so a new borrower joins this row by existing`);
+  } else if (mounts.length === 0) {
+    bad('E3 every glassFill style has a mount',
+      `${fillStyles.length} glassFill style(s) declared but no JSX element references one — ` +
+      `a declared-and-unmounted borrower cannot be checked, and this row will not call that green`);
+  } else {
+    bad('E3 all glassFill mounts carry <GlassRim>',
+      `${bare.length} of ${mounts.length} bare: ` +
+      `${bare.map((m) => `${rel(m.file)}:${m.line} (${m.name})`).join(', ')} — a flat ` +
+      `translucent fill with no edge is what Colin was looking at when he said the glass ` +
+      `was hard to tell apart from the page`);
+  }
+
+  // ── E5 — the rim traces the host's edge ───────────────────────────────────
+  // A rim at a different radius than the box it frames is a visible mismatch
+  // at the corners, not a subtle one. Resolved from the host element's OWN
+  // referenced styles (the radius commonly sits on a sibling style in the same
+  // array — `styles.button` next to `styles.glass`), and FAILS CLOSED when
+  // either side cannot be read rather than assuming they agree.
+  const radiusRows = [];
+  for (const m of mounts) {
+    if (!m.node) { radiusRows.push({ m, ok: false, why: 'no AST node' }); continue; }
+    const refs = [...m.attrText.matchAll(/\bstyles\.(\w+)\b/g)].map((x) => x[1]);
+    const radii = new Set();
+    for (const r of refs) {
+      const st = allStyles.find((x) => x.file === m.file && x.name === r);
+      const v = st?.props.get('borderRadius');
+      if (v) radii.add(v);
+    }
+    let propText = null;
+    walk(m.node, (n) => {
+      if (propText !== null) return;
+      if (n.type !== 'JSXOpeningElement' || n.name?.name !== 'GlassRim') return;
+      const a = n.attributes?.find((x) => x.name?.name === 'radius');
+      if (a?.value?.type === 'JSXExpressionContainer') {
+        propText = parsed.get(m.file).text.slice(a.value.expression.start, a.value.expression.end);
+      }
+    });
+    if (radii.size !== 1) {
+      radiusRows.push({ m, ok: false, why: `host borderRadius resolved to ${radii.size} values [${[...radii].join(', ')}]` });
+    } else if (propText === null) {
+      radiusRows.push({ m, ok: false, why: '<GlassRim> declares no `radius`' });
+    } else if (propText !== [...radii][0]) {
+      radiusRows.push({ m, ok: false, why: `host \`${[...radii][0]}\` vs rim \`${propText}\`` });
+    } else {
+      radiusRows.push({ m, ok: true, why: propText });
+    }
+  }
+  const offRadius = radiusRows.filter((r) => !r.ok);
+  if (offRadius.length === 0 && radiusRows.length > 0) {
+    ok(`E5 every mount's rim radius matches its host's borderRadius ` +
+       `(${radiusRows.map((r) => `${path.basename(r.m.file)}:${r.m.line} ${r.why}`).join(', ')})`);
+  } else {
+    bad("E5 every mount's rim radius matches its host's borderRadius",
+      `${offRadius.map((r) => `${rel(r.m.file)}:${r.m.line} — ${r.why}`).join('; ')} — the ` +
+      `stack is two absolutely-filled bordered frames, so it traces whatever radius it is ` +
+      `told and nothing about the host constrains it`);
+  }
+}
+
+// ── E4 — BackButton's fill and rim ride ONE predicate ───────────────────────
+// This is the only conditional consumer: the same component renders `solid` for
+// seven call sites and `glass` for four. The fill and the edge have to arrive
+// together, so both read the same identifier rather than each testing `variant`
+// independently — two copies of a predicate is two places for a third variant
+// to be added to only one of.
+{
+  const bb = parsed.get(path.join(SRC, 'components/BackButton.js'));
+  if (!bb?.ast) {
+    bad('E4 BackButton gates fill and rim on one predicate', 'BackButton.js did not parse');
+  } else {
+    const tests = [];
+    walk(bb.ast.program, (node) => {
+      if (node.type !== 'ConditionalExpression') return;
+      const whole = bb.text.slice(node.start, node.end);
+      if (/styles\.glass\b/.test(whole)) tests.push({ role: 'fill', test: bb.text.slice(node.test.start, node.test.end) });
+      else if (/<GlassRim\b/.test(whole)) tests.push({ role: 'rim', test: bb.text.slice(node.test.start, node.test.end) });
+    });
+    const fill = tests.find((t) => t.role === 'fill');
+    const rimT = tests.find((t) => t.role === 'rim');
+    if (!fill || !rimT) {
+      bad('E4 BackButton gates fill and rim on one predicate',
+        `found [${tests.map((t) => t.role).join(', ') || 'none'}] — expected one conditional ` +
+        `selecting \`styles.glass\` and one selecting \`<GlassRim>\``);
+    } else if (fill.test !== rimT.test) {
+      bad('E4 BackButton gates fill and rim on one predicate',
+        `fill tests \`${fill.test}\`, rim tests \`${rimT.test}\` — two predicates is two ` +
+        `places to add a variant, and a variant that gets the fill without the edge is a ` +
+        `borrower this gate's E3 cannot see (it is still \`glassFill\`, still mounted, ` +
+        `just conditionally unrimmed)`);
+    } else {
+      ok(`E4 BackButton gates fill and rim on the same predicate (\`${fill.test}\`)`);
+    }
+  }
+}
+
+// ── E6 — the lens veil stays inside the material ────────────────────────────
+// The ratified decline, encoded. `glassLens` is the veil INSIDE `GlassView`; a
+// borrower circle painted with it would be a conversion, and conversion was
+// measured as a regression: `surface`@0.35 vs the shipped 0.40 is -0.6859 /
+// -0.5122 / -0.3396 / -0.3409 ΔE00 body-vs-cover on sunlit-honey / wildflower /
+// starlight / cream-gold, with zero refraction bought, because the ground under
+// every one of these is static.
+{
+  const lensFiles = new Set();
+  for (const [f, { codeOnly }] of parsed) {
+    if (/theme\.colors\.glassLens\b/.test(codeOnly)) lensFiles.add(f);
+  }
+  const expected = rel(CAPSULE);
+  const got = [...lensFiles].map(rel).sort();
+  if (got.length === 1 && got[0] === expected) {
+    ok(`E6 \`glassLens\` appears only in ${expected} — the veil is a property of the ` +
+       `material, not a fill anyone can borrow`);
+  } else {
+    bad('E6 `glassLens` appears only in the material itself',
+      `found in [${got.join(', ') || 'nowhere'}], expected only [${expected}] — a surface ` +
+      `with a static ground painted at the lens alpha is strictly fainter than the same ` +
+      `surface at \`glassFill\`, and buys no refraction to pay for it`);
+  }
+}
+
+// ── E7 — lone specular rings, named ─────────────────────────────────────────
+// `glassRim` without a hairline under it is a DIFFERENT treatment, and it is
+// ruled differently: GL7's named declines keep avatar rings, category badges
+// and content cards flat — glass is chrome, never content.
+//
+// It also measures differently, and that is the part worth writing down,
+// because GL7(a)'s finding reads like it condemns the lone rim everywhere and
+// it does not. "The white rim ALONE is ΔE00 0.1287" is a property of the PAIR,
+// not of the token: the glass body sits at 254-255 luminance, so a translucent
+// white line has nothing left to be brighter than. Framing a saturated body it
+// is perfectly legible — `surface`@0.65 over the five avatar washes measures
+// ΔE00 9.3064 / 6.5868 / 4.3743 / 14.7421 / 22.6451 (washYellow / washPeach /
+// washSky / accent / accentDeep). Avatar needs no hairline. The capsule did.
+//
+// EXACT SET, deliberately: a NEW lone-rim borrower is not a defect this row can
+// judge, it is a surface that needs its own ruling — so it goes red and gets
+// one, rather than joining a list quietly.
+{
+  const RATIFIED_LONE_RIM = ['src/components/Avatar.js'];
+  const loneRim = new Set();
+  for (const st of allStyles) {
+    if (st.file === GLASS) continue;
+    if (st.props.get('borderColor') === 'theme.colors.glassRim') loneRim.add(rel(st.file));
+  }
+  const got = [...loneRim].sort();
+  const want = [...RATIFIED_LONE_RIM].sort();
+  if (got.length === want.length && got.every((f, i) => f === want[i])) {
+    ok(`E7 lone \`glassRim\` rings are exactly the ratified set (${want.join(', ') || 'none'}) — ` +
+       `a specular ring with no hairline under it is legible on a saturated body and ` +
+       `near-invisible on a near-white one, so each one is a per-surface ruling`);
+  } else {
+    bad('E7 lone `glassRim` rings are exactly the ratified set',
+      `found [${got.join(', ') || 'none'}], ratified [${want.join(', ') || 'none'}] — this row ` +
+      `does NOT say the new one is wrong. It says a surface started wearing the specular ` +
+      `half of the stack without the substrate, and whether that reads depends entirely on ` +
+      `what it is framing`);
   }
 }
 

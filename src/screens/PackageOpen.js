@@ -11,6 +11,7 @@ import { hasNectarConsent } from '../constants/nectar';
 import { randomUUID } from '../utils/uuid';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
+import { GlassRim } from '../components/GlassRim';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { NectarConsentSheet } from '../components/NectarConsentSheet';
 import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
@@ -459,6 +460,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
           accessibilityLabel="Close"
         >
           <Ionicons name="close" size={22} color={cover.textColor} />
+          <GlassRim radius={theme.borderRadius.full} />
         </PressableScale>
         <Text style={styles.emptyTitle}>We couldn't reach this package.</Text>
         <Text style={styles.emptyBody}>Check your connection and try again.</Text>
@@ -480,6 +482,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
         accessibilityLabel="Close package"
       >
         <Ionicons name="close" size={22} color={cover.textColor} />
+        <GlassRim radius={theme.borderRadius.full} />
       </PressableScale>
 
       {step ? (
@@ -767,6 +770,13 @@ const styles = StyleSheet.create({
     right: 24,
     zIndex: 1,
   },
+  // GL7(d′) — `glassFill` (`surface`@0.40) STAYS. This circle floats over a
+  // flat `cover.base` with its scroll region inset below it by construction,
+  // so nothing ever passes underneath it and converting it to the real lens
+  // would buy zero refraction while making the body FAINTER (`surface`@0.35:
+  // -0.34 to -0.69 ΔE00 body-vs-cover on the four covers). Its definition
+  // comes from the shared `<GlassRim>` above instead — same stack as the tab
+  // capsule, 2.87-2.99 ΔE00 of hairline contribution at the edge.
   closeButton: {
     width: 40,
     height: 40,

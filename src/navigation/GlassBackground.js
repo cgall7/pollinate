@@ -3,6 +3,7 @@ import { View, StyleSheet, Platform, AccessibilityInfo } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { theme } from '../constants/theme';
+import { GlassRim } from '../components/GlassRim';
 
 // GL1 — the top rung. `isLiquidGlassAvailable()` is a runtime capability check
 // (iOS 26 and a binary carrying the native module), so it is read ONCE at module
@@ -55,7 +56,10 @@ export const GlassBackground = ({ radius }) => {
     return <View style={[StyleSheet.absoluteFill, clip, styles.androidFallback]} />;
   }
 
-  // The rim stack, shared by both live rungs so they cannot drift apart.
+  // The rim stack, shared by both live rungs so they cannot drift apart — and
+  // now, since GL7(d′), by the borrower circles as well. It lives in
+  // `components/GlassRim` for that reason: one stack, four consumers, no copy
+  // to drift.
   //
   // GL1 residual (a): the white rim ALONE reads weaker on glass than on blur —
   // the body is already at the top of the luminance scale, so a white line has
@@ -63,21 +67,12 @@ export const GlassBackground = ({ radius }) => {
   // the white something to gleam against. Order is the mechanism: hairline
   // first, white over it, so on a bright ground you read a gleam with a dark
   // edge and on a dark one you read a dark edge with a gleam.
-  const rim = (
-    <>
-      <View
-        style={[StyleSheet.absoluteFill, styles.hairline, { borderRadius: radius }]}
-        pointerEvents="none"
-      />
-      {/* ONE 1pt specular edge — the detail that reads as glass, not chrome.
-          This used to spread `StyleSheet.absoluteFillObject`, which does not
-          exist in react-native 0.86.2 (StyleSheetExports.js exports
-          `absoluteFill` only). Spreading `undefined` is legal and silent, so
-          the rim lost its positioning and painted as a 2pt stub at the top
-          of the bar instead of tracing its edge. */}
-      <View style={[StyleSheet.absoluteFill, styles.rim, { borderRadius: radius }]} pointerEvents="none" />
-    </>
-  );
+  //
+  // (The frames spread `StyleSheet.absoluteFill`, never `absoluteFillObject` —
+  // the latter does not exist in react-native 0.86.2, and spreading `undefined`
+  // is legal and silent, so the rim once lost its positioning and painted as a
+  // 2pt stub at the top of the bar instead of tracing its edge.)
+  const rim = <GlassRim radius={radius} />;
 
   if (LIQUID_GLASS) {
     return (
@@ -113,27 +108,5 @@ const styles = StyleSheet.create({
   },
   lensVeil: {
     backgroundColor: theme.colors.glassLens,
-  },
-  hairline: {
-    // GL7(a), 2026-08-30 — `StyleSheet.hairlineWidth` was a conformance miss,
-    // not a choice: GL1_GL2_DESIGN_INTEGRATION.md § Rim Treatment rules this
-    // line at 1pt, coincident with the white rim below it, and on a 3x device
-    // `hairlineWidth` is 0.333pt — one third of the ruled width. It compounded
-    // the alpha defect it sits next to: a one-physical-pixel band, antialiased
-    // along a rounded path, at the ΔE00 the shipped 0.10 alpha could reach, is
-    // at the edge of resolvability. Separate defect from the alpha, same two
-    // lines, so they land together.
-    //
-    // 1, not `StyleSheet.hairlineWidth`, has to match `rim`'s width exactly —
-    // borders paint inboard, so equal widths are what make the two frames
-    // coincident and the transmission model above (0.35 through the rim) true.
-    // If these two ever differ, the hairline stops being "under" the rim and
-    // starts being a second visible ring outboard of it.
-    borderWidth: 1,
-    borderColor: theme.colors.glassHairline,
-  },
-  rim: {
-    borderWidth: 1,
-    borderColor: theme.colors.glassRim,
   },
 });
