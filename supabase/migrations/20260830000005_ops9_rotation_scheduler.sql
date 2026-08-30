@@ -43,6 +43,20 @@
 -- does. The seal must be its own subtransaction; the advance is a
 -- second, independent one that can fail without undoing it.
 --
+-- NEW REQUIREMENT (Vector, thread b57ad406, 2026-08-30, §1B.36.12): the
+-- second block's `raise warning` must interpolate `sqlerrm`, matching the
+-- seal block's own format string below (`raise warning
+-- 'advance_due_rotations: rotation % failed: %', r.id, sqlerrm;`). A
+-- caught exception's SQLSTATE stays on the exception object; SQLERRM
+-- carries the message and nothing else, so the message string is the
+-- only thing that survives into this log line. check-ops9-rotation-
+-- scheduler.mjs's floor-violation assertion (row 3) keys on that message
+-- text via its `client.on('notice', ...)` capture -- there is no other
+-- channel from a caught exception to the tick's log. A finisher who
+-- writes `raise warning 'advance for comb % failed', v_comb_id;` without
+-- sqlerrm silently strips the only thing that assertion can key on, and
+-- the gate goes from proving the floor held to proving nothing.
+--
 -- STALE, CORRECTED (Vector, thread b57ad406, 2026-08-30, §1B.36.11): this
 -- block originally said dormancy was "no eligible subject (every member
 -- removed_at-closed or tombstoned)" -- zero ENROLLABLE members, in
