@@ -227,4 +227,17 @@ export const SENTINELS = {
   // .../comb_rotations?select=voided_reason answers 42703 before this
   // migration, 200-or-42501 after, regardless of anon's grant on the table.
   '20260830000003_eng91_seal_and_send_rotation': { kind: 'column', table: 'comb_rotations', column: 'voided_reason' },
+  // ENG-59 (Fizz). comb_join_by_invite_code adds no new column — same shape
+  // as seal_hive/seal_volume above: a SECURITY DEFINER function revoked from
+  // anon in the same migration that creates it, so 42501 is what "this
+  // migration landed" looks like from outside (an rpc probe against a
+  // service_role-only function like ENG-91's would be ambiguous between
+  // "doesn't exist" and "exists, denied" — not the case here, since anon's
+  // denial is the only state this function has ever been in).
+  '20260830000004_eng59_comb_join_by_invite': {
+    kind: 'rpc',
+    fn: 'comb_join_by_invite_code',
+    args: { p_invite_code: 'calibration-invalid-code' },
+    expect: '42501',
+  },
 };

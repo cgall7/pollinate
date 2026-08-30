@@ -50,6 +50,7 @@
     "check:contributor-names": "node scripts/check-contributor-names.mjs",
     "check:collective-reveal": "node scripts/check-collective-reveal.mjs",
     "check:comb-rotation-seal-send": "node scripts/check-comb-rotation-seal-send.mjs",
+    "check:comb-join": "node scripts/check-comb-join.mjs",
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",
