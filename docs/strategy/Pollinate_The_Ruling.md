@@ -479,3 +479,27 @@ list itself.
   money-transmitter guardrail, and the durability promise (which is still
   *unbuilt* — digital export is owed; printing is now ruled out).
 
+### MVP scope, ruled 2026-08-30 (event `cf648e7f…`)
+
+**Phases 0, 1 and 2 of `POLLINATE_COMB_ROTATION.md` §8.6 are the MVP — build to
+completion now.** Called **MVP-Comb** to keep it distinct from the narrower
+"MVP1" used elsewhere in this file and in `Pollinate_Delivery_Slices.md`.
+
+- **In:** the rotation engine, the daily short-note + **simulated** nectar layer,
+  and Phase 0's unblockers. The approved merge queue, the demo-gap items and the
+  GL1/GL2 luxury pass all carry in — **nothing already in flight is cancelled.**
+- **Out:** Phase 4 entirely — IAP, paywall surfaces, and **cap enforcement**
+  (the caps are built and left disabled, §8.5). All of 19b/c/d — no real sats.
+- **Retired:** the "Slice 1 ships first, *then* the comb work" sequencing. There
+  is one release. Shipping a demo of the product before the thing that is now the
+  product does not make sense. (`O5` if a separate earlier demo build is wanted.)
+- **Definition of done:** a stranger installs, arrives through an invite link
+  with no password form, joins a comb, sees *"the comb is writing for Sarah — 6
+  days left"*, writes, watches Sarah's reveal bloom with every author's entries,
+  sends her a short note with nectar, and does it again next month for someone
+  else. If that does not run end to end on a real device with real strangers,
+  MVP-Comb is not done.
+- **Open, and both need your word:** `O6` — does `ENG-89` instrumentation come
+  into the MVP? (Recommended yes; without it Phase 3 measures nothing.) `O7` —
+  distribution for the seeded combs, since `11.1` TestFlight currently sits in MVP2.
+

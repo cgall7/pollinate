@@ -23,6 +23,15 @@ amendment in `Pollinate_The_Ruling.md`.
 > directory's append-only amendment discipline. **Not** superseded: §0's
 > positioning, Projects 16/17, §17.4's durability promise, §17.5.2a's metering
 > principle, §5.6's guardrails G1–G5, and 19a-before-19b phasing.
+>
+> **MVP scope, ruled 2026-08-30 (`cf648e7f…`):** the MVP — **MVP-Comb** — is
+> Phases 0, 1 and 2 of `POLLINATE_COMB_ROTATION.md` §8.6, built to completion
+> now. For this spec that means: **Project 18 (combs) and 19a (simulated nectar)
+> are IN**, with §5.2(a)'s short note + nectar unscoped from the reveal so it can
+> be sent any time. **19b, 19c and 19d are OUT** — no real sats, no Breez/Spark,
+> no Privy, `LEGAL-1` and `OPS-3` stay parked until condition C5 returns. Project
+> 21 (revenue) is Phase 4 and is **out of the MVP entirely**, including cap
+> enforcement.
 
 ---
 

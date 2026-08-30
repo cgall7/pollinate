@@ -50,6 +50,75 @@ the centre of the product.
 
 ---
 
+## 1A. MVP scope — ruled 2026-08-30 (event `cf648e7f…`)
+
+> **Phases 0, 1 and 2 of §8.6 are the MVP. Build them to completion, now.**
+> Phase 3 is what you do *with* the MVP once it exists; **Phase 4 does not start
+> until Phase 3 returns.**
+
+Call it **MVP-Comb** in all planning from here, because "MVP1" already means
+something narrower in `Pollinate_Delivery_Slices.md` and the two must not be
+conflated.
+
+### What is in
+
+| | Scope |
+|---|---|
+| **Phase 0** | `OPS-8` (analytics promise), `ENG-84` (account deletion), `COPY-13` (sweep + ratify), `OPS-7`, `OPS-3` |
+| **Phase 1** | The rotation engine — `ENG-58`, `ENG-85` (caps **disabled**), `ENG-83`, `ENG-59`, `OPS-9`, `ENG-60`, `DES-21`, `DES-22`, `DES-29`, `DES-31`, `COPY-6` |
+| **Phase 2** | The daily layer — `ENG-62`, `ENG-90`, `ENG-65`, `ENG-66`, `DES-23`, `DES-32`, `COPY-7` |
+| **Carried in-flight** | The approved merge queue and demo-gap items in `PLANS/MVP1_DEMO_READINESS_AUDIT.md`, and the GL1/GL2 luxury pass Colin ruled in scope 2026-08-26. **This ruling does not cancel any of it** |
+
+### What is out
+
+- **Phase 4 entirely** — no IAP, no paywall surface, no cap enforcement. `ENG-79`,
+  `DES-30`, pricing copy. **Cap enforcement is out even though the caps are built**
+  (§8.5).
+- **All of 19b/c/d** — real sats, Breez/Spark, Privy, `ENG-72`, `LEGAL-1`. Nectar
+  is **simulated only** in MVP-Comb.
+- The friend feed, a photo feed, a Wallet tab.
+
+### Three conflicts this creates with standing rulings — resolved, not hidden
+
+**1. It partly reverses the 2026-08-26 "analytics is MVP2" amendment.**
+`Pollinate_Delivery_Slices.md` records Colin's 2026-08-26 ruling that *"crash
+reporting, analytics, legalcopy, and test flight will be mvp2 not mvp1."*
+`OPS-8` sits in Phase 0 and is therefore now **in** the MVP. That is deliberate:
+`legalCopy.js`'s no-analytics promise permanently forecloses C1–C5, and the
+entire justification for MVP-Comb is learning those numbers. **Narrowing the
+promise is in scope; shipping a full analytics stack is a separate question
+(see conflict 2).**
+
+**2. `ENG-89` must ship in the MVP binary, or the measurement is lost.**
+**RECOMMENDED, NOT YET RULED — this is the one place I would widen Colin's scope
+and I will not do it silently.** Phase 3.1 is instrumentation. Analytics events
+have to be present in the build *when the behaviour happens*; a rotation that
+already occurred cannot be instrumented afterwards. If MVP-Comb ships without
+`ENG-89`, Phase 3 measures nothing and the seeded combs are spent for no data.
+
+> **Recommendation: pull `ENG-89` and `ENG-78` into the MVP** (they are build
+> tasks). Leave `3.2` (seed the combs) and `3.3` (wait eight weeks) outside it —
+> those are operations, not build. **Awaiting Colin.**
+
+**3. Phase 3.2 needs a distribution path that is currently MVP2.**
+Seeding three real combs of strangers requires shipping to non-team devices.
+`11.1` (TestFlight / internal track) was moved to MVP2 on 2026-08-26, and the
+Slices doc already flags the resulting hole. **Either `11.1` comes into
+MVP-Comb, or Phase 3.2 needs EAS internal distribution.** Bumble's call on
+mechanism; the need is not optional.
+
+### The definition-of-done for MVP-Comb
+
+A stranger can: install → arrive through an invite link without a password form →
+join a comb → see *"the comb is writing for Sarah — 6 days left"* → write an entry
+→ watch Sarah's reveal bloom with every author's entries → send her a short note
+with nectar → and do it again next month for someone else.
+
+**If that sentence does not run end to end on a real device with real strangers,
+MVP-Comb is not done.**
+
+---
+
 ## 2. Why the shape changed (the reasoning, so it can be checked)
 
 Three problems in the pre-ruling model, all real, all closed by the same move:
@@ -393,6 +462,9 @@ consequence, and learn in between.**
 
 ### 8.6 Build sequence — who does what, in order
 
+> **Phases 0–2 are MVP-Comb (§1A), ruled 2026-08-30. Build to completion now.**
+> Phase 3 is what you do with it; Phase 4 is gated on Phase 3's numbers.
+
 **Phase 0 — Unblock. Starts now, fully parallel, nothing depends on Phase 1.**
 
 | # | Owner | Task |
@@ -470,7 +542,13 @@ ENG-62 ─────► ENG-90 ◄── DES-32  ─────────�
 
 Recorded so no one over-reads this ruling:
 
-- **Slice 1 ships first**, unchanged.
+- **Slice 1's work is not cancelled** — the approved merge queue, the demo-gap
+  items in `MVP1_DEMO_READINESS_AUDIT.md`, and the GL1/GL2 luxury pass all carry
+  into MVP-Comb (§1A). *Amended 2026-08-30:* the earlier "Slice 1 ships first,
+  **then** the comb work" sequencing is retired — shipping a demo of the product
+  before the thing that is now the product does not make sense. **There is one
+  release: MVP-Comb.** See open ruling **O5** if a separate earlier demo build
+  is still wanted.
 - **§0's positioning amendment** — gratitude is the mechanic, not the category.
 - **The metering principle** (§17.5.2a) — meter the artifact, never the practice,
   never the graph. §3.1 complies: the paid line prices **breadth and size**, and
@@ -497,6 +575,9 @@ Recorded so no one over-reads this ruling:
 | ~~**O2**~~ | ~~Free tier keeps unlimited personal hives?~~ **CLOSED** — yes, unchanged (§3.1) | — |
 | **O3** | Carried from V2: §5.5(4) rules *"no projected returns, ever"* while §5.2(e) pitches *"$50 in 2026 versus 50,000 sats in 2044."* Apple 3.1.1 and FTC-adjacent risk both bite | 19d marketing copy, `COPY-8` |
 | **O4** | **The price.** Ceiling ~$39/yr, annual preferred. Deliberately unruled until C1 and C5 return (§4) | Phase 4 only |
+| **O5** | **One release or two?** This encoding assumes the in-flight Slice 1 / MVP1 work folds into MVP-Comb and ships once (§9). The alternative is a separate earlier demo build without combs. Derived, not ruled | Release planning |
+| **O6** | **Does `ENG-89` come into MVP-Comb?** Recommendation: **yes** — instrumentation must ship with the features it measures (§1A conflict 2). Without it Phase 3 measures nothing | Phase 3 |
+| **O7** | **Distribution for Phase 3.2** — `11.1` TestFlight into MVP-Comb, or EAS internal distribution? Bumble's mechanism call; the need is not optional (§1A conflict 3) | Phase 3.2 |
 
 ---
 

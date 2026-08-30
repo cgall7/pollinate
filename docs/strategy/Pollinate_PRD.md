@@ -388,6 +388,13 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 
 **Priority: MVP (solo features) / Phase 3 (social features)**
 
+> **Superseded 2026-08-30 (`cf648e7f…`) — read `POLLINATE_COMB_ROTATION.md` §1A.**
+> The MVP is now **MVP-Comb**: Phases 0, 1 and 2 of that document's §8.6 — the
+> rotation engine plus the daily short-note + **simulated** nectar layer — built
+> to completion now. Out: IAP, paywall surfaces, **cap enforcement** (caps built
+> but disabled), and all real-sats work. The in-flight merge queue, demo-gap
+> items and GL1/GL2 luxury pass carry in; nothing already started is cancelled.
+
 **MVP1 scope:**
 - Monthly Recap (existing feature)
 - Year-end Wrapped (existing feature, 4 slides, shareable)

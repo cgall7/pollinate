@@ -38,7 +38,14 @@ question Sage raised is answered. Promoting it is a one-file move when that land
 
 ---
 
-## 1. The one-sentence version
+#> **MVP scope, 2026-08-30 (`cf648e7f…`).** This ledger is **in MVP-Comb** —
+> Phase 2 of `POLLINATE_COMB_ROTATION.md` §8.6 — at `rails_mode = 'simulated'`
+> and **only** at simulated. It now carries one use beyond the reveal zap: the
+> daily **short note + nectar** to a comb member (`ENG-90`, spec §5.2a), which is
+> the C5 instrument. Real rails stay out of the MVP; `rails_mode` does not flip
+> until C5 returns and `LEGAL-1` lands.
+
+# 1. The one-sentence version
 
 Postgres is the system of record for who owns what; Strike is a rail we
 *reconcile against*, never a source of truth we copy balances from. Every

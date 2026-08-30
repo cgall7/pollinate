@@ -6,8 +6,13 @@ message (event `d99dd08d…`): **Bumble owns every infrastructure/ops row** (was
 UNOWNED); build rows are split by Sage between **Fizz and Pollen**; design rows
 are routed by Lumen between **Pixel and Deezine**.
 **Companion spec:** `POLLINATE_V2_SPEC.md` — every issue below cites a section there.
-**Amended 2026-08-30 — the Comb Rotation Ruling** (Colin, #Strategy event
-`0effa81d…`). `POLLINATE_COMB_ROTATION.md` governs; its §7 is the design handoff
+**Amended 2026-08-30 — the Comb Rotation Ruling** (Colin, #Strategy events
+`0effa81d…` → `d662661b…`, MVP scope `cf648e7f…`).
+**MVP-Comb = Phases 0, 1 and 2 of `POLLINATE_COMB_ROTATION.md` §8.6 — build to
+completion now.** Phase 3 is measurement; **Phase 4 (IAP, paywall, cap
+enforcement) does not start until Phase 3 returns.** Full scope and exclusions:
+that document's §1A. Note `ENG-89` is *recommended* into MVP-Comb but not yet
+ruled (`O6`) — instrumentation must ship with the features it measures. `POLLINATE_COMB_ROTATION.md` governs; its §7 is the design handoff
 and §8 the engineering handoff. **Project 18 moves from Cycle 11–12 to the
 critical path; `ENG-79` is repriced and promoted to the primary paid line;
 `ENG-76` is blocked on ruling O1.** New rows in §5A below.

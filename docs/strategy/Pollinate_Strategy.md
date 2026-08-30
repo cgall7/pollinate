@@ -22,6 +22,14 @@ We sit at the intersection of three proven markets — gratitude apps ($1.3B), s
 
 **Business model (superseded again 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §4 governs: the paid line is a comb plan at $5.99/month, organizer-paid, up to 20 members, first rotation free; the delivery meter is retired as the primary mechanism, and whether individual Plus survives is open ruling O1. The 2026-08-24 text is kept below as the record of that reasoning.):** Freemium, metered at **delivery**. The free tier is unlimited hives and unlimited entries, forever, plus the **first delivery free, forever** — writing is the moat and is never metered (this reverses the 2026-08-19 "1 hive, lifetime" ruling that stood here, which put the paywall at the `private_hives` insert path). **Pollinate Plus** ($39.99/year, annual only — the monthly plan is retired, not repriced) buys every delivery after the first. Export is free on every tier forever (V2 §17.4 — the durability guarantee). The old friend/seed/review-cadence tier splits are **removed** (ruled 2026-08-25, V2 §17.5.2a — "meter the artifact, never the practice, never the graph"): review cadence ungated, friends uncapped, seeds uncounted (abuse is a ~5/week rate limit, not a price). Delivery is the only meter. The money layer is nectar zaps (V2 §5): self-custodial, 100% to the receiver, never revenue — the Cash-App-links-via-iMessage plan is cancelled (V2 §5.7). We are not a money transmitter (V2 §5.6).
 
+> **MVP scope, ruled 2026-08-30 (`cf648e7f…`):** the Slice ladder below is
+> superseded as a *release plan*. **MVP-Comb = Phases 0, 1 and 2 of
+> `POLLINATE_COMB_ROTATION.md` §8.6** — the rotation engine plus the daily
+> short-note + **simulated** nectar layer — built to completion now, as one
+> release. Phase 3 measures it; **Phase 4 (IAP, paywall, cap enforcement) is
+> gated on Phase 3's numbers.** No real sats in the MVP. Scope, exclusions and
+> definition-of-done: that document's §1A.
+
 > **Build Slices:**
 > - **Slice 1 (Demo Mode):** Journal + private hives + social seeds + honeycomb + feed. No money. TestFlight / internal testing. Validates the core emotional and social loop.
 > - **Slice 2 (Public Launch):** Freemium paywall per V2 §17.5 ($39.99/yr annual-only, metered at delivery) + nectar zaps (V2 §5; Cash App gifting cancelled, V2 §5.7). App Store / Play Store launch. *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
