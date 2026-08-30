@@ -2,7 +2,7 @@
 -- (ENG-58) and 20260830000001_eng84_account_deletion (ENG-84), both merged
 -- before docs/strategy/POLLINATE_COMB_ROTATION.md's §1B.23/§1B.24 were
 -- published -- see that doc's own §1B.24.0: "a ruling exists when it is
--- published, not when it is committed." Thread b57ad406, 2026-08-30. Five
+-- published, not when it is committed." Thread b57ad406, 2026-08-30. Six
 -- independent fixes, none touching seal/send behaviour (ENG-91, unchanged):
 --
 --   §1B.23.1 -- comb_rotations_insert_owner's WITH CHECK required the
@@ -50,11 +50,25 @@
 --   question (O8) -- skipping the seat only keeps deletion itself from
 --   depending on that ruling landing first.
 --
--- Verified against github/main@8864a12 before writing this: git grep for
--- create_comb/createComb (zero hits, confirming §1B.29's "nothing creates
--- a comb" finding, which is why this ticket has no client-facing urgency
--- of its own yet) and for every symbol this migration touches, to confirm
--- none of it was already patched elsewhere.
+--   §1B.32 leg 1 -- Vector's finding, same thread, after this branch's first
+--   push: the tombstone class named in §1B.24.1 above is two functions on
+--   the commit this branch was originally cut from, but THREE on
+--   github/main@9bc6d04 -- comb_preview_by_invite_code (20260830000006,
+--   merged one commit after this branch's base, by provenance) also
+--   live-joins profiles for member_count with no deleted_at predicate at
+--   all. Applied here as the rebase target, not as a new ticket: same
+--   predicate, same reasoning, one function later. Legs 2 and 3 of the same
+--   finding (subject_name, inviter_name) are a return-CONTRACT change, not
+--   a predicate -- Vector and Lumen routed those to ENG-94 (Fizz), not
+--   here; ratified in-thread, not this migration's scope.
+--
+-- Verified against github/main@9bc6d04 after rebasing this branch onto it
+-- (was cut from 0f898ce/8864a12; Vector's §1B.32 flagged both PRs in this
+-- thread as one commit stale) -- git grep for create_comb/createComb (zero
+-- hits, confirming §1B.29's "nothing creates a comb" finding, which is why
+-- this ticket has no client-facing urgency of its own yet) and for every
+-- symbol this migration touches, to confirm none of it was already patched
+-- elsewhere.
 
 -- =============================================================================
 -- Part 1 (§1B.23.1). Drop the comb_members existence clause from
@@ -241,5 +255,75 @@ $$;
 revoke all on function public.delete_own_account() from public;
 revoke execute on function public.delete_own_account() from anon;
 grant execute on function public.delete_own_account() to authenticated;
+
+-- =============================================================================
+-- Part 6 (§1B.32 leg 1). comb_preview_by_invite_code()'s member_count leg
+-- gains the same `p.deleted_at is null` predicate as Part 4 -- the third
+-- and, per Vector's §1B.32 grep, only remaining member of the tombstone
+-- class named in §1B.24.1. CREATE OR REPLACE, same signature, same grants
+-- (anon + authenticated, unaffected by a body replace) -- see
+-- 20260830000006 for the full function and its rationale; only the
+-- member_count subquery changes here.
+--
+-- subject_name and inviter_name are untouched -- both are return-CONTRACT
+-- changes (nullable inviter_name, subject collapsing into the
+-- no-active-month boolean), not a predicate, and both were routed to
+-- ENG-94 (Fizz) in-thread, not this migration.
+create or replace function public.comb_preview_by_invite_code(p_invite_code text)
+returns table (
+  comb_name text,
+  inviter_name text,
+  subject_name text,
+  has_active_month boolean,
+  member_count integer
+)
+language plpgsql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+declare
+  v_comb_id uuid;
+  v_owner_id uuid;
+  v_subject_id uuid;
+begin
+  select c.id, c.owner_id into v_comb_id, v_owner_id
+  from public.combs c
+  where c.invite_code = p_invite_code;
+
+  if v_comb_id is null then
+    return;
+  end if;
+
+  select r.subject_profile_id into v_subject_id
+  from public.comb_rotations r
+  where r.comb_id = v_comb_id
+    and r.sealed_at is null
+    and r.voided_at is null;
+
+  return query
+  select
+    c.name,
+    p_owner.display_name,
+    p_subject.display_name,
+    v_subject_id is not null,
+    (
+      select count(*)::integer
+      from public.comb_members m
+      join public.profiles p on p.id = m.profile_id
+      where m.comb_id = v_comb_id
+        and m.removed_at is null
+        and p.deleted_at is null
+    )
+  from public.combs c
+  join public.profiles p_owner on p_owner.id = v_owner_id
+  left join public.profiles p_subject on p_subject.id = v_subject_id
+  where c.id = v_comb_id;
+end;
+$$;
+
+revoke all on function public.comb_preview_by_invite_code(text) from public;
+grant execute on function public.comb_preview_by_invite_code(text) to anon;
+grant execute on function public.comb_preview_by_invite_code(text) to authenticated;
 
 notify pgrst, 'reload schema';

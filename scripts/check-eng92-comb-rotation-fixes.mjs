@@ -1,4 +1,4 @@
-// Gate for ENG-92's five post-merge fixes
+// Gate for ENG-92's six post-merge fixes
 // (supabase/migrations/20260830000007_eng92_comb_rotation_fixes.sql).
 //
 //   npm run check:eng92-comb-rotation-fixes
@@ -19,6 +19,9 @@
 //   a tombstoned (deleted_at non-null) member.
 //   §1B.24.2 -- delete_own_account() ends a caller's non-owner comb_members
 //   seats, and skips (never raises on) the organizer's own seat.
+//   §1B.32 leg 1 -- comb_preview_by_invite_code()'s member_count leg
+//   excludes a tombstoned member, the same predicate as §1B.24.1 applied to
+//   the third function in the class (Vector's finding, this thread).
 //
 // Modeled on check-comb-rotation-seal-send.mjs for the harness shape: real
 // migrations off disk in full chronological order, mutations run under the
@@ -61,6 +64,12 @@ const NON_MEMBER = '88888888-8888-8888-8888-888888888888';
 // Own profile for test 6 (delete_own_account/comb_members) -- deleted_at is
 // immutable, so a deletion test needs a profile no other test tombstones.
 const DEPARTING_MEMBER = '44444444-4444-4444-4444-444444444444';
+// Own profile for test 7 (§1B.32 leg 1) -- deleted_at is immutable, and
+// CONTRIBUTOR/DEPARTING_MEMBER are both already tombstoned by tests 4/6 by
+// the time this runs (sage/eng91-seal-send's own lesson: a fixture identity
+// reused across tests is a hidden coupling once an earlier test mutates it
+// irreversibly). Fresh identity, not a shared one.
+const PREVIEW_TOMBSTONE_MEMBER = '55555555-5555-5555-5555-555555555555';
 
 let pass = 0;
 const failures = [];
@@ -135,7 +144,7 @@ async function main() {
     }
 
     await client.query(
-      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12), ($13, $14)',
+      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12), ($13, $14), ($15, $16)',
       [
         OWNER, JSON.stringify({ display_name: 'Owner' }),
         OTHER_OWNER, JSON.stringify({ display_name: 'Other Owner' }),
@@ -144,6 +153,7 @@ async function main() {
         CONTRIBUTOR2, JSON.stringify({ display_name: 'Contributor Two' }),
         NON_MEMBER, JSON.stringify({ display_name: 'Non Member' }),
         DEPARTING_MEMBER, JSON.stringify({ display_name: 'Departing Member' }),
+        PREVIEW_TOMBSTONE_MEMBER, JSON.stringify({ display_name: 'Preview Tombstone Member' }),
       ]
     );
 
@@ -440,6 +450,44 @@ async function main() {
         ok("§1B.24.2: the organizer's account is actually deleted (auth.users row gone)");
       } else {
         bad("§1B.24.2: the organizer's account is actually deleted (auth.users row gone)", `got ${authRows[0].n}`);
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 7 (§1B.32 leg 1). comb_preview_by_invite_code's member_count leg
+    // excludes a tombstoned member -- same predicate as test 4, third
+    // function in the class. Not testing subject_name/inviter_name here:
+    // both are ENG-94's scope (return-contract change, not a predicate),
+    // per Vector/Lumen's in-thread routing.
+    //
+    // Owned by OTHER_OWNER, not OWNER -- test 5's second block runs
+    // delete_own_account() AS OWNER, which tombstones OWNER's own profile.
+    // Using OWNER here would silently exclude the owner from member_count
+    // too (2 members counted instead of 3 before the tombstone, not 3), the
+    // same fixture-identity-reuse class this file's own header warns about
+    // one test over.
+    {
+      const combId = await makeComb(OTHER_OWNER, [SUBJECT, PREVIEW_TOMBSTONE_MEMBER]);
+      const { rows: comb } = await asPostgres(() =>
+        client.query('select invite_code from public.combs where id = $1', [combId])
+      );
+      const inviteCode = comb[0].invite_code;
+      await asPostgres(() =>
+        client.query("update public.profiles set display_name = '', deleted_at = now() where id = $1", [
+          PREVIEW_TOMBSTONE_MEMBER,
+        ])
+      );
+      const { rows } = await asUser(NON_MEMBER, () =>
+        client.query('select member_count from public.comb_preview_by_invite_code($1) as p', [inviteCode])
+      );
+      // Owner + Subject = 2, PREVIEW_TOMBSTONE_MEMBER excluded (tombstoned).
+      if (rows[0]?.member_count === 2) {
+        ok('§1B.32 leg 1: comb_preview_by_invite_code member_count excludes a tombstoned member');
+      } else {
+        bad(
+          '§1B.32 leg 1: comb_preview_by_invite_code member_count excludes a tombstoned member',
+          JSON.stringify(rows)
+        );
       }
     }
 
