@@ -333,10 +333,13 @@ async function main() {
       const { rows: after } = await client.query('select sent_at from public.private_hives where id = $1', [
         t1.hiveId,
       ]);
-      if (before[0].sent_at.getTime() === after[0].sent_at.getTime()) {
+      if (before[0].sent_at && after[0].sent_at && before[0].sent_at.getTime() === after[0].sent_at.getTime()) {
         ok('idempotent: second call on an already-sent rotation is a silent no-op');
       } else {
-        bad('idempotent: second call on an already-sent rotation is a silent no-op', 'sent_at changed');
+        bad(
+          'idempotent: second call on an already-sent rotation is a silent no-op',
+          `before=${before[0].sent_at} after=${after[0].sent_at}`
+        );
       }
     }
     // Permission boundary: not grantable to authenticated at all.
