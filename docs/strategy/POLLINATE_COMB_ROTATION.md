@@ -2413,6 +2413,117 @@ Both mine, both ruled here, both cheap for Colin to reverse.
    rename. It names a file that exists on no branch.
 
 **Open:** `O3`, `O4`, `O8`. No new `O`.
+### §1B.31.1 — Lumen's rider ratified with one addition; **and I mis-assigned the row.** The advance's *policy* is `ENG-60`'s, not `OPS-9`'s — two builders read that routing off the ticket and both were right
+
+Lumen's three legs re-verified at `github/main`, all exact:
+`comb_members_identity_immutable` bars `comb_id`/`profile_id`/**`joined_at`**
+updates leaving `removed_at` the only mutable column (`20260830000002:215-227`);
+`joined_at` is real at `:181`; and there is no cadence column anywhere.
+
+**The strengthener is better than the ruling it supports.** The rotation-order key
+is **immutable by construction** — no update path can reshuffle a comb's schedule,
+and the one column that *can* move is exactly Ruling 1's skip condition. Ruling 1
+therefore needs no defending code; the schema already refuses the attack.
+
+#### (i) I mis-assigned the row. Correcting §1B.31.
+
+I wrote *"whose row — yours [`OPS-9`], and the ticket already said so."* **Half of
+that is wrong, and the half I got wrong is the half two other people had already
+ruled on.**
+
+`20260830000002:459-466` — Sage's, and addressed **at this document**:
+
+> *"**No selection algorithm** (who becomes next month's subject) **and no
+> rotation cadence/duration default are ruled anywhere I can find** in
+> `POLLINATE_COMB_ROTATION.md` — flagging this back in-thread rather than
+> inventing one here. This ticket provides the mechanism … **`ENG-60`** …
+> **owns the policy of how those values get chosen and how a rotation
+> auto-advances**."*
+
+Bumble's `20260830000005:104` reads the same routing independently. **Two builders,
+two migrations, same conclusion — and the ticket text supports them:** `OPS-9` is
+*"`ENG-60`'s runtime"* and `ENG-60` is *"the rotation loop: **open**, notify,
+collect, seal, reveal."* The **clock** is `OPS-9`. The **policy** — who is next,
+how long a month is, when to advance — is `ENG-60`. I read `OPS-9`'s *"open a
+rotation"* as ownership of both and it is ownership of the tick only.
+
+This is my own §1B lesson on the other side of the table: *read the comment next to
+the constraint before designing around it.* Sage's was a **fourth held-open
+ruling**, written to me, and §1B.31's rulings 1 and 2 are its answer — I supplied
+the answer and then filed it against the wrong row.
+
+**What survives unchanged:** nothing opens month N+1; it is on no built ticket; the
+sweep must **resolve-then-advance in one tick** or a comb sits with no open
+rotation between ticks; and `C1`/`C3` are unmeasurable until it exists.
+
+#### (ii) The corrected graph — and my first version had a **cycle**
+
+Row 1.9 (`ENG-60`) already depends on row 1.8 (`OPS-9`). §1B.31 added 1.8 → 1.7a;
+routing the policy to `ENG-60` instead would make it 1.8 → 1.9 → 1.8. **Split
+`ENG-60`:**
+
+- **NEW row 1.9a — `comb_advance_rotation(p_comb_id)`, @Fizz** (`ENG-60`'s, carved
+  out). The server-side policy: compute the next subject, compute the next
+  `closes_at`, call `ENG-93`'s `comb_open_rotation()`. **Deps: `1.1`, `1.7a`.**
+- **Row 1.8 (`OPS-9`)** — the tick becomes **resolve, then advance**. Deps `1.1`,
+  `1.8a`, **`1.9a`** (not `1.7a` — superseding §1B.31's edge).
+- **Row 1.9 (`ENG-60` remainder)** — notify / collect / reveal, the client loop.
+  Deps `1.1`, `1.6`, `1.8a`, `1.8`, **`1.9a`**. Acyclic.
+
+`comb_open_rotation(comb_id, subject, closes_at)` stays the single **mint body**
+with explicit parameters; `comb_advance_rotation(comb_id)` is the **policy
+wrapper** above it. Month 1's subject is organizer-chosen and month N+1's is
+derived — genuinely different policies over one mint, which is what §1B.29.2(c)
+asked for and not a second guard surface.
+
+#### (iii) Lumen's downtime rider — ratified, with one addition it does not cover
+
+The rider: if `closes_at + cadence` is already past, jump to the smallest
+`closes_at + k·cadence > now()` and mint **one** rotation, never fabricating the
+intermediate months as quiet-voids. **Ratified in full.** A rotation that never
+existed cannot be voided *quiet* — nobody could have written to it, and a
+fabricated void is the system stating something false about people. And it is free
+of ordinal bookkeeping: `ordinal` has **zero calendar coupling** in the schema
+(`:471`, `:479` — a rotation counter, not a month index), so a skip leaves no gap
+to reconcile.
+
+**The hole: the first future boundary can be hours away.** An outage ending just
+before a boundary mints a window of hours. Nobody is notified in time, nobody
+writes, the month voids **quiet**, and `C1` records a failed month **caused by our
+downtime**. That is `C1` contamination #5 — and the first one where the writers
+were never even present to do anything right.
+
+**It is Lumen's own principle, one step further.** They barred fabricating a month
+nobody *could* write in. A one-hour window **is** a month nobody could write in —
+minted rather than fabricated, but producing the identical false record at the end.
+
+**RULED — a floor, on the derived path only:** the minted window must be at least
+**half a cadence**; if the first future boundary is nearer than that, take the next
+one. Still on a boundary, so no drift. Still one rotation, so no fabrication. The
+subject pointer still advances once, so no turn is burned.
+
+**Half a cadence, not a day count**, because cadence is now a stored per-comb
+column and a fixed number of days would be a second constant obliged to track it —
+the drift class Lumen just correctly named. Expressed in the same unit, it needs no
+second decision.
+
+**Derived path only.** An organizer who taps *create* and picks a `closes_at`
+tomorrow has made a visible choice that is theirs to make. The floor exists because
+the outage case is **invisible and system-caused**.
+
+#### (iv) Lumen's render pin, accepted and narrowed
+
+*"The order is a mechanism, not a rendered promise"* — accepted. One narrowing so it
+is checkable rather than a posture: if `DES-33`'s tense frame (*"next month, for
+someone else"*) ever **names** that someone, the client needs the same ordering
+rule and it gets written twice. **`comb_advance_rotation` is not the only possible
+reader — so the ordering belongs in a function, not inlined in the advance.** If
+`DES-33` names nobody, nothing is needed and this costs nothing.
+
+**Open:** `O3`, `O4`, `O8`. No new `O`.
+
+---
+
 
 ---
 
@@ -2722,7 +2833,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 |---|---|---|---|
 | **ENG-58** | Sage | L | Migration: `combs`, `comb_members`, `comb_rotations` + RLS. **Not built** — no such migration exists, and no `invite_code` or rotation path exists in `src/` (both searched). **Also owns the definer-backed roster read** (§1B.17): `profiles` RLS admits only your own row and your connections, so in a comb formed by invite link every member renders as `'Someone'` |
 | **ENG-59** | Fizz | M | Comb invite-link join flow. Deep-link scheme `pollinate` already registered (`app.json`); `AuthContext.js:93-101` already listens and drops non-auth URLs (§1B.28.3). **Three additions:** (a) the anon landing preview is a **new** definer, not `comb_member_count`, whose WHERE-clause auth returns `0` rather than refusing (§1B.28.4); (b) its invite code carries the access control, so it needs enumeration-resistant entropy (§1B.28.4); (c) a **name-collection step between auth and join** — without it every account `ENG-83` creates is `'New user'` and the comb roster is a column of placeholders (§1B.28.2). **Must not mint friend connections on join** (§1B.16) |
-| **ENG-60** | Fizz | L | The rotation loop: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9` |
+| **ENG-60** | Fizz | L | The rotation loop: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9`. **§1B.31.1: `ENG-60` owns the advance POLICY** — `20260830000002:459-466` (Sage) routed *"who becomes next month's subject … and how a rotation auto-advances"* here and flagged it back to this doc as unruled; §1B.31's Rulings 1 and 2 plus Lumen's downtime rider are that answer. **The `open` half is carved out to row 1.9a** so `OPS-9` can depend on it without a cycle |
 | **ENG-62** | Sage | L | Land the nectar ledger with `rails_mode='simulated'` |
 | **ENG-66** | Fizz | M | Comb pot. **G2 binding:** direct-to-recipient, never pooled |
 
@@ -2804,9 +2915,10 @@ consequence, and learn in between.**
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
-| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick opens the comb's next rotation through `ENG-93`'s `comb_open_rotation()` — same body, third caller | 1.1, **1.8a**, **1.7a** |
+| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE | 1.1, **1.8a**, **1.9a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
-| 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
+| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv | 1.1, **1.7a** |
+| 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
 | 1.12 | **Pixel** | `DES-35` — glass prominence to ≥23% (Colin `a478c335…`, §1B.5). **Material prerequisite merged** — `13cf806` + `cdb07a1` are ancestors of the tip (§1B.7) | — (parallel; **gates nothing**) |
