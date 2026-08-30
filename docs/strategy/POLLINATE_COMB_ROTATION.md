@@ -1081,8 +1081,16 @@ table in the path, no rotation state in the path, nothing to leak.
 *"Six people are writing for you"* is grammatically satisfied by **two different
 queries**, and only one of them is legal:
 
-- `count(comb_members where removed_at is null)` — **membership. Static all
-  month. Ruled in.**
+- ~~`count(comb_members where removed_at is null)` — **membership. Static all
+  month. Ruled in.**~~ **[Vector, 2026-08-30 — source replaced, ruling upheld.
+  §1B.23.2: neither half of that justification survived §1B.20's split. Comb
+  membership is subject-**including**, so this overcounts the writers by exactly
+  one — the subject herself — every month; and it is not static, because a member
+  may leave and `ENG-59`'s join RPC may add rows to an open month while that
+  month's `hive_contributors` was snapshotted at mint. The legal source is
+  `comb_rotation_writer_count(rotation_id)` — that rotation's `hive_contributors`
+  where `removed_at is null`. It clears every bar this section set. This function
+  is still correct for the **comb** screen, just not for this sentence.]**
 - `count(distinct author)` over the rotation's entries — **write-status. Rises as
   people write. This is the `C1` contaminant §1B.9 exists to stop.**
 
@@ -1264,6 +1272,157 @@ both guards sit out the transaction.
   lands beside it the two read identically. @Sage — name the new one for the group
   explicitly.
 
+### §1B.23 — `ENG-58` is built and correct on every ruling I gave it. Three things it collides with were ruled somewhere else, and one of them is `C1`'s denominator
+
+Read at `github` `sage/eng58-comb-schema@ae39cf1` (`ls-remote` confirmed;
+`180ef95` is an ancestor). **§1B.22's three additions all landed and landed
+right** — Part 0's two triggers are `before insert or update` and `before
+insert` on the two tables, `TG_OP`-branched with no `old` textually reachable in
+the INSERT arm; `comb_rotation_roster()` is authorized by
+`is_hive_contributor(v_hive_id)` and returns `has_written` as existence only,
+never content, never a count; §1B.19's deletion paragraph is stated in-file, and
+it correctly flags the tombstoned comb **owner** as unruled rather than deciding
+it. Nothing below is a defect in the work I asked for. All three are collisions
+with rulings that live in other sections of this document, which is exactly
+where a migration author would not look.
+
+#### 1. `comb_rotations_insert_owner`'s `WITH CHECK` re-imposes what §3.2 rule A removed
+
+The FK is right — `subject_profile_id uuid not null references public.profiles
+(id)` — and §3.2 rule A is stated in FK terms, so it reads as satisfied. **The
+policy defeats it three lines later:**
+
+```sql
+and exists (
+  select 1 from public.comb_members m
+  where m.comb_id = comb_rotations.comb_id
+    and m.profile_id = subject_profile_id
+    and m.removed_at is null
+)
+```
+
+§3.2 rule A, ruled explicitly by Colin at event `d662661b…`: *"A comb may write
+for anyone, member or not — the same shape as the newborn/grandmother case
+(§17.2b: delivery is link-based, no install required). Without this rule, a free
+user in one comb would have to **pay in order to be celebrated by another**."*
+§11 lists that outcome as a rejected position. **This clause reinstates it** —
+and it reinstates it through the seat cap rather than through a paywall clause,
+which is worse, because §3.2 rule B's promise (*"an invitee never sees 'sorry,
+the comb is full'"*) fails the moment being written for consumes a capped seat.
+
+The `not null` is the second half of the same narrowing. `private_hives`'
+subject is nullable **on purpose** — `HiveStore.js:65-68`: *"it is only ever set
+when the subject is themselves a registered user."* The shipped 1:1 flow already
+has an unregistered-subject path; `comb_rotations` forecloses it, so a comb
+cannot run a month for §17.2b's own named examples.
+
+**And rule A has a third gate nobody has named, which is not Sage's.** `send_hive`
+(live at `20260828000001:154-165`) raises `'owner and subject are not a
+connected friend'` unless an accepted `honeycomb_connections` row exists between
+them. **Rule A has never been buildable.** It was ruled as though choosing the FK
+implemented it; the FK is necessary and nowhere near sufficient.
+
+**Ruled, and it is small: drop the `comb_members` clause from the `WITH CHECK`,
+keep `not null` for now.** The hive clause already carries the integrity the
+membership check was reaching for — `h.owner_id = auth.uid() and h.is_collective
+and h.subject_profile_id = comb_rotations.subject_profile_id` means an organizer
+can only point a rotation at a collective hive they own whose subject already
+matches. Dropping the clause restores *"member or not"* for any registered
+subject at zero cost and adds no null-handling. The **unregistered** subject
+(§17.2b) and `send_hive`'s connection requirement are one decision, they are
+`ENG-91`'s surface, and they need Colin: **does MVP-Comb measure `C2`?** As built,
+`C2` — *"reveal→install for **non-member** recipients"* — has an empty population
+by construction and can never return.
+
+#### 2. `comb_member_count()` is not the number the sentence claims, and the gap is exactly one person
+
+§1B.21 ruled `count(comb_members where removed_at is null)` the legal source for
+§8's *"Six people are writing for you."* The justification was *"membership.
+Static all month."* **Neither half survives the split @Lumen and I ratified one
+section earlier.** §1B.20: comb membership is **subject-including**, hive
+membership is **subject-excluding**. So in the modal case the subject **is** a
+comb member and **is not** a writer:
+
+> A comb of six. Sarah's month. `comb_member_count` returns **6**.
+> `hive_contributors` holds **5**. The screen tells Sarah *"Six people are writing
+> for you."* Five are. **The sixth is Sarah.**
+
+Not a leak — §1B.9 and §1B.8 are untouched, nothing rises as anyone writes. It is
+simply **wrong, always, by one, in the one number the subject sees.** And it is
+not static either: `comb_members_update_owner_or_self` lets a member leave
+mid-month and `ENG-59`'s join RPC will add rows to an open month, while the
+month's `hive_contributors` was snapshotted at mint and nothing in this migration
+adds a late joiner to it. Two rosters, two clocks.
+
+**The same off-by-one is `C1`'s denominator, and `C1` is the number Colin said
+decides the business.** `C1` is defined here as *"share of an **active comb** who
+write for that month's subject."* The subject cannot write for herself, so the
+ceiling is `(N−1)/N`, and it bites hardest on the small combs the free tier
+manufactures:
+
+| Comb size | Everyone who *can* write, writes | `C1` as currently defined |
+|---|---|---|
+| 12 | 11 of 12 | **91.7%** |
+| 5 (the free cap) | 4 of 5 | **80.0%** |
+| 3 | 2 of 3 | **66.7%** — against a 60% bar |
+
+**We would be judging the model on a ratio that cannot reach 1.0, with the
+haircut scaling inversely with comb size.** A perfect free-tier comb reads 80%.
+
+**Ruled, three parts.** (a) `C1`'s denominator is the month's
+`hive_contributors`, not `comb_members` — people who **could** write, not people
+in the club; §6's `C1` row is corrected in place and `ENG-89` instruments that.
+(b) `ENG-58` adds `comb_rotation_writer_count(p_rotation_id)` — count of that
+rotation's `hive_contributors` where `removed_at is null`, authorized by
+`is_comb_member` on the rotation's comb, **never** `is_hive_contributor` (which
+refuses the subject, who is the caller this exists for). It clears every bar
+§1B.21 set: no `entries` in the path, cannot rise as anyone writes, moves only on
+roster actions. (c) `comb_member_count()` **stays and is not deleted** — it is the
+correct source for the comb screen (*"your comb has six members"*). It is simply
+**not** the source for *"N are writing for you."* §1B.21's own rule is what caught
+this: a count rendered to the subject names its source. The source it named has
+become the wrong one. Corrected there.
+
+#### 3. The projection is frozen and its source is not
+
+`comb_rotations` mirrors `subject_profile_id`/`sealed_at`/`sent_at` from the
+hive, declared *"one-directional… a projection, not a second source of truth."*
+The `WITH CHECK` verifies the two agree **at insert**. After that:
+
+- `comb_rotations` has **no UPDATE policy at all** — deliberate, and it means the
+  mirror can never be corrected.
+- `private_hives_update_own` (`20260815000001:40`) is a **full-row** owner policy.
+  Column pins exist for `sealed_at` (`20260815000004`) and `is_collective`
+  (`20260827000001:24`). **`subject_profile_id` has none** — the only trigger
+  touching it is the disjointness guard, which only asks whether the new subject
+  is an active contributor.
+
+The comb organizer **is** the hive owner (the `WITH CHECK` requires it), so one
+`update private_hives set subject_profile_id = …` leaves the hive saying one
+person and the projection every comb member reads saying another — **permanently,
+with no correction path.** Eleven people write into a month the UI addresses to
+Mira; `send_hive` reads the hive and delivers to whoever the owner last set. For
+a keepsake product that is the worst available failure, and it needs no
+malice — `HiveStore.js` already writes that column generically for the 1:1 flow.
+
+**Ruled: pin the source, not the copy.** A `before update` trigger on
+`private_hives` raising if `subject_profile_id` changes while a `comb_rotations`
+row references that hive — the same shape as
+`private_hives_is_collective_immutable_trigger` sitting eleven lines away in the
+file Sage already read. **General form, and it is the lesson: a one-directional
+projection is only one-directional if the source is immutable for as long as the
+copy is. Pinning the copy alone does not make them agree — it guarantees that
+when they disagree, they disagree forever.**
+
+#### Scope
+
+(1) and (2b) are `ENG-58`, both small, both ride the rebase Fizz already
+required. (3) is `ENG-58` and is one trigger. (2a) is `ENG-89`'s definition and
+is corrected in §6 above. The `C2` question and `send_hive`'s connection
+requirement are **Colin's**, then `ENG-91`'s.
+
+---
+
 ## 2. Why the shape changed (the reasoning, so it can be checked)
 
 Three problems in the pre-ruling model, all real, all closed by the same move:
@@ -1314,7 +1473,10 @@ the same shape as the newborn/grandmother case (§17.2b: delivery is link-based,
 no install required). Without this rule, a free user in one comb would have to
 **pay in order to be celebrated by another** — which V2 §17.5.5 (*"Receiving.
 Metering it kills the viral loop"*) and the PRD (*"Never paywall the receiving
-experience"*) both bar. Ruled explicitly, event `d662661b…`.
+experience"*) both bar. Ruled explicitly, event `d662661b…`. **[Vector, 2026-08-30 — the FK is
+necessary and not sufficient; §1B.23.1 found three gates standing between this
+rule and the build, only one of which is `ENG-58`'s. Read it before citing this
+rule as implemented.]**
 
 **B — The cap is on the comb you *create* and the combs you *write in*, never on
 the comb you are *invited to as a subject*.** An invitee never sees *"sorry, the
@@ -1490,7 +1652,7 @@ instrument these five, and the answer arrives in eight weeks.**
 
 | # | Condition | Threshold | Instrumented by |
 |---|---|---|---|
-| **C1** | **Rotation participation** — share of an active comb who write for that month's subject | **≥60%, sustained 3 months** | `ENG-89` |
+| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** | **≥60%, sustained 3 months** | `ENG-89` |
 | **C2** | Reveal→install for non-member recipients | ≥25% | `ENG-78` (exists) |
 | **C3** | Comb survival — seeded combs still rotating at month 6 | ≥50% | `ENG-89` |
 | **C4** | Willingness to pay at the member cap and the second-comb moment | Conversion at each gate | `ENG-89` |
@@ -1635,7 +1797,7 @@ consequence, and learn in between.**
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2. **Plus the co-member name read** — definer helper, **not** a widened `profiles` policy (§1B.17). **Three additions from §1B.22:** (a) the subject/contributor disjointness must be re-expressed as a **`before insert or update` trigger** on both tables — today Direction 1 is an RLS `WITH CHECK` a definer bypasses and Direction 2's trigger is `before update` only, so a server-minted rotation hive evaluates neither (§1B.22.4); (b) a **second** definer read for member-view per-person write-status — per-member boolean, never content, never a count of content, authorized by `is_hive_contributor(hive_id)` and never `is_comb_member()`; RLS cannot supply it and OPEN-1 closed that side deliberately (§1B.22.3); (c) any table added here that references `profiles` states its own deletion behaviour in its own migration (§1B.19) | — |
+| 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2. **Plus the co-member name read** — definer helper, **not** a widened `profiles` policy (§1B.17). **Three additions from §1B.22:** (a) the subject/contributor disjointness must be re-expressed as a **`before insert or update` trigger** on both tables — today Direction 1 is an RLS `WITH CHECK` a definer bypasses and Direction 2's trigger is `before update` only, so a server-minted rotation hive evaluates neither (§1B.22.4); (b) a **second** definer read for member-view per-person write-status — per-member boolean, never content, never a count of content, authorized by `is_hive_contributor(hive_id)` and never `is_comb_member()`; RLS cannot supply it and OPEN-1 closed that side deliberately (§1B.22.3); (c) any table added here that references `profiles` states its own deletion behaviour in its own migration (§1B.19). **Built at `ae39cf1`; all three landed. Three additions from §1B.23, all small, all riding the rebase:** (d) drop the `comb_members` existence clause from `comb_rotations_insert_owner`'s `WITH CHECK` — it reinstates §11's rejected *pay-to-be-celebrated* shape through the seat cap and empties `C2`'s population (§1B.23.1); (e) add `comb_rotation_writer_count(p_rotation_id)` over the month's `hive_contributors`, authorized by `is_comb_member` — `comb_member_count` overcounts the writers by one, always, and is `C1`'s wrong denominator (§1B.23.2); (f) a `before update` trigger pinning `private_hives.subject_profile_id` while a `comb_rotations` row references that hive — the projection is frozen and its source is not (§1B.23.3) | — |
 | 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5). **Must include a per-comb entitlement override column** so Phase 4 can grandfather the seeded combs without a schema change (§1B.4) | 1.1 |
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
 | 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17) | — (start now, ahead of 1.6) |
