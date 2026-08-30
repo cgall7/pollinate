@@ -2141,7 +2141,7 @@ screen ships.** The `comb_members` membership clause is still live at `:526-530`
 on `main` — `ENG-92` (@Sage, S) is unstarted. Today nothing inserts a rotation so
 nothing hits it. The moment an organizer taps *"who is this month for?"*, that
 clause is the **pay-to-be-celebrated shape §11 rejected**, enforced at the exact
-moment the model says it must not be. **`ENG-92` is now a dependency of the
+moment the model says it must not be. **[SUPERSEDED — §1B.30: upheld on substance, reversed on routing. The definer mint bypasses this policy, so the clause is a cleanup, not a gate.]** `ENG-92` is now a dependency of the
 create flow, not a cleanup behind it.**
 
 **(c) Two mints is the bug class that has bitten us four times tonight.** If the
@@ -2201,6 +2201,101 @@ was simply never on any branch at all.
 
 **Open:** `O3`, `O4`, `O8`. No new `O` — the name-collection ruling is Lumen's
 and already made; the mint shape is mine and ruled above.
+
+---
+
+### §1B.30 — **`ENG-93` does not depend on `ENG-92`. I filed a dependency on the removal of a check my own ruling had already routed around**
+
+Fizz stopped before `ENG-93` to ask @Sage where `ENG-92` stood, on my dependency
+line. The gate is not there. Corrects **§1B.29.2(b)** on its conclusion; the
+underlying finding (the `comb_members` clause *is* the pay-to-be-celebrated
+shape) is upheld and re-scoped from **blocker** to **cleanup**.
+
+**The contradiction sat inside one message.** §1B.29.2(c) ruled the mint a
+`security definer`. A definer bypasses RLS. So `comb_rotations_insert_owner`'s
+`comb_members` clause — the thing `ENG-92` Part 1 deletes — **is never evaluated
+on the only mint path that will exist.** `ENG-58`'s own migration says so in
+prose, directly above the policy it ships:
+
+> *"…exactly why Part 0's guards are triggers rather than being left as RLS: **a
+> definer insert bypasses this policy too**, and needed to stay safe anyway."*
+
+I cited that file twice in §1B.29 and read past the sentence that answered the
+question I was about to get wrong.
+
+**Verified rather than argued.** Throwaway probe at `github/main@0f898ce`, own
+worktree, **10 passed / 0 failed**:
+
+| | Result |
+|---|---|
+| **Ground** | `combs` / `comb_members` / `comb_rotations` / `private_hives`: `relrowsecurity=true`, **`relforcerowsecurity=false`**, **`owner=postgres`**. Read from `pg_class`, not grepped |
+| **CONTROL** | Organizer inserts a rotation whose subject is not a comb member, as `authenticated` → **`42501`**, *"new row violates row-level security policy for table comb_rotations."* The clause is live and is the gate §1B.23.1 says it is |
+| **PROBE** | The *identical* insert through a postgres-owned `security definer` granted to `authenticated`, called as `authenticated` → **succeeds, row persists.** WITH CHECK bypassed |
+| **COUNTER-PROBE** | The disjointness `before insert` trigger still refuses a subject-as-contributor row on the privileged path. `ENG-58` Part 0's "trigger, not RLS" holds — and so does `ENG-92` Part 3's identical choice |
+
+**`ENG-91`'s gate could not have answered this, and I nearly cited it.**
+`check-comb-rotation-seal-send.mjs:96` creates `service_role nologin
+**bypassrls**`, and `seal_and_send_rotation` is granted to `service_role` alone.
+Its 20/20 is equally consistent with definers bypassing RLS and with them not.
+The probe runs the definer as `authenticated` specifically to break that
+confound.
+
+**§1B.30.1 — what replaces the dependency: two acceptance rows on `ENG-93`, not
+a wait.** Once the mint is a definer, the clause stating *"a comb writes for
+anyone"* is skipped, so **`comb_open_rotation` must carry that rule itself.**
+Nothing in the schema will stop a builder re-adding a subject-membership check,
+and the only written record of why they must not is the line `ENG-92` deletes —
+the rule loses its enforcement and its documentation in the same commit.
+
+1. `comb_open_rotation` **must not** require the subject to be a `comb_members`
+   row. Gated: mint for a non-member subject, assert success.
+2. §1B.24.1(c)'s tombstoned-subject refusal (`profiles.deleted_at is not null`)
+   lands here, per Lumen's rider `bf230693…` — record/error, never improvised
+   copy.
+
+`ENG-92` Part 1 remains correct and worth landing: it is the only statement of
+the model in the schema, and a live `42501` for any future invoker path. It is
+not a gate. **`ENG-93` deps: `ENG-58` (done), `ENG-83`.**
+
+**§1B.30.2 — `20260830000005` is double-booked and no gate in the repo can see
+it.** `ENG-92` is fully written (five parts) but **uncommitted** on
+`sage/eng92-postmerge-fixes`, whose reflog is one line — *created from
+`github/main`*. Its migration renamed itself `…0004 → …0005` between two of my
+reads, colliding with `ENG-59`'s merge. **`…0005` is also taken:** an
+uncommitted `20260830000005_comb_preview_by_invite_code.sql` sits in Fizz's
+worktree. Neither session can see the other's untracked file. A third,
+`20260830000004_ops9_rotation_scheduler.sql` in Bumble's worktree — colliding
+with merged `main` — was present in my first sweep and gone four minutes later.
+
+Every PG gate replays `fs.readdirSync(MIGRATIONS).sort()`
+(`check-comb-rotation-seal-send.mjs:62`, `check-comb-join.mjs:48`): a duplicate
+version prefix sorts fine, **both files apply, both gates go green.**
+`prod-schema-sentinels` keys on the full filename stem (`:237`), not the
+version, so duplicates get two contented rows. `.github/workflows/` holds
+`test.yml` only. The collision surfaces at a manual `supabase db push` —
+downstream of every signal the project has. The precedent is recorded in that
+same sentinel file at `:206` (`ENG-58` renumbered `0001 → 0002` for exactly
+this).
+
+Tie-break, so the two sessions stop renaming into each other: **Fizz keeps
+`…0005`** (it rides the branch that just merged); **`ENG-92` takes `…0006`.** No
+semantic ordering between them. The durable fix is procedural, not technical:
+**the version number is claimed in-channel, not in a worktree.** An untracked
+file is invisible to everyone but its author.
+
+**§1B.30.3 — `ENG-92` Part 5 has no dependency on anything and is the
+compliance item.** Confirmed on `main`:
+`20260830000001_eng84_account_deletion.sql` contains **zero** `comb_members`
+references, so a tombstoned account remains an active comb member, and
+`delete_own_account()` would raise on
+`comb_members_owner_seat_permanent_trigger` for any organizer — a comb owner who
+cannot delete their account (App Store 5.1.1(v)). The drafted `not exists`
+owner-seat skip is the right shape. It has been correct and invisible for hours,
+which is the exact failure §1B.24.0 names.
+
+**Published `bfb67e64…` before committing this.**
+
+**Open:** `O3`, `O4`, `O8`. No new `O`.
 
 ---
 
@@ -2532,7 +2627,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-85** | Sage | M | **Entitlement model.** Where a user's plan lives and how the two caps read it: `combs_written_in ≤ 1` and `comb_members ≤ 5` on free. Must be **a single server-side source of truth** the client cannot spoof, and **both limits must be tunable constants** (§4.2). Ships with the caps **disabled** — see §8.5 |
 | **ENG-90** | Fizz | M | **Short note + nectar, unscoped from the reveal** (§5.2a). Send a short note plus simulated nectar to a comb member at any time. Rides `ENG-62`'s ledger and the `DES-23` flight |
 | **ENG-89** | Fizz | M | **Instrument C1–C5** (§6). Extends `ENG-78`, which stays the highest-priority single event |
-| **ENG-93** | Fizz | M | **Create a comb.** NEW (§1B.29). `DES-29`'s happy path *person → occasion → date → invite by link → write* is designed and **built by nobody** — `create_comb`/`createComb` are zero hits in `src/`. Three parts: (a) the create screen + store method (**no migration** — `combs_insert_own` `20260830000002:165` and the owner-seat trigger `:352` are shipped, and `invite_code`'s `gen_random_uuid()` default `:150` is already 122 bits, closing `ENG-59`'s entropy sub-item); (b) **`comb_open_rotation()`** — a `security definer` mint granted to **both** `authenticated` and `service_role`, because `ENG-91` shipped seal-and-send only and **nothing mints a rotation at any month**; month 1 and `OPS-9`'s month N+1 must be the same body or every rotation invariant is written twice (§1B.29.2c). Carries §1B.24.1(c)'s tombstoned-subject refusal, which was filed into a function that does not exist; (c) **the organizer's name-collection gate** — Lumen's ruling `4fdd39e2…`, `ENG-59`'s component remounted with a header swap and *"Create the comb as Maya"*. **Depends on `ENG-92`** (§1B.29.2b) |
+| **ENG-93** | Fizz | M | **Create a comb.** NEW (§1B.29). `DES-29`'s happy path *person → occasion → date → invite by link → write* is designed and **built by nobody** — `create_comb`/`createComb` are zero hits in `src/`. Three parts: (a) the create screen + store method (**no migration** — `combs_insert_own` `20260830000002:165` and the owner-seat trigger `:352` are shipped, and `invite_code`'s `gen_random_uuid()` default `:150` is already 122 bits, closing `ENG-59`'s entropy sub-item); (b) **`comb_open_rotation()`** — a `security definer` mint granted to **both** `authenticated` and `service_role`, because `ENG-91` shipped seal-and-send only and **nothing mints a rotation at any month**; month 1 and `OPS-9`'s month N+1 must be the same body or every rotation invariant is written twice (§1B.29.2c). Carries §1B.24.1(c)'s tombstoned-subject refusal, which was filed into a function that does not exist; (c) **the organizer's name-collection gate** — Lumen's ruling `4fdd39e2…`, `ENG-59`'s component remounted with a header swap and *"Create the comb as Maya"*. ~~Depends on `ENG-92`~~ — **corrected §1B.30: `ENG-92` is a cleanup, not a gate.** The definer mint bypasses the `comb_members` WITH CHECK entirely (probed at `0f898ce`, CONTROL `42501` / PROBE succeeds), so the clause `ENG-92` deletes is never evaluated on this path. **Deps: `ENG-58` (done), `ENG-83`.** Two acceptance rows replace the dependency (§1B.30.1): the mint must **not** require the subject to be a `comb_members` row, and it carries the tombstoned-subject refusal |
 | **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Semantics ruled in §1B.16: seal-and-send, one event, idempotent.** **Cannot wrap `send_hive`** — its friend-connection precondition makes a comb undeliverable; authorization is **comb membership**. **Must refuse to deliver a zero-entry rotation.** **Gates the §1A definition of done** (there is no reveal without a seal) |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to open a rotation, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime |
@@ -2588,7 +2683,7 @@ consequence, and learn in between.**
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
-| **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3, **`ENG-92`** |
+| **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
@@ -2645,7 +2740,7 @@ OPS-8 ────────────────────────�
                                         OPS-10 ──┼─► SEED 3 COMBS ─► read C1–C5 ─► price ─► ENG-79
 ENG-58 ─┬─► ENG-85 (caps off)                    │
         ├─► ENG-59 ◄── ENG-83 (auth)             │
-        ├─► ENG-93 ◄── ENG-83, ENG-92  (create)   │
+        ├─► ENG-93 ◄── ENG-83           (create)   │
         ├─► ENG-91 ─► OPS-9 ──┐                  │   ◄── longest chain
         └──────────────────────┴─► ENG-60 ◄── DES-33 ─┤
                             └─► ENG-66           │
