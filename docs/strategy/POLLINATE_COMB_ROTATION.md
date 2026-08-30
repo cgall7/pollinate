@@ -1837,11 +1837,57 @@ ever existed and the first that is not `seal_hive`; sealing a volume without the
 leaves every one of those reads saying the month is still open, including the gold card
 and the "+ Add Entry" gate.
 
+#### 4. Addendum — `COPY-14` (@Lumen, event `8e9358b4`) and the cell that detects the mirror
+
+Published as event `e1cc2a90`. Lumen claimed the client half as **`COPY-14`** (branch
+`lumen/copy14-42501-cause`), ruling **the code names the outcome; only state names the
+cause** — on 42501 the client resolves with one refetch: `getHive` first (non-null ⇒
+owner), else `getContributingHive` (the seat test), else neutral connection copy. Seat
+closed renders *"Your seat in this hive has closed — new entries can't be added."*
+
+**Three mechanics verified rather than accepted:**
+
+- *"`getHive` non-null means owner"* holds at **both** layers — `HiveStore.js:170`
+  filters `.eq('owner_id', ownerId)`, and `private_hives_select_own`
+  (`20260827000001:204`) is `auth.uid() = owner_id or is_hive_contributor(id)`, so a
+  removed contributor gets zero rows even without the client filter.
+- `getContributingHive` **is** the seat test: `HiveStore.js:400-402` chains
+  `.eq('hive_contributors.profile_id', contributorId)` and
+  `.is('hive_contributors.removed_at', null)` on the `!inner`. An unfiltered `!inner`
+  would have returned non-null on a *colleague's* roster row. RLS refuses it
+  independently (`is_hive_contributor` is active-only).
+- **Exactly two entry points** to the screen — `HiveDetail.js:271` (owner) and
+  `ContributingHive.js:179` (member). The resolution is closed over the caller set.
+
+**The unfilled cell.** Step 2 has three outcomes, not two: the fetch can return
+**non-null with `sealedAt` null** — active seat, hive not sealed, refused anyway.
+Neither branch covers it, and it is empty in exactly two of three worlds:
+
+| World | Reachable? |
+|---|---|
+| Today, pre-`ENG-91` | **No** — no-open-volume is unreachable; the seat is the only live cause |
+| Post-`ENG-91` **with** the mirror | **No** — no open volume implies `private_hives.sealed_at` is stamped |
+| Post-`ENG-91` **without** the mirror | **Yes**, and it is the only observable symptom |
+
+**So the cell is the detector for §3(b) failing, and it sits in Lumen's file rather than
+Sage's.** Asked: @Lumen fills it with the neutral retry copy plus a comment stating *why*
+it should be unreachable (a cell unreachable for a stated reason is a check; an unhandled
+one is a fall-through). @Sage — this promotes the mirror write to an **acceptance row on
+`ENG-91`**: after a rotation seal, `getHive(hiveId).sealedAt` must be non-null. Otherwise
+the visible failure is a copy bug in a file Sage never touched.
+
+**Sequencing correction:** *"correct in both worlds"* holds for **landing** `COPY-14`, not
+for **testing** it. The sealed branch cannot fire until `ENG-91` ships, so its test must
+fabricate a hive with zero open volumes — a state no shipped path can produce today.
+Write it now and mark it `ENG-91`'s first assertion rather than letting the branch land
+unexercised.
+
 #### Scope
 
-Both rulings live inside the function @Sage is writing now and are cheaper there than
-in any downstream ticket. §1's copy row is @Lumen's. No new `O`. Nothing gates any
-merge; `ENG-92` and `DES-22` are untouched.
+Both rulings in §3 live inside the function @Sage is writing now and are cheaper there
+than in any downstream ticket. §1's copy row is @Lumen's, claimed as `COPY-14`; §4 adds
+one cell to it and one acceptance row to `ENG-91`. No new `O`. Nothing gates any merge;
+`ENG-92` and `DES-22` are untouched.
 
 ---
 
