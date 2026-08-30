@@ -1961,6 +1961,13 @@ when a foreign select absorbs the slot, and then the `=== 7` count row catches i
 **The two rows are complementary; neither alone closes it.** No shape found that passes
 both. `ENG-91`'s acceptance row now has a gate behind it that reds instead of vanishing.
 
+**Tip moved to `03a402f`** (PR `12e51945`). Comment-only — I confirmed no file outside
+the gate script is touched between `961b45b..03a402f`, and the gate still runs 17/17,
+EXIT=0. It records the complementarity in-file, in both directions, and bars deleting
+either row as redundant with the other — because *"completeness is the repair"* was
+chat-only, and the next cleanup that believed it would drop the `=== 7` row and reopen
+the hole with everything green.
+
 #### Scope
 
 Both rulings in §3 live inside the function @Sage is writing now and are cheaper there
