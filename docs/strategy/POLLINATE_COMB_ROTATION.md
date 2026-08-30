@@ -127,6 +127,17 @@ builders asked me for (§1B.8) or made themselves and I have upheld (§1B.9). **
 `github/main@cdb07a1`** — the tip moved from `080edd5` while the brief was being
 read; see §1B.7.
 
+**[Amended 2026-08-30 (§1B.36.23) — the count above is as-written, and §1B IS IN
+TWO PARTS.]** *"Seventeen corrections"* was exact when this preamble was written.
+§1B now holds **69** sections (this commit included) — and, more importantly, they are **not
+contiguous**: **§1B.1–§1B.32 run from here down to §2; §1B.33–§1B.36.23 resume
+after §11, at the end of this file**, with §2–§11 sitting between the two halves.
+A reader who takes §2 as the end of §1B misses **34 sections** — including every
+§1B.36.x: `ENG-100`, `OPS-9`'s advance, the tombstone class, `subject_name`, and
+the entire gate arc. A continuation marker now sits at the §1B.32/§2 boundary.
+The split began at `1fc1696`; §1B.36.23 records why it is **marked rather than
+reflowed**.
+
 ### 1B.1 — The free cap is **5 members inclusive of the organizer**. The 20 is not superseded.
 
 Colin ruled (event `a68da86a…`): *"the first comb as 5 free members. if you want
@@ -482,6 +493,21 @@ to one owner is not a team-wide stop.
 
 
 ### 1B.13 — Line-number citations into this document are already dead. Cite sections.
+
+**[Amended 2026-08-30 (§1B.36.23) — the RULE is upheld; its stated MECHANISM
+expired at `1fc1696`.]** The ground given below is *"§1B has now grown thirteen
+times, always upward, and every growth shifts every line of §2–§11 down."* That
+was true for this document's first 29 commits, over which §2 climbed from line
+`37` to line `2798`. It has been **false for the 36 commits since**: §1B.33
+onward append **below §11**, so §2 sat at `2798` while the file grew from 3,806
+lines to 5,481. Line cites into §2–§11 have therefore been *accidentally stable
+all evening* — I published four of them tonight and @Lumen verified two, and
+every one resolved, because a second defect (§1B's split, §1B.36.23) was
+neutralising the hazard this section exists to name. **A rule whose violations
+stop having consequences stops being a rule.** The rule stands on stronger
+ground: stability here is a property of *where the next amendment happens to
+land*, and it reverses the moment anyone prepends to §1B or reflows the split.
+Cite sections.
 
 Sage verified organizer-in-5 against `POLLINATE_COMB_ROTATION.md:152` and `:176`.
 **That verification was correct** — at `5a39495`, the revision Sage fetched and
@@ -2781,17 +2807,15 @@ what it tests; the class is simply absent from it.
 
 ---
 
-
----
-
-
----
-
-
----
-
-
----
+> ### ⤵ §1B CONTINUES AFTER §11 — this is the end of §1B.32, not the end of §1B
+>
+> The next section in numerical order is **§1B.33**, and it is at the **end of
+> this file**, below §11, with §2–§11 in between. **Thirty-four §1B sections
+> live down there, including every §1B.36.x.** Do not read §2 as §1B's
+> terminator: §1B.33–§1B.36.22 are the *newest* amendments, and so the ones most
+> likely to be live.
+>
+> Split introduced at `1fc1696`; recorded and reasoned at **§1B.36.23**.
 
 ---
 
@@ -5479,3 +5503,116 @@ process rule, the first thing to do is not admire it; it is to run it forward on
 action, and then to name the moment it must fire from now on.** Corollary, and the reason this one
 hid so well: consolidations *feel* like the fix, because they leave a tidy artifact — but a
 consolidation is a batch repair, and a habit is what makes batch repairs unnecessary. 📈
+
+---
+
+### §1B.36.23 — **§1B is in two parts and nothing says so.** Thirty-four sections — every §1B.36.x — sit *after* §11, and the preamble's count still reads "Seventeen." The split is also why §1B.13's line-cite ban has had no consequences all evening (2026-08-30)
+
+**Provenance.** @Lumen closed the encode step with *"a compression banked into
+memory propagates later with the authority of a record"* — their `C1–C5` range,
+sourced from their own core. I ran that check against **my** core rather than
+accepting it, verifying six banked compressions against the doc. My core was
+clean. The document was not.
+
+#### (a) The structural defect, measured
+
+| | |
+|---|---|
+| §1B sections, total (this commit included) | **69** |
+| above §2 (§1B.1 → §1B.32) | **35** |
+| **below §11 (§1B.33 → §1B.36.23)** | **34** |
+| continuation note at the §1B.32/§2 boundary | **none** |
+| continuation note at §1B's header | **none** |
+
+§1B's header sits at the top of the file; §2 begins immediately after §1B.32;
+and §1B.33 resumes *after §11*, at the file's tail. **A reader who opens §1B to
+see the amendments, reads to §2 and stops has read 35 of 69 and has no signal
+that 34 remain** — and the 33 are the *newest*, so they are the ones most likely
+to still be live: `ENG-100` entire, `OPS-9`'s advance, the tombstone class,
+`subject_name`, `comb_member_count`, and every gate ruling from tonight.
+
+The preamble compounds it. *"Seventeen corrections"* was exact when written and
+now understates §1B by 52 sections — **and it does not read as stale**, because
+a reader who stops at §2 has just read something close to that many. The number
+*confirms* the truncation instead of exposing it. That is @Lumen's shape exactly,
+one layer out: not a compression banked in memory, a compression banked in the
+artifact's own preamble, where it carries the authority of the document.
+
+**Two header styles also exist** — §1B.1–§1B.18 are `### 1B.x`, §1B.19 onward are
+`### §1B.x`. `grep -E '^### §1B\.'` returns 34 and looks exhaustive. It is half.
+
+#### (b) The larger finding: §1B.13's ban has been unenforced by accident
+
+§1B.13 rules *"cite this document by section, never by line."* Its stated ground:
+*"§1B has now grown thirteen times, always upward, and every growth shifts every
+line of §2–§11 down by the size of the amendment."*
+
+**That mechanism died at `1fc1696`, the commit that first appended §1B.33 below
+§11.** Measured across all 65 commits that touch this file:
+
+| | §2's line | file lines |
+|---|---|---|
+| first commit (`7a32b60`) | `37` | — |
+| last commit before the split (`bf779ea`) | `2798` | — |
+| `1fc1696` → `4044d15` — **36 commits** | **`2798`, unmoved** | 3,806 → 5,481 |
+
+**Every line of §2–§11 has been frozen for 36 commits and 1,675 lines of growth.**
+So tonight I cited `:3113`, `:3128`, `:3137` and `:3316` in channel — four
+violations of a rule in this document — @Lumen verified two of them against a
+later commit, and **all four resolved correctly.** The rule was broken, the
+breakage was checked, and the check passed.
+
+**A rule whose violations stop having consequences stops being a rule** — and
+here the thing removing the consequences was itself the defect in (a). The
+stability is not a property of the document; it is a property of *where the next
+amendment happens to land*, and it reverses the instant anyone prepends to §1B
+or reflows the split. §1B.13 is **upheld on the rule, superseded on the ground**,
+annotated in place.
+
+**The four cites, converted, as the rule requires:** `:3113` → **§8.2** (`ENG-76`
+cancelled); `:3128` → **§8.3** (`COPY-13`'s retired-token list); `:3137` →
+**§8.4** (no price ruling before `C1` and `C5`); `:3316` → **§10**, `O4`. This
+commit shifts all four. **They are now dead as line numbers** — which is the
+demonstration §1B.13 asked for, delivered on my own citations inside the hour.
+
+#### (c) Ruled: marked, not reflowed — and why
+
+Moving 34 sections above §2 would relocate ~2,700 lines on a branch that is
+merge-ready and waiting on one word from @Colin, would re-break every line cite
+in the file, and would put a 2,700-line reflow into a diff whose entire safety
+argument is *"docs only, zero overlap with `main`'s 30 commits, zero conflict
+markers."* **The reading defect is fixed by navigation; the reflow is not worth
+the merge risk tonight.** Encoded:
+
+1. **§1B header** — amendment retiring the "Seventeen" count and stating the
+   two-part structure, with the missing sections named.
+2. **§1B.32/§2 boundary** — a `⤵ §1B CONTINUES AFTER §11` marker, written into
+   the run of seventeen stray `---` separators that was already sitting there.
+3. **§1B.13** — upheld on the rule, mechanism annotated as expired at `1fc1696`.
+
+**Follow-up, deliberately not done now: reflow §1B into one contiguous block
+after the merge lands.** Named here so it is not lost, and it belongs to whoever
+next has this file open with no merge pending.
+
+#### (d) Running the process invariant on this ruling
+
+§1B.36.22: *every ruling that adds a requirement to a ticket edits that ticket's
+row in the same commit.* Ran it. **This ruling adds no requirement to any §8.6
+row** — it is document navigation, and @Lumen's `COPY-13` sweep is `git grep`
+over `docs/strategy/`, which is indifferent to section placement. No row edit is
+owed. Stating that I ran the check rather than leaving its absence to be read as
+either answer.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. No new `O`.
+
+---
+
+**The shape.** I have spent tonight asking whether a builder's surface carries a
+requirement, whether a document is reachable from `main`, and whether a rule was
+adopted or merely paid off. **I never asked whether the document could be read
+in order.** A file is a surface too, and its structure is a claim about reading
+order that nothing tests — there is no gate for "the section you are looking for
+is 2,700 lines below where the section ends." Corollary, and the one that
+generalises: **a rule that is being violated without consequence is
+indistinguishable from a rule being followed** — so when a rule looks
+well-observed, check whether anything would happen if it weren't. 📈
