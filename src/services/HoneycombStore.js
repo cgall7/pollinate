@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getAuthRedirectUrl, parseAuthCallbackParams } from './authLinking';
 
 const requireSupabase = () => {
   if (!supabase) throw new Error('Supabase is not configured — check .env');
@@ -51,6 +52,82 @@ export const HoneycombStore = {
     const client = requireSupabase();
     const { error } = await client.auth.signOut();
     if (error) throw error;
+  },
+
+  // ENG-83 — the no-password path a stranger following a comb invite link
+  // (ENG-59) needs: there is no screen anywhere in this flow that could
+  // collect a password from someone who has never set one. Supabase emails
+  // a link back to `getAuthRedirectUrl()` (src/services/authLinking.js);
+  // AuthContext's Linking listener hands the returned URL to
+  // `completeSessionFromUrl` below, which is what actually produces the
+  // session — `onAuthStateChange` picks it up from there the same way it
+  // already does for every other sign-in path, so this function itself
+  // returns nothing.
+  //
+  // `shouldCreateUser: true` (GoTrue's default, made explicit here) is the
+  // property that makes this a real alternative to the sign-up form and not
+  // just a passwordless sign-IN: a first-time email reaching this function
+  // gets an account, not a "no such user" bounce.
+  async signInWithOtp(email) {
+    const client = requireSupabase();
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: getAuthRedirectUrl(), shouldCreateUser: true },
+    });
+    if (error) throw error;
+  },
+
+  // The other half of the magic-link round trip — called from
+  // AuthContext.js with whatever URL `Linking` handed it (cold-start via
+  // `getInitialURL()`, or warm via the `url` event). PKCE's `?code=` is the
+  // shape `flowType: 'pkce'` (src/services/supabase.js) produces and the
+  // one Apple/Google's in-app browser preview-fetch of the link can't
+  // silently consume behind the user's back — a preview fetch of a GET
+  // link redeems it, which is exactly what an OTP encoded straight in the
+  // link (the old implicit-flow shape) is vulnerable to. The `#access_token`
+  // fragment branch is parsed defensively for the same reason
+  // `authLinking.js` keeps it: a dashboard-side flow-type mismatch fails
+  // loud here rather than silently.
+  //
+  // Returns `null` (not a throw) for a URL that isn't an auth callback at
+  // all — every other `Linking` event this app will ever receive, until
+  // ENG-59 adds its own deep link, resolves that way rather than erroring.
+  async completeSessionFromUrl(url) {
+    const client = requireSupabase();
+    const params = parseAuthCallbackParams(url);
+    if (!params) return null;
+
+    if (params.code) {
+      const { data, error } = await client.auth.exchangeCodeForSession(params.code);
+      if (error) throw error;
+      return data;
+    }
+
+    const { data, error } = await client.auth.setSession({
+      access_token: params.access_token,
+      refresh_token: params.refresh_token,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  // Sign in with Apple's native token exchange (`signInWithIdToken` —
+  // requires @supabase/supabase-js >= 2.31, this repo is on 2.109). `token`
+  // is `AppleAuthentication.signInAsync()`'s `identityToken`; `nonce` is the
+  // RAW nonce Onboarding.js generated before hashing it for Apple (Apple
+  // gets the SHA-256 hash so it can't be replayed off the wire, GoTrue gets
+  // the raw value so it can verify the hash inside the token itself matches
+  // — passing the same value to both would make every check trivially pass
+  // regardless of what came back from Apple).
+  async signInWithApple(identityToken, nonce) {
+    const client = requireSupabase();
+    const { data, error } = await client.auth.signInWithIdToken({
+      provider: 'apple',
+      token: identityToken,
+      nonce,
+    });
+    if (error) throw error;
+    return data;
   },
 
   // --- Connections ------------------------------------------------------

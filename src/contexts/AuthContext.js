@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as Linking from 'expo-linking';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { HoneycombStore } from '../services/HoneycombStore';
+import { isAuthCallbackUrl } from '../services/authLinking';
 import { migrateLegacyJournal } from '../services/legacyJournalMigration';
 import { PendingOnboardingWrites } from '../services/pendingOnboardingWrites';
 
@@ -61,6 +64,42 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => subscription.subscription.unsubscribe();
+  }, []);
+
+  // ENG-83 — the other end of the magic-link email. A tap on the emailed
+  // link reopens THIS app via its `pollinate://auth-callback` scheme
+  // (`app.json`'s `expo.scheme`, resolved by `Linking.createURL` in
+  // src/services/authLinking.js); this effect is what notices that reopen
+  // and turns it into a session.
+  //
+  // Both listeners are needed, not either: `addEventListener('url', …)`
+  // fires only while a JS process is already running to receive it (a warm
+  // background→foreground reopen). A user who followed the link from a
+  // cold start — the app was never running, or was killed while they were
+  // in their mail client — launches straight into a NEW process with the
+  // callback URL as its *launch* URL, which `addEventListener` cannot see;
+  // `getInitialURL()` is the one-shot read for exactly that case. Skipping
+  // either one silently strands the coldest and warmest ends of the same
+  // flow.
+  //
+  // `exchangeCodeForSession`/`setSession` inside `completeSessionFromUrl`
+  // update the client's own session, which is what fires the
+  // `onAuthStateChange` listener above — so this effect does not call
+  // `setSession` itself; it only hands the URL off and lets the existing
+  // single path pick up the result, same as every other sign-in method.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+
+    const handleUrl = (url) => {
+      if (!isAuthCallbackUrl(url)) return;
+      HoneycombStore.completeSessionFromUrl(url).catch((err) => {
+        console.warn('Magic-link session exchange failed', err);
+      });
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => subscription.remove();
   }, []);
 
   return (
