@@ -4788,6 +4788,11 @@ while the floor was stripped** — which is the exact failure row 1 exists to ca
 a ticket: it is the reason the message key is a requirement rather than a belt-and-braces.
 
 **RULED — assertion row 1 keys on `e.code === '23514'` AND a message matcher.**
+**[SUPERSEDED ON THE SECOND KEY, NOT ON THE REASON — §1B.36.14(c), same evening.]** The reason
+below (the code alone aliases) is upheld and is why the ruling exists. The second key is now
+`e.constraint === '<name>'`, **not** the message: an identifier cannot be reworded, and the
+message has a second gate consumer (row 3's notice matcher) that a copy edit would red at the
+same time. Row 3 keeps the message. Read §1B.36.14 before building this row.
 
 **Withdrawn before publication: my own first draft of this ruling leaned on a precedent that
 says the opposite.** It cited *"8 of the 11 `e.code === '42501'` sites under `scripts/` already
@@ -4805,7 +4810,10 @@ cause.
 
 *The principled discriminator, recorded but not required:* a genuine constraint violation
 populates the error's `constraint` (and `table`) field; a hand-written `raise … using errcode`
-populates neither unless the raise also passes `using constraint = …`. **No gate in `scripts/`
+populates neither unless the raise also passes `using constraint = …`. **[FACT DELETED BY
+`ENG-100` — §1B.36.14(b).** The ruling now requires that raise to pass `using constraint`, so
+our raise DOES populate the field and this presence-test stops discriminating. The residual
+structural discriminator is `schema`, which the engine populates and a `raise` does not.**]** **No gate in `scripts/`
 reads `e.constraint` today** (`git grep 'e\.constraint' 7d61ba5 -- scripts/` -> zero). Message
 matching is cheaper, and row 3 needs the message anyway — but if a later gate ever must
 distinguish our raise from the engine's *without* the string, that field is how.
