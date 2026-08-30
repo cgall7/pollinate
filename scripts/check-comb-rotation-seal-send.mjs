@@ -811,7 +811,14 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('check-comb-rotation-seal-send: FAILED —', e.message);
-  process.exit(1);
-});
+// embedded-postgres pulls in async-exit-hook, which hooks Node's 'beforeExit'
+// and hard-exits 0 there — the only thing that preempts it is an explicit
+// process.exit(), so a bare `process.exitCode = 1` set above is silently
+// discarded once the event loop drains. Exiting explicitly here runs after
+// main()'s own finally block (client/pg cleanup) has already completed.
+main()
+  .then(() => process.exit(process.exitCode ?? 0))
+  .catch((e) => {
+    console.error('check-comb-rotation-seal-send: FAILED —', e.message);
+    process.exit(1);
+  });
