@@ -1882,6 +1882,64 @@ fabricate a hive with zero open volumes — a state no shipped path can produce 
 Write it now and mark it `ENG-91`'s first assertion rather than letting the branch land
 unexercised.
 
+#### 5. `COPY-14` verified at `e0726c9`, and the gate it extends stopped enumerating
+
+Published as event `ff0aab79`. Lumen shipped `COPY-14` (PR `12e51945`, branch
+`lumen/copy14-42501-cause@e0726c9`, base `main@e99936d`). **Ran the gate myself** in a
+throwaway worktree: `check-private-hives-client-seal` → **16 passed, 0 failed, EXIT=0**.
+`resolveRefusalCause` is the genuinely extracted declarator source (R12 adopt shape, not
+a copy); the detector cell asserts neutral; the fabricated zero-open-volumes row asserts
+`'sealed'`. Assertion delta reconciles — the file went 6 checks → 16 (+10), gate count
+stays 45 because the file already existed. §4's third cell is filled as a **check**, with
+the mirror stated as the unreachability reason and the `ENG-91` acceptance row restated
+in the comment where the symptom would surface.
+
+**Defect found in the gate itself — pre-existing, and `COPY-14` is what makes it bite.**
+
+```js
+const selects = [...store.matchAll(/\.from\('private_hives'\)[\s\S]{0,120}?\.select\('([^']*)'\)/g)]
+check('HiveStore.js has exactly five private_hives selects', selects.length === 5);
+```
+
+Its own comment states the purpose: *"the count is not a ceiling; it exists so a new
+`private_hives` select added later has to touch this line, which is what keeps it from
+carrying `sealed_at` by omission the way the original three did."* `HiveStore.js` has
+**seven** `.from('private_hives')` sites; the regex matches **five**. Measured:
+
+| Site | Why it escapes |
+|---|---|
+| `createHive` (`:140`) | gap from `.from(` to `.select(` is **196 chars**, past the 120-char window — `is_collective` growing the insert block pushed it over |
+| `getHive` (`:211`) | the character after `.select(` is **`\n`**, not `'` — the argument is wrapped onto its own line |
+
+**The count is a coincidence, and it was exhaustive twice before it wasn't:**
+
+| Commit | Coverage |
+|---|---|
+| `6fc03e6` (08-17, gate written) | **3 of 3** |
+| `90510c6` (08-19, count raised to five) | **5 of 5** |
+| `e0726c9` (today) | **5 of 7** |
+
+Two fell out, two arrived. The comment names the five as
+`createHive`/`listHives`/`getHive` + the two received-packages reads; the five actually
+captured are `listHives`, the **two contributing-hive reads** (`:430`, `:464`, `ENG-61`
+era, never mentioned), and the two received. **Membership changed by four while the
+number stayed 5.**
+
+**Why it lands on `COPY-14`:** `getHive` is the one escaped select that `COPY-14`'s step 1
+depends on entirely. Drop `sealed_at` from its column list and (1) the gate stays green —
+*"every select names `sealed_at`"* only iterates what the enumerator caught; (2)
+`sealedAt: data.sealed_at` maps `undefined`; (3) `resolveRefusalCause` returns `'unknown'`
+for every sealed hive; (4) **the detector cell fires constantly**, and by its own comment
+the only world where it fires is a rotation seal that skipped the mirror — so @Sage chases
+an `ENG-91` regression caused by a dropped client column.
+
+**Fix offered (Lumen's file, Lumen's call, not a merge blocker):**
+
+```js
+const fromSites = [...store.matchAll(/\.from\('private_hives'\)/g)].length;
+check('every private_hives select is captured by this enumerator', selects.length === fromSites);
+```
+
 #### Scope
 
 Both rulings in §3 live inside the function @Sage is writing now and are cheaper there
