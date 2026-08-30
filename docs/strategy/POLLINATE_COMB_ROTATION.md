@@ -65,7 +65,7 @@ conflated.
 | | Scope |
 |---|---|
 | **Phase 0** | `OPS-8` (analytics promise), `ENG-84` (account deletion), `COPY-13` (sweep + ratify), `OPS-7`, `OPS-3` |
-| **Phase 1** | The rotation engine — `ENG-58`, `ENG-85` (caps **disabled**), `ENG-83`, `ENG-59`, **`ENG-93`** (§1B.29), `OPS-9`, `ENG-60`, `DES-33` (**not `DES-21`** — see §1B.3), `DES-22`, `DES-29`, `DES-31`, `COPY-6` |
+| **Phase 1** | The rotation engine — `ENG-58`, `ENG-85` (caps **disabled**), `ENG-83`, `ENG-59`, **`ENG-93`** (§1B.29), **`ENG-94`** (§1B.32), `OPS-9`, `ENG-60`, `DES-33` (**not `DES-21`** — see §1B.3), `DES-22`, `DES-29`, `DES-31`, `COPY-6` |
 | **Phase 2** | The daily layer — `ENG-90`, `ENG-65`, `ENG-66`, `DES-23`, `DES-32`, `COPY-7`. **`ENG-62` is already shipped** (§1B.2) |
 | **Phase 2, measurement** | `ENG-89` + `ENG-78` — instrumentation **is in the MVP** (ruled `a11aa144…`, closing `O6`). `OPS-10` — **EAS internal distribution**, the ruled mechanism for reaching seeded testers (`a11aa144…`, closing `O7`; **not** TestFlight, which stays MVP2) |
 | **Carried in-flight** | The approved merge queue and demo-gap items in `PLANS/MVP1_DEMO_READINESS_AUDIT.md`, and the GL1/GL2 luxury pass Colin ruled in scope 2026-08-26. **This ruling does not cancel any of it** |
@@ -2681,6 +2681,101 @@ The revival probe runs every tick against combs with no open rotation — a set 
 three seeded combs, real at scale. **Wants a partial index before it matters**;
 noting it rather than ruling it, because the right shape depends on the query 1.9a
 actually writes.
+
+**Open:** `O3`, `O4`, `O8`. No new `O`.
+
+---
+
+### §1B.32 — `ENG-92` closes the tombstone class in two functions. A **third** landed one commit later, it is the only **anon** one, and the Part 4 predicate applied to it would make one leg *worse*
+
+**Provenance, so this reads as a merge-order artifact and not a miss.** Sage wrote
+`ENG-92` against `github/main@8864a12` and based the branch on `0f898ce`.
+`comb_preview_by_invite_code` (`20260830000006`, Fizz's `ENG-59` preview) exists in
+**neither** — it merged at `9bc6d04`, after both. This is §1B.24.0's shape again:
+*two tickets merging one commit apart cannot cite each other as already-done.*
+
+**`ENG-92` Part 4 names the class exactly** — *"`comb_member_count()` and
+`comb_co_member_names()` **both** live-join profiles and both need to stop
+counting/naming a tombstone."* On `github/main@9bc6d04` there are **three**
+functions in that class, not two.
+
+#### (i) The three legs, verified at `github/main@9bc6d04`
+
+`comb_preview_by_invite_code` returns three profile-derived values and **none of
+them reads `deleted_at`**:
+
+| Leg | Source | Tombstoned → |
+|---|---|---|
+| `member_count` (`:94-97`) | plain `comb_members` count, **no `profiles` join at all** | counts deleted accounts |
+| `subject_name` (`:91`, `:101`) | `left join profiles p_subject` | renders `''`, with `has_active_month = true` |
+| `inviter_name` (`:90`, `:100`) | `join profiles p_owner` (inner) | renders `''` |
+
+`git grep deleted_at github/main -- supabase src` returns **exactly two files**:
+`ENG-84`'s own migration and `ENG-91`'s seal. The preview is not among them.
+
+**Reachable today, not hypothetical:** `delete_own_account()` is wired to a live
+client caller at `src/services/HoneycombStore.js:68`.
+
+**The sharpest form — two functions, one row, opposite answers.** `ENG-91` reads
+`p.deleted_at` for the subject (`20260830000003:168`) and classifies
+`subject_gone` → **void** (`:181`). For the same open rotation, the preview
+answers `has_active_month = true` and names the subject. The function that says
+*"this month is already void"* is server-side and private; the function that says
+*"there is an active month, come write for her"* is **anon, and is the only
+pre-auth surface the product has**.
+
+**Gate coverage:** `scripts/check-comb-preview.mjs` is 9/9 green and contains
+**zero** occurrences of `deleted_at` or `tombstone`. Its count row asserts
+*"a removed member is not counted"* — `removed_at` only. The gate is correct about
+what it tests; the class is simply absent from it.
+
+#### (ii) RULED — the fix is not one predicate, and applied blind to leg 3 it is a regression
+
+- **Leg 1 (`member_count`) — Part 4's shape, verbatim.** Join `profiles`, add
+  `and p.deleted_at is null`. `DES-37`'s small-N suppression (absent at N=1–2,
+  present at N=3+) keys off this number, so two live members plus one tombstone
+  currently lifts the suppression and prints *"3 people are writing for Sarah"*
+  when two are.
+- **Leg 3 (`inviter_name`) — DO NOT add the predicate.** `p_owner` is an **inner**
+  join: `and p_owner.deleted_at is null` returns **zero rows**, which is byte-identical
+  to the invalid-code return (`:81-83`). A stranger holding a **valid** link to a
+  **live** comb would get *not found*. That collapses two distinct states into one —
+  precisely the defect `has_active_month` was built to avoid. Correct shape is a
+  **nullable `inviter_name`** plus a `COPY-6` variant, never a filter.
+- **Leg 2 (`subject_name`) — recommended, copy is Lumen's.** A tombstoned subject's
+  month is *guaranteed* to void at seal (`ENG-91` above). Naming her is naming a
+  month that cannot happen — **Lumen's fabricated-void bar, on the read side.**
+  Recommend `subject_name` null and `has_active_month` **false**. Whether that
+  copy-collapses with pre-launch and dormant is `COPY-6`'s call, not this
+  function's.
+
+#### (iii) Routing — split at the artifact line
+
+- **Leg 1 → `ENG-92` Part 6 (Sage).** Same predicate, same `create or replace`,
+  same rationale paragraph; and Sage **must rebase anyway** (base `0f898ce`, main
+  is `9bc6d04`). Shipping `ENG-92` as-is lands a migration that closes a *named*
+  class in two of three functions and leaves the newest and only anon one open —
+  **a partial fix to a named class is worse than none, because the next reader
+  believes the class is closed.**
+- **Legs 2+3 → new row 1.7b, `ENG-94` (Fizz, S).** These change the function's
+  **return contract**, not a predicate — a different artifact from `ENG-92`'s.
+  Blocks nothing: `git grep` finds **no client reader** of
+  `comb_preview_by_invite_code`, `comb_member_count` or `comb_co_member_names` in
+  `src/` on main, so the whole class is still pre-emptive. Fix it before `DES-37`
+  renders it, not after.
+
+#### (iv) Two merge-pass items, neither a defect
+
+1. **Neither open PR has run against current main.** `sage/eng92-postmerge-fixes@4632eec`
+   and `bumble/ops9-rotation-scheduler@15635f8` both sit on `0f898ce`; main is
+   `9bc6d04`. Both suites (48/48) are true statements about a tree that is one
+   commit behind. Re-run on the actual merge result.
+2. **Migration numbers are collision-free but the merge order inverted.** Applied
+   order on main is `…0004`, `…0006`; Bumble's `…0005` merges *after* `…0006` is
+   already in the tree. There is **no deploy workflow** (`.github/workflows/` is
+   `test.yml` only), so nothing applies automatically — but if `…0006` reaches prod
+   before `…0005` merges, `…0005` is an out-of-order migration. Land it first, or
+   renumber it at merge.
 
 **Open:** `O3`, `O4`, `O8`. No new `O`.
 
