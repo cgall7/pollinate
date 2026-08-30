@@ -2812,7 +2812,7 @@ what it tests; the class is simply absent from it.
 > The next section in numerical order is **§1B.33**, and it is at the **end of
 > this file**, below §11, with §2–§11 in between. **Thirty-four §1B sections
 > live down there, including every §1B.36.x.** Do not read §2 as §1B's
-> terminator: §1B.33–§1B.36.22 are the *newest* amendments, and so the ones most
+> terminator: §1B.33–§1B.36.24 are the *newest* amendments, and so the ones most
 > likely to be live.
 >
 > Split introduced at `1fc1696`; recorded and reasoned at **§1B.36.23**.
@@ -3202,10 +3202,10 @@ consequence, and learn in between.**
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
-| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE. **ACCEPTANCE ADDED §1B.36.19: this row inherits the CLOCK-BOUNDARY pair** (moved off `1.9a`, which could not run them). In `check-ops9-rotation-scheduler.mjs`, with the second block built: **row 2** — tick with the floor intact → `warnings` contains **no** match; **row 3** — tick with the floor stripped → `warnings` **does** match, the **positive control**. **Undeletable pair, with the in-gate comment saying so** — row 3 is the only thing separating *the floor held* from *nothing ran*, and row 2 alone is green on a tick that never advances. Runnable here because `1.9a` is already a dep | 1.1, **1.8a**, **1.9a** |
+| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE. **ACCEPTANCE ADDED §1B.36.19: this row inherits the CLOCK-BOUNDARY pair** (moved off `1.9a`, which could not run them). In `check-ops9-rotation-scheduler.mjs`, with the second block built: **row 2** — tick with the floor intact → `warnings` contains **no** match; **row 3** — tick with the floor stripped → `warnings` **does** match, the **positive control**. **Undeletable pair, with the in-gate comment saying so** — row 3 is the only thing separating *the floor held* from *nothing ran*, and row 2 alone is green on a tick that never advances. Runnable here because `1.9a` is already a dep. **MERGE-TIME REQUIREMENTS ADDED §1B.36.24 — this branch is 11 behind `main`, so its gate set is a snapshot of a stale merge-base:** (i) `OPS-11` landed inside the gap and `check-share-visibility` now asserts a catalog-wide `EXPECTED_DEFINER_GRANTS` map whose rule is *“no row at all is also a failure”* — `advance_due_rotations()` is `security definer` with **no row**, so it reds on merge until one is added; (ii) `…0005` now sorts **below** `main`'s `0006`–`0010` — **renumber to `…0011`** (the target moved once already tonight, so re-read `main` at rebase time rather than reusing this number); (iii) re-derive **then** re-count — whatever `npm test` says on that tip is scoped to a suite three gates behind | 1.1, **1.8a**, **1.9a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ENROLLABLE MEMBERS** — `removed_at is null` AND `profiles.deleted_at is null`, **adopted from `ENG-100`'s predicate, never re-implemented** (§1B.36.10; @Lumen's coupling pin, R12 adopt-don't-copy). A floor that counts a different population from the mint it green-lights green-lights a month with zero contributors (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv. **ACCEPTANCE ADDED §1B.36.20 + §1B.36.21 — read both before building.** (a) **In-body pre-launch dormancy:** *no resolved rotation* returns **quietly**, in this function, not only in the tick's `WHERE` — the derivation is UNDEFINED without a prior rotation (no subject cursor, no base `closes_at`), and this function has two direct callers that are not the tick's `SELECT`. Comment carries the **mechanism** *and* the **hazard** (a `now()` fallback would silently mint month 1 over the organizer's choice, §1B.31.3(i)) — otherwise the silence reads as unfinished. (b) **Its gate is a 2×2 with ONE green cell, all three runnable at this row's landing via a direct `service_role` call, sharing ONE base varying one axis:** **A** (1 enrollable, ≥1 resolved) → no row, no raise; **B** (2, ≥1 resolved) → **a row appears, the shared positive control**; **C** (2, no prior) → no row, no raise. A and C each differ from B on exactly one axis; neither negative substitutes for the other | 1.1, **1.7a** |
-| **1.7b** | **Fizz** | **`ENG-100` — the mint's roster hole + empty-snapshot refusal.** NEW (§1B.36.9). **Rides `ENG-94`'s `create or replace` of `comb_open_rotation`; SEPARATE acceptance** — `ENG-94` is titled *subject-gone repoint* and is done when the SUBJECT line is repointed, so the roster requirement dies with it if folded in (§1B.36.9). **Full consolidated acceptance at §1B.36.18 — build from that block, not from the six sections that produced it.** Two lines: (1) the roster snapshot excludes tombstoned CONTRIBUTORS via a general predicate (`not exists … p.deleted_at is not null`), written as the general rule, NOT *"exclude the organizer"*; (2) `get diagnostics` the snapshot's `row_count` and refuse at zero, `using errcode = 'check_violation', constraint = '<name>'` (§1B.36.12/.13/.14). **Month 1 is EXEMPT from §1B.31.3's floor, so the mint is the only place an empty writing roster is observable** — 1.9a's floor does not cover this and cannot | **1.7a**, and lands in `ENG-94`'s migration |
+| **1.7b** | **Fizz** | **`ENG-100` — the mint's roster hole + empty-snapshot refusal.** NEW (§1B.36.9). **Rides `ENG-94`'s `create or replace` of `comb_open_rotation`; SEPARATE acceptance** — `ENG-94` is titled *subject-gone repoint* and is done when the SUBJECT line is repointed, so the roster requirement dies with it if folded in (§1B.36.9). **Full consolidated acceptance at §1B.36.18 — build from that block, not from the six sections that produced it.** Two lines: (1) the roster snapshot excludes tombstoned CONTRIBUTORS via a general predicate (`not exists … p.deleted_at is not null`), written as the general rule, NOT *"exclude the organizer"*; (2) `get diagnostics` the snapshot's `row_count` and refuse at zero, `using errcode = 'check_violation', constraint = '<name>'` (§1B.36.12/.13/.14). **Month 1 is EXEMPT from §1B.31.3's floor, so the mint is the only place an empty writing roster is observable** — 1.9a's floor does not cover this and cannot. **CLOSED §1B.36.24 — landed on `github/main@52a9733`**, verified independently (50 gates, 0 FAIL, 1,690 assertions, `rev-parse HEAD` confirmed in the same shell). **The near-miss is the part to carry:** the branch was **6 behind `main`** and `…0010`'s `create or replace` of `comb_preview_by_invite_code` was derived from `…0006`'s body, so merging it would have **reverted `ENG-92` Part 6** — reproduced at 18/18 on `main` vs 17/18 on the merge commit. **Standing requirement for every migration on this table: a `create or replace` must be re-derived from the HIGHEST-NUMBERED prior definition at MERGE time, never at authoring time**, and the full suite runs on the merge commit with the per-gate `FAIL` lines read, never `$?` | **1.7a**, and lands in `ENG-94`'s migration |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
@@ -5518,9 +5518,9 @@ clean. The document was not.
 
 | | |
 |---|---|
-| §1B sections, total (this commit included) | **69** |
+| §1B sections, total (this commit included) | **69** — *70 as of §1B.36.24* |
 | above §2 (§1B.1 → §1B.32) | **35** |
-| **below §11 (§1B.33 → §1B.36.23)** | **34** |
+| **below §11 (§1B.33 → §1B.36.24)** | **34** — *35 as of §1B.36.24* |
 | continuation note at the §1B.32/§2 boundary | **none** |
 | continuation note at §1B's header | **none** |
 
@@ -5616,3 +5616,127 @@ is 2,700 lines below where the section ends." Corollary, and the one that
 generalises: **a rule that is being violated without consequence is
 indistinguishable from a rule being followed** — so when a rule looks
 well-observed, check whether anything would happen if it weren't. 📈
+
+---
+
+### §1B.36.24 — `ENG-100` was built correctly and **would have reverted `ENG-92` Part 6 on merge**: `…0010`'s `create or replace` of `comb_preview_by_invite_code` was derived from a superseded body. Reproduced, fixed by @Fizz, landed and re-verified — and the class had a second member in `OPS-9` (2026-08-30)
+
+@Fizz reported `ENG-100` (row `1.7b`) built on `fizz/eng94-repoint-subject-gone@faf47ad`, with a
+full suite of **49 gates / 1,667 assertions / exit `0`** on the pushed commit, and `github/main`
+`ls-remote`-confirmed unmoved at `7d61ba5` before and after the push. Every one of those statements
+was true. The merge was still red.
+
+#### (a) The ticket itself was correct — verified before raising the objection
+
+Read `…0010` end to end. The floor is as ruled: `get diagnostics` on the roster snapshot, raise at
+zero with `errcode = 'check_violation'` **and** `constraint = 'comb_open_rotation_enrollable_floor'`,
+no `using table` (§1B.36.12/.13/.14). The ENROLLABLE predicate is the general one
+(`removed_at is null` + `not exists … deleted_at is not null`), not organizer-scoped
+(§1B.36.18 Correction 1). On the merged tree both of Fizz's own gates passed:
+`check-comb-open-rotation` 13/13, `check-comb-preview` 11/11.
+
+Fizz's rename-the-constraint mutation is also the probe that settles §1B.36.13's operator question:
+a code-only assertion — or a code-`||`-constraint one — stays green under a rename. Redding under it
+is what proves the conjunction.
+
+#### (b) The defect — a `create or replace` derived from a superseded body
+
+```
+merge-base(github/main, fizz/eng94-repoint-subject-gone) = 46ce848
+main…branch                                             = 2 ahead, 6 behind
+```
+
+The six were `OPS-11`, `ENG-92` (`4dc65d7`), **`ENG-92` Part 6 (`1ba6315`)**, `ENG-99`, and two
+Part 2 fixes. `ENG-92` Part 6 is `main`'s `…0007`, and it `create or replace`s
+`comb_preview_by_invite_code` to add the tombstone predicate to the `member_count` leg:
+
+```sql
+from public.comb_members m
+join public.profiles p on p.id = m.profile_id
+where m.comb_id = v_comb_id and m.removed_at is null and p.deleted_at is null
+```
+
+`…0010` replaced the same function with a body derived from `…0006`, without that leg. **`0010` >
+`0007`**, so on a fresh replay and on prod alike the stale body runs last and wins. Sage's own
+`…0007` header names the split — `member_count` is Part 6's, and only `subject_name`/`inviter_name`
+were routed to `ENG-94`.
+
+#### (c) Reproduced, not argued
+
+Merged `github/main@7d61ba5` with `faf47ad` in a throwaway worktree, resolved the one real conflict
+(§(d)), and ran it:
+
+| run | result |
+|---|---|
+| `check-eng92-comb-rotation-fixes` on `main` alone | **18 passed, 0 failed** |
+| the same gate on the merge commit | **17 passed, 1 failed** |
+| the failure | `§1B.32 leg 1: comb_preview_by_invite_code member_count excludes a tombstoned member — [{"member_count":3}]` |
+| full suite on the merge commit | 50 gates, **1,689 passed, 1 failed** |
+
+Two things a branch-local run structurally could not see:
+
+- **The gate did not exist on the branch.** `package.json` listed **50** `check:` scripts on `main`
+  and **49** on the branch; `check-eng92-comb-rotation-fixes` arrived in the six commits the branch
+  was behind. The 49/49 was honest and blind by construction.
+- **`npm test` exited `0` on the merge commit with that gate red** — this repo's known-unreliable
+  exit status, re-earned. `exit 0` is not evidence here; the per-gate `FAIL` lines are.
+
+#### (d) There was also a real conflict, and it was the *visible* half
+
+`scripts/lib/prod-schema-sentinels.mjs` — both sides append a sentinel at the same anchor.
+Mechanical: keep both, `…0007` then `…0010`, 47 keys. Worth recording because it means the PR did
+not merge clean, so a reviewer *was* stopped — just not by the thing that mattered. The revert lived
+in two different files with zero textual overlap and auto-merged without a murmur. **A clean merge
+is a statement about text, never about semantics.**
+
+#### (e) Fixed and landed — verified on `main`'s actual tip, not on the branch
+
+@Fizz rebased onto `main`, kept both sentinel entries, and re-derived the `member_count` leg from
+`…0007`'s body — reproducing the exact red string first, then restoring. Independently verified:
+
+```
+ls-remote github/main                  →  52a9733
+merge-base --is-ancestor 7d61ba5 main  →  YES (true fast-forward, no merge commit)
+npm test @ 52a9733 (own worktree)      →  50 gates, 0 FAIL, 1,690 assertions, exit 0
+rev-parse HEAD in the same shell       →  52a9733
+```
+
+Content on the tip: `…0010` carries **both** `p.deleted_at is null` (`ENG-92` Part 6 restored) **and**
+`comb_subject_gone(v_comb_id, v_subject_id)` (`ENG-94`'s own collapse) — the re-derivation did not
+cost `ENG-94` its own change, which was the live hazard the fix itself introduced. `ENG-100`'s floor
+intact with the errcode/constraint pair. No duplicate migration prefixes. **Row `1.7b` is closed.**
+
+#### (f) The class, run rather than assumed — `OPS-9` is the second member
+
+Enumerated every unmerged remote branch carrying a migration. Two were comb-era: `ENG-94`'s and
+`bumble/ops9-rotation-scheduler`, which is now **11 behind** `main`.
+
+`OPS-9` is clean on *this* axis — it `create`s one new function and replaces none. But `OPS-11`
+landed on `main` inside its gap, extending `check-share-visibility` into a catalog-wide
+`EXPECTED_DEFINER_GRANTS` map whose stated rule is *"no row at all is also a failure — a new definer
+ships un-reviewed."* `advance_due_rotations()` is `security definer` and has **no row** (it appears
+on `main` only inside another entry's `why` string). It reds on merge. Separately, `…0005` now sorts
+below `main`'s `0006`–`0010`; **renumber target is `…0011`**, and it moved once already tonight.
+Both carried onto row `1.8`.
+
+#### (g) The shape
+
+Fizz checked that `main` had not moved — **the right check for a push race, and the wrong one for a
+stale base.** *"`main` is still where I left it"* and *"my base is `main`"* are different claims, and
+only the second makes a branch-local green suite predictive of the merge. **A green suite is scoped
+to the gate set it ran, and a branch's gate set is a snapshot of its merge-base** — so the gates most
+likely to catch a change are exactly the ones a behind-branch does not have. Count `package.json`'s
+`check:` scripts on both sides before trusting an N/N.
+
+**The correction that matters, because the fix ran the same check again:** on the second push Fizz
+wrote *"confirmed `main` unmoved at `7d61ba5`"* — and that time it was correct **and** sufficient,
+because the rebase had just made `7d61ba5` the base. `ls-remote` was never the flawed instrument; it
+answers *"has `main` moved since I read it,"* and it becomes sufficient the moment your base **is**
+the ref you compare. Rebase-then-confirm is the whole fix. **A check that was insufficient is not
+thereby wrong — it was answering a question nobody had asked yet.**
+
+Corollary, and the transferable half: **a `create or replace` is a whole-body assertion about a
+function at a moment in time. Re-derive it from the highest-numbered prior definition at MERGE time,
+never at authoring time.** Same family as §1B.36.8's *a fix that names its class freezes that class
+at the author's base commit*, one layer down — here the "class" is the function body itself, and the
+enumeration that goes stale is not a list in a comment but every line the author did not retype.
