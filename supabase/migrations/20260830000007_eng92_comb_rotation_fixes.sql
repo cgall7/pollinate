@@ -2,7 +2,7 @@
 -- (ENG-58) and 20260830000001_eng84_account_deletion (ENG-84), both merged
 -- before docs/strategy/POLLINATE_COMB_ROTATION.md's §1B.23/§1B.24 were
 -- published -- see that doc's own §1B.24.0: "a ruling exists when it is
--- published, not when it is committed." Thread b57ad406, 2026-08-30. Six
+-- published, not when it is committed." Thread b57ad406, 2026-08-30. Seven
 -- independent fixes, none touching seal/send behaviour (ENG-91, unchanged):
 --
 --   §1B.23.1 -- comb_rotations_insert_owner's WITH CHECK required the
@@ -62,6 +62,22 @@
 --   a predicate -- Vector and Lumen routed those to ENG-94 (Fizz), not
 --   here; ratified in-thread, not this migration's scope.
 --
+--   ENG-99 -- Vector's ruling (thread b57ad406, ~19:09-19:13), ratified by
+--   Lumen from the design side: a comb member who leaves mid-month keeps a
+--   live hive_contributors seat on that month's rotation hive -- the
+--   card's existence/write-acceptance read hive_contributors, the fold/
+--   count read comb_members (comb_rotations_select,
+--   comb_rotation_writer_count), and nothing propagated a self-removal
+--   between the two. "Membership is writing rights" is half-applied
+--   without this. Five build pins, below. Pin 3/5's guard was argued as an
+--   abort-path fix (the trigger firing inside delete_own_account, which
+--   already swept hive_contributors three statements earlier) -- live-
+--   verified against a real Postgres and CORRECTED at Part 7's own comment:
+--   that specific mechanism doesn't reproduce (`now()` is frozen for the
+--   whole transaction, so the two writes never disagree), but the guard is
+--   real protection against a different, also-verified hazard
+--   (cross-transaction re-entry) and stays.
+--
 -- Verified against github/main@9bc6d04 after rebasing this branch onto it
 -- (was cut from 0f898ce/8864a12; Vector's §1B.32 flagged both PRs in this
 -- thread as one commit stale) -- git grep for create_comb/createComb (zero
@@ -96,8 +112,28 @@ alter policy "comb_rotations_insert_owner"
 -- the per-person write-status and content stay contributor-only. Counts
 -- hive_contributors directly, never comb_members -- comb_members answers
 -- "how big is this comb," this answers "how many people are in this
--- month's writing roster," and the two diverge the moment §1B.23.1 lets a
--- non-member be honored.
+-- month's writing roster."
+--
+-- CORRECTED (Vector, thread b57ad406, 2026-08-30, after this migration's
+-- first push): the divergence direction below was backwards. comb_members
+-- and hive_contributors AGREE when the subject is not a comb member --
+-- §1B.23.1 excludes her from both, N = N. They DIVERGE when the subject IS
+-- a comb member, which comb_open_rotation's mint always excludes her from
+-- (`and m.profile_id <> p_subject_profile_id`) -- not an edge case
+-- §1B.23.1 introduced, but the modal shape of a rotating comb since the
+-- mint shipped.
+--
+-- CAVEAT (Vector 19:09 + Lumen's ratification, same thread): this
+-- function's "the subject is entitled to know" promise holds only for a
+-- subject who IS a comb member -- is_comb_member(v_comb_id) gates the
+-- whole body (below), so a subject who has never joined her own comb (the
+-- population §1B.23.1/ENG-95 legalized) reads 0 here exactly as she would
+-- from comb_member_count, not the true roster size. DES-33's Subject Mask
+-- bars any pre-seal count reaching the subject regardless (`§1B.36.1`), so
+-- this does not bite today -- but a future subject-facing pre-seal count
+-- must not cite this function without also checking comb membership, or
+-- restate the promise against the delivered roster instead
+-- (`contributor_names.length`, post-seal, per the four-row source table).
 create function public.comb_rotation_writer_count(p_rotation_id uuid)
 returns integer
 language plpgsql
@@ -325,5 +361,113 @@ $$;
 revoke all on function public.comb_preview_by_invite_code(text) from public;
 grant execute on function public.comb_preview_by_invite_code(text) to anon;
 grant execute on function public.comb_preview_by_invite_code(text) to authenticated;
+
+-- =============================================================================
+-- Part 7 (ENG-99). A comb member's departure closes their writing seat on
+-- the comb's currently-open rotation hive -- five build pins, per Vector's
+-- ruling and Lumen's design-side ratification (thread b57ad406):
+--
+--   Pin 1 -- open rotation only. A sealed or voided month's roster is
+--   historical record, not something departure should touch: entries.
+--   author_name_at_seal (20260828000001) already freezes the writer's name
+--   per-entry at seal, independent of hive_contributors, so a past month's
+--   contributor_names is unaffected either way (Pin 2). Scoped below via
+--   comb_rotations.sealed_at/voided_at both null.
+--
+--   Pin 2 -- departure ends the writing, not the written. No code change:
+--   verified 20260828000001's contributor_names aggregate reads
+--   entries.author_name_at_seal via array_agg, distinct on entries.user_id,
+--   never hive_contributors -- a writer who leaves after writing still
+--   ships in the keepsake, named.
+--
+--   Pin 3 / Pin 5 -- `removed_at is null` guards the UPDATE below.
+--
+--   CORRECTED (Sage, live-verified against a real embedded-Postgres
+--   instance before trusting the claim, not just re-argued): Vector raised
+--   this as an ABORT-PATH guard -- delete_own_account() (20260830000001)
+--   sweeps hive_contributors three statements before it sweeps
+--   comb_members (Part 5 above), so this trigger fires, during account
+--   deletion, against a hive_contributors row that already carries
+--   removed_at, and hive_contributors_removed_at_immutable_trigger
+--   (20260827000001) raises on any re-stamp of an already-removed row.
+--   That specific mechanism does NOT reproduce: `now()` is
+--   `transaction_timestamp()` -- frozen for the life of the whole calling
+--   transaction, not the wall clock -- so delete_own_account's own sweep
+--   (Part 5, using `now()`) and this trigger's UPDATE (also `now()`, same
+--   transaction) write the IDENTICAL timestamp to the same row.
+--   `new.removed_at is distinct from old.removed_at` is therefore FALSE,
+--   the immutable trigger's raise condition never evaluates true, and the
+--   second write is silently a no-op -- reproduced directly: stripping this
+--   guard and re-running the gate's delete_own_account/open-rotation-seat
+--   test (below) still passes 18/18, no abort, because the two writes
+--   never actually disagree.
+--
+--   The guard still stands, for the reason that DOES hold: it makes this
+--   trigger idempotent against retry, and it is real protection against a
+--   DIFFERENT, live-verified hazard -- a hive_contributors seat closed in
+--   an EARLIER, already-COMMITTED transaction (any future path that closes
+--   a seat outside this trigger's own transaction) genuinely does raise on
+--   a bare re-stamp, confirmed against a real clock gap across two
+--   separate transactions. The guard is therefore load-bearing against
+--   cross-transaction re-entry, not against delete_own_account's specific
+--   same-transaction statement order -- a narrower claim than originally
+--   argued, but a real one.
+--
+--   Pin 4 -- an empty roster (every writer's seat closed mid-month) is
+--   already voided by §1B.16's existing zero-entry mechanism at seal time.
+--   No new behaviour: this trigger only closes seats, it never seals or
+--   voids a rotation itself.
+--
+-- SECURITY DEFINER, not a bare trigger function: hive_contributors_update_
+-- owner (20260827000001) grants UPDATE only to the hive owner (the comb
+-- organizer), and comb_members_update_owner_or_self (20260830000002) lets
+-- a MEMBER end their own seat directly -- so a self-departing member's own
+-- UPDATE on comb_members would have no privilege to also close their
+-- hive_contributors row without this function running as its definer.
+--
+-- The organizer's own row can never reach this trigger:
+-- comb_members_owner_seat_permanent_trigger (20260830000002, BEFORE
+-- UPDATE, same table/event) raises on any removed_at set on an owner's
+-- row before this AFTER trigger would ever fire -- one shape, not two, per
+-- Lumen's verification in-thread.
+create function public.comb_members_departure_closes_writing_seat()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.hive_contributors
+  set removed_at = now()
+  where profile_id = new.profile_id
+    and removed_at is null
+    and hive_id in (
+      select r.hive_id
+      from public.comb_rotations r
+      where r.comb_id = new.comb_id
+        and r.sealed_at is null
+        and r.voided_at is null
+    );
+
+  return new;
+end;
+$$;
+
+create trigger comb_members_departure_closes_writing_seat_trigger
+  after update on public.comb_members
+  for each row
+  when (old.removed_at is null and new.removed_at is not null)
+  execute function public.comb_members_departure_closes_writing_seat();
+
+-- Same shape as combs_create_owner_membership (20260830000002) -- a
+-- SECURITY DEFINER trigger function is directly callable by anyone with
+-- default PUBLIC execute unless explicitly revoked, bypassing the trigger
+-- context entirely. Only `authenticated` reaches this: comb_members_
+-- update_owner_or_self admits the organizer or the member themselves, both
+-- authenticated; no service_role caller of a comb_members UPDATE exists
+-- today.
+revoke all on function public.comb_members_departure_closes_writing_seat() from public;
+revoke execute on function public.comb_members_departure_closes_writing_seat() from anon;
+grant execute on function public.comb_members_departure_closes_writing_seat() to authenticated;
 
 notify pgrst, 'reload schema';

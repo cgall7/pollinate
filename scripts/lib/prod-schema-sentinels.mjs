@@ -255,7 +255,6 @@ export const SENTINELS = {
     args: { p_invite_code: 'calibration-invalid-code' },
     expect: 'success',
   },
-<<<<<<< HEAD
   // ENG-93 (Fizz, row 1.7a). comb_open_rotation is the same grant shape as
   // comb_join_by_invite_code above: revoked from anon in the same migration
   // that creates it (granted only to authenticated and service_role), so

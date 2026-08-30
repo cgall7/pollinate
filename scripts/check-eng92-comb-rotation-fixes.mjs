@@ -1,4 +1,4 @@
-// Gate for ENG-92's six post-merge fixes
+// Gate for ENG-92's seven post-merge fixes
 // (supabase/migrations/20260830000007_eng92_comb_rotation_fixes.sql).
 //
 //   npm run check:eng92-comb-rotation-fixes
@@ -22,6 +22,10 @@
 //   §1B.32 leg 1 -- comb_preview_by_invite_code()'s member_count leg
 //   excludes a tombstoned member, the same predicate as §1B.24.1 applied to
 //   the third function in the class (Vector's finding, this thread).
+//   ENG-99 -- a comb member's departure closes their writing seat on the
+//   comb's OPEN rotation only (a sealed rotation's seat is untouched), and
+//   the abort-path guard: delete_own_account for a member holding an
+//   open-rotation seat does not abort (Vector's hazard, pin 3/5).
 //
 // Modeled on check-comb-rotation-seal-send.mjs for the harness shape: real
 // migrations off disk in full chronological order, mutations run under the
@@ -70,6 +74,14 @@ const DEPARTING_MEMBER = '44444444-4444-4444-4444-444444444444';
 // reused across tests is a hidden coupling once an earlier test mutates it
 // irreversibly). Fresh identity, not a shared one.
 const PREVIEW_TOMBSTONE_MEMBER = '55555555-5555-5555-5555-555555555555';
+// Own profiles for ENG-99's tests -- LEAVING_WRITER self-removes (comb_
+// members row survives, just removed_at-stamped) so it stays inert for
+// reuse across both of ENG-99's assertions in the same test; DELETING_WRITER
+// goes through delete_own_account (auth.users row gone after), same
+// per-test-identity discipline as DEPARTING_MEMBER/PREVIEW_TOMBSTONE_MEMBER
+// above -- an account-deletion test needs a profile no other test deletes.
+const LEAVING_WRITER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const DELETING_WRITER = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 let pass = 0;
 const failures = [];
@@ -144,7 +156,7 @@ async function main() {
     }
 
     await client.query(
-      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12), ($13, $14), ($15, $16)',
+      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12), ($13, $14), ($15, $16), ($17, $18), ($19, $20)',
       [
         OWNER, JSON.stringify({ display_name: 'Owner' }),
         OTHER_OWNER, JSON.stringify({ display_name: 'Other Owner' }),
@@ -154,6 +166,8 @@ async function main() {
         NON_MEMBER, JSON.stringify({ display_name: 'Non Member' }),
         DEPARTING_MEMBER, JSON.stringify({ display_name: 'Departing Member' }),
         PREVIEW_TOMBSTONE_MEMBER, JSON.stringify({ display_name: 'Preview Tombstone Member' }),
+        LEAVING_WRITER, JSON.stringify({ display_name: 'Leaving Writer' }),
+        DELETING_WRITER, JSON.stringify({ display_name: 'Deleting Writer' }),
       ]
     );
 
@@ -487,6 +501,163 @@ async function main() {
         bad(
           '§1B.32 leg 1: comb_preview_by_invite_code member_count excludes a tombstoned member',
           JSON.stringify(rows)
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 8 (ENG-99, pins 1 + 4). A non-owner member's departure closes their
+    // writing seat on the comb's OPEN rotation, but leaves a SEALED
+    // rotation's seat untouched -- same member, same comb, two rotations,
+    // so the trigger's WHERE clause is proven to discriminate rather than
+    // happening to pass on a fixture with only one rotation to touch.
+    {
+      const combId = await makeComb(OWNER, [SUBJECT, LEAVING_WRITER]);
+
+      // Rotation 1: already sealed -- historical record, must be untouched.
+      const { rows: sealedHiveRows } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective) values ($1, 'Sealed Rotation', $2, true) returning id",
+          [OWNER, SUBJECT]
+        )
+      );
+      const sealedHiveId = sealedHiveRows[0].id;
+      await asUser(OWNER, () =>
+        client.query('insert into public.hive_contributors (hive_id, profile_id, invited_by) values ($1, $2, $3)', [
+          sealedHiveId,
+          LEAVING_WRITER,
+          OWNER,
+        ])
+      );
+      await asUser(OWNER, () =>
+        client.query(
+          `insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at, sealed_at)
+           values ($1, 1, $2, $3, now() - interval '1 day', now())`,
+          [combId, sealedHiveId, SUBJECT]
+        )
+      );
+
+      // Rotation 2: open -- the one departure should touch.
+      const { rows: openHiveRows } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective) values ($1, 'Open Rotation', $2, true) returning id",
+          [OWNER, SUBJECT]
+        )
+      );
+      const openHiveId = openHiveRows[0].id;
+      await asUser(OWNER, () =>
+        client.query('insert into public.hive_contributors (hive_id, profile_id, invited_by) values ($1, $2, $3)', [
+          openHiveId,
+          LEAVING_WRITER,
+          OWNER,
+        ])
+      );
+      await asUser(OWNER, () =>
+        client.query(
+          `insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at)
+           values ($1, 2, $2, $3, now() + interval '1 day')`,
+          [combId, openHiveId, SUBJECT]
+        )
+      );
+
+      // Self-departure -- comb_members_update_owner_or_self admits the
+      // member as well as the organizer; this is the "leave-comb" gesture
+      // itself, not an owner-initiated removal.
+      await asUser(LEAVING_WRITER, () =>
+        client.query('update public.comb_members set removed_at = now() where comb_id = $1 and profile_id = $2', [
+          combId,
+          LEAVING_WRITER,
+        ])
+      );
+
+      const { rows: seats } = await asPostgres(() =>
+        client.query(
+          'select hive_id, removed_at from public.hive_contributors where profile_id = $1 and hive_id in ($2, $3)',
+          [LEAVING_WRITER, sealedHiveId, openHiveId]
+        )
+      );
+      const sealedSeat = seats.find((r) => r.hive_id === sealedHiveId);
+      const openSeat = seats.find((r) => r.hive_id === openHiveId);
+      if (openSeat?.removed_at) {
+        ok('ENG-99 pin 1: departure closes the writing seat on the OPEN rotation');
+      } else {
+        bad('ENG-99 pin 1: departure closes the writing seat on the OPEN rotation', JSON.stringify(openSeat));
+      }
+      if (sealedSeat && sealedSeat.removed_at === null) {
+        ok("ENG-99 pin 1: departure leaves a SEALED rotation's seat untouched (historical record)");
+      } else {
+        bad(
+          "ENG-99 pin 1: departure leaves a SEALED rotation's seat untouched (historical record)",
+          JSON.stringify(sealedSeat)
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 9 (ENG-99 pins 3/5). delete_own_account for a non-owner member holding
+    // an open-rotation writing seat must not abort -- this is the scenario
+    // Vector raised as the reason for the removed_at-is-null guard on Part
+    // 7's trigger. Live-verified (migration's own Pin 3/5 comment) that the
+    // guard is NOT what prevents an abort here: `now()` is frozen for the
+    // whole calling transaction, so delete_own_account's own hive_
+    // contributors sweep and this trigger's UPDATE write the identical
+    // timestamp to the same row and never trip hive_contributors_removed_
+    // at_immutable_trigger's `is distinct from` check, guard or no guard.
+    // Asserted anyway, unconditionally, because the invariant itself (this
+    // flow must never abort, App Store 5.1.1(v)) is real regardless of
+    // which mechanism protects it.
+    {
+      const combId = await makeComb(OWNER, [SUBJECT, DELETING_WRITER]);
+      const { rows: hiveRows } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective) values ($1, 'Open Rotation', $2, true) returning id",
+          [OWNER, SUBJECT]
+        )
+      );
+      const hiveId = hiveRows[0].id;
+      await asUser(OWNER, () =>
+        client.query('insert into public.hive_contributors (hive_id, profile_id, invited_by) values ($1, $2, $3)', [
+          hiveId,
+          DELETING_WRITER,
+          OWNER,
+        ])
+      );
+      await asUser(OWNER, () =>
+        client.query(
+          `insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at)
+           values ($1, 1, $2, $3, now() + interval '1 day')`,
+          [combId, hiveId, SUBJECT]
+        )
+      );
+
+      try {
+        await asUser(DELETING_WRITER, () => client.query('select public.delete_own_account()'));
+        ok('ENG-99 pin 3/5: delete_own_account does not abort for a member with an open-rotation writing seat');
+      } catch (e) {
+        bad(
+          'ENG-99 pin 3/5: delete_own_account does not abort for a member with an open-rotation writing seat',
+          firstLine(e)
+        );
+      }
+
+      const { rows: contribRows } = await asPostgres(() =>
+        client.query('select removed_at from public.hive_contributors where hive_id = $1 and profile_id = $2', [
+          hiveId,
+          DELETING_WRITER,
+        ])
+      );
+      const { rows: memberRows } = await asPostgres(() =>
+        client.query('select removed_at from public.comb_members where comb_id = $1 and profile_id = $2', [
+          combId,
+          DELETING_WRITER,
+        ])
+      );
+      if (contribRows[0]?.removed_at && memberRows[0]?.removed_at) {
+        ok('ENG-99 pin 3/5: both the hive_contributors seat and the comb_members seat end on deletion');
+      } else {
+        bad(
+          'ENG-99 pin 3/5: both the hive_contributors seat and the comb_members seat end on deletion',
+          JSON.stringify({ contrib: contribRows[0], member: memberRows[0] })
         );
       }
     }

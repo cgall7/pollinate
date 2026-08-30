@@ -405,6 +405,7 @@ async function main() {
     ['comb_member_count(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster-count RPC, requires a session' }],
     ['comb_open_rotation(uuid,uuid,timestamp with time zone)', { roles: ['authenticated', 'service_role'], why: 'ENG-93 organizer mint (authenticated) + advance_due_rotations cron (service_role)' }],
     ['comb_rotation_roster(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster RPC, requires a session' }],
+    ['comb_rotation_writer_count(uuid)', { roles: ['authenticated', 'service_role'], why: 'ENG-92 Part 2, C1 denominator RPC, requires a session (see §1B.23.2\'s caveat: only accurate for a subject who is a comb member)' }],
     ['consent_to_nectar()', { roles: ['authenticated', 'service_role'], why: 'nectar consent RPC, requires a session' }],
     ['delete_own_account()', { roles: ['authenticated', 'service_role'], why: 'ENG-84 self-service deletion, requires a session' }],
     ['find_connectable_profile(text)', { roles: ['authenticated', 'service_role'], why: 'account-lookup RPC; anon revoked 20260813000005 (account-existence oracle)' }],
@@ -422,6 +423,7 @@ async function main() {
 
     // -- trigger functions: grant is inert, row still states the true grant --
     ['combs_create_owner_membership()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
+    ['comb_members_departure_closes_writing_seat()', { roles: ['authenticated', 'service_role'], why: 'ENG-99 trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['entries_mark_shared()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
     ['entries_resolve_volume_id()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['handle_new_user()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
