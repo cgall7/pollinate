@@ -134,6 +134,18 @@ alter policy "comb_rotations_insert_owner"
 -- must not cite this function without also checking comb membership, or
 -- restate the promise against the delivered roster instead
 -- (`contributor_names.length`, post-seal, per the four-row source table).
+--
+-- ADDENDUM (Vector, thread b57ad406, 2026-08-30, after Part 7/ENG-99 landed
+-- in this same migration): this function remains the correct member/
+-- organizer card count post-ENG-99 -- a departed writer should not be
+-- counted as writing. It is C1's denominator only BEFORE ENG-99. ENG-99
+-- stamps hive_contributors.removed_at on ordinary comb departure with the
+-- identical on-disk signature account deletion already used, but the two
+-- no longer share account deletion's symmetric numerator/denominator
+-- drop -- a comb departure leaves the entry and its author in place. C1's
+-- exclusion (`§1B.26.3`) must key on profiles.deleted_at, not on this
+-- function's bare removed_at test, or a comb that lost non-writers to
+-- departure reads a false 100%. See Part 7's own header for the ruling.
 create function public.comb_rotation_writer_count(p_rotation_id uuid)
 returns integer
 language plpgsql
