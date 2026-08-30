@@ -387,14 +387,29 @@ async function main() {
     // the mirror write into the deliver branch only (plausible -- "aligning"
     // private_hives with comb_rotations.sealed_at's deliberate XOR) would
     // green this gate while lighting COPY-14's detector cell for every
-    // contributor of every voided rotation. One row here legitimately
-    // covers all three void reasons -- quiet/departed/subject_gone share
-    // the single UPDATE block at the migration's void branch, there is no
-    // per-reason variant to test separately. sent_at must stay null on
-    // every void reason: private_hives_select_as_subject gates the
-    // subject-readable surface on sent_at is not null, so a void that
+    // contributor of every voided rotation. Asserted separately on all
+    // three void fixtures (this one, t4, t5), NOT folded into one row for
+    // "the block is shared" -- Vector's finding (event 13): that's true of
+    // the migration's TEXT today (one unconditional UPDATE inside the
+    // v_void_reason branch, :200-242), but nothing enforces it stays that
+    // way. v_void_reason is already computed three lines above the block,
+    // so wrapping it in `if v_void_reason <> 'departed'` (etc.) is one `if`
+    // away and would leave exactly this row green while silently dropping
+    // the mirror for the other two reasons -- proven by mutation, each
+    // wrap green except the reason still covered by whichever single
+    // fixture asserted it. subject_gone is the reason that actually
+    // matters here: departed leaves no active seat, so a contributor
+    // hitting compose resolves through COPY-14's seat-closed branch before
+    // the sealed check is ever reached -- but subject_gone (t4, t5) leaves
+    // contributors ACTIVE (t4's CONTRIBUTOR2 has a written entry), so a
+    // dropped mirror there is exactly the "COPY-14 detector cell fires for
+    // real" symptom this row exists to catch. sent_at must stay null on
+    // every void reason: private_hives_select_as_subject
+    // (20260819000001:69-71) is `auth.uid() = subject_profile_id and
+    // sent_at is not null` -- no membership term -- so a void that
     // accidentally stamped it would expose a voided month's hive row to
-    // the subject it was never sent to.
+    // the subject it was never sent to; t5 is the sharpest case, a subject
+    // who left the comb entirely.
     {
       const { rows } = await client.query('select sealed_at, sent_at from public.private_hives where id = $1', [
         t2.hiveId,
@@ -424,6 +439,16 @@ async function main() {
         ok('void-departed: voided_reason = departed when the roster emptied');
       } else {
         bad('void-departed: voided_reason = departed when the roster emptied', JSON.stringify(rows[0]));
+      }
+    }
+    {
+      const { rows } = await client.query('select sealed_at, sent_at from public.private_hives where id = $1', [
+        t3.hiveId,
+      ]);
+      if (rows[0].sealed_at && !rows[0].sent_at) {
+        ok('void-departed: private_hives.sealed_at mirror written, sent_at stays null');
+      } else {
+        bad('void-departed: private_hives.sealed_at mirror written, sent_at stays null', JSON.stringify(rows[0]));
       }
     }
 
@@ -464,6 +489,24 @@ async function main() {
         bad('void-subject_gone: the entry is preserved (sealed), not deleted', JSON.stringify(rows));
       }
     }
+    // The sharpest fixture for this row: CONTRIBUTOR2 is still an active
+    // seat here (nobody removed them), so a dropped mirror is exactly the
+    // case where COPY-14's detector cell would fire for a real, present
+    // writer -- not the departed case, where no active seat is left to
+    // read it.
+    {
+      const { rows } = await client.query('select sealed_at, sent_at from public.private_hives where id = $1', [
+        t4.hiveId,
+      ]);
+      if (rows[0].sealed_at && !rows[0].sent_at) {
+        ok('void-subject_gone (tombstone): private_hives.sealed_at mirror written, sent_at stays null');
+      } else {
+        bad(
+          'void-subject_gone (tombstone): private_hives.sealed_at mirror written, sent_at stays null',
+          JSON.stringify(rows[0])
+        );
+      }
+    }
 
     // ---------------------------------------------------------------
     // 5. Void — subject_gone via comb departure (no profile tombstone).
@@ -491,6 +534,25 @@ async function main() {
       } else {
         bad(
           'void-subject_gone: subject removed from the comb (no tombstone) also voids as subject_gone',
+          JSON.stringify(rows[0])
+        );
+      }
+    }
+    // sent_at's sharpest fixture: SUBJECT_FOR_COMB_DEPARTURE left the comb
+    // entirely. private_hives_select_as_subject has no membership term, so
+    // a stray sent_at here would expose a voided month's hive row to
+    // someone who is no longer even a comb member -- the exposure Lumen's
+    // assertion exists to prevent, on the one fixture that previously
+    // never read the column.
+    {
+      const { rows } = await client.query('select sealed_at, sent_at from public.private_hives where id = $1', [
+        t5.hiveId,
+      ]);
+      if (rows[0].sealed_at && !rows[0].sent_at) {
+        ok('void-subject_gone (comb departure): private_hives.sealed_at mirror written, sent_at stays null');
+      } else {
+        bad(
+          'void-subject_gone (comb departure): private_hives.sealed_at mirror written, sent_at stays null',
           JSON.stringify(rows[0])
         );
       }
