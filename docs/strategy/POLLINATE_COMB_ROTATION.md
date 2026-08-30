@@ -207,7 +207,7 @@ the brief. #4 was already `ENG-59`. The other three:
 
 | ID | Owner | Est | Issue |
 |---|---|---|---|
-| **DES-34** | Pixel | M | **The mascot's sitting motion.** Colin: *"has to get fixed for mvp-comb… needs to get way better."* Perch weight `R-PW-1/2/3` is derived constants on `pixel/perch@2fab96b`, verified **not** an ancestor of the tip; `MascotBee` is untouched and has no settle beat. Bee motion is licensed by a cause outside the bee — landing **is** a cause, so this is in-principle clean |
+| **DES-34** | Pixel | M | **The mascot's sitting motion.** Colin: *"has to get fixed for mvp-comb… needs to get way better."* Perch weight `R-PW-1/2/3` is derived constants on **`pixel/perch-weight@40b04ed`** (PR `ed746e20…`, pushed 03:16Z, merge-base `cdb07a1`), verified **not** an ancestor of the tip and **marked NOT WIRED / DO NOT MERGE by its own author** until `DES-34` consumes `R-PW-3`; `MascotBee` is untouched and has no settle beat. Bee motion is licensed by a cause outside the bee — landing **is** a cause, so this is in-principle clean |
 | **DES-35** | Pixel | M | **Glass prominence to ≥23% of the display.** Colin: *"i love the idea of getting the [glass] to over 23% of the screen. Let's do that."* A floating cover-tinted header, 6.54% → 23.1%. **This is a new composition, not the GL1/GL2 pass** — do not let it get absorbed. **Its material prerequisite is now satisfied** (§1B.7). Glass stays chrome only; a header is chrome |
 | **DES-36** | Pixel | S | **The nectar door on the reveal is unfindable, and `ENG-90` does not fix it.** See below |
 
@@ -422,8 +422,24 @@ in a prose section does not reach the person reading the table. Annotate the row
 
 Deezine read all three as theirs. Rows 1.11–1.13 name **Pixel**, and `DES-34` is
 not greenfield: the perch-weight constants `R-PW-1/2/3` already exist on
-`pixel/perch@2fab96b`, re-verified **not** an ancestor of the live tip `cdb07a1`.
-A second owner starting there duplicates an unmerged branch.
+**`pixel/perch-weight@40b04ed`**, re-verified **not** an ancestor of the live tip
+`cdb07a1`. A second owner starting there duplicates an unmerged branch.
+
+**Cite corrected twice over.** This section originally read `pixel/perch@2fab96b`
+— wrong branch name *and* wrong SHA; Pixel corrected both at 03:08. Lumen carried
+that correction forward at 03:14 with *"local-only,"* which was true when Pixel
+said it and is **no longer true**: `ls-remote --heads github` now returns
+`40b04edb7ff8cdf04946ecc17af4be261f541a18  refs/heads/pixel/perch-weight`, and PR
+`ed746e20…` opened against it at **03:16:33Z**, merge-base `cdb07a1`.
+
+The third state is the one that matters for sequencing, and neither earlier cite
+carries it: the branch is now **visible and sequenceable, and simultaneously a
+merge hazard.** Its PR body and its commit subject both say *"NOT WIRED — do not
+merge"*, because `R-PW-3`'s settle-beat constants have **no consumer** —
+`MascotBee` is untouched. `R-PW-1`/`R-PW-2` are live the instant it merges;
+`R-PW-3` is inert. Anyone treating *"has an open PR"* as *"ready to land"* ships
+two tuning changes and a dead constant set. **`DES-34` is what makes it
+mergeable**, not what follows it.
 
 There is a clean line under this, and it is not a coincidence:
 
@@ -442,6 +458,64 @@ this channel and I did not read the original event myself.
 Against that stands Colin's instruction to this thread at `f2c15b7d…`: **"Please
 do not stop working until the definition of done is complete."** A gate addressed
 to one owner is not a team-wide stop.
+
+
+### 1B.13 — Line-number citations into this document are already dead. Cite sections.
+
+Sage verified organizer-in-5 against `POLLINATE_COMB_ROTATION.md:152` and `:176`.
+**That verification was correct** — at `5a39495`, the revision Sage fetched and
+`ls-remote`-confirmed. Pixel independently re-verified the same `:152`. Both were
+right. Both citations are now dead, and I broke them.
+
+At the live tip `eceee54`:
+
+| Cited | Was, at `5a39495` | Is, at `eceee54` | Content now at |
+|---|---|---|---|
+| `:152` | `\| **Members in a comb you run** \| **5** (you + 4 writers) \| **20** …` | `\|---\|---\|---\|` | **§3.1**, the tier table |
+| `:176` | *"The only person who meets the member cap is the organizer"* | *"Consequence: `ENG-90`, `ENG-65` and `ENG-66` are not waiting on Sage"* | **§3.2**, rule A |
+
+The right-hand column is a **section**, deliberately. I drafted it as `:480` and
+`:504` — the line numbers those two facts sat on while I was writing this
+paragraph — and adding this very section pushed them to `:548` and `:572` before
+the commit existed. A remap table written in line numbers expires inside the
+edit that creates it.
+
+**The failure mode is the dangerous one: it is silent and it looks like a pass.**
+`:152` did not become garbage — it became the **separator row of the very cap
+table it used to be a row of**. A reader re-checking the cite lands inside the
+right table, on a line that is unmistakably table-shaped, and moves on. `:176`
+is worse: it now resolves to a *different, also-true, also-Sage-relevant*
+sentence. Neither dead cite announces itself.
+
+**The cause is a discipline this document adopted on purpose.** §1A's own lesson:
+*"place the new amendment ABOVE the older ones it collides with so nobody reads
+the stale ones first."* §1B has now grown thirteen times, always upward, and
+every growth shifts every line of §2–§11 down by the size of the amendment. The
+mechanism that keeps readers off stale rulings is the same mechanism that
+invalidates every line-number cite beneath it. Those are not two problems to
+balance — the amendment discipline stays, and line numbers go.
+
+**Rule, effective now: cite this document by section (`§3.1`, `§1B.1`, `§8.6`
+row 1.4), never by line.** Section numbers are stable under prepending by
+construction; line numbers are stable only in files nobody prepends to. Line
+numbers remain correct for **source and migrations** — `20260827000001:234-239`
+is on `main`, immutable, and every such cite in this thread stands.
+
+**And the root of it: this document is not on `main`.** `git ls-tree -r
+github/main -- docs/strategy/` returns ten files; `POLLINATE_COMB_ROTATION.md` is
+not one of them. Every ruling the build lane is executing tonight — `DES-31`,
+presence-not-capacity, the tombstone, `ENG-58`'s shape, the 5/20 split — is
+specified by a document that exists on **one unmerged branch** (`vector/comb-rotation-strategy`,
+PR `deed03bd…`) that has moved **four times in three hours**
+(`298e3a9 → 8e00f19 → 5a39495 → 9a7bf08 → eceee54`). The line-number decay is a
+symptom; the branch is the disease. **Merging this is what makes citation stable**
+— until then §1B.13's rule is the mitigation, not the fix.
+
+*Minor, same family:* row 1.6 and several §7 rows cite `GUIDES/POLLINATE_*.md`.
+`GUIDES/` does not exist in the repository at any ref — those specs live in the
+shared **workspace**. A repo document citing a workspace-relative path resolves
+to nothing from a clean checkout. Correct as team shorthand, unresolvable as a
+repo reference; flagged, not changed, because the specs are genuinely there.
 
 ---
 
