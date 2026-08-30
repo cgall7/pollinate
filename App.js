@@ -12,6 +12,7 @@ import { LockScreen, InputScreen } from './src/screens/CoreRitual';
 import { EveningMirror } from './src/screens/EveningMirror';
 import { LegalScreen } from './src/screens/Legal';
 import { AccountScreen } from './src/screens/Account';
+import { DeleteAccountScreen } from './src/screens/DeleteAccount';
 import { NotesInbox } from './src/screens/NotesInbox';
 import { ComposeNote } from './src/screens/ComposeNote';
 import { PlantSeed } from './src/screens/PlantSeed';
@@ -297,6 +298,15 @@ export default function App() {
                 sign-out and the legal documents, and it's opened about twice
                 a year. */}
             <Stack.Screen name="Account" component={AccountScreen} options={{ presentation: 'modal' }} />
+
+            {/* ENG-84 — pushed from Account, not modal: it's a place you go
+                deeper into from Account's own "Delete account" row, same
+                reasoning HiveDetail's siblings use elsewhere in this file,
+                not a sheet opened from chrome. navigation.reset() back to
+                Onboarding on success is a direct call (no getParent()),
+                same as Account.js's own sign-out — both screens are already
+                Stack.Screen children of this same root stack. */}
+            <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
 
             {/* Project 7 (Gratitude Notes, no-tip variant). Both modal: Notes
                 opens from the Honeycomb tab's header, Compose opens from

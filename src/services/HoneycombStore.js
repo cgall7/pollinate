@@ -54,6 +54,22 @@ export const HoneycombStore = {
     if (error) throw error;
   },
 
+  // ENG-84 — self-service in-app account deletion (App Store 5.1.1(v)).
+  // delete_own_account() (supabase/migrations/20260830000001) does the whole
+  // server side in one transaction: hard-deletes unsealed authored entries,
+  // ends every hive_contributors membership, tombstones the profile, then
+  // deletes the auth.users row outright. That last step means the session's
+  // underlying user is gone by the time this RPC returns — `scope: 'local'`
+  // clears the client's stored session without calling GoTrue's /logout
+  // endpoint, which would otherwise be asking the server to revoke a token
+  // for a user that no longer exists.
+  async deleteAccount() {
+    const client = requireSupabase();
+    const { error } = await client.rpc('delete_own_account');
+    if (error) throw error;
+    await client.auth.signOut({ scope: 'local' });
+  },
+
   // ENG-83 — the no-password path a stranger following a comb invite link
   // (ENG-59) needs: there is no screen anywhere in this flow that could
   // collect a password from someone who has never set one. Supabase emails

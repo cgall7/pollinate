@@ -194,4 +194,13 @@ export const SENTINELS = {
     args: { p_entry_id: '00000000-0000-0000-0000-000000000000' },
     expect: 'success',
   },
+  // Column probe, not an rpc probe on delete_own_account() itself — that
+  // function is destructive (deletes the caller's auth.users row) and this
+  // suite must never invoke it against prod, permission-denied or not.
+  // deleted_at is the anon-visible surface this migration actually adds:
+  // GET .../profiles?select=deleted_at answers 42703 before this migration,
+  // and 200 (empty array under RLS, since anon matches no profiles row —
+  // policies require auth.uid()) after it — same undefined-column-fires-
+  // before-RLS shape 20260813000006's row already relies on.
+  '20260830000001_eng84_account_deletion': { kind: 'column', table: 'profiles', column: 'deleted_at' },
 };

@@ -36,12 +36,17 @@ import appConfig from '../../app.json';
 //      so they became unreachable the moment anyone had an account.
 //   3. Support needs to know which build someone is on.
 //
-// Deliberately NOT here yet: "contact us" and "delete my account". Both
-// need a working support address and we still don't have one. The old
-// brand's `gratitudeapp.com` had no MX record and redirected to a different
-// company's app; the new brand's `pollinateapp.xyz` isn't registered yet
-// (§19.4 — Colin is buying it, tracked as pending). A row that silently goes
-// nowhere is worse than an absent row, so they land when the address does.
+// "Contact us" is still NOT here — it needs a working support address and
+// we still don't have one. The old brand's `gratitudeapp.com` had no MX
+// record and redirected to a different company's app; the new brand's
+// `pollinateapp.xyz` isn't registered yet (§19.4 — Colin is buying it,
+// tracked as pending). A row that silently goes nowhere is worse than an
+// absent row, so it lands when the address does.
+//
+// "Delete my account" no longer waits on that: ENG-84 (App Store 5.1.1(v)
+// hard-rejection blocker) is a self-service in-app flow, not an email, so
+// the missing support address was never actually a dependency for it —
+// see the row below and src/screens/DeleteAccount.js.
 // D2 (Sage, 2026-08-19) — the daily nudge's settings row, ship-with-the-
 // nudge per that ruling and §6 row 8 of the gate. Four states, not a plain
 // boolean: the switch's own truth is `permission.granted && enabled`, never
@@ -204,6 +209,15 @@ export const AccountScreen = ({ navigation }) => {
 
         <View style={styles.card}>
           <Row icon="log-out-outline" label={signingOut ? 'Signing out…' : 'Sign out'} onPress={handleSignOut} tone="danger" />
+        </View>
+
+        <View style={styles.card}>
+          <Row
+            icon="trash-outline"
+            label="Delete account"
+            onPress={() => navigation.navigate('DeleteAccount')}
+            tone="danger"
+          />
         </View>
 
         <Text style={styles.version}>Version {appConfig.expo.version}</Text>
