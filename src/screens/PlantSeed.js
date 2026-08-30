@@ -6,7 +6,15 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { theme } from '../constants/theme';
 import { HoneycombStore } from '../services/HoneycombStore';
 import { SeedsStore, SEED_CONTENT_MAX } from '../services/SeedsStore';
-import { bloomDateLabel, bloomFloor, bloomHint, sealHint, validateSeedDraft, SEED_DRAFT_REASONS } from '../utils/seedDraft';
+import {
+  bloomDateLabel,
+  bloomFloor,
+  bloomHint,
+  sealHint,
+  seedCtaLabel,
+  validateSeedDraft,
+  SEED_DRAFT_REASONS,
+} from '../utils/seedDraft';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
@@ -224,22 +232,27 @@ export const PlantSeed = ({ navigation }) => {
         )}
 
         {(recipientView === LOAD_STATES.READY || recipientView === LOAD_STATES.STALE) && (
-          <View style={styles.recipientRow}>
-            {connections.map((person) => (
-              <PressableScale
-                key={person.id}
-                onPress={() => setRecipientId(person.id)}
-                style={[styles.recipientChip, recipientId === person.id && styles.recipientChipSelected]}
-                accessibilityLabel={person.display_name}
-                accessibilityState={{ selected: recipientId === person.id }}
-              >
-                <Avatar name={person.display_name} avatarUrl={person.avatar_url} size={40} />
-                <Text style={styles.recipientName} numberOfLines={1}>
-                  {person.display_name}
-                </Text>
-              </PressableScale>
-            ))}
-          </View>
+          <>
+            {/* The row reads as decoration without this — chips alone didn't
+                tell Colin a tap here was required before send could enable. */}
+            {!recipientId && <Text style={styles.hint}>Choose who this seed is for.</Text>}
+            <View style={styles.recipientRow}>
+              {connections.map((person) => (
+                <PressableScale
+                  key={person.id}
+                  onPress={() => setRecipientId(person.id)}
+                  style={[styles.recipientChip, recipientId === person.id && styles.recipientChipSelected]}
+                  accessibilityLabel={person.display_name}
+                  accessibilityState={{ selected: recipientId === person.id }}
+                >
+                  <Avatar name={person.display_name} avatarUrl={person.avatar_url} size={40} />
+                  <Text style={styles.recipientName} numberOfLines={1}>
+                    {person.display_name}
+                  </Text>
+                </PressableScale>
+              ))}
+            </View>
+          </>
         )}
 
         <Text style={styles.sectionLabel}>NOTE</Text>
@@ -283,7 +296,7 @@ export const PlantSeed = ({ navigation }) => {
         {error && <Text style={styles.error}>{error}</Text>}
 
         <PrimaryButton onPress={handlePlant} disabled={!draft.ok || planting}>
-          {planting ? 'Planting…' : 'Plant this seed'}
+          {seedCtaLabel(draft, planting)}
         </PrimaryButton>
       </ScrollView>
     </View>

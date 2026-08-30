@@ -58,6 +58,28 @@ export const validateSeedDraft = ({ recipientId, content, bloomAt }, now = new D
   return { ok: true, reason: null, message: null };
 };
 
+// The primary button's label while the draft is incomplete — names the one
+// thing standing between here and plantable, keyed by `validateSeedDraft`'s
+// own `reason`. Lumen's ruling (thread 95095e74, item 1): a disabled CTA must
+// say what it's waiting for, never sit on a dead "Plant this seed" — that is
+// exactly what left Colin unable to tell why send wouldn't light up. Every
+// key in SEED_DRAFT_REASONS has an entry here on purpose (see
+// check-plant-seed.mjs §6) — a reason with no label would silently fall back
+// to the same dead-button failure this exists to close.
+export const SEED_CTA_LABELS = {
+  [SEED_DRAFT_REASONS.NO_RECIPIENT]: 'Pick someone',
+  [SEED_DRAFT_REASONS.NO_TEXT]: 'Write something',
+  [SEED_DRAFT_REASONS.TOO_LONG]: 'Trim your seed',
+  [SEED_DRAFT_REASONS.NO_DATE]: 'Pick a bloom date',
+  [SEED_DRAFT_REASONS.DATE_IN_PAST]: 'Pick a later date',
+};
+
+export const seedCtaLabel = (draft, planting) => {
+  if (planting) return 'Planting…';
+  if (draft.ok) return 'Plant this seed';
+  return SEED_CTA_LABELS[draft.reason];
+};
+
 // Both hints in the copy (GRATITUDE_COPY_LIBRARY §4, 8.2) interpolate the
 // recipient's name, and both have to read before anyone is picked — a sentence
 // with a hole in it is worse than a slightly vaguer sentence. "they"/"They" is

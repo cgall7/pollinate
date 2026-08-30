@@ -41,6 +41,20 @@ export const ComposeNote = ({ navigation }) => {
     }, [])
   );
 
+  // Names the one thing standing between here and sendable, in priority
+  // order — recipient before text, because an unpicked chip is the likelier
+  // gap and a form that only complains about the field you never see (an
+  // empty hive) is worse than one that just says so. A dead "Send" told
+  // Colin nothing when he had typed a note but never tapped a chip; this is
+  // the fix Lumen ruled for (thread 95095e74, item 1).
+  const ctaLabel = sending
+    ? 'Sending…'
+    : !recipientId
+    ? 'Pick someone'
+    : !content.trim()
+    ? 'Write something'
+    : 'Send';
+
   const handleSend = async () => {
     if (!recipientId || !content.trim() || sending) return;
     setSending(true);
@@ -78,20 +92,27 @@ export const ComposeNote = ({ navigation }) => {
         ) : connections.length === 0 ? (
           <Text style={styles.emptyBody}>Add someone to your hive first — then you can send them a note.</Text>
         ) : (
-          <View style={styles.recipientRow}>
-            {connections.map((person) => (
-              <PressableScale
-                key={person.id}
-                onPress={() => setRecipientId(person.id)}
-                style={[styles.recipientChip, recipientId === person.id && styles.recipientChipSelected]}
-              >
-                <Avatar name={person.display_name} avatarUrl={person.avatar_url} size={40} />
-                <Text style={styles.recipientName} numberOfLines={1}>
-                  {person.display_name}
-                </Text>
-              </PressableScale>
-            ))}
-          </View>
+          <>
+            {/* The row reads as decoration without this — chips alone didn't
+                tell Colin a tap here was required before send could enable. */}
+            {!recipientId && <Text style={styles.hint}>Choose who this note is for.</Text>}
+            <View style={styles.recipientRow}>
+              {connections.map((person) => (
+                <PressableScale
+                  key={person.id}
+                  onPress={() => setRecipientId(person.id)}
+                  style={[styles.recipientChip, recipientId === person.id && styles.recipientChipSelected]}
+                  accessibilityLabel={person.display_name}
+                  accessibilityState={{ selected: recipientId === person.id }}
+                >
+                  <Avatar name={person.display_name} avatarUrl={person.avatar_url} size={40} />
+                  <Text style={styles.recipientName} numberOfLines={1}>
+                    {person.display_name}
+                  </Text>
+                </PressableScale>
+              ))}
+            </View>
+          </>
         )}
 
         <Text style={styles.sectionLabel}>NOTE</Text>
@@ -112,7 +133,7 @@ export const ComposeNote = ({ navigation }) => {
         {error && <Text style={styles.error}>{error}</Text>}
 
         <PrimaryButton onPress={handleSend} disabled={!recipientId || !content.trim() || sending}>
-          {sending ? 'Sending…' : 'Send'}
+          {ctaLabel}
         </PrimaryButton>
       </ScrollView>
     </View>
@@ -144,6 +165,11 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.textSecondary,
     marginBottom: 16,
+  },
+  hint: {
+    ...theme.type.bodySm,
+    color: theme.colors.textSecondary,
+    marginBottom: 12,
   },
   recipientRow: {
     flexDirection: 'row',

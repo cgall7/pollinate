@@ -71,9 +71,8 @@ globalThis.__PLANT_STUB_CLIENT__ = {
 };
 
 const { SeedsStore, SEED_CONTENT_MAX } = await import(pathToFileURL(path.join(ROOT, 'src/services/SeedsStore.js')).href);
-const { validateSeedDraft, bloomFloor, sealHint, bloomHint, bloomDateLabel, SEED_DRAFT_REASONS } = await import(
-  pathToFileURL(path.join(ROOT, 'src/utils/seedDraft.js')).href
-);
+const { validateSeedDraft, bloomFloor, sealHint, bloomHint, bloomDateLabel, seedCtaLabel, SEED_CTA_LABELS, SEED_DRAFT_REASONS } =
+  await import(pathToFileURL(path.join(ROOT, 'src/utils/seedDraft.js')).href);
 
 let pass = 0;
 const failures = [];
@@ -203,6 +202,7 @@ console.log('\n  §5 — source check (labelled: this proves wiring, not behavio
 
 const screen = fs.readFileSync(path.join(ROOT, 'src/screens/PlantSeed.js'), 'utf8');
 eq('PlantSeed imports the shared rule', /validateSeedDraft/.test(screen), true);
+eq('PlantSeed sources its CTA label from the shared rule, not a hand-picked string', /seedCtaLabel\(/.test(screen), true);
 eq(
   'PlantSeed does not re-inline the length rule',
   /content[^\n]*\.length\s*>\s*SEED_CONTENT_MAX/.test(screen),
@@ -225,6 +225,28 @@ eq(
 );
 // The behaviour itself — that `empty` is unreachable without a read that
 // returned — is executed, not grepped, in check-load-state.mjs.
+
+// ---------------------------------------------------------------------------
+console.log('\n  §6 — the CTA never sits on a dead label (thread 95095e74, item 1)');
+
+// Every refusal reason needs a label, or an unmapped reason falls through to
+// `undefined` and the button goes blank instead of naming its next step —
+// the same silent-refusal shape Colin hit, just moved one layer down.
+for (const reason of Object.values(SEED_DRAFT_REASONS)) {
+  eq(`${reason} has a CTA label`, typeof SEED_CTA_LABELS[reason], 'string');
+}
+eq('a plantable draft reads "Plant this seed"', seedCtaLabel({ ok: true, reason: null }, false), 'Plant this seed');
+eq('mid-flight overrides everything', seedCtaLabel({ ok: true, reason: null }, true), 'Planting…');
+eq(
+  'no recipient reads "Pick someone", never a dead "Plant this seed"',
+  seedCtaLabel({ ok: false, reason: SEED_DRAFT_REASONS.NO_RECIPIENT }, false),
+  'Pick someone'
+);
+eq(
+  'no date reads "Pick a bloom date"',
+  seedCtaLabel({ ok: false, reason: SEED_DRAFT_REASONS.NO_DATE }, false),
+  'Pick a bloom date'
+);
 
 console.log(`\ncheck-plant-seed: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
