@@ -27,13 +27,34 @@
 //     in the same paragraph, and turns `profiles.phone_hash` real.
 //   * Flow C app-locking adds a data category this policy has no section for.
 //     It needs new copy, NOT a pre-written sentence — see below.
-//   * Daily-nudge open-rate or conversion metrics falsify two sentences here:
-//     "nothing here reports what you do back to us or to anyone else" in
-//     'The short version', and "We do not include analytics, attribution or
-//     crash-reporting tools" in 'What we do not do'. Cited by heading and by
-//     the sentence, not by line: a comment in this file moves the lines it
-//     cites, which is how the first draft of this entry shipped both numbers
-//     three short.
+//   * RETIRED 2026-08-30 (OPS-8, V2 spec §20.2, Colin ruling 2026-08-24): the
+//     prior bullet here said daily-nudge metrics would falsify an absolute
+//     "no analytics anywhere" claim. That claim is gone — narrowed, not
+//     deleted, because Project 20 puts first-party usage analytics and crash
+//     reporting in scope for MVP-Comb (ENG-89/ENG-78). The sentences now live
+//     in 'The short version' ("we measure how the app itself is used and we
+//     collect crash reports") and 'What we do not do' ("we do collect
+//     anonymous usage analytics and crash reports, first-party only"). What
+//     still falsifies them, cited by heading and by the sentence, not by
+//     line:
+//   * Instrumenting entry text, or any event payload that carries what a user
+//     wrote, falsifies "we never read what you write" in 'The short version'
+//     and "never the content of what you write" in 'What we do not do'.
+//     §20.3's rule: event names and counts only, content never leaves as
+//     telemetry.
+//   * An ad-network SDK, an attribution library, or any cross-app tracking
+//     (IDFA or equivalent) falsifies "no tracking code that follows you to
+//     other apps or websites" and "we do not use ad-network attribution or
+//     cross-app tracking tools of any kind" — both sentences, same landing.
+//   * Selling analytics data, or handing it to a vendor for that vendor's own
+//     purposes rather than running the pipeline on our behalf, falsifies
+//     "first-party only" and the shared "never sold, shared with a data
+//     broker" clause both sentences already carry for account data.
+//   * Landing the actual SDK (Sentry/Crashlytics + a first-party analytics
+//     vendor) still owes its own obligations, not covered by this edit:
+//     App Store Connect privacy nutrition labels (`OPS-6`), sub-processor
+//     disclosure in 'Where your information is kept', and the client-side
+//     opt-out toggle §20.3 requires. V2 spec §20.4 has the full list.
 //
 // On Flow C specifically, because the obvious reassuring line — "we can see
 // that you locked apps, we cannot see which ones" — is not one sentence:
@@ -156,7 +177,7 @@ export const PRIVACY_POLICY = {
       heading: 'The short version',
       body:
         'What you write stays on your phone. We never receive an entry unless you tap Share, and when you do, only the people you have accepted into your honeycomb can read it.\n\n' +
-        'There are no ads in this app. There is no analytics, crash-reporting or tracking code in it either — nothing here reports what you do back to us or to anyone else. We do not sell or share anything about you.\n\n' +
+        'There are no ads in this app, and no tracking code that follows you to other apps or websites. We measure how the app itself is used and we collect crash reports, so we can find what is broken — we never read what you write, and we never sell or share anything about you.\n\n' +
         'The rest of this page is the same thing said precisely.',
     },
     // Sits after the short version rather than before it: the opener is the
@@ -204,7 +225,7 @@ export const PRIVACY_POLICY = {
     {
       heading: 'What we do not do',
       body:
-        'We do not show advertising. We do not include analytics, attribution or crash-reporting tools. We do not sell your information, share it with data brokers, or hand it to anyone for their own marketing.\n\n' +
+        'We do not show advertising, and we do not use ad-network attribution or cross-app tracking tools of any kind. We do collect anonymous usage analytics and crash reports, first-party only — never the content of what you write, and never sold, shared with a data broker, or handed to anyone for their own marketing.\n\n' +
         'We do not read your entries and we do not use them to train machine-learning models.\n\n' +
         'We would disclose information if the law genuinely required it of us, and we would tell you unless we were forbidden from doing so.',
     },

@@ -724,7 +724,7 @@ console.log('\nF. the notification service touches no network');
     if (n.type === 'CallExpression' && n.callee?.name === 'fetch') fetchCalls += 1;
   });
   if (badImports.length === 0 && fetchCalls === 0) {
-    ok('the notification service imports no Supabase client and makes no network call (dailyNudge.js keeps the legal-copy "no analytics, crash-reporting or tracking code" sentence true by construction)');
+    ok('the notification service imports no Supabase client and makes no network call (dailyNudge.js reports nothing to a server at all — narrower than the legal-copy promise now requires (OPS-8, V2 spec §20.2), but still the true state of this specific file)');
   } else {
     bad(
       'the notification service imports no Supabase client and makes no network call',
