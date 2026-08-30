@@ -255,6 +255,7 @@ export const SENTINELS = {
     args: { p_invite_code: 'calibration-invalid-code' },
     expect: 'success',
   },
+<<<<<<< HEAD
   // ENG-93 (Fizz, row 1.7a). comb_open_rotation is the same grant shape as
   // comb_join_by_invite_code above: revoked from anon in the same migration
   // that creates it (granted only to authenticated and service_role), so
@@ -282,4 +283,16 @@ export const SENTINELS = {
   // create-or-replace. No anon-visible surface, same class as
   // nectar_sats_override above.
   '20260830000009_eng95_seal_nonmember_subject': { kind: 'order', reason: 'new SECURITY DEFINER helper revoked from every client role; seal_and_send_rotation body replace only, grants unchanged' },
+  // ENG-92 (Sage). No new table/column and no anon-visible surface: one
+  // ALTER POLICY (comb_rotations_insert_owner, still authenticated-only
+  // insert), one new trigger (private_hives, no new column), and every new
+  // or replaced function here is anon-revoked (comb_rotation_writer_count
+  // explicitly; comb_member_count/comb_co_member_names/delete_own_account
+  // were already anon-revoked by the migrations that first created them
+  // and this one only replaces their bodies, not their grants) — same
+  // reasoning as 20260830000002/3's rows, one migration over.
+  '20260830000007_eng92_comb_rotation_fixes': {
+    kind: 'order',
+    reason: 'policy alter + trigger + definer functions, all anon-revoked; no anon-visible surface',
+  },
 };
