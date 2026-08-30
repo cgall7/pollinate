@@ -294,4 +294,15 @@ export const SENTINELS = {
     kind: 'order',
     reason: 'policy alter + trigger + definer functions, all anon-revoked; no anon-visible surface',
   },
+  // ENG-94 (Fizz). Repoints comb_open_rotation and comb_preview_by_invite_code
+  // onto the shared comb_subject_gone predicate (ENG-95) — body replace only
+  // for both functions, no grant changes (comb_open_rotation stays revoked
+  // from anon per `...0008`'s sentinel above; comb_preview_by_invite_code
+  // stays anon-callable per `...0006`'s). The externally-visible probe shape
+  // for both functions is identical before and after this migration — the
+  // only behavior change (the departure arm folding into the mint refusal
+  // and into has_active_month) requires a live open rotation with a
+  // departed/tombstoned subject to observe, which no anon calibration probe
+  // can construct. Same class as `...0009` above.
+  '20260830000010_eng94_repoint_subject_gone': { kind: 'order', reason: 'comb_open_rotation and comb_preview_by_invite_code body replace only; grants unchanged for both' },
 };

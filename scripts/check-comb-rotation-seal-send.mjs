@@ -765,17 +765,15 @@ async function main() {
       }
 
       // 9b. Caller roster: assert the construction, not just the count.
-      // Today's roster is exactly one name. ENG-94 repoints
-      // comb_preview_by_invite_code and comb_open_rotation to call this
-      // same body -- when it lands, this array must grow to all three or
-      // this test fails, forcing that edit instead of letting a fourth
-      // caller slide under it silently. A NEW site that reimplements the
+      // ENG-94 (`...0010`) repointed comb_preview_by_invite_code and
+      // comb_open_rotation to call this same body, growing the roster
+      // from one name to three. A NEW site that reimplements the
       // predicate inline instead of calling comb_subject_gone() is still
       // invisible to this grep -- same blind spot as any behavioural
       // test -- so this catches an existing caller reverting to inline,
       // or the expected roster going stale, not every possible future
       // reimplementation.
-      const EXPECTED_CALLERS = ['seal_and_send_rotation'];
+      const EXPECTED_CALLERS = ['comb_open_rotation', 'comb_preview_by_invite_code', 'seal_and_send_rotation'];
       const { rows: callerRows } = await asPostgres(() =>
         client.query(
           `select p.proname

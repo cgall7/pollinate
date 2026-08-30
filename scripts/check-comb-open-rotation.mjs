@@ -18,17 +18,13 @@
 //       itself, so hive/is_collective/subject_profile_id cannot disagree
 //       with the comb_rotations row it also inserts.
 //
-// Plus Row 2 (§1B.24.1(c)/§1B.30.1): a tombstoned subject is refused at
-// mint, not left to the RLS layer or improvised client copy. This is the
-// TOMBSTONE-ONLY shape Vector's §1B.34.1 ruled as the ship-now sequencing
-// -- ENG-95 (Sage) is building the shared subject-deliverable predicate
-// (tombstoned OR departed) now; it does not exist yet, so this gate
-// deliberately does NOT assert that a departed (non-tombstoned) subject is
-// refused. That assertion, and the repoint of this mint onto the shared
-// body, belongs to ENG-94 (Fizz, per Vector §1B.34.2 -- ENG-94's migration
-// is the first number where both the shared body and this mint exist),
-// not to this file -- asserting it here today would just be a second copy
-// of the predicate this migration's own header says not to write.
+// Plus Row 2 (§1B.24.1(c)/§1B.30.1/§1B.34.1-2, repointed by ENG-94,
+// `...0010`): a subject who is GONE -- tombstoned OR departed the comb
+// (comb_members row with removed_at set) -- is refused at mint, by one
+// shared predicate (comb_subject_gone, ENG-95), not left to the RLS layer
+// or improvised client copy. The refusal message does not distinguish
+// which arm fired, matching seal_and_send_rotation's own undifferentiated
+// 'subject_gone' void reason -- the predicate answers one question.
 //
 // Modeled on check-comb-preview.mjs for the harness shape (embedded
 // Postgres, SUPABASE_ENV fixture, asUser/asPostgres/asAnon helpers) and its
@@ -378,10 +374,41 @@ async function main() {
         );
         bad('Row 2: mint for a tombstoned subject is refused', 'mint succeeded');
       } catch (e) {
-        if (/deleted their account/i.test(e.message)) {
+        if (/subject is gone/i.test(e.message)) {
           ok('Row 2: mint for a tombstoned subject is refused, by name');
         } else {
           bad('Row 2: mint for a tombstoned subject is refused, by name', `got: ${e.message}`);
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Row 2 (departure arm, ENG-94): a subject who is still a comb_members
+    // row but has DEPARTED (removed_at set, not tombstoned) is refused the
+    // same way — the arm `...0008`'s tombstone-only check was ruled to be
+    // missing. SUBJECT_MEMBER (Priya) already minted and voided a rotation
+    // earlier in this suite; marking her departed now must not disturb
+    // that history, only refuse a NEW mint naming her as subject.
+    {
+      await asPostgres(() =>
+        client.query('update public.comb_members set removed_at = now() where comb_id = $1 and profile_id = $2', [
+          comb.id,
+          SUBJECT_MEMBER,
+        ])
+      );
+      try {
+        await asUser(OWNER, () =>
+          client.query('select public.comb_open_rotation($1, $2, now() + interval \'30 days\')', [
+            comb.id,
+            SUBJECT_MEMBER,
+          ])
+        );
+        bad('Row 2 (departure arm): mint for a departed (non-tombstoned) subject is refused', 'mint succeeded');
+      } catch (e) {
+        if (/subject is gone/i.test(e.message)) {
+          ok('Row 2 (departure arm): mint for a departed (non-tombstoned) subject is refused');
+        } else {
+          bad('Row 2 (departure arm): mint for a departed (non-tombstoned) subject is refused', `got: ${e.message}`);
         }
       }
     }

@@ -15,6 +15,13 @@
 // Modeled on check-comb-join.mjs for the harness shape and its exit-code
 // discipline (process.exit(1) directly, not process.exitCode — the same
 // async-exit-hook / embedded-postgres pitfall applies here).
+//
+// ENG-94 (Fizz, `...0010`) repointed has_active_month onto Lumen's own
+// gloss for it — "an open rotation WITH A LIVE SUBJECT" — via the shared
+// comb_subject_gone predicate (ENG-95). Sections 2c/2d below cover the two
+// arms: a tombstoned subject and a departed-but-intact-account subject,
+// both collapsing to the same subject_name-null/has_active_month-false
+// shape as the pre-launch/dormant cases in 2a/2b.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +56,8 @@ const SUBJECT = '22222222-2222-2222-2222-222222222222';
 const MEMBER_A = '33333333-3333-3333-3333-333333333333';
 const MEMBER_B = '44444444-4444-4444-4444-444444444444';
 const REMOVED = '55555555-5555-5555-5555-555555555555';
+const SUBJECT_TOMBSTONED = '66666666-6666-6666-6666-666666666666';
+const SUBJECT_DEPARTED = '77777777-7777-7777-7777-777777777777';
 
 let pass = 0;
 const failures = [];
@@ -128,6 +137,13 @@ async function main() {
         MEMBER_A, JSON.stringify({ display_name: 'A' }),
         MEMBER_B, JSON.stringify({ display_name: 'B' }),
         REMOVED, JSON.stringify({ display_name: 'Gone' }),
+      ]
+    );
+    await client.query(
+      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4)',
+      [
+        SUBJECT_TOMBSTONED, JSON.stringify({ display_name: 'Deleted' }),
+        SUBJECT_DEPARTED, JSON.stringify({ display_name: 'Departed' }),
       ]
     );
 
@@ -298,6 +314,97 @@ async function main() {
         ok('dormant (only sealed rotation, none open): subject_name null, has_active_month false');
       } else {
         bad('dormant (only sealed rotation, none open): subject_name null, has_active_month false', JSON.stringify(rows));
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 2c. Gone subject (tombstoned), ENG-94: an open, unsealed, unvoided
+    // rotation whose subject has since deleted their account must not
+    // read as an active month — Lumen's gloss is "an open rotation WITH A
+    // LIVE SUBJECT." Same no-active-month shape as pre-launch/dormant.
+    // The rotation row itself is untouched (still voids at seal, ENG-91).
+    {
+      await asPostgres(() =>
+        client.query('update public.profiles set deleted_at = now() where id = $1', [SUBJECT_TOMBSTONED])
+      );
+      const { rows: tombstoneCombRows } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.combs (owner_id, name) values ($1, 'Tombstone Comb') returning id, invite_code",
+          [OWNER]
+        )
+      );
+      const tombstoneComb = tombstoneCombRows[0];
+      await asPostgres(() =>
+        client.query(
+          `insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective)
+           values ($1, 'Deleted', $2, true) returning id`,
+          [OWNER, SUBJECT_TOMBSTONED]
+        )
+      ).then(({ rows }) =>
+        client.query(
+          `insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at)
+           values ($1, 1, $2, $3, now() + interval '30 days')`,
+          [tombstoneComb.id, rows[0].id, SUBJECT_TOMBSTONED]
+        )
+      );
+      const { rows } = await asAnon(() =>
+        client.query('select * from public.comb_preview_by_invite_code($1)', [tombstoneComb.invite_code])
+      );
+      if (rows.length === 1 && rows[0].subject_name === null && rows[0].has_active_month === false) {
+        ok('gone subject (tombstoned), open rotation: subject_name null, has_active_month false');
+      } else {
+        bad('gone subject (tombstoned), open rotation: subject_name null, has_active_month false', JSON.stringify(rows));
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 2d. Gone subject (departed the comb, not tombstoned), ENG-94: the
+    // departure arm of comb_subject_gone reaches this function through
+    // the same repoint — a comb_members row with removed_at set is
+    // "gone" even though the account itself is intact.
+    {
+      const { rows: departedCombRows } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.combs (owner_id, name) values ($1, 'Departed Comb') returning id, invite_code",
+          [OWNER]
+        )
+      );
+      const departedComb = departedCombRows[0];
+      await asPostgres(() =>
+        client.query('insert into public.comb_members (comb_id, profile_id) values ($1, $2)', [
+          departedComb.id,
+          SUBJECT_DEPARTED,
+        ])
+      );
+      await asPostgres(() =>
+        client.query('update public.comb_members set removed_at = now() where comb_id = $1 and profile_id = $2', [
+          departedComb.id,
+          SUBJECT_DEPARTED,
+        ])
+      );
+      await asPostgres(() =>
+        client.query(
+          `insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective)
+           values ($1, 'Departed', $2, true) returning id`,
+          [OWNER, SUBJECT_DEPARTED]
+        )
+      ).then(({ rows }) =>
+        client.query(
+          `insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at)
+           values ($1, 1, $2, $3, now() + interval '30 days')`,
+          [departedComb.id, rows[0].id, SUBJECT_DEPARTED]
+        )
+      );
+      const { rows } = await asAnon(() =>
+        client.query('select * from public.comb_preview_by_invite_code($1)', [departedComb.invite_code])
+      );
+      if (rows.length === 1 && rows[0].subject_name === null && rows[0].has_active_month === false) {
+        ok('gone subject (departed, not tombstoned), open rotation: subject_name null, has_active_month false');
+      } else {
+        bad(
+          'gone subject (departed, not tombstoned), open rotation: subject_name null, has_active_month false',
+          JSON.stringify(rows)
+        );
       }
     }
 
