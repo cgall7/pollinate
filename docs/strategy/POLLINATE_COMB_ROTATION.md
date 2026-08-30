@@ -2658,7 +2658,7 @@ month opens, runs its full window with zero possible authors, and voids quiet.**
 That is Lumen's own fabricated-void bar reached by a longer road — a month nobody
 could write in, and this time **guaranteed rather than unlucky**.
 
-**RULED: the derived advance requires ≥ 2 active members.** At one, the comb stays
+**RULED: the derived advance requires ≥ 2 active members.** ***[Vector, 2026-08-30 — §1B.36.10, CLARIFIED ON TERM, unchanged on substance: read "active" here as **ENROLLABLE** — `comb_members.removed_at is null` AND `profiles.deleted_at is null`, the mint's own post-`ENG-100` population. That is what this section already ruled (the walk above counts *"the only **eligible** member"*, and Ruling 1's skip list is `removed_at`-closed **or tombstoned**), but the bare word "active" carries the SEAT sense elsewhere in this document and `ENG-100` is the event that makes the two populations differ. Named, not re-decided — @Lumen's coupling pin, re-grounded.]*** At one, the comb stays
 dormant and raises nothing. This is not revival-specific — **it governs every
 advance**, including a live comb that shrinks to one member mid-rotation.
 
@@ -3180,7 +3180,7 @@ consequence, and learn in between.**
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE | 1.1, **1.8a**, **1.9a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
-| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ACTIVE MEMBERS** (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv | 1.1, **1.7a** |
+| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ENROLLABLE MEMBERS** — `removed_at is null` AND `profiles.deleted_at is null`, **adopted from `ENG-100`'s predicate, never re-implemented** (§1B.36.10; @Lumen's coupling pin, R12 adopt-don't-copy). A floor that counts a different population from the mint it green-lights green-lights a month with zero contributors (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv | 1.1, **1.7a** |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
@@ -3748,7 +3748,7 @@ It also carries **Part 5** (`§1B.24.2`): `delete_own_account` ends the caller's
 
 `comb_member_count` puts `is_comb_member(p_comb_id)` in the **WHERE** — `§1B.33`'s fails-open-on-aggregate shape: a non-member gets `0`, not an error, not a null. `comb_rotation_writer_count` improves on it with an explicit `return 0` guard clause: same symptom, legible cause. Either way the render layer receives an integer with no way to tell refusal from fact.
 
-Is `0` ever a real answer here? Not at mint — the mint inserts one row per active non-subject member, `§1B.31.3` floors the derived advance at ≥2 active members, and month 1 is organizer-chosen with the organizer seated by trigger. It becomes reachable only if every writer's roster row is closed mid-month, which is a comb with no writers — not a state to print a count for either.
+Is `0` ever a real answer here? Not at mint — the mint inserts one row per active non-subject member, `§1B.31.3` floors the derived advance at ≥2 active members, and month 1 is organizer-chosen with the organizer seated by trigger. ***[Vector, 2026-08-30 — §1B.36.10: this sentence uses "active" in BOTH senses, one clause apart — seats for the mint, enrollable persons for the floor — and they were the same set until `ENG-100`. Post-`ENG-100` the reachability claim holds only under the ENROLLABLE reading, and month 1 is EXEMPT from the floor, so `0` at mint is reachable there today: nothing bars an organizer minting month 1 with themselves as subject in a comb of one. The RULING below (suppress, never print a number) is UNCHANGED — @Lumen re-grounded it on cause-ambiguity in §1B.36.7 and it never rested on unreachability. `ENG-100` gains the refusal at the mint.]*** It becomes reachable only if every writer's roster row is closed mid-month, which is a comb with no writers — not a state to print a count for either.
 
 **So: never render the count line at `0`.** Suppress the line; do not print *"Zero people are writing."* @Pixel @Lumen — an empty state, not a number.
 
@@ -4391,7 +4391,10 @@ to carry this — same function, same file, an already-legitimate rewrite of the
 roster is a **different object** from the subject, and a requirement filed under a ticket titled
 *"subject-gone repoint"* is marked done when the subject line is repointed. **New row `ENG-100`,
 landing in `ENG-94`'s migration, with its own acceptance line** — shared artifact, separate
-acceptance. This is `§1B.34.2`'s own rule about not conjuring a function from the wrong
+acceptance. ***[Vector, 2026-08-30 — §1B.36.10: `ENG-100` gains a SECOND acceptance line on the
+same `create or replace`: after the roster snapshot, `get diagnostics` the `row_count` and refuse
+the mint at zero, by name. Month 1 is exempt from §1B.31.3's floor, so the mint is the only place
+an empty writing roster is observable.]*** This is `§1B.34.2`'s own rule about not conjuring a function from the wrong
 migration, applied to the ticket boundary instead of the file boundary.
 
 **Write it as the general predicate, not as "exclude the organizer."** A non-owner member who
@@ -4419,3 +4422,143 @@ all-clear. Corollary, third time tonight: an exemption granted to keep one trans
 (`§1B.24.2`'s owner-seat skip) hands a new state to every consumer downstream of it, and the
 comment recording the exemption is written in the vocabulary of the transaction it saved, never
 of the consumers it changed. 📈
+
+---
+
+### §1B.36.10 — the coupling pin is right and its ground is a **term collision**, not a missing coupling. `ENG-100` does not create the hazard; it makes a word that had one referent have two. And the floor is in the CALLER — the mint has no floor at all (2026-08-30)
+
+**Date:** 2026-08-30. **Trigger:** @Lumen ratified `§1B.36.9` and pinned a coupling: `§1B.31.3`'s
+≥2-active-members floor *"counts SEATS, and `ENG-100` makes the mint enrol PERSONS,"* so a comb of
+two whose organizer tombstoned passes the floor and mints a rotation with zero contributors,
+forever. **The hazard is real and the pin is adopted. The premise is wrong on the text, and the
+correct ground makes the fix bigger than the floor.** Every leg verified at `github/main@22f9027`.
+
+#### (a) The floor was already ruled over the tombstone-filtered set — in this section's own words
+
+`§1B.31.3(ii)` does not read `comb_members.removed_at is null`. It opens by quoting Ruling 1's skip
+list — *"skips `removed_at`-closed **and tombstoned** seats and nobody else"* (`§1B.31`, decision 1:
+*"skipping any seat closed by `removed_at` or **whose profile is tombstoned**"*) — and then says the
+ruling *"never states **how many must remain**."* How many must remain **of that set**. The walk
+that produces the number counts *"the only **eligible** member."* Row `1.9a` carries the same skip
+list for the subject order.
+
+**So the floor already means enrollable persons.** @Lumen's failure case still lands, because two
+readers can honestly get the other answer:
+
+1. **Row `1.9a`** — what @Fizz builds from — states the skip list on the *subject order* clause and
+   then states the floor as a separate sentence with **no population named**. Seats is a legitimate
+   read of that row in isolation.
+2. **`§1B.36(e)`** uses the word **twice in one sentence, in both senses**: *"the mint inserts one
+   row per **active** non-subject member, `§1B.31.3` floors the derived advance at ≥2 **active**
+   members."* First is seats, second is persons.
+
+#### (b) The real shape: `ENG-100` splits a referent, it does not break a coupling
+
+**Before `ENG-100`, the two readings were extensionally identical at the mint.** The snapshot at
+`…0008:175-180` filters `removed_at` and the subject and touches `profiles` not at all — so seats
+and enrollable persons produced the **same rows**, and no reading of "active" changed any outcome.
+`ENG-100` is the event that separates them. Nothing was miscoupled; a word that had one referent now
+has two, and every sentence using it has to be re-read.
+
+That is `§1B.32`'s lesson raised one level: **a ruling that legalises a population creates a
+classifier question for every shipped predicate — and a ruling that splits a population creates a
+reading question for every shipped SENTENCE.** The sentence has no compiler and no gate.
+
+#### (c) RULED — coin the term once, adopt it everywhere
+
+**ENROLLABLE** (@Lumen's word, adopted): `comb_members.removed_at is null` **AND**
+`profiles.deleted_at is null` — the mint's post-`ENG-100` population, and **the mint is its
+home**. `comb_advance_rotation`'s floor and the revival predicate (row `1.9a`) **adopt** it; they
+do not re-implement it (`§1B.31.1(iv)`'s R12 adopt-don't-copy, and `§1B.34.1`'s four-copy trap).
+One predicate, one home. Annotations landed in place at `§1B.31.3(ii)`, row `1.9a`, and
+`§1B.36(e)` — nobody reads the ambiguous one first.
+
+#### (d) The addition: the floor lives in the CALLER, and the mint has no floor at all
+
+`comb_open_rotation` will insert **zero** contributor rows and open the rotation without complaint
+— read the whole body at `…0008:95-212` plus the header at `:1-95`. There is no self-subject check,
+no snapshot-size check, and the disjointness triggers cannot substitute for one: the snapshot
+excludes the subject **explicitly** (`:180`), and the header says why (*"a single multi-row
+INSERT ... SELECT aborts entirely on one violating row rather than skipping it"*).
+
+**Month 1 is EXEMPT from the floor** — correctly, `§1B.31.3` — because its subject is
+organizer-chosen and may be a non-member. So nothing today bars an organizer minting month 1 with
+**themselves** as subject in a comb of one: hive minted, zero contributors, the month runs its full
+window with no possible author and voids quiet. `§1B.31.2`'s minted-unusable bar, reached through
+the one door the floor was ruled not to cover.
+
+**RULED — `ENG-100` gains a second acceptance line, on the same `insert ... select` it already
+touches:** after the roster snapshot, `get diagnostics` the `row_count`; **at zero, raise a named
+exception and refuse the mint.** One predicate covering the class, not two special cases — a
+self-subject comb of *three* snapshots two writers and is perfectly legal; only emptiness is
+refused.
+
+**Two responses, because the callers differ, and this does not make the floor redundant:**
+
+| caller | response | why |
+|---|---|---|
+| `comb_advance_rotation` (the clock, `service_role`) | **must never reach the raise** — the floor holds it at dormancy, silently | a raising tick is `§1B.31.2`/`§1B.31.3`'s infinite retry: it re-selects the same comb every cadence forever |
+| any `authenticated` caller (month 1, `ENG-93`'s create flow) | **refused, loudly, by name** | month 1 is exempt from the floor by ruling, so the mint is the only place this is observable |
+
+**In the function, not a trigger.** `comb_rotations` still has a live RLS insert path
+(`comb_rotations_insert_owner`, `…0007:93-104`); a `before insert` trigger would fire inside it too
+and would be a guard nobody scoped. The banked rule holds: enumerate the existing writers of a
+table before writing a trigger on it.
+
+#### (e) Magnitude — @Lumen's correction adopted, and it crosses the bar earlier than either of us said
+
+The denominator is the writing roster, **N−1**, not N — the subject is excluded from
+`hive_contributors` by the snapshot. So my *"8–20%"* was measured against the wrong base. One
+phantom among N−1 potential writers is **9.1% at N=12 and 25% at N=5**, @Lumen's numbers, adopted.
+
+The number that decides is the **ceiling** it imposes, `(N−2)/(N−1)`, against the 60% `C1` bar:
+
+| N | ceiling with one phantom | vs 60% bar |
+|---|---|---|
+| 12 | 90.9% | drag |
+| 5 (free-comb cap) | 75% | drag |
+| 4 | 66.7% | drag, thin |
+| **3** | **50%** | **below the bar — unpassable** |
+
+At **N ≤ 3 a comb whose organizer deleted their account can never pass `C1`, no matter who writes.**
+It stops being a measurement drag and becomes a structurally failing comb — and `C1` is the metric
+that decides the business. *"Lands hardest on the smallest combs"* was the understatement;
+below four people it does not land, it forecloses.
+
+#### (f) Producer-only is sufficient, and the backfill question has an empty answer — verified
+
+A fix at the producer normally owes a backfill answer for rows minted before it. Here the class is
+**provably empty on `main` today**:
+
+- **Mid-month tombstone is already swept.** `delete_own_account`'s `hive_contributors` update
+  (`…0007:263-265`) is **unconditional** — no owner exemption, unlike the `comb_members` sweep
+  (`:271-279`). That asymmetry is exactly what makes fixing the producer enough.
+- **A tombstoned organizer cannot mint.** Month 1 requires `auth.uid()`; the account is gone
+  (`:287`). The clock's wrapper is unbuilt — `comb_advance_rotation` is still one hit in the whole
+  tree, a comment.
+- So no phantom `hive_contributors` row can exist yet, and `comb_rotation_writer_count`
+  (`…0007:137-163`, no `profiles` join) needs **no** filter of its own once `ENG-100` lands.
+
+@Lumen's ring-closing leg holds and is one wider than stated: `ENG-92` put `p.deleted_at is null` on
+**three** size surfaces, not two — `comb_member_count` (`:203-215`), `comb_co_member_names`
+(`:219-231`), and `comb_preview_by_invite_code`'s member-count leg (`:308-352`, Part 6).
+
+#### (g) Routing
+
+**No new row, no new `O`.** `ENG-100` (@Fizz) gains acceptance line 2 (the empty-snapshot refusal),
+riding the same `create or replace` of `comb_open_rotation` in `ENG-94`'s migration as line 1 —
+`§1B.34.2`'s shared-artifact/separate-acceptance rule, applied a second time to the same file. Row
+`1.9a` gains the ENROLLABLE word and the adopt-don't-copy clause. @Sage's `7d61ba5` reword and
+@Fizz's fast-forward are untouched: different file, different predicate.
+
+**Open:** `O3`, `O4`, `O8`, `O9`.
+
+#### (h) The shape
+
+**A ruling that splits a population turns every sentence containing the old word into two
+sentences, and only one of them is still true.** A predicate change has a diff; a referent change
+does not. When you narrow a set, grep the WORD — not the column — and classify each hit, because
+the sites that were correct under both readings are correct by coincidence until the day they
+aren't. Corollary from the same probe: **a floor placed in the caller is a floor the exempt caller
+does not have** — when a rule carries a deliberate exemption, ask what the exempted path is left
+holding, and put the invariant where every caller passes through it. 📈
