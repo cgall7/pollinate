@@ -43,13 +43,24 @@
 -- does. The seal must be its own subtransaction; the advance is a
 -- second, independent one that can fail without undoing it.
 --
--- Also per §1B.31.2: a comb_advance_rotation call that finds no
--- eligible subject (every member removed_at-closed or tombstoned) is
--- DORMANCY, not an error -- it returns without minting and raises
--- nothing. That is Fizz's function's contract to honor, not this
--- file's to work around, but it matters here too: if comb_advance_rotation
--- ever raised for the dormant case, the loop below would log a warning
--- per sweep, forever, for a comb that isn't actually broken.
+-- STALE, CORRECTED (Vector, thread b57ad406, 2026-08-30, §1B.36.11): this
+-- block originally said dormancy was "no eligible subject (every member
+-- removed_at-closed or tombstoned)" -- zero ENROLLABLE members, in
+-- §1B.36.10's later term (removed_at is null AND profiles.deleted_at is
+-- null). §1B.31.3 (posted the same evening, after this file's first
+-- draft) raised the floor to TWO enrollable members, not zero -- a comb
+-- needs two people to be a comb. The skip list above was already
+-- correct (it named the right population before the term existed); only
+-- the threshold was wrong.
+--
+-- Per §1B.31.2 + §1B.31.3: a comb_advance_rotation call that finds FEWER
+-- THAN TWO enrollable members is DORMANCY, not an error -- it returns
+-- without minting and raises nothing. That is Fizz's function's contract
+-- to honor, not this file's to work around, but it matters here too: if
+-- comb_advance_rotation ever raised for the dormant case (including the
+-- one-enrollable-member case ENG-100 makes reachable), the loop below
+-- would log a warning per sweep, forever, for a comb that isn't actually
+-- broken.
 --
 -- This job owns the CLOCK (when the sweep runs); it has never owned the
 -- POLICY (who's next, how long a month is) -- Sage drew that boundary
