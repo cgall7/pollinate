@@ -65,8 +65,8 @@ conflated.
 | | Scope |
 |---|---|
 | **Phase 0** | `OPS-8` (analytics promise), `ENG-84` (account deletion), `COPY-13` (sweep + ratify), `OPS-7`, `OPS-3` |
-| **Phase 1** | The rotation engine — `ENG-58`, `ENG-85` (caps **disabled**), `ENG-83`, `ENG-59`, `OPS-9`, `ENG-60`, `DES-21`, `DES-22`, `DES-29`, `DES-31`, `COPY-6` |
-| **Phase 2** | The daily layer — `ENG-62`, `ENG-90`, `ENG-65`, `ENG-66`, `DES-23`, `DES-32`, `COPY-7` |
+| **Phase 1** | The rotation engine — `ENG-58`, `ENG-85` (caps **disabled**), `ENG-83`, `ENG-59`, `OPS-9`, `ENG-60`, `DES-33` (**not `DES-21`** — see §1B.3), `DES-22`, `DES-29`, `DES-31`, `COPY-6` |
+| **Phase 2** | The daily layer — `ENG-90`, `ENG-65`, `ENG-66`, `DES-23`, `DES-32`, `COPY-7`. **`ENG-62` is already shipped** (§1B.2) |
 | **Phase 2, measurement** | `ENG-89` + `ENG-78` — instrumentation **is in the MVP** (ruled `a11aa144…`, closing `O6`). `OPS-10` — **EAS internal distribution**, the ruled mechanism for reaching seeded testers (`a11aa144…`, closing `O7`; **not** TestFlight, which stays MVP2) |
 | **Carried in-flight** | The approved merge queue and demo-gap items in `PLANS/MVP1_DEMO_READINESS_AUDIT.md`, and the GL1/GL2 luxury pass Colin ruled in scope 2026-08-26. **This ruling does not cancel any of it** |
 
@@ -116,6 +116,287 @@ with nectar → and do it again next month for someone else.
 
 **If that sentence does not run end to end on a real device with real strangers,
 MVP-Comb is not done.**
+
+---
+
+## 1B. Amendments — 2026-08-30, after the #Collab handoff
+
+Ten corrections. Seven came from the builders reading the encoding against the
+tree; one is a ruling Colin made after this doc was written; two are rulings the
+builders asked me for (§1B.8) or made themselves and I have upheld (§1B.9). **Verified against
+`github/main@cdb07a1`** — the tip moved from `080edd5` while the brief was being
+read; see §1B.7.
+
+### 1B.1 — The free cap is **5 members inclusive of the organizer**. The 20 is not superseded.
+
+Colin ruled (event `a68da86a…`): *"the first comb as 5 free members. if you want
+more combs or more members you have to pay for premium."*
+
+Pixel asked the arithmetic question: does the organizer occupy one of the 5?
+**Yes. Product call, mine.**
+
+- `comb_members` holds **one row per writer**, and the organizer writes. A free
+  comb is **organizer + 4 invitees**. The cap is a row count on `comb_members`,
+  which is the only number the plumbing can actually see.
+- It already agrees with `DES-30`, which fires the paywall at *"adding the **6th**
+  member."* Sixth from a first who is the organizer.
+- Every seat-priced group product counts the owner — Slack, Notion, Figma,
+  Workspace. The ones that don't spend the rest of their lives explaining why
+  the number in the copy isn't the number on the screen. **The consistency is
+  worth more than the extra seat.**
+
+**Correction to the record: the 20 is *not* superseded.** They are two different
+caps and both are live:
+
+| Cap | Value | Counts |
+|---|---|---|
+| **Free comb** | 5 | rows in `comb_members`, organizer included |
+| **Hard ceiling, any comb** | 20 | same count. §1 and §8.4 — *"closed, capped at 20"* |
+
+Colin's ask #4 (*"up to 20 people join"*) is the **premium** ceiling and it
+survives intact. `ENG-59`'s invite path must be built against 20, not 5.
+
+**The rotation subject does not consume a seat** — `comb_rotations.subject_profile_id`
+references `profiles`, not `comb_members` (§18.2(2)), deliberately, so a comb can
+write for someone outside it. When the subject *is* a member — the normal case —
+they are already counted as a writer. Pin this in the migration comment; the next
+reader will assume the subject is a member.
+
+**In MVP-Comb neither number is enforced** (§8.5). Both are built, both are off.
+
+### 1B.2 — `ENG-62` is closed. It shipped four days ago.
+
+Sage's correction, verified: `supabase/migrations/20260826000001_nectar_ledger.sql`
+is a full double-entry ledger, merged and prod-live since 2026-08-26.
+`ledger_accounts.owner_user_id → profiles(id)` (generic, **not** hive-scoped),
+`ledger_settings.rails_mode` defaults `'simulated'`, plus `nectar_sim_service`
+and `nectar_sats_override`. §8.1 listed `ENG-56/57/61` as shipped and missed this
+one.
+
+**Consequence: `ENG-90`, `ENG-65` and `ENG-66` are not waiting on Sage.** The
+ledger is there to ride today. Phase 2 rows 2.3–2.5 lose a dependency.
+
+### 1B.3 — `DES-21` is closed; the rotation frame is **`DES-33`**.
+
+Pixel built and merged `DES-21` as filed — `github/main@a02e247`, verified an
+ancestor of the tip. Reusing a closed number made merged work read as open and
+made an XL estimate carry work that is already done. **New number.**
+
+| ID | Owner | Est | Issue |
+|---|---|---|---|
+| **DES-33** | Deezine | S/M | **The reveal needs tense.** The collective bloom renders today (`PackageOpen.js:511`, `:618-620` — per-entry `authorName`, colophon roster, count-not-content). What it has no notion of is *"this month"* and *"next month, for someone else."* Design the **rotation frame** around the shipped bloom. Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`; **do not rebuild the bloom** |
+
+### 1B.4 — `ENG-85` needs a per-comb override, or §8.5 detonates in Phase 4.
+
+§8.5 says build the caps and leave them off so a seeded run club of twelve is not
+strangled at five. That is right, and it is incomplete: **when the caps flip on in
+Phase 4, that same comb of twelve is retroactively over the limit.** The trap we
+avoided at seed time re-arrives at monetization, pointed at the exact relationships
+the measurement was built on.
+
+**`ENG-85` ships with a per-comb entitlement override column.** Nullable, unset by
+default, set for every comb created before the flip. It costs a column now and a
+migration-against-live-combs later. Pixel is right that the residual bill arrives
+as copy under `COPY-13` — but grandfathering makes that sentence *"your comb keeps
+its twelve"* instead of *"four of your friends have to leave."*
+
+### 1B.5 — Colin's #2 and #3 have rows now. #5 does not mean what the encoding assumed.
+
+Colin ruled four items into MVP-Comb at `a478c335…` (02:45), three minutes before
+the brief. #4 was already `ENG-59`. The other three:
+
+| ID | Owner | Est | Issue |
+|---|---|---|---|
+| **DES-34** | Pixel | M | **The mascot's sitting motion.** Colin: *"has to get fixed for mvp-comb… needs to get way better."* Perch weight `R-PW-1/2/3` is derived constants on `pixel/perch@2fab96b`, verified **not** an ancestor of the tip; `MascotBee` is untouched and has no settle beat. Bee motion is licensed by a cause outside the bee — landing **is** a cause, so this is in-principle clean |
+| **DES-35** | Pixel | M | **Glass prominence to ≥23% of the display.** Colin: *"i love the idea of getting the [glass] to over 23% of the screen. Let's do that."* A floating cover-tinted header, 6.54% → 23.1%. **This is a new composition, not the GL1/GL2 pass** — do not let it get absorbed. **Its material prerequisite is now satisfied** (§1B.7). Glass stays chrome only; a header is chrome |
+| **DES-36** | Pixel | S | **The nectar door on the reveal is unfindable, and `ENG-90` does not fix it.** See below |
+
+**On #5 — two doors do not fix an unfindable first one, and Pixel is right to
+flag it.** Verified at the tip: the *only* nectar send surface in `src/` is
+`NectarSendPanel`, reached from `PackageOpen.js:571` — a **22pt unlabelled icon
+in an entry card's rail**, double-gated on `nectarConsent && authorReachable`
+(`PackageOpen.js:474`, `:536`, `:566`). Pre-consent it is an `enter-outline`
+glyph; `src/constants/nectar.js:218` states the intent plainly — *"the nectar row
+does not exist."*
+
+So Colin could not find the door because, for his account state, **there wasn't
+one to find**. That is a gating-and-affordance defect on the existing surface.
+`ENG-90` + `DES-32` build a *second*, any-time door somewhere else entirely.
+
+**Ruling: `ENG-90` does not supersede the in-reveal send.** They are one compose
+sheet with two entry points — in-reveal (contextual, "for this memory") and
+in-comb (`ENG-90`, any time). `DES-32` specs **one sheet**. `DES-36` fixes the
+in-reveal entry point's discoverability. That is what #5 asked for.
+
+### 1B.6 — Account deletion crosses the rotation, and nobody owns the seam.
+
+Two findings that only collide when read together:
+
+**Fizz is right about the ledger, for a stronger reason than the one given.**
+`ledger_accounts.owner_user_id` is `on delete restrict`
+(`20260826000001:84`), so a hard delete FK-violates for anyone who has touched
+nectar. Fizz proposes anonymizing the rows. **Confirmed, and it is not a
+preference:** the ledger is double-entry. Deleting one side's postings breaks
+debits = credits — the invariant the whole ledger exists to hold. Anonymize is
+the only option that leaves the books valid. `ENG-84` proceeds as scoped.
+
+**The unowned seam: what happens to a rotation whose subject deletes their
+account mid-month?** `private_hives.subject_profile_id` is `on delete set null`
+(`20260815000001:19`). If `comb_rotations` copies that shape — and §1B.1 says it
+should — then `ENG-84` can leave a live rotation pointing at nobody, which
+`OPS-9`'s `pg_cron` tick will then iterate over. **`ENG-58` must define a
+rotation state that tolerates a null subject** (void it and advance, do not
+stall), and `OPS-9` must skip it rather than fault. @Sage owns the column,
+@Bumble owns the tick, @Fizz's `ENG-84` is what fires it.
+
+### 1B.7 — The tip moved. Pixel's glass prerequisite is already merged.
+
+Lumen and Pixel both scoped from `github/main@080edd5` and both recorded the two
+glass PRs as unmerged. **They merged at 2026-08-29 22:34.** Verified by
+`ls-remote` and `merge-base --is-ancestor`:
+
+```
+github/main = cdb07a1   (was 080edd5)
+  cdb07a1  GL7(b'): the capsule takes the clear rung, and the veil moves with it
+  13cf806  GL7(d'): the borrower circles get the edge, not the material
+  3648631  GL7(a) gate: name D6's sensitivity axis
+  d616860  GL7(a): the glass edge is the hairline
+```
+
+`13cf806` and `cdb07a1` are both ancestors of the tip. **`DES-35` is unblocked
+on material.** Everyone re-scope from `cdb07a1`.
+
+**Also confirmed against the tip, for `ENG-58`:** the subject-as-slot pattern is
+not new — `private_hives.subject_profile_id uuid references public.profiles (id)
+on delete set null` has existed since `20260815000001:19`, and
+`private_hives_send.sql:71` restricts the subject's own read to
+`auth.uid() = subject_profile_id and sent_at is not null`. **That answers
+Pixel's `DES-31` question: on today's layer the subject cannot read the roster
+or a count before the seal, by construction.** `hive_contributors_select`
+(`20260827000001:233-239`) admits only the owner or an active contributor, and
+the migration's own comment says that is deliberate. If `DES-31` shows the
+subject a count, it must come from a **snapshot at seal** — the
+`contributor_names` shape (`HiveStore.js:443`, `:485`) — not a live read. That is
+a column decision inside `ENG-58`, not a design decision downstream of it.
+
+> **Annotation, added with §1B.9 below:** the conditional in the sentence above
+> (*"if `DES-31` shows the subject a count"*) has since been answered — **it does
+> not.** Pixel ruled the subject sees no count at all, live or snapshot, and I
+> have upheld it. The snapshot-vs-live analysis stands for the *member's* view;
+> it no longer has a subject-facing case to cover. Read §1B.9 before acting on
+> this paragraph.
+
+### 1B.8 — `DES-22` draws **presence, not capacity**. Confirmed.
+
+Pixel asked for this ruling and read it correctly before I answered: `§1A` puts
+`DES-30` and all cap enforcement **out** of MVP-Comb, so **no surface in
+MVP-Comb names the number 5.** It lives in the plumbing and nowhere a person can
+see it. **Confirmed — spec it that way.**
+
+The literal reading is the right one, and there are two harder reasons under it.
+
+**1. A denominator you are not enforcing cannot be drawn honestly.** §8.5 exists
+so a seeded run club of twelve is not strangled at five. That comb *will* exist —
+it is the point of the seed. `"12 of 5"` is not a state a UI can render. Every
+denominator on that screen either lies about the limit or advertises a limit we
+have deliberately switched off. There is no third rendering.
+
+**2. The price is unruled, and pixels are the most expensive place to store a
+business decision.** `O4` (§4, still open) leaves the price blank on purpose
+until `C1` and `C5` return. A surface that names 5 hard-codes one half of a
+pricing model whose other half we have refused to guess. Every consumer product
+that painted its tier boundaries into the core UI before the tiers settled paid
+for it twice — once to build them, once to tear them out. Draw the thing that is
+true regardless of price.
+
+**So `DES-22` draws:** who is here, who has been invited and not joined, who has
+not written this rotation. **Presence, invitation, participation.** No
+denominator, no seats-remaining, no fullness, no progress-toward-full — a comb of
+four and a comb of twelve are drawn by the same rule, and neither is drawn as
+*partly full.*
+
+**On the bill Pixel says arrives later as copy: §1B.4 has already paid most of
+it.** With the per-comb entitlement override, a comb that grew to twelve during
+the measurement window **keeps its twelve** — so no existing comb is ever shown a
+cap it was never shown while forming. The hardest sentence in `COPY-13` is not
+*"four of your friends have to leave."* It is not written at all. The cap first
+becomes visible to combs formed **after** enforcement, where a denominator is
+honest because it is live.
+
+`DES-22`'s missing denominator and §1B.4's grandfathering are the same decision
+seen from two sides. @Lumen — that is the constraint `COPY-6` and `COPY-13`
+inherit.
+
+### 1B.9 — Pixel's `DES-31` ruling is **upheld**: the subject sees no count. It also protects `C1`.
+
+Pixel ruled, without waiting for me, that **the rotation subject sees no
+contributor count before the seal — not a live one, not a snapshot one, not
+*"some people have written."*** Contributor count is the **member's** view only.
+**Upheld.** Ruling made correctly and at the right moment; `ENG-58`'s schema
+should not have waited on it.
+
+Pixel's reason is a design reason and it is sound: a rising count is a progress
+meter on how many people care, delivered before the gift, and it can only land
+two ways — higher than she hoped or lower.
+
+**The reason I would add is a measurement reason, and it is the one that would
+have cost us the release.**
+
+`C1` is defined at §6 (`:511`) as *"share of an active comb who write for that
+month's subject."* **If the subject can watch that share while the rotation is
+open, the subject will act on it** — she chases the quiet ones, because that is
+what any decent person does when shown a number about their own friends.
+
+`C1` then stops measuring organic participation and starts measuring **nudged**
+participation. We would have shipped our own KPI to the single person with the
+strongest incentive and the best standing to move it.
+
+The failure is worse than a wrong number, because it is **silent and it
+misroutes**. §6 pre-commits a response to each failure signature so a bad result
+produces action instead of an argument. But *"combs form and people write
+unprompted"* and *"combs form and the subject chases everyone every month"*
+produce **the same `C1`** and demand opposite responses — the first is a business,
+the second is a chore with a good retention curve and no organic engine. A
+contaminated `C1` does not just cost us the number; it walks us confidently into
+the wrong row of §6's table. `C1` is the number that decides the business
+(`:517`), so this is the one place contamination is unaffordable.
+
+**Blind-until-seal is therefore load-bearing twice** — a privacy boundary for
+Sarah, and the isolation that makes `C1` a real measurement. Two independent
+reasons for the same line, which is how you know it is not a preference.
+
+**What this does and does not do for `ENG-58`.** @Sage: it removes the
+requirement for a subject-facing count query — nothing in MVP-Comb needs one. It
+does **not** make Pixel's role-aware read guard optional, and Pixel's correction
+to your *"identical shape"* is right: in the hive, subject and contributor are
+disjoint **by enforced constraint**
+(`hive_contributors_insert_owner`, `20260827000001:248-257`), which is exactly
+why the bare owner-or-contributor policy is safe there. **In a comb the subject
+is normally a member — that is what a rotation is** — so the same policy shape
+hands the subject the full roster during their own month. The hive's guard is on
+*identity*; the comb's has to be on *role in the current rotation*, and it cannot
+be an insert-side constraint, because forbidding the subject from being a member
+would forbid the rotation. **That guard is new work, not inherited.**
+
+### 1B.10 — The design longest pole is `DES-22`, not `DES-21`. The brief got this wrong.
+
+Pixel's catch, and it stands. The brief and §8.7 both said *"`DES-21` and
+`ENG-58` are the two longest poles. Start both immediately."* Every clause of
+that is now wrong except `ENG-58`:
+
+- `DES-21` is **closed** (§1B.3) — telling the team to start it first pointed the
+  design lane at merged work.
+- Its successor `DES-33` is **S/M, not XL** — a frame around a shipped bloom.
+- **`DES-22` has two rows queued behind it** — `COPY-6` (8.6 row 1.10, an explicit
+  dependency) and `DES-29`'s comb happy path *person → occasion → date → invite →
+  write*, which cannot be drawn until comb identity exists. `DES-33` has none.
+
+**Depth of the queue behind a task, not its own estimate, is what makes a pole.**
+The brief ranked by estimate and inherited an estimate that had gone stale. §8.7
+and 8.6 row 1.4 are corrected; `DES-22` starts first in the design lane.
+
+
+---
 
 ---
 
@@ -377,10 +658,18 @@ do not delete it**, and do it **before** the policy publishes. `OPS-8`.
 
 Existing rows now on the critical path rather than in Cycle 11–12:
 
-- **`DES-21`** (Deezine, L) — collective reveal, N authors in one sequence.
-  **Now gates the hero flow.** Attribution visible without becoming a feed.
+- ~~**`DES-21`** (Deezine, L) — collective reveal, N authors in one sequence.~~
+  **CLOSED — SHIPPED 2026-08-28, `github/main@a02e247` (Pixel, not Deezine).**
+  Per-entry signature, colophon roster/count, gate `check-collective-reveal.mjs`,
+  ratified spec `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`. This row was
+  reused in error when this doc was written; **the rotation frame is `DES-33`**
+  (§1B.3). Do not re-open `DES-21` and do not carry its L estimate.
 - **`DES-22`** (Pixel, M) — comb identity: hexagon cluster, member states,
   rotation indicator *("writing for Sarah — 6 days left")*.
+  **AMENDED 2026-08-30 (§1B.8): "member states" means PRESENCE, NOT CAPACITY.**
+  No denominator, no seats-remaining, no fullness. **No surface in MVP-Comb names
+  the number 5** — cap enforcement is out (`§1A`), and a cap you are not enforcing
+  cannot be drawn honestly against a seeded comb of twelve.
 - **`COPY-6`** (Lumen, M) — comb + rotation copy. **Never "group," never
   "community," never "post."**
 
@@ -390,7 +679,7 @@ New rows:
 |---|---|---|---|
 | **DES-29** | Deezine | L | **Comb-first first run.** The app opens on `TodayTab`, a solo journal (`src/navigation/MainTabs.js:115`), and `Onboarding` ends in a personal entry — teaching "journal app" in three seconds and hiding the pillar we sell. Two doors, **comb primary**: *"Start a comb with your people"* / *"Write for one person."* Comb happy path: **person → occasion → date → invite by link → write.** Sequence with `ONBOARDING_ZERO_DOOR_SPEC.md` — same `App.js` region |
 | **DES-30** | Pixel | M | **Paywall surfaces, at two moments and no others.** (1) **Adding the 6th member** to a comb you run. (2) **Creating or joining a second comb** to write in. Both are private, organizer-side, high-intent. **Never at a seal or a reveal**, never "upgrade to unlock" (`COPY-13`). Copy must never imply a friend is being excluded — the message is *"add more people,"* never *"they can't come"* |
-| **DES-31** | Pixel | M | **Rotation state on the Hive tab**: subject, days remaining, contributor **count**. **Never contributor content** — blind-until-seal (§18.1) is a privacy boundary, not a nicety |
+| **DES-31** | Pixel | M | **Rotation state on the Hive tab**: subject, days remaining, contributor **count**. **Never contributor content** — blind-until-seal (§18.1) is a privacy boundary, not a nicety. **AMENDED 2026-08-30 (§1B.9): the count is the MEMBER's view only. The subject sees NO count before the seal — not live, not snapshot, not "some people have written."** The subject sees who it is for and how long, and nothing countable. Two views of one rotation. Blind-until-seal covers the number, or the number becomes the spoiler — and a subject-visible share contaminates `C1` |
 | **DES-32** | Deezine | M | **Short-note + nectar compose surface** (§5.2a). Eight words and a nectar amount, sent to a comb member from the comb, any time — not only at a reveal. Fast, one-handed, closer to a reaction than to composing an entry. Reuses the `DES-23` zap flight |
 
 **Constraint unchanged:** no photo feed in the Hive tab or a comb (§11, "Do not
@@ -482,25 +771,35 @@ consequence, and learn in between.**
 | # | Owner | Task | Depends on |
 |---|---|---|---|
 | 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2 | — |
-| 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5) | 1.1 |
+| 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5). **Must include a per-comb entitlement override column** so Phase 4 can grandfather the seeded combs without a schema change (§1B.4) | 1.1 |
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
-| 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state | — (start now) |
+| 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9) | — (start now, ahead of 1.6) |
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | — (start now) |
-| 1.6 | **Deezine** | `DES-21` — collective reveal. **XL, gates the hero flow — start it the day 1.1 is ruled**, it can be designed against a stub | — |
+| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — rotation ritual: open → notify → collect → seal → reveal | 1.1, 1.6, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
+| 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
+| 1.12 | **Pixel** | `DES-35` — glass prominence to ≥23% (Colin `a478c335…`, §1B.5). **Material prerequisite merged** — `13cf806` + `cdb07a1` are ancestors of the tip (§1B.7) | — (parallel; **gates nothing**) |
+| 1.13 | **Pixel** | `DES-36` — make the existing in-reveal nectar door findable (§1B.5). **Not** superseded by `ENG-90` | — (parallel; **gates nothing**) |
+
+**On 1.11–1.13:** Colin ruled these into MVP-Comb at `a478c335…`, three minutes
+before the brief was posted, so they carry his authority and they are **in**.
+They run parallel and **nothing in the definition of done depends on them** — they
+are the difference between shipping the ritual and shipping it *gloriously*, which
+is Colin's other standing instruction. If they slip, the release still runs
+end to end; do not let them gate 1.1–1.10, and do not let 1.1–1.10 crowd them out.
 
 **Phase 2 — The daily layer. Parallel to Phase 1 from 2.1 onward; no shared files with the rotation work.**
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 2.1 | **Sage** | `ENG-62` — land the nectar ledger, `rails_mode='simulated'` | — |
+| 2.1 | ~~Sage~~ | ~~`ENG-62`~~ — **CLOSED, ALREADY SHIPPED** in `20260826000001_nectar_ledger.sql` (+ `…05_nectar_sim_service`, `…06_nectar_sats_override`), prod-live since 2026-08-26. `ledger_accounts.owner_user_id → profiles`, `ledger_settings.rails_mode` defaults `'simulated'`. **2.3 / 2.4 / 2.5 are no longer gated on Sage** | — |
 | 2.2 | **Deezine** | `DES-23` zap flight + `DES-32` short-note compose | — |
-| 2.3 | **Fizz** | `ENG-90` — short note + nectar, any time, in-comb | 2.1, 2.2 |
-| 2.4 | **Fizz** | `ENG-65` — honeyed hexagon (comb-as-wallet) | 2.1, `DES-24` |
-| 2.5 | **Fizz** | `ENG-66` — comb pot. **G2: direct-to-recipient, never pooled** | 2.1, 1.9 |
+| 2.3 | **Fizz** | `ENG-90` — short note + nectar, any time, in-comb | ~~2.1~~ (shipped), 2.2 |
+| 2.4 | **Fizz** | `ENG-65` — honeyed hexagon (comb-as-wallet) | ~~2.1~~ (shipped), `DES-24` |
+| 2.5 | **Fizz** | `ENG-66` — comb pot. **G2: direct-to-recipient, never pooled** | ~~2.1~~ (shipped), 1.9 |
 | 2.6 | **Lumen** | `COPY-7` — nectar vocabulary. **"Drops," not "sats."** No "bitcoin" in default UI | — |
 | 2.7 | **Fizz** | `ENG-89` + `ENG-78` — **instrument C1–C5. In the MVP** (`O6` closed). Must ship in the same binary as the features it measures | 0.1, 1.9, 2.3 |
 | 2.8 | **Bumble** | `OPS-10` — **EAS internal distribution** for the seeded combs (`O7` closed; **not** TestFlight, which stays MVP2) | — |
@@ -516,9 +815,9 @@ consequence, and learn in between.**
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 4.1 | **Colin** | **Rule the price.** Ceiling ~$39/yr, annual preferred (§4) | 3.3 |
+| 4.1 | **Colin** | **Rule the price.** Ceiling ~$39/yr, annual preferred (§4) | 3.2 (was written `3.3`, which does not exist) |
 | 4.2 | **Fizz** | `ENG-79` — IAP layer + subscription. **L+, carries the whole StoreKit/RevenueCat surface** | 4.1, 1.2 |
-| 4.3 | **Sage** | Flip `ENG-85`'s caps on: 1 comb written in, 5 members (§8.5) | 4.2 |
+| 4.3 | **Sage** | Flip `ENG-85`'s caps on: 1 comb written in, **5 members counted inclusive of the organizer** (§1B.1); hard ceiling 20 on any comb, free or premium. **Grandfather every comb created before this flip** via `ENG-85`'s per-comb override (§1B.4) | 4.2 |
 | 4.4 | **Pixel** | `DES-30` — paywall at the two moments, and no others | 4.1 |
 | 4.5 | **Lumen** | Pricing copy. Never "upgrade to unlock" | 4.1 |
 
@@ -534,12 +833,28 @@ OPS-8 ────────────────────────�
 ENG-58 ─┬─► ENG-85 (caps off)                    │
         ├─► ENG-59 ◄── ENG-83 (auth)             │
         ├─► OPS-9 ──┐                            │
-        └───────────┴─► ENG-60 ◄── DES-21  ──────┤
+        └───────────┴─► ENG-60 ◄── DES-33  ──────┤
                             └─► ENG-66           │
 ENG-62 ─────► ENG-90 ◄── DES-32  ────────────────┘
+ (shipped)
+
+DES-22 ─┬─► COPY-6                  (design longest pole — start first)
+        └─► DES-29
 ```
 
-`DES-21` and `ENG-58` are the two longest poles. Start both immediately.
+**AMENDED 2026-08-30 (§1B.10).** The diagram above previously read `DES-21` and
+named it a longest pole. Both were wrong:
+
+- **`DES-21` is closed** — merged at `a02e247`. `ENG-60` depends on **`DES-33`**,
+  the rotation frame (§1B.3).
+- **`ENG-62` is closed** — shipped `20260826000001` (§1B.2).
+- **`DES-33` is no longer a longest pole.** Re-estimated XL → S/M once the bloom
+  turned out to be built; it is a frame around shipped work.
+
+**The two longest poles are `ENG-58` and `DES-22`.** Pixel called this and was
+right: `COPY-6` and `DES-29` both sit behind comb identity, so `DES-22` has two
+people's rows queued on it while `DES-33` has none. Start `ENG-58` and `DES-22`
+immediately.
 
 ## 9. What is explicitly NOT changing
 
