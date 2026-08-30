@@ -86,9 +86,24 @@ export const FileToHive = ({ entry, hives }) => {
       setOpen(true);
       let message;
       if (err?.code === '42501') {
-        // §1a(c) — a sealed race: refused at the database, not dropped.
-        setRaceSealedIds((prev) => new Set(prev).add(hive.id));
-        message = `${hive.subjectName}'s hive was sealed. Nothing more can go in.`;
+        // §1a(c) amended by COPY-14: 42501 is one code with two causes, so
+        // a "SEALED" pill is asserted only from state-confirmed sealedAt,
+        // never from the bare code — an unconfirmed refusal gets the
+        // neutral line. Filing is owner-scoped (rows come from listHives),
+        // so the resolution is COPY-14's step 1 only: refetch the hive.
+        let confirmedSealedAt = null;
+        try {
+          const fresh = await HiveStore.getHive(hive.id);
+          confirmedSealedAt = fresh?.sealedAt ?? null;
+        } catch (refetchErr) {
+          console.warn('FileToHive: 42501 refetch failed, leaving cause unresolved', refetchErr);
+        }
+        if (confirmedSealedAt) {
+          setRaceSealedIds((prev) => new Set(prev).add(hive.id));
+          message = `${hive.subjectName}'s hive was sealed. Nothing more can go in.`;
+        } else {
+          message = "We couldn't file it. Try again.";
+        }
       } else {
         message = "We couldn't file it. Try again.";
       }

@@ -27,12 +27,13 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
       navigation.goBack();
     } catch (err) {
       console.warn('ComposeHiveEntryScreen: failed to save entry', err);
-      // SQLSTATE 42501 (insufficient_privilege) is Postgres's row-level-
-      // security violation code — here that's entries_insert_own's
-      // `sealed_at is null` clause. It's a permanent refusal, not a
-      // dropped connection, so it gets its own copy rather than the retry
-      // prompt below.
-      setError(err?.code === '42501' ? 'sealed' : 'unknown');
+      // SQLSTATE 42501 is entries_insert_own's refusal — one code, two
+      // causes (no open volume / closed seat), so the cause a user is shown
+      // comes from refetched state, never from the code itself (COPY-14;
+      // the derivation lives on HiveStore.resolveEntryRefusal). Still a
+      // permanent refusal, not a dropped connection, so each cause gets its
+      // own copy rather than the retry prompt below.
+      setError(err?.code === '42501' ? await HiveStore.resolveEntryRefusal(hiveId) : 'unknown');
     } finally {
       setSaving(false);
     }
@@ -62,6 +63,9 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
         />
         {error === 'sealed' && (
           <Text style={styles.errorText}>This hive has been sealed and can't accept new entries.</Text>
+        )}
+        {error === 'seatClosed' && (
+          <Text style={styles.errorText}>Your seat in this hive has closed — new entries can't be added.</Text>
         )}
         {error === 'unknown' && (
           <Text style={styles.errorText}>Couldn't save this entry. Check your connection and try again.</Text>

@@ -65,5 +65,59 @@ check(
   /can't accept new entries/.test(compose) && !/sealed[\s\S]{0,80}Check your connection/.test(compose)
 );
 
+// --- COPY-14 (2026-08-30): the code names the outcome; only state names the
+// cause. 20260827000001 rewrote entries_insert_own so 42501 has two true
+// causes (no open volume / closed seat) — no client sentence may be derived
+// from the bare code.
+check(
+  'ComposeHiveEntry.js resolves 42501 through resolveEntryRefusal, never straight to a cause',
+  /42501'\s*\?\s*await HiveStore\.resolveEntryRefusal\(hiveId\)/.test(compose) &&
+    !/42501'\s*\?\s*'sealed'/.test(compose)
+);
+check(
+  "ComposeHiveEntry.js carries the seat-closed sentence in DES-22's register (seat, never removed)",
+  /Your seat in this hive has closed/.test(compose) && !/removed from this hive/i.test(compose)
+);
+check(
+  'HiveStore.js no longer cites 20260815000005 as the live sealed refusal',
+  !/20260815000005[\s\S]{0,160}sealed/.test(store) &&
+    /entries_insert_own[\s\S]{0,120}20260827000001/.test(store)
+);
+
+// The case table runs as the declarator's own source text (R12 adopt shape:
+// evaluating a copy would stay green while the app drifts). Five fabricated
+// states; the last two are the load-bearing pair:
+//   - seat.sealedAt set is the post-ENG-91 world (a rotation hive with zero
+//     open volumes, mirror written) — no shipped path produces it yet, so
+//     this row is deliberately ENG-91's first real assertion of the sealed
+//     sentence coming back.
+//   - seat active + sealedAt null + 42501 is unreachable for a stated
+//     reason (the mirror); it must resolve NEUTRAL, because it is the
+//     client-side detector for ENG-91 sealing without the
+//     private_hives.sealed_at mirror write.
+const resolverSrc = store.match(/const resolveRefusalCause = \(own, seat\) => \{[\s\S]*?\n\};/)?.[0];
+check('resolveRefusalCause is extractable from HiveStore.js', !!resolverSrc);
+if (resolverSrc) {
+  const resolve = new Function(`${resolverSrc}\nreturn resolveRefusalCause;`)();
+  check("owner + sealedAt set -> 'sealed'", resolve({ sealedAt: '2026-08-30' }, null) === 'sealed');
+  check("owner + open hive -> neutral 'unknown' (an owner never reads seat-closed)", resolve({ sealedAt: null }, null) === 'unknown');
+  check("no hive, no seat -> 'seatClosed'", resolve(null, null) === 'seatClosed');
+  check(
+    "fabricated ENG-91 state (zero open volumes, mirror written) -> 'sealed'",
+    resolve(null, { sealedAt: '2026-09-01' }) === 'sealed'
+  );
+  check(
+    "active seat + sealedAt null + 42501 -> neutral 'unknown' (mirror-regression detector cell)",
+    resolve(null, { sealedAt: null }) === 'unknown'
+  );
+}
+
+const fileTo = read('src/components/FileToHive.js');
+check(
+  'FileToHive.js asserts the SEALED pill only from state-confirmed sealedAt, never the bare code',
+  /if \(confirmedSealedAt\) \{[\s\S]{0,120}setRaceSealedIds/.test(fileTo) &&
+    !/42501'\)\s*\{\s*\n\s*(\/\/[^\n]*\n\s*)*setRaceSealedIds/.test(fileTo)
+);
+
 console.log(`\ncheck-private-hives-client-seal: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

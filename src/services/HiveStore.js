@@ -59,6 +59,51 @@ const toHiveEntry = (row) => ({
   authorName: row.author_name_at_seal,
 });
 
+// COPY-14's cause table (ruled 2026-08-30): THE CODE NAMES THE OUTCOME;
+// ONLY STATE NAMES THE CAUSE. `entries_insert_own`'s 42501 has two true
+// causes — no open volume, or a closed seat — so the sentence a user reads
+// is derived from refetched state, never from the bare code. Pure and
+// self-contained on purpose: check-private-hives-client-seal evaluates this
+// exact text and runs the table against fabricated states, including the
+// one no shipped path can produce yet (a rotation hive with zero open
+// volumes) — deliberately ENG-91's first real assertion.
+//
+// `own` = HiveStore.getHive(hiveId) result; `seat` = getContributingHive
+// result, only consulted when `own` is null.
+const resolveRefusalCause = (own, seat) => {
+  if (own) {
+    // Owner first — HiveDetail routes owners into the same compose screen,
+    // so this ordering is load-bearing: an owner must never read "seat
+    // closed." `getHive` is owner-scoped at both layers (client `.eq
+    // ('owner_id', …)` + `private_hives_select_own`), so non-null IS the
+    // ownership test.
+    if (own.sealedAt) return 'sealed';
+    // Owner, hive open, refused anyway — no live cause names this state,
+    // so no sentence claims one.
+    return 'unknown';
+  }
+  // `getContributingHive`'s !inner join on own active membership IS the
+  // seat test: null here means the seat closed (or the hive is gone —
+  // same sentence-safe outcome, DES-22's "seat" register, never "removed").
+  if (!seat) return 'seatClosed';
+  // When both facts hold (seat closed AND sealed) the fetch above already
+  // returned null, so seat-closed wins by construction — the more personal
+  // truth, and never false.
+  if (seat.sealedAt) return 'sealed';
+  // Active seat, sealedAt null, 42501 anyway. This cell is unreachable for
+  // a stated reason, which makes it a check rather than a fall-through:
+  // pre-ENG-91 a hive always has an open volume, so the only live cause is
+  // the seat — and the seat just tested open; post-ENG-91 WITH the
+  // `private_hives.sealed_at` mirror write, zero open volumes implies
+  // `sealedAt` was stamped and the branch above fires. The only world where
+  // this cell is reachable is a rotation seal that closed the volume but
+  // skipped the mirror — so this neutral fallback is the client-side
+  // detector for that regression (ENG-91 acceptance row: after a rotation
+  // seal, `getHive(hiveId).sealedAt` must be non-null). Neutral retry copy,
+  // never a guessed cause.
+  return 'unknown';
+};
+
 export const HiveStore = {
   // The complete creation act against today's schema (§30.9.3): a hive IS
   // its subject's name plus its owner, plus (as of 20260817000002) the
@@ -228,11 +273,15 @@ export const HiveStore = {
   // index is `where hive_id is null` on purpose (20260815000001's own
   // note), so a hive is its own per-day space with no such cap.
   //
-  // This call does not check sealedAt itself — `entries_insert_own`
-  // (20260815000005) rejects the write at the database once a hive is
-  // sealed, with `and h.sealed_at is null` in its WITH CHECK. That refusal
-  // is a standard Postgres RLS violation (SQLSTATE 42501), not a network
-  // failure — callers must gate the UI (HiveDetailScreen hides "+ Add
+  // This call does not check sealedAt itself. The live WITH CHECK is
+  // `entries_insert_own` as rewritten by 20260827000001: the entry's
+  // `volume_id` must name a `hive_volumes` row with `sealed_at is null`,
+  // and the writer must be the owner or an active contributor
+  // (`is_hive_contributor`). Its 42501 is therefore ONE CODE WITH TWO
+  // CAUSES — no open volume, or a closed seat — so callers must never
+  // derive a sentence from the code alone; `resolveEntryRefusal` below is
+  // the ruled resolution (COPY-14). It is still a permanent refusal, not a
+  // network failure — callers gate the UI (HiveDetailScreen hides "+ Add
   // Entry" once `sealedAt` is set) and must not report a 42501 the way
   // they'd report a dropped connection.
   // `paper` defaults to null (Cream) — see EntryStore.saveEntry's comment.
@@ -249,6 +298,23 @@ export const HiveStore = {
       .single();
     if (error) throw error;
     return toHiveEntry(data);
+  },
+
+  // COPY-14 — resolve `addHiveEntry`'s 42501 into the cause a user may be
+  // shown, with one refetch, exhaustive over both entry points to the
+  // compose screen (HiveDetail owner route, ContributingHive member route).
+  // The case table itself is `resolveRefusalCause` above; this method only
+  // fetches its inputs. A failed refetch resolves 'unknown' — the neutral
+  // connection copy, never the sealed sentence from a bare code.
+  async resolveEntryRefusal(hiveId) {
+    try {
+      const own = await this.getHive(hiveId);
+      const seat = own ? null : await this.getContributingHive(hiveId);
+      return resolveRefusalCause(own, seat);
+    } catch (err) {
+      console.warn('HiveStore.resolveEntryRefusal: refetch failed', err);
+      return 'unknown';
+    }
   },
 
   // Invite one connection onto the roster (POLLINATE_MULTIWRITER_COPY_VOCAB
