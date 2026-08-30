@@ -143,9 +143,13 @@ alter policy "comb_rotations_insert_owner"
 -- identical on-disk signature account deletion already used, but the two
 -- no longer share account deletion's symmetric numerator/denominator
 -- drop -- a comb departure leaves the entry and its author in place. C1's
--- exclusion (`§1B.26.3`) must key on profiles.deleted_at, not on this
--- function's bare removed_at test, or a comb that lost non-writers to
--- departure reads a false 100%. See Part 7's own header for the ruling.
+-- exclusion (`§1B.26.3`) must key on `removed_at = profiles.deleted_at`
+-- (same-transaction identity, per Part 7's own `now()` proof -- both
+-- operands frozen by their immutability triggers), not on a bare
+-- `deleted_at is not null`, which lets a post-seal account deletion
+-- reclassify an earlier quit -- a comb that lost non-writers to
+-- departure must not read a false 100%. Predicate per Lumen/Vector
+-- (thread b57ad406, `§1B.36.8`); see Part 7's own header for the ruling.
 create function public.comb_rotation_writer_count(p_rotation_id uuid)
 returns integer
 language plpgsql
