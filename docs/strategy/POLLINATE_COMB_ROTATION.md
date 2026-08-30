@@ -5078,3 +5078,73 @@ the refusal it is actually downstream of, and if you must approximate, name the 
 error.** Corollary worth keeping: when the prose and the predicate disagree about precision,
 **the prose is usually right** — it was written by someone imagining the actual user, and the
 predicate by someone imagining the rule. 📈
+
+### §1B.36.17 — @Lumen's exactness walk holds, and I verified it rather than accepting it. The **conclusion** is right; the **support** names one trigger where three separate guarantees are doing the work, and the weakest has no name and no test. One build pin, because an unreachability proof is a licence to simplify and the simplification is the `< 2` we just deleted (2026-08-30)
+
+#### (a) The conclusion is confirmed — `=== 1` is exact, not merely safe
+
+Conditioned on a mint `23514` reaching an authenticated caller: line 2 fires iff enrollable
+members ⊆ {subject}. `≥ 2` means the snapshot held a non-subject writer, so no raise. `0` is
+unreachable. One reachable state remains: the comb of one, self-subject,
+`comb_member_count = 1`. Confirmed.
+
+#### (b) But three facts hold `0` unreachable, not one — and only two are triggers
+
+@Lumen's support was *"the organizer holds a permanent seat by trigger."* Read at
+`main@7d61ba5`, that is one of three:
+
+1. **The seat EXISTS** — `combs_create_owner_membership_trigger`, `AFTER INSERT on combs`
+   (`…0002:352-366`), whose own comment is *"Creating a comb seats the organizer."* This is the
+   fact that makes the count `≥ 1`, and it is **not** the trigger cited.
+2. **The seat cannot be CLOSED** — `comb_members_owner_seat_permanent_trigger` (`…0002:251-253`).
+   This *is* the trigger cited, and it is **`BEFORE UPDATE` only**: it bars stamping `removed_at`
+   on an owner's row. It says nothing about a delete.
+3. **The seat cannot be DELETED** — and this one is **not a trigger at all.** `comb_members`
+   carries exactly two policies: `comb_members_select` (`:321`) and
+   `comb_members_update_owner_or_self` (`:338`). **No INSERT policy, no DELETE policy.** With RLS
+   enabled, `authenticated` cannot delete a seat because **nobody wrote the policy** — an
+   *absence*, not an assertion. The file says as much at `…0002:261-263`: the `on delete`
+   clauses are *"dead code with respect to tombstoning; they only guard an actual row delete,
+   which this flow does not perform."*
+
+Leg 3 is the weakest: it has no name, no comment claiming it, and nothing that fails if a "leave
+this comb" feature adds a DELETE policy. Note the shape — **leg 2's trigger would not fire on
+that delete either** (`BEFORE UPDATE`), so the guard that *looks* like it protects the seat is
+the one that would miss.
+
+#### (c) RULED — @Lumen, one build pin: keep the `0` arm WRITTEN, not inferred
+
+*"`0` is unreachable on this path"* is true, and it is a **licence to simplify**. The natural
+simplification is `count >= 2 ? 'unknown' : floorCopy` — which folds `0` into the floor arm and
+**reinstates the exact `< 2` shape `§1B.36.16` just deleted**, through the back door of an
+unreachability proof rather than a borrowed threshold.
+
+**Write the case table with `0 → 'unknown'` as its own line, carrying its reason** (*"unreachable
+today: the organizer's seat is minted by `combs_create_owner_membership_trigger` and there is no
+DELETE policy on `comb_members`; if either changes, `0` means we cannot see the roster and must
+not name a cause"*). An unreachable branch that is *written down* costs one line, and it is the
+difference between a ruling and a coincidence. Same discipline as `§1B.36.11`'s positive control:
+a state nobody asserts is a state nobody notices arriving.
+
+#### (d) Confirmed and closed: the exactness is NOT hostage to `O8`
+
+`…0002:274-284` flags *"Comb OWNER, tombstoned"* as **UNRESOLVED**, with three live options —
+transfer ownership, void the comb, or a tombstone-specific bypass of the permanence trigger.
+That flag **is `O8`**, and a later reader would reasonably ask whether `O8` can reopen `0`.
+
+It cannot. `comb_open_rotation`'s leg (a) (`…0008:119-122`) requires the authenticated caller to
+be the comb's **current** owner, and the current owner always holds a seat by (b)(1). Transfer
+moves the protection to the new owner, who has one; void removes the rotation entirely; a
+tombstone bypass only touches a profile that cannot authenticate. **`O8` may change who the
+organizer is; it cannot make the organizer seatless.** Recorded so the open item and this ruling
+are not read as coupled.
+
+#### (e) The shape
+
+**An unreachability proof is a licence to simplify, and the simplification is usually the thing
+the last ruling deleted.** When you prove a branch unreachable, write the branch down with the
+proof attached — otherwise the next reader inherits the conclusion without the conditions and
+folds it into its neighbour. Corollary from (b): **when several guarantees compose to make a
+state unreachable, name them separately and rank them** — collapsing three into one guard's name
+promotes the guard that happens to be memorable, and here the memorable one (`BEFORE UPDATE`)
+was the one that would miss. 📈
