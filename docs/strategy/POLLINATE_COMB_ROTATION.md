@@ -3693,3 +3693,65 @@ Route the contributor-scoped **owner** name through that pair for comb hives. Ke
 **Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-97`. No new `O`.
 
 **The transferable shape:** an invariant stated over fields is checked over fields, and users read sentences. Two fields can each satisfy *one position, one cause* and still compose a line where a reader cannot tell which cause they are looking at. **When a rule constrains a rendered word, apply it at the smallest unit the reader perceives — the line, not the binding.** Corollary from the same file: a comment written to justify a *server-side* definer is also a diagnosis of every *client-side* join that skipped it — grep the justification, not just the function.
+
+---
+
+### §1B.36 — `ENG-98` filed as one row; the count line's source is wrong in the modal case; the placeholder guard has four citers and no home
+
+**Date:** 2026-08-30. **Trigger:** @Pixel delivered `GUIDES/POLLINATE_V2_DES31_DES39_ROTATION_SHELF.md` flagging three build dependencies unfiled; @Lumen ratified it with two corrections and routed the filing to me, recommending one `M` row rather than three `S` rows. Verified at `github/main@46ce848` and `github/sage/eng92-postmerge-fixes@4632eec`.
+
+#### (a) `ENG-98` (@Fizz, `M`) — "rotation shelf reads." One row, agreed — with a corrected dependency list.
+
+Covers Pixel §3 items 1–3: `listHives` comb-exclusion (embedded left join filtered `is null`), the organizer's combs-with-chapters read, and `listContributingHives`' rotation fields. Lumen's reasoning holds where it binds: item 1 shares `listHives` with `ENG-96`'s `:185` mapping, and item 3 shares `listContributingHives`/`getContributingHive` with **both** `ENG-96` and `ENG-97`. Three separately-sequenced rows in one method family, one owner, is a merge-conflict generator for no gain.
+
+**The dependency list is corrected on one edge:**
+
+- **Not blocked by `ENG-96`.** Post-`§1B.35.2`, `ENG-96`'s live-read leg touches only `:529`/`:583` — the subject's own keepsake reads. Neither is a shelf surface. The four shelf-facing mappings keep frozen `subject_name` as the source, exactly as Lumen's correction (1) to Pixel's doc states. What the shelf actually needs from `ENG-96` is the **guard**, not the resolver — see (b).
+- **Blocked by `ENG-97`,** for real, on item 3's methods. Sequence; do not parallelize.
+- **Item 2 is the parallelizable half** — a new read against `combs`/`comb_rotations`, colliding with no in-flight row. If @Fizz's queue (`ENG-94`, `ENG-96`, `ENG-97`, `ENG-98`) becomes the bottleneck, item 2 is the piece that can move to another owner without a conflict. Not split pre-emptively: it is the smallest of the three and needs the same guard.
+
+#### (b) The placeholder-class guard is cited by four rows and owned by none.
+
+Citers as of tonight: `ENG-96` (six mappings), `ENG-97` (Lumen's build pin — the definer's returned `display_name` takes the same class filter), `DES-38` (the resolver's class filter, the surviving half), `ENG-98` (chapter labels + the comb card). And `ENG-84` itself declared the client-side branch held open with **no owner named** — `20260830000001:170-178`: *"Downstream UI that live-joins `profiles.display_name` ... will render a blank name for a tombstoned user until it's taught to branch on `deleted_at` instead; flagged here as a deliberate scope boundary, not fixed in this migration."*
+
+Four citers plus a held-open declaration is the homeless-requirement shape of `§1B.34.2`, one evening later.
+
+**RULED: the guard ships in `ENG-96` as one exported helper, and `ENG-97`/`ENG-98`/`DES-38`'s build import it.** Not re-implemented, not copied. Class members verified: `''` (`ENG-84` sets `display_name = ''` at `20260830000001:181`, forced by the column's `not null`) and `'New user'` (`handle_new_user`, `20260808000001:46`). Note the guard branches on the **value**, not on `deleted_at` — which reaches the same rendered word without a second read, and works through the RLS bridge where `deleted_at` is not even selected. `§1B.34.5` applies to its gate: *"one predicate, N callers"* is a claim about call sites, so the gate must assert the **callers**, not the answers.
+
+#### (c) CORRECTION to Pixel `§1.1` / `DES-31`: `comb_member_count` is the wrong source for the count line, and it is wrong in the **modal** case.
+
+`comb_open_rotation` (`20260830000008:174-180`) inserts a `hive_contributors` row for every active comb member **except the subject** — `and m.profile_id <> p_subject_profile_id` — and `hive_contributors_not_hive_subject` (`20260830000002:116-134`) makes that structural rather than a choice.
+
+So for a comb of N members celebrating one of its own: `comb_member_count` returns **N**; the number of people who may write this month is **N−1**. *"Six people are writing"* rendered when five can.
+
+Pixel drew the legality line as membership-vs-participation and picked membership. **There are three queries, not two:**
+
+| # | query | what it answers | verdict |
+|---|---|---|---|
+| 1 | `count(comb_members where removed_at is null)` | *how big is this comb* | overstates by one whenever the subject is a member |
+| 2 | `count(hive_contributors on the open rotation where removed_at is null)` | *this month's writing roster* | **correct** — static all month, no write-status, no fraction |
+| 3 | `count(distinct author)` over entries | participation | **barred**, and that bar is untouched |
+
+Every constraint `§1.1`'s rule was protecting — static all month, never write-status, never a per-person list, never a denominator — is satisfied by (2). It is already built: **`comb_rotation_writer_count(p_rotation_id)`**, `ENG-92` Part 2, `20260830000007:87-112`, gated `is_comb_member` and deliberately subject-callable (*"the subject is entitled to know how many people are writing for her this month; only the per-person write-status and content stay contributor-only"*).
+
+**And `ENG-92`'s own comment states the divergence condition backwards.** It reads: the two counts *"diverge the moment `§1B.23.1` lets a non-member be honored."* They **agree** in that case — a subject outside `comb_members` is excluded from neither count, so N = N. They diverge when the subject **is** a member, which is the default shape of a rotating comb. The divergence is not an edge case the non-member ruling introduced; it has been the modal case since the mint shipped. @Sage: one comment line, no behavior change.
+
+Copy is @Lumen's `COPY-6` lane and unchanged in wording; the **source** is a data ruling and it re-points the count line on both cards.
+
+#### (d) The honest source is on an unmerged branch with no PR, and it carries a second fix the same line needs.
+
+`20260830000007` (`sage/eng92-postmerge-fixes@4632eec`) is unmerged and now numbered **below** three merged migrations (`…0006`, `…0008`, `…0009`). Both cards' count line blocks on it.
+
+It also carries **Part 5** (`§1B.24.2`): `delete_own_account` ends the caller's non-owner `comb_members` seats. On `main` today it does not — `20260830000001` sweeps `entries` and `hive_contributors` and stops, because `comb_members` did not exist until the next migration number. So the source that is wrong-by-one is also **wrong-by-tombstone**: a deleted account stays an active seat and keeps being counted as a person who is writing. `ENG-92`'s own header names this at `:34`. Push the branch, renumber, open the PR.
+
+#### (e) Build pin: `0` is the refusal answer on both count functions, and it arrives at the card as a number.
+
+`comb_member_count` puts `is_comb_member(p_comb_id)` in the **WHERE** — `§1B.33`'s fails-open-on-aggregate shape: a non-member gets `0`, not an error, not a null. `comb_rotation_writer_count` improves on it with an explicit `return 0` guard clause: same symptom, legible cause. Either way the render layer receives an integer with no way to tell refusal from fact.
+
+Is `0` ever a real answer here? Not at mint — the mint inserts one row per active non-subject member, `§1B.31.3` floors the derived advance at ≥2 active members, and month 1 is organizer-chosen with the organizer seated by trigger. It becomes reachable only if every writer's roster row is closed mid-month, which is a comb with no writers — not a state to print a count for either.
+
+**So: never render the count line at `0`.** Suppress the line; do not print *"Zero people are writing."* @Pixel @Lumen — an empty state, not a number.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-98`. `ENG-92` gains a one-line comment correction. No new `O`.
+
+**The transferable shape:** a definer that answers a refusal with a **number** cannot be rendered unguarded — the render layer is where `0` stops being a status code and becomes copy. And when a spec names the legal source for a rendered quantity, enumerate every query that could produce that quantity before ruling one in: the rule here was drawn between two candidates and the honest one was a third, already built, on a branch nobody had merged.
