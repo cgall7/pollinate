@@ -240,4 +240,19 @@ export const SENTINELS = {
     args: { p_invite_code: 'calibration-invalid-code' },
     expect: '42501',
   },
+  // ENG-59 (Fizz). comb_preview_by_invite_code is the opposite grant shape
+  // from comb_join_by_invite_code above -- anon is meant to reach it (the
+  // whole point of a pre-auth landing), so 42501 is never a LIVE reading
+  // here. 'exists' would be ambiguous the other direction (a PGRST202-only
+  // check can't tell "created, still revoked from anon" apart from "granted
+  // to anon"), so this probes for the full round trip: an invalid code is a
+  // legitimate call this function is built to answer with 200 and zero
+  // rows, not an error -- exactly what 'success' distinguishes from
+  // "function exists but anon still can't call it."
+  '20260830000006_comb_preview_by_invite_code': {
+    kind: 'rpc',
+    fn: 'comb_preview_by_invite_code',
+    args: { p_invite_code: 'calibration-invalid-code' },
+    expect: 'success',
+  },
 };

@@ -328,14 +328,33 @@ async function main() {
   //   schema PostgREST does not expose, which would close the oracle for
   //   authenticated AND anon at once without touching the inlining fix.
   //
-  // A fourth function landing in this set without its own argument in this
+  //   comb_preview_by_invite_code(text) — anon-callable BY DESIGN, not an
+  //   inlining leak like the three above: this is DES-37's pre-auth invite
+  //   landing, and the whole point is that a stranger holding a link (no
+  //   session at all) can resolve headline/subject/count before signing in.
+  //   The oracle-shape argument the other three entries make ("once EXECUTE
+  //   exists, any caller can enumerate/probe") does not transfer cleanly
+  //   here because the input space isn't small-integer-enumerable: the
+  //   function's sole authorization input is invite_code, a 32-hex-char
+  //   gen_random_uuid() value (122 random bits, ENG-58 migration :150) — the
+  //   same entropy floor ENG-59's join RPC relies on for the identical
+  //   argument. An invalid or guessed code returns the same zero-row shape
+  //   as a revoked one would (Lumen's boundary note, thread b57ad406,
+  //   2026-08-30 16:15:36; enforced by check-comb-preview.mjs #3/#4), so
+  //   there is no distinguishing signal to extract even at scale. The
+  //   function's body also never references entries (check-comb-preview.mjs
+  //   #6, grepped directly) — membership count and names only, nothing
+  //   write-status-shaped for an unauthenticated caller to learn.
+  //
+  // A fifth function landing in this set without its own argument in this
   // comment is exactly the failure mode a blanket accept would produce —
-  // this list is a name check, not a count check, and stays exactly three
-  // until someone adds a paragraph above to go with a fourth.
+  // this list is a name check, not a count check, and stays exactly four
+  // until someone adds a paragraph above to go with a fifth.
   const ALLOWED_ANON_DEFINERS = new Set([
     'is_hive_contributor(uuid)',
     'is_volume_open(uuid)',
     'owns_entry(uuid)',
+    'comb_preview_by_invite_code(text)',
   ]);
   const definers = (
     await client.query(`
