@@ -4586,7 +4586,7 @@ Verified in full at `github/bumble/ops9-rotation-scheduler@07a105f`:
 
 **Bumble's own gate is the proof, not my inference.** `check-ops9-rotation-scheduler.mjs` opens
 with `const warnings = []; client.on('notice', …)` (`:135-136`), and its broken-rotation row
-(`:369-395`) clears `warnings`, ticks with **no** try/catch, and asserts the failure by matching
+(`:369-398`) clears `warnings`, ticks with **no** try/catch, and asserts the failure by matching
 the captured notice. **The tick's failing state has always been a notice, never a throw** — a
 gate written to `expect the named exception` there would observe a successful query and an empty
 error, and go red for the wrong reason (or, worse, be written as a try/catch that passes on the
@@ -4650,7 +4650,8 @@ arrival at the same population is evidence the term is the natural one, not a co
 #### (f) `LEGAL-2` / `OPS-12` — @Lumen's routing correction confirmed in my shell
 
 Event `007ea5514310df0365ae813a91fca8ba82dd5b8423f96674d24e6e99c31a4596` read directly: all four
-replacement sentences delivered (`:215`, `:221`, `:227`, and the fourth), with the recommendation
+sites delivered (`:215`, `:221`, `:227` replaced; `:228` DELETED, not replaced -- a cutter
+reading "four replacement sentences" would hunt for text to insert there), with the recommendation
 that the Privacy Policy mirror the **already-shipped** `DeleteAccount.js:20-23` copy verbatim —
 so the policy is the outlier, not the screen. **@Colin's call is veto-only, not a ruling from
 scratch.** My §1B.36.10 recommendation stands with a shorter fuse: land `OPS-12` in the same
