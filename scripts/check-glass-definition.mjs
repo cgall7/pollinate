@@ -41,9 +41,30 @@
 //       hairline) lands inside the blur rung's measured rim band.
 //   D6  the same, live-enumerated over EVERY cover theme — the four grounds
 //       the borrower circles sit on (GL7(d)). This is what licenses ONE token
-//       rather than a per-ground tuning, and it expires correctly: add a
-//       saturated cover theme and this row reds to say the single token no
-//       longer serves the population.
+//       rather than a per-ground tuning, and it expires correctly when the
+//       population changes.
+//
+//       D6'S SENSITIVITY AXIS IS LIGHTNESS, NOT SATURATION — measured, and
+//       written down here because the obvious guess is wrong and cost one
+//       mis-aimed mutation already. The rim above the hairline is
+//       `surface`@0.65, opaque enough to dominate the composite, so on any
+//       LIGHT ground the hairline's contribution barely moves: the four
+//       shipped covers span 2.8658-2.9902, and `goldField` — saturated, and
+//       the most chromatic ground in the system — lands 2.8485, comfortably
+//       in band. Adding a saturated cover does NOT fire this row.
+//       A DARK ground does: `paperEvening` as a cover base measures 1.6400,
+//       under the band's 1.67 floor, because an alpha of ink on a dark ground
+//       is not a quieter ink — dimming moves the mark TOWARD the paper instead
+//       of away from it, and the whole rim stack inverts (the same rule that
+//       governs `paperEvening` text, R-EXT's dark-paper ink gate). That is the
+//       real live risk here: an Evening cover theme is a plausible next ask,
+//       and it needs its own ruling rather than this token.
+//
+//       The row's dependence runs through `glassRim`: swept 0.65 -> 0.00, the
+//       spread across grounds widens from 1.5573 to 2.6569 and every ground
+//       leaves the band. So D5/D6 also fail if the rim's alpha is retuned
+//       without re-solving the hairline against it — the two are coupled, and
+//       nothing else in the repo says so.
 //
 // THE BOUND IS EXTERNAL, ON PURPOSE. D5/D6 compare against the BlurView
 // rung's own measured rim — ΔE00 2.88 / 1.67 / 3.19, from
