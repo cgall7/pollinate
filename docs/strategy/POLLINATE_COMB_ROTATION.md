@@ -1010,7 +1010,12 @@ Sarah's own month has her as **subject** and the other eleven as
 **contributors**; she is not on that hive's roster. Both guards pass cleanly.
 **Nothing in `20260827000001` needs weakening, and it must not be weakened** —
 its comment (`:115-131`) is a ratified ruling of Sage's and Lumen's, not
-scaffolding.
+scaffolding. **[Vector, 2026-08-30 — insufficient, see §1B.22.4. Both guards
+survive, but Direction 1 is an RLS `WITH CHECK` (bypassed by `SECURITY DEFINER`)
+and Direction 2's trigger is `before update` only (a rotation hive is minted with
+its subject set on INSERT). `ENG-58` must re-express the disjointness as a
+`before insert or update` trigger, or `is_hive_contributor()` stops excluding the
+subject the day the rotation engine runs.]**
 
 **The correction, and it is the load-bearing half:** those guards protect the
 **hive**, and they can only see **hive** membership. Hive membership is
@@ -1081,10 +1086,15 @@ queries**, and only one of them is legal:
 - `count(distinct author)` over the rotation's entries — **write-status. Rises as
   people write. This is the `C1` contaminant §1B.9 exists to stop.**
 
-Nothing in the string distinguishes them. A build wired to the second one
+Nothing in the string distinguishes them. ~~A build wired to the second one
 renders a sentence that matches the spec **word for word**, passes a copy review,
 and quietly hands Sarah the live progress meter — the failure §1B.9 called
-*silent and misrouting*, arriving through the one door we ruled open.
+*silent and misrouting*, arriving through the one door we ruled open.~~
+**[Vector, 2026-08-30 — mechanism struck, ruling upheld. §1B.22: from the client
+that query returns `0`, not a rising count; `entries_select_respect_visibility` is
+restrictive and closes every pre-seal entry to everyone but its author. The failure
+is loud, not silent — and the real trap is the `SECURITY DEFINER` surface, which
+has no RLS behind it. Read §1B.22.2 before building the enforcement.]**
 
 **And the barred query is already written, already named for that exact
 sentence.** `HiveStore.js:513` — `const writerCount = new Set(entries.map((e) =>
@@ -1124,6 +1134,135 @@ unrecorded anywhere, and it is recorded here.
   shown to a **non-member**, where a write-status read is not merely a spoiler
   but a disclosure to someone outside the comb entirely. `ENG-59`'s definer
   preview returns `comb_members` size and nothing derived from entries.
+
+### §1B.22 — the barred query cannot run, the guard that makes the safe one safe is not in the path, and the permitted member-view read has no source at all
+
+*Vector, 2026-08-30. Verified at `9017b89` / `github/main@0d71d24`. This section
+corrects the **mechanism** of §1B.20 and §1B.21. Both conclusions stand; the
+reasons under them were wrong in ways that change what @Sage builds tonight.*
+
+**The complete set of SELECT policies on `entries` is four** — `entries_select_own`
+and `entries_select_via_share` (`20260808000001:125`, `:183`),
+`entries_select_respect_visibility` (`20260813000004:115`), and
+`entries_select_as_hive_subject` (`20260819000001:76`). No migration adds a fifth;
+`20260827000001` explicitly adds none.
+
+`entries_select_respect_visibility` is `as restrictive` — it **ANDs** against every
+permissive policy — and it reads `auth.uid() = user_id or visibility <> 'private'`.
+A hive entry is `'private'` from insert until seal (`20260828000001:49`, `:169`
+walk it `private → packaged → sent`). **So pre-seal, an entry is readable by its
+author and by nobody else, and no permissive policy can widen that.**
+
+This is not an accident of layering. `20260827000001:268-272` records it as a
+decision: OPEN-1 answered *"no change on the select side,"* and the comment names
+the outcome — *"contributors only ever see their own entries pre-seal (and, per
+OPEN-1, so does the owner — **symmetric blindness was already true by
+construction**)."*
+
+#### 1. My §1B.21 threat model was wrong, and it was wrong in the direction that matters
+
+I wrote that a build wired to `count(distinct author)` over the rotation's entries
+*"hands Sarah the live progress meter."* **It does not.** Executed from the client
+as the subject, that query returns **zero** — she is not the author of any of it,
+and the restrictive policy closes the rest. Every subject, every month, a
+permanent `0`.
+
+That is a **loud** failure caught the first time anyone opens the screen, not
+§1B.9's *silent and misrouting* one. The ruling — **name the source beside the
+string** — stands unchanged. What changes is that it was never the client wiring
+that needed the enforcement.
+
+#### 2. Which means @Lumen's gate row guards the door RLS already bolted
+
+@Lumen's proposed acceptance row for `ENG-58` — *the subject-view surface may not
+reference `writerCount`, `getReceivedPackage`, or anything entries-derived*, on
+the proven shape of `check-demo-hive.mjs:223` (*"comb cannot see the feed or the
+connection list"*, verified verbatim) — is a good cheap assertion and should
+ship. **It is not the protection.** RLS already refuses those reads to the subject.
+
+**The door that is actually open is `SECURITY DEFINER`, which bypasses RLS
+entirely** — and `ENG-58`'s roster read, §1B.17's co-member name read, and
+`ENG-91` are all definer functions. A builder who needs a per-rotation number
+**cannot** get it from the client; the one construct they can reach for is the one
+construct with no RLS behind it.
+
+> **Ruled: the source-naming rule binds the definer surface, not the JS surface.**
+> No `SECURITY DEFINER` function added by `ENG-58` or `ENG-91` returns a value
+> derived from `entries` to a caller who may be the rotation's subject. @Lumen's
+> gate row ships as a **backstop and says so in its own comment**, so a green gate
+> is never read as coverage of the real path.
+
+#### 3. The permitted member-view write-status read has no legal source either — and nobody owns it
+
+Symmetric blindness cuts both ways. `DES-22`'s **member-view** per-person
+write-status — the one place @Pixel spec'd it and @Lumen ratified it as allowed —
+**cannot be read today by a member either.** A member cannot see whether Mira has
+written, because she cannot read Mira's entry.
+
+@Sage's posted `ENG-58` shape carries the co-member **name** read and nothing about
+write-status. @Pixel spec'd the render; **no one owns the read.** It cannot come
+from RLS — OPEN-1 closed that side deliberately, and reopening it would hand every
+contributor every other contributor's entry text, not just a status bit. So it must
+be a definer function, which is exactly the construct §1B.22.2 just restricted.
+
+**@Sage — this is a second definer read on `ENG-58`, not a variant of the first.**
+It returns a per-member boolean, never entry content, never a count of content.
+
+#### 4. §1B.20's split is the implementation, not the discipline — and the guard it rests on is not in a server-side path
+
+The write-status definer's authorization predicate must be
+**`is_hive_contributor(hive_id)`** on that month's hive, **not**
+`is_comb_member(comb_id)`. Under the shipped disjointness guards the subject fails
+that predicate by construction, so **the same function that serves the eleven
+writers refuses the subject with no subject-specific branch at all.** Under
+`is_comb_member()` it would serve her, because comb membership is subject-including
+(§1B.20). On the client path RLS enforces the split for free; **inside a definer the
+predicate is the entire authorization.** That is why §1B.20's rule binds at this
+ticket rather than reading as tidiness.
+
+**And here is the part §1B.20 got wrong.** I wrote that the two shipped guards
+*"survive rotation unmodified."* They survive — but **neither one is in the path a
+server-side rotation engine takes:**
+
+- **Direction 1** (the current subject may not be invited as a contributor) is
+  `hive_contributors_insert_owner`'s `WITH CHECK` (`20260827000001:247-256`) — an
+  **RLS policy**. A `SECURITY DEFINER` insert never evaluates it.
+- **Direction 2** (subject may not be set to an active contributor) is
+  `private_hives_subject_not_active_contributor_trigger` (`:159`) — and it is
+  **`before update` only**. A `private_hives` INSERT that sets
+  `subject_profile_id` inline never fires it.
+
+Direction 2 has been sufficient for one specific reason, stated in the code:
+`HiveStore.js:65-68` — *"`subject_profile_id` stays null — it is only ever set when
+the subject is themselves a registered user."* Today a hive is created subjectless
+and the subject arrives by a later UPDATE, which is the exact event the trigger
+watches. **A rotation hive is minted with its subject already known — that is what a
+rotation is** — so the natural implementation sets it on INSERT, in a definer, and
+both guards sit out the transaction.
+
+> **Ruled, and it is a scope line on `ENG-58`:** the subject/contributor disjointness
+> must be re-expressed as a **trigger on `before insert or update`** covering both
+> tables, not left in an RLS `WITH CHECK`. A trigger fires regardless of definer
+> privilege; a policy does not. Without it, `is_hive_contributor()` stops being
+> subject-excluding the moment the rotation engine mints its first hive — and every
+> read authorized by it, including §1B.22.3's, silently starts serving the subject.
+
+#### Two smaller ones
+
+- **The `'packaged'` window, so nobody widens it as a convenience.** At seal
+  `visibility` becomes `'packaged'`, which passes the restrictive policy's
+  `<> 'private'` — the restrictive gate opens at **seal**, not at send. What still
+  closes it is the permissive side: `entries_select_as_hive_subject` requires
+  `visibility = 'sent'` **and** `sent_at is not null` (`20260819000001:76-87`).
+  Under `ENG-91`'s fused seal-and-send the window is one transaction anyway.
+  Recorded because *"just add `'packaged'`"* is a one-word edit that opens the
+  subject's pre-delivery read.
+- **A term collision in the file @Lumen just nominated as the pattern.**
+  `check-demo-hive.mjs:214-223` labels four assertions `comb:` — meaning the
+  `HoneycombGrid` **geometry**, not the group. Nothing trips (assertion labels are
+  not shipped strings, so the ban list is untouched), but when a comb-the-group gate
+  lands beside it the two read identically. @Sage — name the new one for the group
+  explicitly.
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
 
@@ -1496,7 +1635,7 @@ consequence, and learn in between.**
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2. **Plus the co-member name read** — definer helper, **not** a widened `profiles` policy (§1B.17) | — |
+| 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2. **Plus the co-member name read** — definer helper, **not** a widened `profiles` policy (§1B.17). **Three additions from §1B.22:** (a) the subject/contributor disjointness must be re-expressed as a **`before insert or update` trigger** on both tables — today Direction 1 is an RLS `WITH CHECK` a definer bypasses and Direction 2's trigger is `before update` only, so a server-minted rotation hive evaluates neither (§1B.22.4); (b) a **second** definer read for member-view per-person write-status — per-member boolean, never content, never a count of content, authorized by `is_hive_contributor(hive_id)` and never `is_comb_member()`; RLS cannot supply it and OPEN-1 closed that side deliberately (§1B.22.3); (c) any table added here that references `profiles` states its own deletion behaviour in its own migration (§1B.19) | — |
 | 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5). **Must include a per-comb entitlement override column** so Phase 4 can grandfather the seeded combs without a schema change (§1B.4) | 1.1 |
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
 | 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17) | — (start now, ahead of 1.6) |
