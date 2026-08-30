@@ -337,13 +337,22 @@ honest because it is live.
 seen from two sides. @Lumen — that is the constraint `COPY-6` and `COPY-13`
 inherit.
 
-### 1B.9 — Pixel's `DES-31` ruling is **upheld**: the subject sees no count. It also protects `C1`.
+### 1B.9 — Pixel's `DES-31` ruling is **upheld**: the subject sees no **write-status** count. It also protects `C1`.
+
+> **AMENDED 2026-08-30 (§1B.21) — the term in this section was wrong and it was
+> read both ways.** This section originally said *"contributor count."* In this
+> schema `hive_contributors` is the **invited roster**, so that phrase literally
+> names a **membership** count — the one thing this section's own reasoning never
+> argued against. Every argument below is about **who has written**. The bar is
+> and always was on **write-status** counts; membership size is not a spoiler.
+> Corrected in place. See §1B.21 for the consequence, which is a live `ENG-58`
+> requirement, not a wording matter.
 
 Pixel ruled, without waiting for me, that **the rotation subject sees no
-contributor count before the seal — not a live one, not a snapshot one, not
-*"some people have written."*** Contributor count is the **member's** view only.
-**Upheld.** Ruling made correctly and at the right moment; `ENG-58`'s schema
-should not have waited on it.
+write-status count before the seal — not a live one, not a snapshot one, not
+*"some people have written."*** How many have **written** is the **member's**
+view only. **Upheld.** Ruling made correctly and at the right moment; `ENG-58`'s
+schema should not have waited on it.
 
 Pixel's reason is a design reason and it is sound: a rising count is a progress
 meter on how many people care, delivered before the gift, and it can only land
@@ -376,7 +385,9 @@ Sarah, and the isolation that makes `C1` a real measurement. Two independent
 reasons for the same line, which is how you know it is not a preference.
 
 **What this does and does not do for `ENG-58`.** @Sage: it removes the
-requirement for a subject-facing count query — nothing in MVP-Comb needs one. It
+requirement for a subject-facing count query — nothing in MVP-Comb needs one.
+**~~Struck 2026-08-30 — see §1B.21. MVP-Comb needs exactly one: a `comb_members`
+count. Do not build `ENG-58` to this sentence.~~** It
 does **not** make Pixel's role-aware read guard optional, and Pixel's correction
 to your *"identical shape"* is right: in the hive, subject and contributor are
 disjoint **by enforced constraint**
@@ -590,7 +601,7 @@ bodies and grants** — and it changes `ENG-60`'s dependency graph and estimate.
 `ENG-58` and `DES-22`"* was true when written. `ENG-58 → ENG-91 → ENG-60` is now
 the longest chain, with `OPS-9` calling into `ENG-91` rather than into
 `seal_hive`. @Colin — this is a schedule fact, not a scope change: no new
-product surface, one new server-side path that the ritual already assumed
+product surface, one new server-side path that the rotation already assumed
 existed.
 
 ### 1B.15 — Account deletion: **ruled.** Keep-and-disclose, tombstone, and the defense of record.
@@ -755,6 +766,16 @@ record it as a zero-participation rotation.** That month is a **`C1` signal, not
 a delivery** — and §6's response table needs it recorded, not hidden by an empty
 send. **The clock delivers a gift, not an empty box.**
 
+**Scope boundary, @Lumen's reconciliation, ratified and recorded here because the
+ruling above does not state it and would otherwise be quotable as precedent.**
+Fusing seal and send at `closes_at` does **not** amend the standing **seal ≠
+send** doctrine (*"sealing never gates on a recipient,"* hero arc, 2026-08-17).
+That doctrine governs the **writer's verb**, and in a comb rotation **no writer
+holds a seal verb at all** — the clock owns one fused event, and a rotation has a
+subject by construction, so no seal ever waits on a recipient. `seal_hive`'s tap
+is untouched in the 1:1 flow. **The comb is not precedent for gating the 1:1
+seal on anything.**
+
 **@Deezine — `DES-33`'s dependency, stated so you do not meet it on device.**
 Lumen is right that the before-seal tense is only honest once `ENG-91` exists.
 The spec can be written now; the countdown copy ships **with or after** `ENG-91`
@@ -822,7 +843,7 @@ exactly `DES-22`'s subject matter.
 **Ruling, and it is a product position, not only a mechanism.** **Joining a comb
 discloses your display name to that comb's members.** A roster that cannot name
 its members is not a roster, and "you are writing for someone, alongside people
-we won't name" is not the ritual. The mechanism is already precedented in this
+we won't name" is not the moment we are building. The mechanism is already precedented in this
 schema: `20260828000001:204-215` documents this exact class of bug — an inline
 `profiles` subquery collapsing under the caller's RLS — and its fix, a
 `SECURITY DEFINER` helper that reads the fact directly, the same shape as
@@ -918,6 +939,191 @@ disclosure now has a screen to live on, and the "no roster before you join"
 boundary is a copy constraint as well as a data one: the landing may say *"11
 people are writing"* and may not say who.
 
+### §1B.19 — Deletion cannot reach a table that does not exist yet, and one case is currently owned by nobody
+
+`ENG-84` and `ENG-58` are being built **at the same time, by different people**,
+and that is the whole problem. Verified at `github/main@0d71d249` (`ENG-83`
+merged): there is no `combs`, no `comb_members`, no `comb_rotations` — the only
+whole-word hits for those names in the tree are `honeycombs` and an unrelated
+`dateRanges.js` symbol. So whatever `ENG-84` enumerates, it enumerates over a
+world without combs.
+
+**This is not an ordering bug you can fix by picking an order.** If `ENG-84`
+lands first, its enumeration is complete for today and silently incomplete the
+moment `ENG-58` lands. If `ENG-58` lands first, `ENG-84` can only cover the comb
+tables if `@Fizz` already knows column names that are still being decided. Either
+way the coverage gap opens; the sequence only chooses which week it opens in.
+
+**The fix is a contract, not a sequence.** `ENG-84`'s tombstone predicate is a
+**public, queryable** thing — a named column and a helper other migrations call
+— and the standing rule is: *any table added after `ENG-84` that references
+`profiles` states its own deletion behaviour in its own migration.* That puts the
+obligation on the migration that creates the risk, which is the only place that
+can see it. `@Sage` — this is a new line on `ENG-58`, not a favour to `ENG-84`.
+
+**The three answers, so this is not left open:**
+
+- **`comb_members`** — end the membership, `removed_at`, exactly the
+  `hive_contributors` shape. Note it moves `C1`'s **denominator**, not just its
+  numerator (§1B.15).
+- **`comb_rotations`, open, deleter is the subject** — **void and advance.** The
+  machinery already exists: it is §1B.16's zero-entry path, reached by a
+  different door.
+- **`comb_rotations`, already sent** — nothing. Delivered keepsakes stay, per
+  Colin's ruling (`34d96ff7…`).
+
+**The case nobody owns right now is the middle one, and it is the §1B.15
+delivery hole re-armed by build order.** `send_hive` checks the subject exactly
+once — `if v_subject_id is null then raise`
+(`20260828000001:153-155`). A tombstone keeps the row, so `subject_profile_id` is
+**not null** and that check passes. `ENG-84` cannot void the rotation, because
+`comb_rotations` will not exist when `@Fizz` writes it. `ENG-91`'s stated shape
+(`c4718523…`) covers the zero-entry window and says nothing about a tombstoned
+subject. **Both sides are currently assuming the other one has it.** Under
+seal-and-send the clock then delivers a keepsake into a deleted account, on
+schedule, with nobody in the loop to notice. **`ENG-91` enforces it** — a
+tombstoned subject voids and advances, same branch as zero entries. Not
+`ENG-84`'s, and not an assumption.
+
+**One thing `ENG-91` retires, in the other direction.** §1B.15 held that an
+*owner's* tombstone permanently freezes everyone else's unsealed writing, because
+the hive could never reach a seal without the owner's tap. **In a comb that
+stops being true the day `ENG-91` ships** — the rotation seals on `closes_at`
+with no caller identity at all, so an organizer's deletion, absence or silence
+costs the month nothing. The freeze survives only for the **1:1** flow, where the
+tap is still the verb. Add it to `ENG-91`'s list of reasons; it was not one of
+the ones the row was written for.
+
+
+### §1B.20 — the shipped subject/roster guards survive rotation intact, which is exactly why they are not the protection `ENG-58` will assume
+
+`@Pixel` raised this from the read side in `DES-22` (`70caf2ce…`) and is right.
+I checked the write side, and the framing needs one correction before `@Sage`
+builds to it.
+
+**Both shipped guards keep working, unmodified, under rotation.** `20260827000001`
+enforces subject/contributor disjointness in two directions — Direction 1 in
+`hive_contributors_insert_owner`'s `WITH CHECK` (`:255`, the hive's current
+subject may not be invited as a contributor) and Direction 2 in the
+`private_hives_subject_not_active_contributor` trigger (`:140-158`, raises).
+Sarah's own month has her as **subject** and the other eleven as
+**contributors**; she is not on that hive's roster. Both guards pass cleanly.
+**Nothing in `20260827000001` needs weakening, and it must not be weakened** —
+its comment (`:115-131`) is a ratified ruling of Sage's and Lumen's, not
+scaffolding.
+
+**The correction, and it is the load-bearing half:** those guards protect the
+**hive**, and they can only see **hive** membership. Hive membership is
+*ephemeral and subject-excluding* — Sarah is a contributor on eleven hives and
+absent from her own. **Comb membership is durable and subject-including** — she
+is a `comb_members` row on all twelve months, including the one where she is the
+gift. So **every read authorized by "is a member of this comb" is authorized for
+the subject too, on her own month.** The guards do not fail; they are simply
+blind to a table written after them. That is the leak `@Pixel` found, and it is
+not a variant of the old one — it is a membership object the old one never had.
+
+**Ruled, and it is buildable today because it reuses what shipped:**
+
+> **`is_comb_member(comb_id)` may authorize identity, never state.** Who is in
+> this comb — names, §1B.17 — is comb-scoped. Who has **written this rotation**,
+> the count, the entries, anything indexed to the current month, stays
+> authorized by **`is_hive_contributor(hive_id)` on that month's hive**, which
+> already excludes the subject by the guards above.
+
+Two membership tables, two scopes, and the axis is the one `DES-31` and §1B.9
+already draw: *am I this rotation's subject.* `@Sage` — the temptation `ENG-58`
+will create is a single `is_comb_member()` used for every comb read because it
+is tidier. That one function, used once on a rotation-state read, hands Sarah
+her own surprise. `@Pixel` — `DES-22`'s member-view/subject-view split is the
+design expression of exactly this line, so the spec and the schema agree.
+
+
+
+### §1B.21 — The membership count is allowed, and the sentence that carries it is a wiring trap. Plus one instruction of mine that is now stale in Sage's hands.
+
+@Lumen's `DES-22` amendment (`33255515…`) is **ratified**: the bar is on
+**write-status** counts, not **membership** counts, and §8's *"Six people are
+writing for you."* stays. The reasoning is right and it is the reasoning §1B.9
+actually contains — everything in that section is about *who has written*.
+§1B.8 does not conflict either: that ruling bars a **denominator** (*"12 of 5"*,
+seats, fullness), and a bare *"six people"* has none.
+
+**The ambiguity was mine.** §1B.9 said *"contributor count."* In this schema
+`hive_contributors` is the **invited roster** — so my term named the membership
+count while my argument attacked the write-status count. Pixel read the term and
+barred both; Lumen read the argument and permitted one. **Both readings were
+faithful to the section; the section was the defect.** Corrected in place above.
+
+#### The stale instruction, and it is live in a migration being written tonight
+
+§1B.9 told @Sage, in the paragraph headed *"What this does and does not do for
+`ENG-58`"*: *"it removes the requirement for a subject-facing count query —
+nothing in MVP-Comb needs one."* `DES-22` §6 carries the same sentence
+(*"DES-22 does not need a subject-facing count query at all (§1B.9)"*).
+**The amendment creates one, and both documents still deny it.** Sage is
+building `ENG-58` now and said so (`c4718523…`); Pixel has already applied
+Lumen's amendment to `DES-22` §1.1 and §8, so the spec now **renders** a count
+its own §6 tells the backend not to build. Struck above.
+
+**It is a cheap read, and §1B.20 already authorizes it.** A membership count is
+**identity-side**, not state-side, so it falls on the permitted side of the line
+ruled one section up: *`is_comb_member(comb_id)` may authorize identity, never
+state.* One count over `comb_members` where `removed_at is null`. No entries
+table in the path, no rotation state in the path, nothing to leak.
+
+#### The trap: the honest query and the barred query satisfy the same sentence
+
+*"Six people are writing for you"* is grammatically satisfied by **two different
+queries**, and only one of them is legal:
+
+- `count(comb_members where removed_at is null)` — **membership. Static all
+  month. Ruled in.**
+- `count(distinct author)` over the rotation's entries — **write-status. Rises as
+  people write. This is the `C1` contaminant §1B.9 exists to stop.**
+
+Nothing in the string distinguishes them. A build wired to the second one
+renders a sentence that matches the spec **word for word**, passes a copy review,
+and quietly hands Sarah the live progress meter — the failure §1B.9 called
+*silent and misrouting*, arriving through the one door we ruled open.
+
+**And the barred query is already written, already named for that exact
+sentence.** `HiveStore.js:513` — `const writerCount = new Set(entries.map((e) =>
+e.authorId)).size`. Verified at `github/main@0d71d24`: it is the **only**
+`writerCount` in `src/` (three hits, all in this one function), and it is safe
+today because it lives **only** in `getReceivedPackage` (`:480`), strictly
+post-delivery. It was built for `DES-21`'s overflow case and it is correct there.
+**The hazard is not that it is wrong; it is that it is the nearest available
+symbol to a sentence we just placed on the subject's pre-seal screen.** A builder
+rendering *"N people are writing"* reaches for the variable named for it.
+
+**Ruled: any count rendered to the subject before the seal names its source, not
+just its number.** `DES-22` §8 and `COPY-6` state the query alongside the string;
+`ENG-58` exposes the membership count as its own read and **no pre-seal
+subject-facing surface may call anything that counts entries.** A copy rule
+cannot enforce this — the copy is identical either way. It has to be enforced
+where the two queries are actually distinguishable, which is the read path.
+
+**One consequence for @Lumen's tense ruling, which I am not reopening.**
+*"...are writing for you"* as collective purpose is right — **while the number is
+membership.** The moment the number becomes writers, the same words stop being a
+purpose statement and become a live participation report, and the tense defense
+stops protecting it. **The tense ruling has a data precondition**, it was
+unrecorded anywhere, and it is recorded here.
+
+#### Two smaller ones
+
+- **@Lumen's open question — whether subject-view renders invited-not-joined
+  hollow cells — is answered, and the axis says the same thing your lean did.**
+  Invited-but-not-joined is **membership** state, not participation state, so it
+  sits on the permitted side of the line you just drew; hollow and nameless it
+  carries no chase list. @Pixel has already ruled it into `DES-22` §1.1
+  (*"a list of faces/names (plus hollow not-yet-joined cells)"*). Nothing further
+  to decide.
+- **The `DES-37` landing count is a membership count too, and inherits this
+  ruling.** §1B.18's *"11 people are writing for Sarah"* is the same sentence
+  shown to a **non-member**, where a write-status read is not merely a spoiler
+  but a disclosure to someone outside the comb entirely. `ENG-59`'s definer
+  preview returns `comb_members` size and nothing derived from entries.
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
 
@@ -1217,7 +1423,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 |---|---|---|---|
 | **ENG-58** | Sage | L | Migration: `combs`, `comb_members`, `comb_rotations` + RLS. **Not built** — no such migration exists, and no `invite_code` or rotation path exists in `src/` (both searched). **Also owns the definer-backed roster read** (§1B.17): `profiles` RLS admits only your own row and your connections, so in a comb formed by invite link every member renders as `'Someone'` |
 | **ENG-59** | Fizz | M | Comb invite-link join flow. Deep-link scheme `pollinate` already registered (`app.json`) |
-| **ENG-60** | Fizz | L | Rotation ritual: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9` |
+| **ENG-60** | Fizz | L | The rotation loop: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9` |
 | **ENG-62** | Sage | L | Land the nectar ledger with `rails_mode='simulated'` |
 | **ENG-66** | Fizz | M | Comb pot. **G2 binding:** direct-to-recipient, never pooled |
 
@@ -1245,7 +1451,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Semantics ruled in §1B.16: seal-and-send, one event, idempotent.** **Cannot wrap `send_hive`** — its friend-connection precondition makes a comb undeliverable; authorization is **comb membership**. **Must refuse to deliver a zero-entry rotation.** **Gates the §1A definition of done** (there is no reveal without a seal) |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to open a rotation, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime |
-| **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays`. Follow `README.md`'s ritual — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
+| **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays`. Follow `README.md`'s sweep procedure — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
 
 ### 8.4 Do not start
 
@@ -1299,7 +1505,7 @@ consequence, and learn in between.**
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver | 1.1 |
-| 1.9 | **Fizz** | `ENG-60` — rotation ritual: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
+| 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
 | 1.12 | **Pixel** | `DES-35` — glass prominence to ≥23% (Colin `a478c335…`, §1B.5). **Material prerequisite merged** — `13cf806` + `cdb07a1` are ancestors of the tip (§1B.7) | — (parallel; **gates nothing**) |
@@ -1308,7 +1514,7 @@ consequence, and learn in between.**
 **On 1.11–1.13:** Colin ruled these into MVP-Comb at `a478c335…`, three minutes
 before the brief was posted, so they carry his authority and they are **in**.
 They run parallel and **nothing in the definition of done depends on them** — they
-are the difference between shipping the ritual and shipping it *gloriously*, which
+are the difference between shipping the rotation and shipping it *gloriously*, which
 is Colin's other standing instruction. If they slip, the release still runs
 end to end; do not let them gate 1.1–1.10, and do not let 1.1–1.10 crowd them out.
 
@@ -1383,7 +1589,7 @@ calling `ENG-91` instead of `seal_hive`. `DES-22` is unchanged and still the
 design pole. **The engineering pole is now one row longer than when this section
 was written**, and the added row gates §1A's definition of done — there is no
 reveal without a seal. Nothing new is being *designed*; a server-side path the
-ritual always assumed existed is being *built*.
+rotation always assumed existed is being *built*.
 
 ## 9. What is explicitly NOT changing
 
