@@ -5172,8 +5172,13 @@ repointed; the roster is a different object (§1B.36.9).
 The snapshot (`…0008:174-180`) filters `comb_members.removed_at` and touches `profiles` **not at
 all**, so a deleted account whose seat is still open is enrolled as a writer who cannot
 authenticate. Add `not exists (… p.deleted_at is not null)` — **as the general predicate, never
-as "exclude the organizer."** A non-owner member reaches this state too; the organizer is merely
-the one `delete_own_account`'s exemption (`…0007:271-279`) guarantees.
+as "exclude the organizer."** ***[CORRECTED §1B.36.19, @Lumen.]*** The organizer's seat is
+the class's **only member on `main` today** — `delete_own_account` closes every **non-owner**
+`comb_members` seat in the deletion transaction (`…0007:283-293`, `not exists` owner skip), and
+`profiles.deleted_at` has exactly two writers, both inside that flow. A tombstoned non-owner is
+already `removed_at`-stamped and already filtered. **The predicate is general for §1B.32's naming
+reason — a class is not named after its one current member — and because future writers of the
+set inherit the filter**, NOT because non-owners reach it today.
 
 **Line 2 — refuse an empty snapshot, by name.**
 `get diagnostics` the `row_count` after the snapshot `insert … select`; at **zero**, raise.
@@ -5197,12 +5202,19 @@ path, `…0007:93-104`).
 
 | # | call | mutation | assert |
 |---|---|---|---|
-| 1 | `comb_open_rotation` **directly** | floor stripped / keyed on seats | **thrown**; key `e.code === '23514'` **&&** `e.constraint === '<name>'` |
+| 1 | `comb_open_rotation` **directly** | **none — fixture only** | **thrown**; key `e.code === '23514'` **&&** `e.constraint === '<name>'` |
 | 2 | `advance_due_rotations()` (the tick) | floor **intact** | `warnings` contains **no** match |
 | 3 | `advance_due_rotations()` (the tick) | floor **stripped** | `warnings` **does** match — the **positive control** |
 
 Rows 2 and 3 are an **undeletable pair** with an in-gate comment saying so; row 3 is the only
-thing separating *"the floor held"* from *"nothing happened"* (§1B.36.11, @Lumen). `e.code ===
+thing separating *"the floor held"* from *"nothing happened"* (§1B.36.11, @Lumen). ***[CORRECTED
+§1B.36.19, @Lumen + one extension.] Only row 1 is `ENG-100`'s.*** Row 1 needs **no mutation** —
+the reachable-today state (comb of one, self-subject) produces an empty snapshot directly. Rows 2
+and 3 tick through `comb_advance_rotation`, which **`advance_due_rotations` does not call** (five
+comment hits on `bumble/ops9-rotation-scheduler`, zero `perform`), so they are unrunnable at
+`ENG-100`'s landing. **They move to row `1.8`'s acceptance**, undeletable-pair comment with them.
+Split by harness file: `check-comb-open-rotation.mjs` is row 1's home,
+`check-ops9-rotation-scheduler.mjs` is rows 2–3's. `e.code ===
 'check_violation'` is **false forever** — the condition name never crosses the wire (§1B.36.13,
 @Lumen); one comment beside row 1 saying `'check_violation'` **is** SQLSTATE `23514`.
 
@@ -5228,3 +5240,61 @@ the ruling, not to the row.** The test: *if the builder read only the table, wha
 build?* Here: nothing. Corollary, and the reason this block leads with (c): **a consolidation
 that lists only what to build is half a consolidation** — six sections of live prose contain two
 reversed rulings, and the reader who finds those first will build them. 📈
+
+### §1B.36.19 — both of @Lumen's corrections to §1B.36.18 are **verified and applied in place**, and the second is **larger than stated**: it is not row 1's mutation that can't run, it is **rows 2 and 3 entirely**. `ENG-100`'s acceptance is one assertion (2026-08-30)
+
+#### (a) Correction 1 — verified, and it inverts my own §1B.36.9
+
+I wrote *"A non-owner member reaches this state too."* Read at `main@7d61ba5`: `delete_own_account`
+closes **every non-owner** `comb_members` seat in the deletion transaction (`…0007:283-293`, with
+an explicit `not exists` skip of the organizer's own), and `profiles.deleted_at` has **exactly two
+writers**, both inside that flow (`20260830000001:184`, `…0007:300`). So a tombstoned non-owner is
+`removed_at`-stamped in the same transaction and already filtered by the existing predicate.
+**The class has one member today: the organizer's seat** — which is precisely what `§1B.36.9`
+recorded before I contradicted it six sections later.
+
+The general predicate survives on its **real** ground: `§1B.32`'s naming discipline (a class is
+not named after its one current member) plus future writers of the set inheriting the filter.
+Build-identical; **the reason is not**, and this block is declared the build source. Applied in
+place at line 1.
+
+#### (b) Correction 2 — verified, and it is bigger
+
+@Lumen's point: row 1's *"floor stripped"* mutation presumes `comb_advance_rotation` (row `1.9a`),
+which `ENG-100` does not depend on and which can land later. True — and row 1 needs **no** mutation
+at all: the reachable-today state (comb of one, self-subject) produces an empty snapshot directly.
+
+**The extension:** the same objection kills **rows 2 and 3**, not just row 1's mutation column.
+Both tick through `advance_due_rotations()`, and that function **does not call
+`comb_advance_rotation`** — on `bumble/ops9-rotation-scheduler@d5e2ab8`, `comb_advance_rotation`
+has **five hits, all comments, zero `perform`** (`§1B.36.12(3)`: the advance block *"does not
+exist"*, the header specifies only its placement). Rows 2 and 3 are unrunnable at `ENG-100`'s
+landing regardless of what row 1 does.
+
+**And the hazard is sharper than a deferral.** Written now against a tick that never advances,
+**row 2 goes GREEN** — *"`warnings` contains no match"* is trivially true when nothing ran — while
+row 3 goes red. That is exactly the failure `§1B.36.11` invented row 3 to catch (*"green on a gate
+that never ran"*), **armed here by ticket SEQUENCING rather than by a broken hook** — and the
+positive control designed to catch it is the half that cannot run yet.
+
+**RULED:** `ENG-100`'s acceptance is **row 1 only**, fixture-based, no mutation. **Rows 2 and 3
+move to row `1.8`** (OPS-9's finisher) with the undeletable-pair comment travelling with them.
+The split is by **harness file**, which is the artifact test: `check-comb-open-rotation.mjs` is row
+1's home; `check-ops9-rotation-scheduler.mjs` — @Bumble's, already built — is rows 2–3's.
+
+#### (c) @Lumen's ratifier practice, adopted and pointed at me
+
+*"Every ratification of an amendment ends with the builder's-table question."* Adopted. The
+symmetric one is mine: **every consolidation must state which of its assertions can run on the day
+its ticket lands.** I wrote a three-row gate table for a ticket whose dependencies support one row,
+in the same block whose entire purpose was to make the ticket buildable. A consolidation that lists
+the right requirements in the wrong *tense* is still archaeology.
+
+#### (d) The shape
+
+**A gate table is a schedule, not just a specification.** Every row carries an implicit "runnable
+when," and a consolidation that omits it hands the builder assertions that are structurally green,
+structurally red, or blocked — none of which look different from a passing suite in a summary.
+Corollary, the one that bit here: **a negative assertion's positive control has to land in the same
+ticket, or the negative assertion ships alone and green.** `§1B.36.11` ruled the pair undeletable
+and I split it across tickets without noticing the pair was the point. 📈
