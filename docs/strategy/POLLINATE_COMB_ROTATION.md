@@ -4769,11 +4769,46 @@ mint's client-visible code surface **already** contains a Postgres-native code b
 `23505` from `comb_rotations_one_open_per_comb`, which the file's own comment names (`:186-190`)
 and the gate keys at `check-comb-open-rotation.mjs:322`. And `42501` is RLS-native as well.
 
-**RULED — assertion row 1 keys on `e.code === '23514'` AND a message matcher.** This is not new
-discipline: it is the repo's own majority convention — **8 of the 11** `e.code === '42501'`
-sites under `scripts/` already pair the code with a message regex (`check-contributor-names.mjs
-:334,:348`; `check-multi-writer-hives.mjs:247…`). The codebase worked out years-of-Postgres ago
-that a standard SQLSTATE names a *class*, not a *cause*.
+**Enumerated rather than sampled — the mint's write path carries SIX native `23514` producers,
+not two.** `private_hives` has four (`private_hives_subject_name_length`, `…0002:73`;
+`cover_theme` and `review_cadence`, `…20260817000002:25,:29`; `relationship`,
+`20260824000001:12`), `comb_rotations` has the two above, `hive_contributors` has **none**
+(`…20260827000001:46-53` — its guards are a trigger and a primary key, no CHECK).
+
+Three of the four `private_hives` constraints take column defaults the mint never supplies, so
+they cannot fire on its input. **The fourth is fed directly by it** — the mint writes
+`subject_name = coalesce(nullif(display_name,''), 'Someone')` (`…0008:164-171`) into a column
+capped at 100, from a column capped at 100 (`display_name_length`, `20260810000001:25`,
+VALIDATEd). It is unreachable **because two independently-declared caps happen to be the same
+number**, five days and two migrations apart, with no shared constant and no comment on either
+side naming the other. That is the same species as the statement-order note in §1B.36.12: it
+holds today, nothing enforces that it keeps holding, and the day one cap moves, an over-long
+display name raises `23514` from inside the mint. **A code-only assertion would go green on it
+while the floor was stripped** — which is the exact failure row 1 exists to catch. Not a row, not
+a ticket: it is the reason the message key is a requirement rather than a belt-and-braces.
+
+**RULED — assertion row 1 keys on `e.code === '23514'` AND a message matcher.**
+
+**Withdrawn before publication: my own first draft of this ruling leaned on a precedent that
+says the opposite.** It cited *"8 of the 11 `e.code === '42501'` sites under `scripts/` already
+pair the code with a message regex."* The count is exact — 11 sites, 8 carrying a regex — but the
+operator is `||`, not `&&`: `if (e.code === '42501' || /row-level security/.test(e.message))`
+(`check-contributor-names.mjs:334,:348`; `check-multi-writer-hives.mjs:247,:277,:320,:427,:523,
+:616`). Those eight lines **widen** — either signal alone accepts — because an RLS refusal can
+arrive under more than one code. Row 1 needs the **conjunction**, which narrows. The repo's
+convention is code-**or**-message and is not precedent for it. A shape read at a glance rather
+than at its operator argued for its own inverse.
+
+So the ruling stands on the enumeration above and nothing else: `23514` is a class Postgres
+raises for six constraints on this function's own write path, so the code alone cannot name the
+cause.
+
+*The principled discriminator, recorded but not required:* a genuine constraint violation
+populates the error's `constraint` (and `table`) field; a hand-written `raise … using errcode`
+populates neither unless the raise also passes `using constraint = …`. **No gate in `scripts/`
+reads `e.constraint` today** (`git grep 'e\.constraint' 7d61ba5 -- scripts/` -> zero). Message
+matching is cheaper, and row 3 needs the message anyway — but if a later gate ever must
+distinguish our raise from the engine's *without* the string, that field is how.
 
 **Consequence for the message string:** it now has **two gate consumers** (row 1's matcher and
 row 3's notice matcher). `ENG-100`'s acceptance quotes the exact string, and it carries the
@@ -4810,4 +4845,8 @@ before treating a code as an assertion's key, enumerate what the *engine* raises
 same path. Corollary, and the reason (d) is in this document at all: **a count is a measurement,
 and a grep counts lines.** Two people independently quoted a line count as a site count, in a
 thread whose entire convention is enumerate-then-assert — including the one whose banked lesson
-says exactly this. 📈
+says exactly this. Second corollary, from the withdrawn precedent in (b): **a convention is its
+OPERATOR, not its operands.** Eleven sites pairing a code with a message regex look like the
+discipline you are about to require until you read the `||` between them — they widen where you
+mean to narrow, and citing them would have shipped the inverse of the ruling under the ruling's
+own name. 📈
