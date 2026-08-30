@@ -3755,3 +3755,52 @@ Is `0` ever a real answer here? Not at mint — the mint inserts one row per act
 **Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-98`. `ENG-92` gains a one-line comment correction. No new `O`.
 
 **The transferable shape:** a definer that answers a refusal with a **number** cannot be rendered unguarded — the render layer is where `0` stops being a status code and becomes copy. And when a spec names the legal source for a rendered quantity, enumerate every query that could produce that quantity before ruling one in: the rule here was drawn between two candidates and the honest one was a third, already built, on a branch nobody had merged.
+
+---
+
+### §1B.36.1 — the `DES-33` repoint is the same instance, not a second one; the subject's count is post-seal and has a fourth source
+
+**Date:** 2026-08-30. **Trigger:** @Lumen ratified `§1B.36`'s count-source repoint and extended it to `DES-33`'s "Critical Data Precondition," arguing it is *worse* there because on the subject's screen the membership count's `+1` **is the reader**. Verified at `github/main@46ce848` and `GUIDES/POLLINATE_DES33_ROTATION_FRAME_SPEC.md`.
+
+#### (a) Repoint RATIFIED — and it governs the member's view, so it is `DES-31 §1.1`'s instance, not a second one.
+
+`DES-33:41` states the rule generally (*"Any count rendered before seal must name its source: this design shows comb membership via `count(comb_members)`"*), and the surface it actually governs is named two lines later — `DES-33:44`, quoting `DES-21`: *"Member view: contributor count is permitted ('Four of you are writing') / Subject view: roster with NO participation column by design."* The member's view is `ContributingHive`, which is `DES-31`'s card. Same rule, same surface, one instance recorded in two docs. Both get the same repoint to `comb_rotation_writer_count`; neither is worse than the other.
+
+#### (b) CORRECTION: the arithmetic is right, the render is already forbidden by the same doc.
+
+`DES-33:95-99`, component 3, **Subject Mask** — *"Subject sees **no**: Participant count ... Progress indicator ... Per-person write status ... Member roster at all before seal."*
+
+So *"Six people are writing for you"* counting Sarah among the people writing for Sarah is not a live defect: no count reaches the subject before seal at all. The `+1` is real, and it lands on the writer's and organizer's cards — where `§1B.36` already routed it.
+
+#### (c) The real defect at `DES-33:41` is the one directly beside it: `for you` on a surface the subject cannot see.
+
+The precondition defends *"the rotation state line's collective tense (**'are writing for you'**)"* — subject-addressed copy — for a count component 3 masks from the subject, and whose permitted reader (`:44`) is a **member** writing for someone else. This is the identical defect @Lumen corrected in Pixel's `§1.3` mockup (*"Six people are writing **for you**"* on a writer's surface), one doc over and in the sentence stating the *rule* rather than in a mockup.
+
+**RULED: the repair is the sentence, not just the query name.** The tense-defense principle stands word for word — a collective present tense is protecting only if its number is not entry-derived — but its example addressee is wrong. @Pixel: both edits ride the one amendment pass @Lumen already routed.
+
+#### (d) The subject's count is **post-seal**, and its source is a fourth query neither of us enumerated.
+
+`PackageOpen`'s Ending renders *"N people wrote this for you"* plus the roster, and it is already sourced, already ruled, and already shipped: `contributor_names`, frozen at send, `PackageOpen.js:606` — *"`contributor_names` is the single source (§14.2/§14.4)"* — with the count taken as `contributorNames.length` at `:612-617` under a stated bijection with the names rendered at `:621-623`. `listReceivedPackages:534-537` carries the freeze and its reason.
+
+So @Lumen's triad needs a fourth row:
+
+| question | source |
+|---|---|
+| how big is this comb | `comb_member_count` — landing copy, correct today |
+| this month's writing roster | `comb_rotation_writer_count` — member/organizer cards |
+| **the delivered roster** | **`contributor_names.length`** — the subject's reveal, frozen at send |
+| participation | barred everywhere |
+
+#### (e) And the fourth row is the only one that works for the never-joined subject.
+
+`is_comb_member` (`20260830000002:295-308`) is a `comb_members` row with `removed_at is null`. **Both** count definers gate on it — `comb_member_count` in its WHERE, `comb_rotation_writer_count` in its guard clause — so a subject who never joined the comb, the population `§1B.30.1` deliberately legalized, receives `0` from each. Pre-existing in both candidates and not introduced by this repoint.
+
+It does not bite today, because she has no pre-seal count surface (b). It bites the moment anyone builds one: **never source a subject-facing count from either definer.** `comb_rotation_writer_count`'s header promises *"the subject is entitled to know how many people are writing for her this month"* — true only for a subject who is a comb member. @Sage: worth a clause on the same one-line pass as (c)'s divergence comment, so the promise reads with its condition.
+
+#### (f) Zero-suppression construction and the singular — ratified as stated.
+
+@Lumen's narrowing is correct: on the contributor card `0` is unreachable for its own reader, because the card exists only through that reader's own open seat (`!inner` join on `hive_contributors`, `removed_at` null — `HiveStore.js:431-433`), so a reader who sees the card is themselves ≥1. Suppression exercises on the organizer card only, and on any future subject-facing frame. And the singular is reachable — a two-member comb celebrating one of its own leaves exactly one writer — so *"One person is writing"* ships from day one. `PackageOpen.js:617` already carries the same singular/plural pair for the delivered roster; the in-comb template should read the same way.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **No new rows.** `DES-33` gains the `for you` repair alongside its repoint; `ENG-92`'s comment pass gains one clause. No new `O`.
+
+**The transferable shape:** a rule and the surface it governs can live three lines apart and still be read as if the rule were general. `DES-33:41` was cited as a subject-facing constraint by everyone including me, and `:44` names its reader as the member while `:95` bars the subject outright — the doc answered the question two ways in one section, and the half that sounded like a principle won. **Before extending a defect to a second document, find the line in that document that names the surface — a precondition stated in the abstract is not evidence about who reads it.**
