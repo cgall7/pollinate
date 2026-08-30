@@ -1569,7 +1569,81 @@ ruling and ships now.
 `profiles`. §1 (c) and (d) are `ENG-91` and were already its work — this names
 the trigger. §2's skip-clause is `ENG-92`. `O8` is Colin's, and nothing in
 MVP-Comb is blocked waiting for it.
+---
 
+### §1B.25 — the shim `DES-22` calls temporary is permanent for one member, and one blank freezes into the keepsake
+
+Published as event `cf1ce0c5` before this commit. All citations read at
+`github/main@e99936d`.
+
+#### 1. @Pixel's `DES-22` ruling is right for members and has exactly one exception — the organizer
+
+`DES-22` §4 rules that no "deleted member" cell should ever render: `ENG-92` ends
+the `comb_members` row and the member drops out of `comb_co_member_names()` like
+any other removal. True — **except for the organizer, and that exception is
+mine.** §1B.24.2's skip-clause exists because
+`comb_members_owner_seat_permanent_trigger` (`20260830000002:238-253`) raises on
+any `removed_at` set on an owner's row, and inside `delete_own_account()` that
+raise aborts the transaction and makes a comb organizer **undeletable** —
+App Store 5.1.1(v). The seat stays, so a tombstoned organizer's `display_name =
+''` renders **forever** in every comb they own.
+
+Reachable **today, before `ENG-92`**: `delete_own_account()` does not touch
+`comb_members` at all, so right now *every* tombstoned member renders blank.
+
+**The dangerous artifact is the label, not the shim.**
+`GUIDES/POLLINATE_V2_DES22_COMB_IDENTITY.md` §4's client-side empty-name filter is
+the right call, but it is annotated *removable once `ENG-92` lands* — and `ENG-92`
+is the commit that converts it from a shim into the only defense. **Ruled: the
+filter is removable when §1B.24.1's `deleted_at is null` predicate ships on
+`comb_co_member_names()`, never on `ENG-92`'s merge alone.** That predicate (already
+scoped in §1B.24) closes the organizer case too, which is why `O8` stays a product
+question and not a rendering fix.
+
+#### 2. `''` freezes into `author_name_at_seal` and cannot be repaired — `ENG-91`, not `ENG-92`
+
+Every other blank in §1B.24 is a live join a later commit can fix. **This one is
+not.** `seal_volume` (`20260828000001:48-54`) writes the frozen snapshot from a
+bare, unguarded live read:
+
+```sql
+set visibility = 'packaged', author_name_at_seal = p.display_name
+```
+
+A contributor who deletes **after writing and before the seal** freezes `''` into
+`entries.author_name_at_seal`; `send_hive` (`:172-180`) then `array_agg`s it
+straight into `private_hives.contributor_names`, the sealed roster the reveal
+renders.
+
+**Unrepairable, verified not asserted:** the backfill at `:258-264` is gated
+`and e.author_name_at_seal is null`, so a stored empty string is never revisited,
+and the column sits inside the signature-integrity guarantee `20260828000001`
+exists to provide. A permanent hole in the keepsake, not a query bug.
+
+Window is exact: **delete-before-seal only.** After the seal the real name was
+already captured. That window is precisely the mid-month deletion `ENG-91` already
+owns for void-and-advance.
+
+**Ruled (mechanism):** the snapshot write coalesces — never store `''`. One site,
+inside `ENG-91`'s fused seal path, fixing the per-entry attribution and the roster
+array together. **Not at `send_hive`'s `array_agg`** — by then the entry row is
+already poisoned. **Do not drop the person:** their letter is in the volume, and a
+roster shorter than the letters breaks the count-not-content reveal.
+
+**Token is Lumen's, not mine.** `ENG-91` ships
+`coalesce(nullif(p.display_name, ''), <token>)`; Lumen rules the word. @Pixel is
+right that this is a *distinct* state from §1B.17's `'Someone'` — that is a live
+RLS gap, this is a person who left, frozen into a keepsake forever. Reusing
+`'Someone'` is defensible and cheap; a distinct word may be truer.
+`PackageOpen.js:514` guards `step.authorName &&`, so `''` today renders an
+**unattributed** letter in a book where every other letter is signed — which reads
+as a bug, not as tact. That is what the word has to beat.
+
+#### Scope
+
+§1's ruling is a doc edit in `DES-22` §4 (@Pixel) — no code. §2 is one `coalesce`
+inside `ENG-91`, cheaper now than in any later ticket. Nothing here gates the
+`ENG-58` merge; all post-merge.
 ---
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
@@ -1954,7 +2028,7 @@ consequence, and learn in between.**
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
-| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver | 1.1 |
+| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **Plus §1B.25.2:** the seal's `author_name_at_seal` snapshot must `coalesce(nullif(p.display_name, ''), <token>)` — a bare live read freezes `''` into the sealed roster and the backfill's `is null` gate can never repair it | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
