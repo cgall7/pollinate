@@ -3337,3 +3337,43 @@ and each was killed by a specific argument, not by preference.
 | **"Others may write to you only in your one free comb"** | Would make a free user **pay in order to be celebrated** by a second comb. Barred by V2 §17.5.5 (*"Receiving. Metering it kills the viral loop"*) and the PRD twice. Fixed by §3.2's rule A: membership is writing rights; being written for is not membership |
 | **Bringing back the Wallet tab for daily nectar** | §5.3. Daily use strengthens the case against it — Apple positioning risk rises, 2.3.1(a) bites harder, and it discards the comb-as-wallet differentiator |
 | **Ruling a price now** | Three price positions in one evening with zero user data. `POLLINATE_V2_ASSIGNMENTS.md` §11 already bars this; the constraint is now respected rather than overridden (§4) |
+
+### §1B.33 — The `…0005`/`…0006` merge-order inversion is **not** non-hazardous. `db push` selects by **version**, never by table; and `prod-schema-check` does not merely miss the skip — **the migration that causes it is the one that certifies it didn't happen**
+
+**Provenance.** @Bumble investigated the inversion I flagged in §1B.32's merge-pass items and concluded it was safe, citing `scripts/deploy-migrations.sh`'s header and the fact that `…0005` (rotation scheduler) and `…0006` (preview RPC) touch disjoint tables. The header quote is accurate; it is about a **different failure mode** — hand-applied dashboard schema producing `42P07`. The out-of-order hazard is documented twice elsewhere and states the opposite.
+
+**`scripts/deploy-migrations.sh`, the comment block immediately above the dry-run:**
+
+> `db push` without `--include-all` applies only migrations newer than the newest version in the remote history table, so a migration that landed on main *behind* an already-applied version is in the diff and is silently not in the push. That happens whenever branches merge out of timestamp order, which is normal, **or whenever a deploy runs between two merges.**
+
+**`supabase/README.md`, under a bolded heading — "Deploy once per merge batch, not between merges":** the older file "ends up behind an already-applied version and push skips it, **permanently and silently**: `main` says the schema has it, the database doesn't."
+
+**The independence argument is on the wrong axis.** `db push` selects by version comparison. It never reads which tables a migration touches, so disjointness is true and does not bear on whether `…0005` is applied.
+
+---
+
+#### The detector is inverted, not blind
+
+`scripts/prod-schema-check.mjs` Rule 3 states its own premise: *"The CLI applies migrations in version order, so a later LIVE probe implies the unprobeable ones before it (IMPLIED)."*
+
+`…0005`'s sentinel is `kind: 'order'` (`service_role-only function + pg_cron schedule, no anon-visible surface`). An `order` row is never probed (`:233`); its status is assigned purely by position (`:243`):
+
+```js
+if (row.status === 'ORDER') row.status = i < lastLive ? 'IMPLIED' : 'UNVERIFIED';
+```
+
+On disk `…0005` precedes `…0006`, and `…0006` (`kind: 'rpc'`, `comb_preview_by_invite_code`) is the batch's only probeable row — therefore `lastLive`. **In the skip scenario `…0006` is live on prod and `…0005` is not, and `…0006` is exactly the row that vouches for `…0005`.** The check prints `implied by a later live probe … Prod is not behind this tree` and exits **0**.
+
+**Position, not probeability, is what makes `…0005` the silent one.** @Sage's `…0007` is also `kind: 'order'` and also unprobeable, but sits *after* `…0006`, so a skip lands it in the UNVERIFIED tail → `die(3)`. Loud. `…0005`'s slot is the only silently-vouched position in the 08-30 batch.
+
+---
+
+#### RULED — controls, in order of preference
+
+1. **`…0005` merges before `…0007`, and no prod push until the batch lands.** Zero code change, zero stale-citation risk. This is the README's own rule and it is the primary control.
+2. **Renumber `…0005` → `…0009` only if it cannot merge first.** @Bumble's stated objection — that renumbering hands the question to the merge queue — does not hold on this batch: version prefixes are monotonic claims and nobody will claim a number *below* `…0006`, so renumbering **vacates** the only silently-vouched slot and cannot refill it. `…0009` would join `…0007` in the UNVERIFIED tail (exit 3). If @Fizz's `…0008` proves probeable, leaving `…0005` in place gets *worse* — `…0007` becomes IMPLIED too and two skips go quiet. Renumbering requires claiming the number in-channel and moving both the header citations and the `SENTINELS` key.
+3. **If a deploy has already run,** the repair is `supabase db push --include-all` after reading the dry run — never a second plain push.
+
+**Owner: @Colin**, who runs the prod pushes. The window is open now: `…0006` is on main, `…0005` is not. Verified `github/main@9bc6d04`; @Bumble's branch pushed by me at `07a105f` (rebase confirmed content-identical to `15635f8` — both `4 files changed, 653 insertions(+)`, empty diff on the migration and the gate).
+
+**The transferable shape:** a status *derived* rather than *measured* inherits its inference's premise as a silent dependency. When the premise fails, the verdict does not go unknown — it goes confidently wrong, in the direction of "fine." Ask what event violates the premise, then ask whether that same event supplies the evidence the inference rests on. If it does, the detector is inverted.
