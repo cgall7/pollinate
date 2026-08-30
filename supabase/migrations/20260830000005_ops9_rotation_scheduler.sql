@@ -3,9 +3,69 @@
 -- (ENG-58, combs/comb_rotations schema) and 1.8a (ENG-91,
 -- seal_and_send_rotation) -- both merged, github/main@8864a12.
 --
--- Scope, deliberately narrow: this migration finds rotations whose window
--- has closed and calls the one function ENG-91 built for exactly this
--- caller. It invents no new seal/send/void logic -- all of that lives in
+-- RESOLVER HALF ONLY -- Vector's §1B.31/§1B.31.1 (thread f2c15b7d,
+-- 2026-08-30, committed 1ff0644 then e319f3e on
+-- vector/comb-rotation-strategy): advance_due_rotations() below ends a
+-- rotation that has closed; it does not open the comb's next one. Row 1.8
+-- is PARTIAL, not done, until the tick also calls the new row 1.9a --
+-- comb_advance_rotation(p_comb_id), Fizz's policy wrapper carved out of
+-- ENG-60: computes the next subject (comb_members by joined_at, wrapping,
+-- skipping removed_at/tombstoned seats and skipping NOBODY else -- a
+-- quiet month costs the comb a month, never a person their turn) and the
+-- next closes_at (= this rotation's closes_at + combs.cadence, never
+-- now() + cadence, with a floor on the derived path: a minted window
+-- must be at least half a cadence or it jumps to the next boundary, so a
+-- long outage can't mint a window nobody could realistically write in),
+-- then mints through ENG-93's comb_open_rotation(). Deps for this row:
+-- 1.1, 1.8a, 1.9a -- NOT 1.7a directly; §1B.31's first cut put it there
+-- and would have made 1.8 -> 1.9 -> 1.8 a cycle, corrected in §1B.31.1
+-- once 1.9a existed as the intermediate policy layer.
+--
+-- Ruled to merge as-is rather than wait: the resolver half below is
+-- independently correct and blocks nothing, and comb_advance_rotation
+-- doesn't exist on main yet -- calling an unbuilt function would be
+-- worse than an honest gap. Whoever finishes this row adds
+-- `perform public.comb_advance_rotation(v_comb_id)` after each successful
+-- resolution, comb_id read off the resolved comb_rotations row --
+-- BUT NOT inside the same `begin ... exception ... end` block as the
+-- `perform public.seal_and_send_rotation(r.id)` call below. §1B.31.2
+-- (thread f2c15b7d, Vector, 2026-08-30, commit 806a33c): a `begin ...
+-- exception ... end` in PL/pgSQL is a subtransaction, so a raising
+-- advance inside the SAME block rolls back the seal that already
+-- committed logically-but-not-yet-durably in that block -- sealed_at
+-- and sent_at go back to null, the warning is swallowed, and the next
+-- sweep re-picks the rotation, finds nothing to skip (the seal was
+-- undone), and fails the same way every five minutes forever. Probed
+-- 4/4 against a live Postgres: one block for seal-plus-advance loses
+-- the delivery on a raising advance; two separate blocks (seal
+-- commits, then a second `begin ... exception ... end` around the
+-- advance call) let the seal survive regardless of what the advance
+-- does. The seal must be its own subtransaction; the advance is a
+-- second, independent one that can fail without undoing it.
+--
+-- Also per §1B.31.2: a comb_advance_rotation call that finds no
+-- eligible subject (every member removed_at-closed or tombstoned) is
+-- DORMANCY, not an error -- it returns without minting and raises
+-- nothing. That is Fizz's function's contract to honor, not this
+-- file's to work around, but it matters here too: if comb_advance_rotation
+-- ever raised for the dormant case, the loop below would log a warning
+-- per sweep, forever, for a comb that isn't actually broken.
+--
+-- This job owns the CLOCK (when the sweep runs); it has never owned the
+-- POLICY (who's next, how long a month is) -- Sage drew that boundary
+-- two migrations earlier (20260830000002:459-466: "This ticket provides
+-- the mechanism ... ENG-60 ... owns the policy of how those values get
+-- chosen and how a rotation auto-advances") and this file agreed with it
+-- from the first draft. §1B.31 briefly argued the routing was wrong and
+-- §1B.31.1 retracted that after re-reading Sage's comment -- recorded
+-- here, not just in the thread, so the retraction doesn't get lost
+-- between the two ruling messages the next reader of this file might
+-- only see one of.
+--
+-- Scope of what's actually built here, deliberately narrow within that
+-- gap: this migration finds rotations whose window has closed and calls
+-- the one function ENG-91 built for exactly this caller. It invents no
+-- new seal/send/void logic -- all of that lives in
 -- seal_and_send_rotation() (20260830000003), including its own row lock,
 -- idempotency check, and three-way deliver/void classification. Duplicating
 -- any of that here would create the two-source-of-truth failure this
@@ -100,12 +160,15 @@ revoke execute on function public.advance_due_rotations() from anon;
 revoke execute on function public.advance_due_rotations() from authenticated;
 grant execute on function public.advance_due_rotations() to service_role;
 
--- Five minutes: no cadence is ruled anywhere in POLLINATE_COMB_ROTATION.md
--- (ENG-60, which mints the rotations this sweeps, isn't built yet either
--- -- this ships ahead of its only producer, same "build the mechanism,
--- defer the consequence" split ENG-58 used for ENG-85's caps). Tight
--- enough that a reveal doesn't feel arbitrarily delayed once closes_at
--- passes, loose enough not to poll an almost-always-empty table needlessly.
+-- Five minutes: this is the SWEEP INTERVAL (how often the tick polls),
+-- not the rotation CADENCE (how long a month is, §1B.31's ruling 2,
+-- stored on combs once 1.9a ships it) -- distinct constants at different
+-- layers, worth naming explicitly now that "cadence" has a specific
+-- meaning in this schema. No sweep-interval number is ruled anywhere in
+-- POLLINATE_COMB_ROTATION.md -- this job owns picking it (the clock,
+-- not the policy; see the header note above). Tight enough that a
+-- reveal doesn't feel arbitrarily delayed once closes_at passes, loose
+-- enough not to poll an almost-always-empty table needlessly.
 -- Re-tunable without a schema change -- unschedule and reschedule under
 -- the same job name in a later migration if the number is wrong.
 --

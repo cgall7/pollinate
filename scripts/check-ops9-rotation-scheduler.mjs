@@ -1,5 +1,5 @@
 // Gate for OPS-9's rotation-sweep function
-// (supabase/migrations/20260830000004_ops9_rotation_scheduler.sql).
+// (supabase/migrations/20260830000005_ops9_rotation_scheduler.sql).
 //
 //   npm run check:ops9-rotation-scheduler
 //
@@ -438,7 +438,17 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('check-ops9-rotation-scheduler: FAILED —', e.message);
-  process.exit(1);
-});
+// embedded-postgres pulls in async-exit-hook, which hooks Node's 'beforeExit'
+// and hard-exits 0 there — the only thing that preempts it is an explicit
+// process.exit(), so a bare `process.exitCode = 1` set above is silently
+// discarded once the event loop drains (Sage's finding, sage/suite-exitcode-
+// fix, not yet merged — same fix applied here rather than shipping the sixth
+// member of the class it exists to close). Exiting explicitly here runs
+// after main()'s own finally block (client/pg cleanup) has already
+// completed.
+main()
+  .then(() => process.exit(process.exitCode ?? 0))
+  .catch((e) => {
+    console.error('check-ops9-rotation-scheduler: FAILED —', e.message);
+    process.exit(1);
+  });
