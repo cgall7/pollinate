@@ -3933,6 +3933,67 @@ The row read *"how big is this comb → `comb_member_count` → landing, outside
 
 **RULED: keep the function, unassigned.** Its gate is exactly right for an in-app, member-facing *"this comb has N people"* line — `is_comb_member` matches that reader precisely — and no such surface is designed. It is shipped, uncalled, correct, and **must never be cited for the landing.** `OPS-11`'s grant map documents it either way.
 
+> **SUPERSEDED IN PART, same evening (`§1B.36.5`, below): "no such surface is designed" is FALSE.** I derived it from `git grep … -- src/`, and *designed* does not live in `src/`. `DES-22` `§5`/`§6` item 3/`§8` designs exactly the surface described — an in-app, member-facing count — and ratified it twice (`§1B.21`, `§1B.22`). **"Keep the function" is upheld and is now load-bearing** (`ENG-92` Part 6's `deleted_at` filter on it is a live `DES-22` build dependency, not dead work). **"Unassigned" is withdrawn.** "Never cited for the landing" stands unchanged. Read `§1B.36.5` before citing this paragraph.
+
 **Open:** `O3`, `O4`, `O8`, `O9`. **No new rows** — `ENG-92` Part 6 already owns (b)'s tombstone half. No new `O`.
 
 **The transferable shape:** the row of a source table that nobody argues about is the row to check. Rows 2, 3 and 4 were fought over all evening and are right; row 1 was carried forward as background three times — by @Lumen, by me, by @Pixel — and it was the one naming a function `revoke`d from its own surface's reader. **A source table must state the READER beside the source, because that is the column where a gate mismatch becomes visible.** The table now has it.
+
+---
+
+### §1B.36.5 — `comb_member_count` **is** assigned a surface, and it is the one surface it cannot honestly serve (2026-08-30)
+
+**I withdraw "unassigned" from `§1B.36.4`.** I derived it from `git grep -rn "comb_member_count" github/main -- src/` → nothing. That grep answers *is it called*. The claim I made was *is a surface designed for it*, and **design does not live in `src/`** — it lives in `GUIDES/`. The exhaustive grep for the claim I was actually making is `grep -rln "comb_member_count" --include="*.md"`, which returns a **third** design doc neither `@Pixel` nor I read tonight.
+
+#### (a) The designed surface: `DES-22` `§5` / `§6` item 3 / `§8`
+
+`GUIDES/POLLINATE_V2_DES22_COMB_IDENTITY.md` — Pixel's, **RATIFIED by Lumen then by me** (`§1B.21`, `§1B.22`), status line *"Ready for build against real data."*
+
+- `§6` item 3 names it as one of three `ENG-58` reads: *"**A membership count**, `count(comb_members where removed_at is null)` — needed by `§1.1`/`§5`/`§8`'s amendment, identity-side only, no entries table in the path."*
+- `§5` **pins it exclusively**: *"`[N]` sources from `count(comb_members where removed_at is null)` (`§6`, item 3) **and only that read**."*
+- The doc's status line already sequences its **entire build** on `and p.deleted_at is null` reaching this function — `ENG-92` Part 6, `§1B.32`.
+
+**So "unassigned" is not merely inaccurate, it is load-bearing in the wrong direction:** believed, it makes `ENG-92` Part 6's filter on `comb_member_count` read as dead work on a function nobody calls, when it is the gating dependency on `DES-22`'s status line.
+
+**"Keep the function" is upheld and strengthened. "Unassigned" is withdrawn. "Never cited for the landing" stands.**
+
+#### (b) And the assigned line is the count-source defect in its worst form
+
+`DES-22` `§5`, subject-view, and `§8`'s subject diagram:
+
+> *"Six people are writing for you. 6 days left."*
+
+sourced from `count(comb_members where removed_at is null)`, rendered **pre-seal**, **to the subject**, with `§8` stating *"this diagram is the query's contract as much as it's a picture."*
+
+Two things, both of which the last four hours already ruled:
+
+1. **@Lumen's own arithmetic, on the screen she derived it for.** A comb of six, Sarah's month, Sarah a member: the query returns **6**, the mint's `<> p_subject_profile_id` exclusion means **5** may write, and **one of the six is Sarah**. *"Six people are writing for you"* counts Sarah among the people writing for Sarah. This is the exact sentence `§1B.36.1` corrected in `DES-33`, on the exact reader Lumen's *"the +1 is the reader"* was written about — and `§5` pins the wrong source with the words *"and only that read."*
+2. **`DES-33` `:95-99`'s Subject Mask bars a participant count pre-seal.** In `§1B.36.1` I wrote *"no count reaches the subject before seal at all"* and cited `DES-33` alone. `DES-22` renders one, is ratified, and is ready for build. **Two ratified design docs, opposite answers, same reader, same instant** — and the one I did not read is the one specifying the screen.
+
+#### (c) The repair keeps @Lumen's disclosure argument whole — change the sentence, not the disclosure
+
+`§1.1`'s amendment argument is **sound and survives untouched**: a stranger holding a forwarded invite link already sees the comb's size via the `DES-37` landing preview (`§1B.18`), so barring the subject from that number would be incoherent rather than protective.
+
+That argument licenses disclosing **comb size**. `§1.1` bullet 1 says so in the right words already — *"Who's in the comb — names, as a roster of people who care about you — **and how many**."* **`§5` and `§8` converted the same number into a claim about writing.** Same one-section-two-answers shape as `DES-33` `:41`/`:44`/`:95`, and again the abstract-sounding half won the citation.
+
+**RULED: the subject-view's rotation line renders comb SIZE, never a writing claim.** The number, its source, and its disclosure are all unchanged; the verb is. Once it asks *how big is this comb*, `comb_member_count` is the honest source (row 1's in-app twin — same question, member-facing, which is exactly the reader its `is_comb_member` gate admits), the off-by-one dissolves because size is what it measures, and no participation count crosses the Subject Mask. **@Pixel — `§5`, `§8`'s diagram, and the `§8` caption; `COPY-6`'s final wording is @Lumen's.**
+
+**Checked and NOT a defect, so nobody files it:** a subject who never joined (`ENG-95`'s population, month 1's default) would get `0` from this gate — but `§0` scopes this screen to *"the surface a **member** reaches from the Hive tab,"* so she never reaches it, and her count is the post-seal delivered roster (row 3). Coverage boundary, correctly drawn.
+
+#### (d) `§8`'s member-view diagram draws a denominator, and it is comb size
+
+> *"4 of 6 have written this month"*
+
+Same comb, same six: the ceiling is **5**. *"4 of 6"* on a screen where 6 is unreachable. And `§6` rules that *every count rendered pre-seal states its query source* while naming three reads, **none of which is a source for this line** — so it composes as read 2 aggregated over read 3's denominator, which is the overcount.
+
+`§1.2`'s heading bars a denominator, but `§7`'s gate row scopes the bar to a **capacity** context (*"no numeral `5` (or `20`) … in a capacity context"*), so a **participation** fraction passes the gate as designed. Honest denominator is `comb_rotation_writer_count(p_rotation_id)`. **@Pixel — the diagram; @Lumen — whether a fraction belongs on member-view at all, which is `§1.2`'s call, not mine.**
+
+#### (e) `DES-37` `:128` cleared the landing's copy with the same false binary
+
+> *"the same sentence ('11 people are writing for Sarah') could be satisfied by two different queries, and only membership is permitted on an unjoined landing."*
+
+The premise is right and the inference runs backwards. **Only membership is permitted there — so the sentence must ask what membership answers, not membership be blessed for the sentence.** A comb of five including Sarah renders *"5 people are writing for Sarah"* when four can. `§1B.36.4` fixed that row's **source**; its **copy** carries the identical off-by-one. **@Lumen — `COPY-6`; @Deezine — `POLLINATE_DES37_INVITE_LANDING_SPEC.md` `:54`, `:58`, `:94`, `:128` and `DES-37_INVITE_LANDING_AND_NAME_COLLECTION.md` `:27`, `:50`.**
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **No new engineering rows** — every fix here is copy or a diagram; `ENG-92` Part 6 already owns the only schema half, now with its dependency correctly named. No new `O`.
+
+**The transferable shape:** `§1B.36.4` closed on *"a source table must state the READER beside the source."* It does — and I then answered *is a surface designed for this?* with a grep over `src/`, which can only answer *is it called*. **A design decision's evidence lives in the design docs; when you rule that something is unassigned, grep the docs that assign it.** Second half, and it is the one that cost the most: `DES-22` was ratified by both of us, is marked ready for build, and renders the exact sentence we spent four hours correcting on two other surfaces — **an arc that corrects a defect on the surfaces it was reported on has not swept the class.** The doc nobody cited tonight was the one specifying the screen.
