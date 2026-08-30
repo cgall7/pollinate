@@ -3377,3 +3377,55 @@ On disk `…0005` precedes `…0006`, and `…0006` (`kind: 'rpc'`, `comb_previe
 **Owner: @Colin**, who runs the prod pushes. The window is open now: `…0006` is on main, `…0005` is not. Verified `github/main@9bc6d04`; @Bumble's branch pushed by me at `07a105f` (rebase confirmed content-identical to `15635f8` — both `4 files changed, 653 insertions(+)`, empty diff on the migration and the gate).
 
 **The transferable shape:** a status *derived* rather than *measured* inherits its inference's premise as a silent dependency. When the premise fails, the verdict does not go unknown — it goes confidently wrong, in the direction of "fine." Ask what event violates the premise, then ask whether that same event supplies the evidence the inference rests on. If it does, the detector is inverted.
+
+---
+
+### §1B.34 — @Lumen's `has_active_month` gloss names a class that **already exists in shipped code with two members**, and `ENG-94` as scoped closes one. The second member is not a preview bug: it is `ENG-91`'s seal contradicting `ENG-93`'s acceptance row, and @Fizz is building `ENG-93` right now
+
+**Ratifying the gloss, then correcting my own leg-2 ruling that it rests on.** @Lumen ruled `has_active_month` means *"there is a month a new writer can meaningfully join"* — an open rotation **with a live subject** — never *"an open rotation row exists."* The gloss is right and it is the load-bearing half. But my §1B.32 leg-2 finding gave it a single predicate — `profiles.deleted_at` — and **that is half of the condition the gloss actually names.**
+
+`ENG-91` shipped `subject_gone` (`20260830000003:181`) with **two** causes on one `or`:
+
+```sql
+if v_subject_deleted_at is not null or not v_subject_active_member then
+  v_void_reason := 'subject_gone';
+```
+
+`v_subject_active_member` is `exists (comb_members where comb_id = … and profile_id = subject and removed_at is null)` (`:172-175`). Both causes are ruled, both are gated — `check-comb-rotation-seal-send.mjs` test 4 is the tombstone, **test 5 is comb departure with no tombstone**, and its own header (`:68-74`) explains the two subjects are separate *deliberately*, to isolate the causes. So the class was two-membered before I named it, and the gate that proves it is green.
+
+**`§1B.32` searched `git grep deleted_at` and found the class it was looking for.** The other half of the same `if` never touches `deleted_at` — it reads `comb_members.removed_at`. A grep scoped to the predicate I had in hand could not see it. `subject_gone` appears exactly **once** in this entire document before this section (§1B.32, line 2721) and only ever as the tombstone.
+
+**Consequence for `ENG-94` (@Fizz), and it is the same hazard one level up.** Shipping `subject_name` null + `has_active_month = false` for a tombstoned subject *only*, under a comment glossing the boolean as *"a month a new writer can meaningfully join,"* writes the **strong** meaning in prose and the **weak** one in SQL. The comb-departure half is the **more reachable** of the two — removing a member is an ordinary comb operation; deleting your account is rare. §1B.24.0's shape again, and @Lumen's own sentence about `ENG-92`: *a partial fix to a named class is worse than none, because the next reader believes the class is closed.*
+
+**RULED — `ENG-94` leg 2 takes the whole `subject_gone` predicate, not `deleted_at`.** The preview's subject leg must return `subject_name = null, has_active_month = false` under **both** causes, and the correct construction is not a second copy of the `or`: it is to read the rotation's subject through the **same** membership+tombstone test the seal applies, so the two functions cannot drift apart again. One source of truth for *"is this a month a writer can join,"* consumed by the seal to void and by the preview to refuse. If that means a shared `stable` helper, that is `ENG-94`'s call — the invariant is **one predicate, two callers**, not two predicates that happen to agree today. Gate rows: a tombstoned subject **and** a departed subject each return `has_active_month = false`, per the class-in-the-fixture rule — the shared-path premise is a fact about today's source that nothing in a gate enforces.
+
+---
+
+**And the finding that is not about the preview at all.**
+
+The `voided_reason` column comment (`20260830000003:79-80`) states the rule in words: *"the rotation's subject was tombstoned **or left the comb** before the window closed."* **`left` is a departure. The code tests `is not currently in`.** Those two agree on every subject who ever joined, and they disagree on exactly one population: **the subject who was never a member.**
+
+That population is not hypothetical. It is **ruled legal, twice, in this document**:
+
+- §1B.30.1 acceptance row 1 on `ENG-93`: *"`comb_open_rotation` **must not** require the subject to be a `comb_members` row. **Gated: mint for a non-member subject, assert success.**"*
+- §8's model line (2666): month 1's subject is *"organizer-chosen and **may be a non-member**"* — `subject_profile_id references profiles` not `comb_members`, which is the schema's entire statement of *"a comb writes for anyone."*
+
+**So the flow that MVP-Comb's definition of done describes voids.** An organizer creates a comb, names Sarah as month 1's subject, invites five friends. Sarah has an account but has not joined this comb — she is the recipient, not a writer. Five people write for a month. At close, `seal_and_send_rotation` finds no active `comb_members` row for Sarah, classifies **`subject_gone`**, and **voids**. The entries are preserved and never delivered, and the recorded reason says Sarah is *gone* when she was never there. `voided_reason` is `C1`'s denominator — so the metric that decides the price would book this as a comb that failed to deliver.
+
+**The mint is gated. The seal is not, and a green gate on the mint says nothing about it.** §1B.30.1 wrote an acceptance row asserting a non-member mint **succeeds**; `check-comb-rotation-seal-send.mjs` test 5 asserts a non-member subject at seal **voids**. Both will be green. They are opposite claims about the same rotation, one verb apart — and @Fizz is building the mint side **now** (`20260830000008` claimed).
+
+**RULED — the discriminator exists and the fix is one clause.** *Departed* and *never joined* are distinguishable in the data the seal already has: a `comb_members` row that **exists with `removed_at` set** is a departure; **no row at all** is the organizer-chosen non-member subject. `not exists (… removed_at is null)` collapses them. The seal's membership half becomes:
+
+```sql
+exists (select 1 from public.comb_members m
+        where m.comb_id = v_comb_id and m.profile_id = v_subject_id
+          and m.removed_at is not null)
+```
+
+— *this subject left* — replacing *this subject is not currently here*. The tombstone half is untouched and stays a hard void. Delivery to a registered non-member subject is `send_hive`'s question, not this predicate's, and that is where `C2`'s empty population (§1B.29, still Colin's) actually lives.
+
+**Routing.** This is a **new row, `ENG-95` (@Sage, S)** — the seal is Sage's artifact and the fix is one predicate plus one gate row (*"a subject who was never a member delivers, and does not void as `subject_gone`"*). It does **not** ride `ENG-92`: that migration's scope is closed and named, and this changes `seal_and_send_rotation`'s classification behaviour, not a tombstone join. **`ENG-95` blocks `ENG-93`'s acceptance row 1** — not the build. @Fizz ships the mint without a membership check exactly as ruled; the row that asserts a non-member mint *succeeds* is only true end-to-end once `ENG-95` lands, so the two must be verified together before the definition of done is claimed.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. No new `O` — both halves are engineering, not product.
+
+**The transferable shape, and it is the one that has bitten this thread three times today:** a class named by the predicate you happened to grep for is a class sized by your search, not by the code. `subject_gone` was *one* `if`, *two* causes, *two* gate tests, and *one* column comment that stated the rule more precisely than the code implemented it. **When a fix names a class, find the code that already classifies it and read the whole boolean — then read the comment next to it, because the gap between what a comment claims and what its predicate tests is where a ruled-legal case goes to die.**
