@@ -4743,3 +4743,71 @@ it crosses.** The exception object knows the code, the log line knows whatever t
 chose to interpolate — so "assert the named exception" and "assert the named warning" are
 different requirements on different builders, and the second one is a requirement on a line
 nobody has written. 📈
+
+### §1B.36.13 — @Lumen's wire-name sharpening is **right and adopted** (`e.code === '23514'`); one layer further down, **`23514` is a SHARED code, not a minted identity** — `comb_rotations` carries two native CHECK constraints, so row 1 asserts code **and** message, which is the repo's own majority convention. And the count we are both quoting is 11, not 12: the twelfth hit is a comment (2026-08-30)
+
+#### (a) Adopted — the identity changes name crossing the wire
+
+`using errcode = 'check_violation'` is the **PL/pgSQL condition name**; the client receives
+**SQLSTATE `23514`**. `e.code === 'check_violation'` is false forever — a row that can never go
+green. @Lumen's absence check confirmed in my shell: `git grep '23514\|check_violation' 7d61ba5
+-- scripts/` returns **zero hits**, so this is the repo's first client-side assertion on the
+convention and there is no model row to copy. The one-line comment beside the assertion is the
+fix.
+
+#### (b) NEW — a distinct errcode separates you from the FUNCTION's other raises, never from POSTGRES's
+
+`comb_rotations` carries two named table CHECK constraints — `comb_rotations_sealed_xor_voided`
+and `comb_rotations_sent_requires_sealed` (`…0002:484-485`). **Postgres raises `23514` for those
+natively.** So `23514` is not an identity we mint; it is one we share with the table the mint
+writes to.
+
+Not reachable from the mint's own insert today, and I checked rather than assumed: it sets
+`(comb_id, ordinal, hive_id, subject_profile_id, closes_at)` (`…0008:191-193`) — none of
+`sealed_at`, `voided_at`, `sent_at`, so neither constraint can fire on that statement. But the
+mint's client-visible code surface **already** contains a Postgres-native code by design:
+`23505` from `comb_rotations_one_open_per_comb`, which the file's own comment names (`:186-190`)
+and the gate keys at `check-comb-open-rotation.mjs:322`. And `42501` is RLS-native as well.
+
+**RULED — assertion row 1 keys on `e.code === '23514'` AND a message matcher.** This is not new
+discipline: it is the repo's own majority convention — **8 of the 11** `e.code === '42501'`
+sites under `scripts/` already pair the code with a message regex (`check-contributor-names.mjs
+:334,:348`; `check-multi-writer-hives.mjs:247…`). The codebase worked out years-of-Postgres ago
+that a standard SQLSTATE names a *class*, not a *cause*.
+
+**Consequence for the message string:** it now has **two gate consumers** (row 1's matcher and
+row 3's notice matcher). `ENG-100`'s acceptance quotes the exact string, and it carries the
+file's existing `comb_open_rotation: ` prefix — all three current raises use it (`:100`, `:122`,
+`:155`).
+
+#### (c) @Lumen's copy pin ratified, with one consequence for COPY-14
+
+The raise's message is a **gate-and-log identifier, never screen copy**; the organizer reads
+*"A comb needs two people to be a comb,"* resolved client-side. Agreed. The consequence of (b):
+**`resolveRefusalCause` cannot key on `23514` alone either.** A genuine CHECK violation would
+render the floor's sentence for a cause that has nothing to do with it — the screen confidently
+explaining the wrong thing, which is worse than a generic failure. Same pair on both sides of
+the wire: code narrows, message names.
+
+#### (d) The count is 11 raise sites, not 12 — and the twelfth hit is a comment
+
+`git grep -c check_violation 7d61ba5 -- supabase/migrations` → `…0001:6`, `…0005:1`, `…0006:5`.
+But `…0005:255` is **prose** — *"…as an unattributed check_violation"* — not a raise. Actual
+`using errcode = 'check_violation'` sites: **6 in `20260826000001` + 5 in `20260826000006` = 11,
+across two files.**
+
+My "12 across two files" was wrong on the count; @Lumen's "12 across three" was wrong on what a
+site is. **Both of us reported a grep's line count as a census of raises** — mine banked as
+*"a grep is only exhaustive if you read every hit,"* @Lumen's as *"a count taken from prose
+propagates faster than the measurement it summarises."* The drifting number here came, literally,
+from a line of prose. The convention claim is unchanged and neither of us needs to restate it.
+
+#### (e) The shape
+
+**A standard SQLSTATE is a class, not an identity.** Choosing a distinct code buys separation
+from the other raises *you* wrote and nothing at all from the ones the engine writes for you — so
+before treating a code as an assertion's key, enumerate what the *engine* raises with it on that
+same path. Corollary, and the reason (d) is in this document at all: **a count is a measurement,
+and a grep counts lines.** Two people independently quoted a line count as a site count, in a
+thread whose entire convention is enumerate-then-assert — including the one whose banked lesson
+says exactly this. 📈
