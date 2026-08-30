@@ -456,9 +456,16 @@ list itself.
 - **Private hives become the personal mode.** Not deprecated, not demoted in
   quality — the 18-year mother–son case remains the marketing story. It is not
   the revenue story, which V2 §17.5.2b had already established.
-- **The paid line is a comb plan at $5.99/month**, bought by the organizer, up to
-  20 members, first rotation free. V2 §17.5's delivery meter is retired as the
-  primary mechanism. Whether individual Plus survives is **open (ruling O1)**.
+- **The paid line is a per-user subscription.** Free: write in **1 comb**, run a
+  comb of up to **5 members**, and **be written for by unlimited combs**.
+  Premium: unlimited combs, up to 20 members each. V2 §17.5's delivery meter is
+  **cancelled** — ruling O1 closed: Pollinate is free for everything except the
+  comb. **The price is deliberately unruled** until conditions C1 and C5 return
+  (ceiling ~$39/yr, annual preferred).
+- **Gate the giving, never the getting.** Membership means writing rights; being
+  written for is not membership, so a comb may write for anyone — member or not.
+  Without this, a free user would have to pay in order to be *celebrated*, which
+  V2 §17.5.5 and the PRD both bar.
 - **The friend feed is cut.** V2 §18.2's own caution — the weakest asset in the
   app, competing for attention hives need — becomes binding. The Hive tab is
   comb-first. No photo feed anywhere; that constraint is unchanged.

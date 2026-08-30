@@ -316,9 +316,9 @@
 > **Project 12's price and meter are superseded 2026-08-30** —
 > `POLLINATE_COMB_ROTATION.md` §4. Rows 12.1, 12.2, 12.3, 12.4 and 12.5 below are
 > written against the $39.99/yr delivery meter. **The paid line is now a comb
-> plan at $5.99/month**, organizer-paid, first rotation free, and the delivery
-> meter is retired as the primary mechanism (whether it survives at all is open
-> ruling O1). 12.3's *free tier* description stays accurate; only its
+> per-user subscription** (free: 1 comb / 5 members; premium: unlimited combs /
+> 20 members), and the delivery meter is **cancelled** — ruling O1 closed
+> 2026-08-30. **The price is deliberately unruled** until C1/C5 return. 12.3's *free tier* description stays accurate; only its
 > "delivery is the only meter" clause is retired. 12.6, 12.7 and 12.8 are
 > unaffected in substance — 12.8 should add rotation participation (condition
 > C1) to its tracked metrics. Build against `ENG-79`, not `ENG-76`.
@@ -544,7 +544,7 @@ after it.
 | Was | Now |
 |---|---|
 | Project 18 (Collective Hives & Combs) — Cycle 11–12 | **On the critical path.** `ENG-58`/`59`/`60` (combs schema, invite-link join, rotation ritual) are the hero build. |
-| Slice 2 = delivery-metered paywall at $39.99/yr annual-only | **Slice 2 = the comb plan, $5.99/month** (`ENG-79`, repriced from $79/yr-6-seats and promoted from Slice 3). `ENG-76` is **blocked on ruling O1**. |
+| Slice 2 = delivery-metered paywall at $39.99/yr annual-only | **Slice 2 = the per-user subscription, price unruled until C1/C5** (`ENG-79`, repriced from $79/yr-6-seats and promoted from Slice 3). `ENG-76` is **blocked on ruling O1**. |
 | `ENG-79` Family/comb plan — Slice 3 | **The primary paid line.** |
 | Friend feed in the Hive tab | **Cut.** Hive tab becomes comb-first. |
 

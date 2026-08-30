@@ -16,10 +16,10 @@ amendment in `Pollinate_The_Ruling.md`.
 > **`POLLINATE_COMB_ROTATION.md` governs where the two disagree.** The comb
 > rotation (§18.2) is promoted from Cycle 11–12 to the hero of the product;
 > private hives become the personal mode. The revenue model in §17.5 is
-> superseded: the paid line is a **comb plan at $5.99/month**, bought by the
-> organizer, first rotation free. §17.5.1's anti-monthly finding, §17.5.2's
+> superseded: the paid line is a **per-user subscription** unlocking **more than one comb to write in** and **more than 5 members** in a comb you run (free: 1 comb, 5 members). **Receiving is never metered** — a comb may write for anyone, member or not. **The price is deliberately unruled** until conditions C1 and C5 return data (ceiling ~$39/yr, annual preferred). §17.5.2's
 > $39.99 annual-only line, §17.5.3's install table and §17.5.4's `Family / comb
-> plan` row are superseded in place — annotated below, bytes untouched, per this
+> plan` row are superseded in place; **§17.5.1's annual-over-monthly finding
+> stands** (see the annotation there) — annotated below, bytes untouched, per this
 > directory's append-only amendment discipline. **Not** superseded: §0's
 > positioning, Projects 16/17, §17.4's durability promise, §17.5.2a's metering
 > principle, §5.6's guardrails G1–G5, and 19a-before-19b phasing.
@@ -413,9 +413,12 @@ It is *more* load-bearing now than it was with a book in the plan, not less.
 ### 17.5 Revenue model (ruled 2026-08-24)
 
 > **SUPERSEDED IN PART, 2026-08-30 — see `POLLINATE_COMB_ROTATION.md` §4.**
-> The **comb plan at $5.99/month** (organizer pays, up to 20 members, first
-> rotation free) replaces $39.99/yr annual-only as the primary paid line, and
-> **the delivery meter is retired as the primary mechanism.** Everything below
+> A **per-user subscription** replaces $39.99/yr annual-only, and **the delivery
+> meter is cancelled outright** (ruling O1 closed 2026-08-30: Pollinate is free
+> for everything except the comb). Free: **1 comb you write in, 5 members in a
+> comb you run.** Premium: unlimited combs, 20 members each. **Receiving is never
+> metered.** **The price is not yet ruled** — deliberately blank until C1 and C5
+> return (ceiling ~$39/yr, annual preferred). Everything below
 > is left byte-intact and remains the record of the 2026-08-24 reasoning.
 > Still live from this section, not superseded: **§17.5.2a's metering principle**
 > ("meter the artifact, never the practice, never the graph" — the comb plan
@@ -431,15 +434,17 @@ vocabulary sweep across those files is owed — see `COPY-11`.
 
 #### 17.5.1 The diagnosis: the old price was the wrong *shape*
 
-> **Superseded by a change of premise, 2026-08-30, not overturned on its merits.**
-> The finding below — *"nobody in this category sells monthly"* — rests on the
-> premise that Pollinate's value is **episodic**: enormous at the reveal, quiet
-> for eleven months. A comb rotating monthly delivers a reveal every month, so
-> the quiet stretch this reasoning protects against does not exist inside an
-> active comb. **The corollary is binding:** monthly pricing is defensible only
-> while rotations actually happen. A comb that stops rotating churns the next
-> month — rotation cadence and subscription retention are one number
-> (`POLLINATE_COMB_ROTATION.md` §4.2, condition C1).
+> **Re-examined 2026-08-30 and LARGELY UPHELD** (`POLLINATE_COMB_ROTATION.md` §4).
+> An earlier draft of this annotation said the finding below was superseded
+> because a comb rotating monthly delivers a reveal every month. **That was
+> withdrawn the same day.** It holds only for a *healthy* comb — and the failure
+> mode that matters is a comb going quiet (August, holidays, a busy organizer),
+> which is exactly when monthly billing loses the subscriber instead of giving
+> the group a year to find its rhythm. **Annual over monthly stands.** What this
+> section no longer governs is the *price* and the *meter*, not the *shape*.
+>
+> **The corollary is binding either way:** a comb that stops rotating churns.
+> Rotation cadence and subscription retention are one number — condition C1.
 
 
 Pollinate's value is **episodic** — enormous at the reveal, quiet for eleven
@@ -553,8 +558,9 @@ accumulated time that *is* the moat. It is a fact to plan around:
 #### 17.5.3 The number the business actually rests on
 
 > **Install table superseded 2026-08-30** (`POLLINATE_COMB_ROTATION.md` §4.4):
-> at $5.99/month, $1M **gross** is ~13,900 *steady-state active combs* (~167K
-> engaged users at 12/comb), not 730K installs at 4% conversion. **The
+> at ~$39/yr per user, $1M **gross** is ~25,600 paying users — but the pool is
+> every comb member, not one organizer per comb, and every comb over five members
+> yields at least one payer. Not 730K installs at 4% conversion. **The
 > reveal→signup question below is NOT superseded** — `ENG-78` remains the
 > highest-priority single analytics event, and it is now condition **C2** of four
 > (§6 of the ruling). C1 — rotation participation — outranks it as the number
@@ -589,8 +595,8 @@ and the correct response is `DES-17`, not a price change.
 
 > **The `Family / comb plan` row below is superseded, 2026-08-30.** It is no
 > longer second-order, no longer Slice 3, no longer $79/yr, and no longer capped
-> at 6 seats: it is **the primary paid line at $5.99/month, up to 20 members**
-> (`ENG-79`, repriced). The **Gifted subscription** and **Legacy tier** rows are
+> at 6 seats: it is **the only paid line — a per-user subscription unlocking
+> unlimited combs and 20 members each** (`ENG-79`, re-scoped). The **Gifted subscription** and **Legacy tier** rows are
 > untouched and remain Slice 3.
 
 

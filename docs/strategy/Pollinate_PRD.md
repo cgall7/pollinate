@@ -577,9 +577,12 @@ the product.
 **Superseded here:**
 
 - Any free/paid tier table denominated in individual subscription at $39.99/yr
-  annual-only. The paid line is a **comb plan, $5.99/month**, organizer-paid,
-  first rotation free. Membership, writing, receiving and export stay free
-  forever on every tier.
+  annual-only. **The paid line is a per-user subscription** unlocking more than
+  one comb to write in and more than 5 members in a comb you run. **Free: 1 comb
+  written in, 5 members in a comb you run.** Joining, writing in your one comb,
+  export, and **receiving without limit** stay free forever on every tier —
+  *"gate the giving, never the getting."* **The price is deliberately unruled**
+  until conditions C1 and C5 return (ceiling ~$39/yr, annual preferred).
 - The friend feed. Cut — the Hive tab is comb-first.
 
 **Not superseded:** §7's data-architecture rule (*if losing the phone destroys

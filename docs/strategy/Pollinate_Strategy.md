@@ -109,9 +109,11 @@ We don't launch to individuals. We launch to **pre-existing friend groups** who'
 ## 4. Business Model
 
 > **SUPERSEDED 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §4 governs.** The paid
-> line is a **comb plan, $5.99/month**, organizer-paid, up to 20 members, first
-> rotation free. $1M **gross** ≈ **13,900 steady-state active combs** (~167K
-> engaged users), not 25,006 individual subscribers at $39.99/yr. The unit
+> line is a **per-user subscription** — free: 1 comb written in, 5 members in a
+> comb you run; premium: unlimited combs, 20 members each; **receiving never
+> metered**. **Price deliberately unruled** until C1/C5 return (ceiling ~$39/yr,
+> annual preferred). At ~$39/yr, $1M **gross** ≈ **25,600 paying users** — but
+> the pool is every comb member, and every comb over five yields ≥1 payer. The unit
 > economics table below is superseded wholesale; the Cash App gifting section
 > (§6) was already cancelled by V2 §5.7. **Not superseded:** "we are not a money
 > transmitter," the never-ads rule, and the free tier's unlimited hives and
@@ -167,9 +169,10 @@ Pollinate is a **freemium consumer app**. The only revenue stream is subscriptio
 
 > **SUPERSEDED WHOLESALE 2026-08-30** — `POLLINATE_COMB_ROTATION.md` §4.4. Every
 > row below is denominated in individual subscribers at $39.99/yr. Replacement:
-> $5.99/month per comb = **$71.88 per comb-year**, ~**$61.10** net of Apple's 15%;
-> **$1M gross ≈ 13,900 steady-state active combs** (~167K engaged users at
-> 12/comb), requiring ~700 new paying combs per month at 5% monthly churn.
+> a **per-user** subscription at a price not yet ruled (ceiling ~$39/yr). At $39:
+> ~$33.15 net of Apple's 15%; **$1M gross ≈ 25,600 paying users**, $1M net ≈
+> 30,200. Every comb over five members yields at least one payer, and one
+> subscriber can run many combs.
 
 
 | Metric | Estimate |
