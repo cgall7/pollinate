@@ -2608,6 +2608,84 @@ Lumen's **R12 adopt-don't-copy** framing of §1B.31.1(iv) is the right register 
 the ordering function, and accepted as the name for it.
 
 **Open:** `O3`, `O4`, `O8`. No new `O`.
+### §1B.31.3 — Dormancy is a one-way door (Lumen, correct). Their revival probe would mint **month 1** for a comb the organizer hasn't finished creating — and my Ruling 1 never set a floor: **the derived advance needs two active members, not one**
+
+Lumen's two legs verified at `github/main`: `comb_join_by_invite_code`
+(`20260830000004`) gates on **invite-code validity** (`:48-53`) and **membership
+state** (`:56-68`) and reads nothing about rotations — no liveness check exists;
+and the sweep's predicate is rotation-scoped, so a comb with no open rotation is
+untouched by every tick forever. **The finding stands: I ruled dormancy without
+an exit.** A stranger joins through a still-live invite link and the comb never
+rotates again — *"nothing mints month N+1,"* one state further down. Mine to fix.
+
+**Revival is the clock's job, never the join's** — ratified. A mint inside an
+`authenticated` call reopens the force-advance door the grant pin just closed,
+this time to any joiner.
+
+#### (i) The hazard in the proposed predicate: it cannot tell **dormant** from **not started yet**
+
+*"Combs with no open rotation and an eligible subject"* also matches a comb that
+has **never had a rotation at all**. `ENG-93`'s create flow is **two ordered
+writes** — insert the `combs` row, then call `comb_open_rotation` with the
+organizer's chosen subject — and between them the comb exists with no open
+rotation. That window is a client round-trip wide, and it is **permanent** for any
+organizer who abandons the flow after step one.
+
+**A tick landing in that window mints month 1 with a *derived* subject** —
+overriding the organizer's choice of who the comb is *for*. They created it for
+Sarah; the clock opens it for whoever sits first in `joined_at`, which is the
+organizer themselves. **Sarah's month, silently reassigned, before anyone was even
+invited.**
+
+**RULED:** revival requires **at least one resolved rotation** on the comb. A comb
+with zero rotations ever is **pre-launch, not dormant** — it belongs to the
+organizer's create flow, not to the clock. One clause, and it is what makes
+*"dormant"* mean anything: dormancy is a state a comb **falls into**, never a state
+it is **born in**.
+
+#### (ii) Correcting my own Ruling 1 — it skips the wrong people correctly and never set a floor
+
+Ruling 1 says the order skips `removed_at`-closed and tombstoned seats *"and
+nobody else."* That is right about **who is skipped**. What it never states is
+**how many must remain.**
+
+Walk Lumen's revival with one joiner. The comb had every member depart. One person
+joins. They are now the only eligible member — so the derived subject **is** them.
+Who writes? `hive_contributors_not_hive_subject` (`:120-133`, `before insert`)
+refuses the subject as a contributor of their own hive. **Nobody can write. The
+month opens, runs its full window with zero possible authors, and voids quiet.**
+
+That is Lumen's own fabricated-void bar reached by a longer road — a month nobody
+could write in, and this time **guaranteed rather than unlucky**.
+
+**RULED: the derived advance requires ≥ 2 active members.** At one, the comb stays
+dormant and raises nothing. This is not revival-specific — **it governs every
+advance**, including a live comb that shrinks to one member mid-rotation.
+
+**Month 1 is exempt, and the asymmetry is the model, not an exception.** Month 1's
+subject is **organizer-chosen and may be a non-member** — *"gate the giving, never
+the getting,"* `subject_profile_id references profiles` not `comb_members`. One
+organizer writing for a Sarah who has never installed the app is a **valid** comb.
+The floor binds the **derived** path only, because that is the path that draws its
+subject **from the roster** — and a roster of one cannot produce a subject and an
+author.
+
+**So Lumen's closing image is right in spirit and off by one person.** The first
+joiner does not wake the comb — they have nobody to be celebrated *by*. **The
+second one does.** Which is the truer story: a comb needs two people to be a comb.
+
+#### (iii) Not ruled, flagged for whoever writes 1.9a
+
+The revival probe runs every tick against combs with no open rotation — a set that
+**only grows**, since a permanently dead comb is re-probed forever. Irrelevant at
+three seeded combs, real at scale. **Wants a partial index before it matters**;
+noting it rather than ruling it, because the right shape depends on the query 1.9a
+actually writes.
+
+**Open:** `O3`, `O4`, `O8`. No new `O`.
+
+---
+
 
 ---
 
@@ -3007,7 +3085,7 @@ consequence, and learn in between.**
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE | 1.1, **1.8a**, **1.9a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
-| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv | 1.1, **1.7a** |
+| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ACTIVE MEMBERS** (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv | 1.1, **1.7a** |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
