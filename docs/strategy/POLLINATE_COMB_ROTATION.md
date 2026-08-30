@@ -3397,7 +3397,7 @@ if v_subject_deleted_at is not null or not v_subject_active_member then
 
 **Consequence for `ENG-94` (@Fizz), and it is the same hazard one level up.** Shipping `subject_name` null + `has_active_month = false` for a tombstoned subject *only*, under a comment glossing the boolean as *"a month a new writer can meaningfully join,"* writes the **strong** meaning in prose and the **weak** one in SQL. The comb-departure half is the **more reachable** of the two — removing a member is an ordinary comb operation; deleting your account is rare. §1B.24.0's shape again, and @Lumen's own sentence about `ENG-92`: *a partial fix to a named class is worse than none, because the next reader believes the class is closed.*
 
-**RULED — `ENG-94` leg 2 takes the whole `subject_gone` predicate, not `deleted_at`.** The preview's subject leg must return `subject_name = null, has_active_month = false` under **both** causes, and the correct construction is not a second copy of the `or`: it is to read the rotation's subject through the **same** membership+tombstone test the seal applies, so the two functions cannot drift apart again. One source of truth for *"is this a month a writer can join,"* consumed by the seal to void and by the preview to refuse. If that means a shared `stable` helper, that is `ENG-94`'s call — the invariant is **one predicate, two callers**, not two predicates that happen to agree today. Gate rows: a tombstoned subject **and** a departed subject each return `has_active_month = false`, per the class-in-the-fixture rule — the shared-path premise is a fact about today's source that nothing in a gate enforces.
+**RULED — `ENG-94` leg 2 takes the whole `subject_gone` predicate, not `deleted_at`.** The preview's subject leg must return `subject_name = null, has_active_month = false` under **both** causes, and the correct construction is not a second copy of the `or`: it is to read the rotation's subject through the **same** membership+tombstone test the seal applies, so the two functions cannot drift apart again. One source of truth for *"is this a month a writer can join,"* consumed by the seal to void and by the preview to refuse. If that means a shared `stable` helper, that is `ENG-94`'s call — the invariant is **one predicate, two callers**, not two predicates that happen to agree today. ***[SUPERSEDED ON OWNERSHIP by §1B.34.2, upheld on substance: the shared body is `ENG-95`'s artifact at `…0009`; `ENG-94` owns the CALLERS, not the body. Naming its home twice and differently is what left it homeless — read §1B.34.2 before building this.]*** Gate rows: a tombstoned subject **and** a departed subject each return `has_active_month = false`, per the class-in-the-fixture rule — the shared-path premise is a fact about today's source that nothing in a gate enforces.
 
 ---
 
@@ -3462,3 +3462,44 @@ Three notes so this is buildable rather than aspirational:
 **Open:** `O3`, `O4`, `O8`, `O9`.
 
 **The transferable shape:** *"one predicate, N callers"* is a claim about **call sites**, and it is worth counting them. A site that reimplements one arm of the predicate reads exactly like a site that calls it — same refusal, same error, same green gate — right up until the arm it omitted is the one that fires.
+
+---
+
+### §1B.34.2 — The shared body is **homeless**: I named its home twice, differently, and both in-flight builders claimed before the second naming. And the repoint I assigned **cannot live where I put it** — `create or replace` on a function that does not yet exist *creates* it
+
+@Lumen ratified §1B.34.1 and @Fizz has the sequencing. **Neither is building the shared body, and neither should be blamed for it — I gave it two different homes in two published sections eleven minutes apart, and both builders claimed against the first one.**
+
+- **§1B.34** (`9554c45`): *"If that means a shared `stable` helper, **that is `ENG-94`'s call**."*
+- **§1B.34.1** (`32d6cc2`): *"The shared body is **`ENG-95`'s artifact** (@Sage)."*
+
+@Sage claimed `20260830000009` at **17:49:31**; §1B.34.1 published at **17:51:30**. The claim predates the amendment by two minutes, and its text is seal-only: *"`seal_and_send_rotation` non-member-subject predicate fix."*
+
+**Verified on disk, not inferred.** `wt-eng95-seal-nonmember/supabase/migrations/20260830000009_eng95_seal_nonmember_subject.sql`, 195 lines, uncommitted: **one** `create or replace function` and it is `seal_and_send_rotation` (`:40`). The predicate is a **local variable** — `select exists (… m.removed_at is not null) into v_subject_departed` (`:104-107`) — and the fix itself is exactly right, with the never-joined fall-through reasoned in the header. `comb_open_rotation` appears **once**, at `:15`, as a *citation* in a comment. The mint is untouched. Nothing is pushed on any of `ENG-93`/`ENG-94`/`ENG-95`; `github/main` is `9bc6d04`.
+
+**So if all three land as currently being built: seal has its own `exists`, mint has its own `deleted_at`, preview gets a third. "One predicate, N callers" would be published, ratified twice, and implemented nowhere — three sites, three copies, and every gate green.** This is §1B.29(a)'s shape done to myself: *a requirement whose home is named twice and differently is as homeless as one never named*, and worse, because each naming looks like an answer.
+
+---
+
+**And the assignment in §1B.34.1 is not merely misrouted, it is unbuildable as written.**
+
+I told `ENG-95` to repoint the mint. It cannot. `create or replace function` on a function that does **not** exist does not error — **it creates it.** `…0009` repointing `comb_open_rotation` while `…0008` has not merged would **conjure a mint function out of the seal's migration**, written by an author who does not hold `ENG-93`'s body: wrong signature, wrong insert order, no cadence. Silent and wrong, not loud and wrong — the same failure class as tonight's `…0005` skip, one layer down. **A repoint needs its target to already exist, and `create or replace` is precisely the statement that will not tell you it didn't.**
+
+---
+
+**RULED — three artifacts, ordering-safe by version number alone, nothing conjured and no cross-branch merge dependency.**
+
+| Migration | Owner | Carries |
+|---|---|---|
+| `…0008` `ENG-93` | @Fizz | **Unchanged.** Inline tombstone refusal as ruled + @Lumen's naming comment. **Depends on nothing new** — ship it |
+| `…0009` `ENG-95` | @Sage | **Create the shared body** — `comb_subject_deliverable(p_comb_id, p_subject_profile_id)`, tombstoned **or** departed — and repoint **the seal only**. `v_subject_departed`'s inline `exists` becomes a call. **Do not touch the mint** |
+| `ENG-94` | @Fizz | **Repoints BOTH the preview and the mint** to the body. Same artifact type (`create or replace` of a definer that reads the body), same author, and by number it lands after `…0008` and `…0009`, so body and mint both exist |
+
+**Superseding §1B.34 in place** (annotated at the line, per *file order is not a timestamp*): the body is **`ENG-95`'s**; `ENG-94` owns the **callers**. @Sage's file is open right now and the edit is small — the `exists` it already wrote, lifted into a function and called twice.
+
+**`ENG-94` is no longer dependency-free.** §1B.32 said it *"blocks nothing and is blocked by nothing"* — true when it was two legs of a return contract, **false now**: it consumes `ENG-95`'s body and rewrites `ENG-93`'s mint, so it is blocked by both. It still blocks nothing, and it still must not delay `ENG-93`.
+
+**@Lumen's comment obligation on the inline line is endorsed and now has a resolvable address.** It should name **`ENG-94`**, not `ENG-95`: *"half of the shared subject-deliverable predicate; `ENG-94` replaces this line with a call to `comb_subject_deliverable()` — do not extend in place."* A comment pointing at the wrong ticket is the failure the comment exists to prevent.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. No new `O`.
+
+**The transferable shape, and it is mine tonight:** an amendment that *relocates* a requirement only relocates it for readers who arrive after it. Everyone already building is working from the first naming — so **when an amendment moves an unbuilt artifact's owner, name the builders who claimed under the old naming and address them by name**, or the requirement is homeless in exactly the way the amendment was written to prevent. Second half: before assigning a repoint, ask what the repointing *statement* does when its target is absent. `create or replace` answers "creates it," which is the one answer that produces no error and no diff to read.
