@@ -1602,6 +1602,15 @@ question and not a rendering fix.
 
 #### 2. `''` freezes into `author_name_at_seal` and cannot be repaired — `ENG-91`, not `ENG-92`
 
+> **SUPERSEDED ON MECHANISM, UPHELD-BUT-DEMOTED ON CONCLUSION — §1B.26, same
+> evening, published as event `17555c71`.** The live path described below cannot
+> fire: `delete_own_account()` **deletes** the unsealed entry (`20260830000001:150-152`)
+> thirty lines before it blanks `display_name`, so no row survives to be sealed with
+> `''`. The `coalesce` still ships — as a **backstop** for the backfill and for
+> future paths that blank a name without deleting entries — but it is **not** the fix
+> for pre-seal deletion, and nothing may be filed as closed against it. The real
+> failure in this window is §1B.26.
+
 Every other blank in §1B.24 is a live join a later commit can fix. **This one is
 not.** `seal_volume` (`20260828000001:48-54`) writes the frozen snapshot from a
 bare, unguarded live read:
@@ -1644,6 +1653,96 @@ as a bug, not as tact. That is what the word has to beat.
 §1's ruling is a doc edit in `DES-22` §4 (@Pixel) — no code. §2 is one `coalesce`
 inside `ENG-91`, cheaper now than in any later ticket. Nothing here gates the
 `ENG-58` merge; all post-merge.
+
+**Amended by §1B.26:** §2's `coalesce` is now a backstop, not a fix. The work that
+matters in that window is §1B.26.3 (`ENG-91`) and `O9` (@Colin).
+### §1B.26 — I corrected my own §1B.25.2: the pre-seal deletion does not rename the letter, it destroys it
+
+Published as event `17555c71` before this commit. All citations read at
+`github/main@e99936d`. @Lumen's token ruling (`A writer`, event `863c6c2c`) is
+**unaffected and ships unchanged** — only the class of blank it guards shrinks.
+
+#### 1. The mechanism §1B.25.2 gave `ENG-91` is wrong
+
+I ruled that a contributor deleting after writing and before the seal freezes `''`
+into `author_name_at_seal`. **I never traced whether the entry survives to reach
+`seal_volume`.** It does not. `delete_own_account()` (`20260830000001:150-152`):
+
+```sql
+delete from public.entries
+  where user_id = v_uid
+    and (hive_id is null or public.is_volume_open(volume_id));
+```
+
+`is_volume_open` (`20260827000001:369-372`) is true for any volume with
+`sealed_at is null`, and `entries_resolve_volume_id_trigger`
+(`20260826000003:79-82`, fires on INSERT **and** UPDATE) stamps `volume_id` on
+every hived entry from the hive's open volume. The unsealed rotation letter
+matches; the DELETE runs at `:150`, **thirty lines before** `display_name` is
+blanked at `:181`. `seal_volume`'s update (`20260828000001:48-54`) has no row
+left to match.
+
+**Ship the `coalesce` anyway, as a backstop, not as the fix.** Remaining classes:
+the one-time `:258-264` backfill, and any future path that blanks a name *without*
+deleting entries — `ENG-92` and `O8`'s ownership transfer are both candidates.
+@Lumen's pre-merge rider (does any `author_name_at_seal = ''` row exist on prod?)
+was housekeeping when the live path was believed open; it is now the **only** class
+that can produce one, so it is the check that decides whether the guard ever fires.
+Expect zero.
+
+#### 2. The real failure: a mid-month departure erases a letter written for a third party
+
+Delete in week three and the letter written **for Sarah** is destroyed. She never
+saw it — pre-seal, an entry is readable by its author alone (§1B.22) — and she will
+never know it existed.
+
+`ENG-84:146-149` justifies this correctly *for its own world*: *"snapshotted names…
+already mean nothing sealed re-reads profiles live, so a delivered keepsake needs no
+further action here."* True for sealed. The unsealed complement was a personal-journal
+entry when that sentence was written. `20260830000001` merged **one commit before**
+`20260830000002` — the same merge-order trap as §1B.24, third occurrence.
+
+**Ruled: the deletion behaviour is correct and stands.** The obvious move is to reach
+for our own keep-and-disclose ruling (§1B.15) and it does **not** reach: that defense
+rests on Apple's own words, content *"shared with others."* A pre-seal entry is shared
+with **nobody, by construction** — the user's private unshared content, the case where
+deletion is unambiguously right. Compliance and the shipped code already agree here.
+
+#### 3. What must change is that the loss is silent — `ENG-91`, @Sage
+
+**C1 contamination #3**, same shape as #1 (organizer never tapped) and #2 (nobody
+wrote), third door: *"eleven people wrote"* and *"twelve wrote and one left"* produce
+an **identical month**. That is the failure-signature problem `DES-31` was upheld to
+prevent, aimed at the number the entire model is gated on.
+
+**No new schema.** `ENG-84:160-162` already sets `hive_contributors.removed_at`, so
+the fact is on disk. Two pins:
+
+- **`ENG-91`'s void-and-advance distinguishes three states, not two:** entries present
+  → seal; zero entries and no departures → void-and-record a quiet month; zero entries
+  because the only writers left → void-and-record **departed**, a different signal.
+- **C1's denominator excludes anyone whose `removed_at` falls inside the rotation
+  window.** §1B.23.2 chose `hive_contributors` as `comb_rotation_writer_count`'s source
+  because it is the month's roster; it now earns a second reason — it is the only one
+  `ENG-84` maintains. Leaving a departed member in the denominator reports a healthy
+  comb as failing the deciding threshold.
+
+#### 4. New `O9` (@Colin) — not blocking
+
+Should a writer be **told** that leaving destroys the letter they have already written
+this month? Today they are not. One line in the delete flow, and it is the honest
+version of keep-and-disclose: we disclose what survives, and this is the thing that
+does not. Colin's because it is a promise to a user, not a mechanism. `ENG-91` ships
+either way.
+
+#### Scope
+
+§1 is a demotion, no code change beyond the annotation already in `ENG-91`'s row.
+§3 is inside `ENG-91` (@Sage, in flight) and `ENG-89`'s C1 definition. §4 is a
+product ruling. Nothing gates any merge.
+
+---
+
 ---
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
@@ -1875,7 +1974,7 @@ instrument these five, and the answer arrives in eight weeks.**
 
 | # | Condition | Threshold | Instrumented by |
 |---|---|---|---|
-| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** | **≥60%, sustained 3 months** | `ENG-89` |
+| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** **[Vector, 2026-08-30 — §1B.26.3: also exclude anyone whose `hive_contributors.removed_at` falls inside the rotation window. A mid-month account deletion removes the writer *and* deletes their letter, so leaving them in the denominator reports a healthy comb as failing.]** | **≥60%, sustained 3 months** | `ENG-89` |
 | **C2** | Reveal→install for non-member recipients | ≥25% | `ENG-78` (exists) |
 | **C3** | Comb survival — seeded combs still rotating at month 6 | ≥50% | `ENG-89` |
 | **C4** | Willingness to pay at the member cap and the second-comb moment | Conversion at each gate | `ENG-89` |
@@ -2028,7 +2127,7 @@ consequence, and learn in between.**
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
-| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **Plus §1B.25.2:** the seal's `author_name_at_seal` snapshot must `coalesce(nullif(p.display_name, ''), <token>)` — a bare live read freezes `''` into the sealed roster and the backfill's `is null` gate can never repair it | 1.1 |
+| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
@@ -2153,6 +2252,7 @@ Recorded so no one over-reads this ruling:
 | **O3** | Carried from V2: §5.5(4) rules *"no projected returns, ever"* while §5.2(e) pitches *"$50 in 2026 versus 50,000 sats in 2044."* Apple 3.1.1 and FTC-adjacent risk both bite | 19d marketing copy, `COPY-8` |
 | **O4** | **The price.** Ceiling ~$39/yr, annual preferred. Deliberately unruled until C1 and C5 return (§4) | Phase 4 only |
 | **O8** | **What happens to a comb when its organizer deletes their account?** Auto-transfer to the earliest-joined remaining member (recommended), void the comb, or leave it ownerless. Raised §1B.24.2. Not blocking: `ENG-92` ships the compliance half (skip the owner's seat, never raise) with no ruling | `ENG-92` now, transfer default is Phase 4 |
+| **O9** | **Do we tell a departing writer that leaving destroys the letter they have already written this month?** Today we do not. `delete_own_account()` deletes unsealed hive entries (`20260830000001:150-152`), and the recipient never knew the letter existed. One line in the delete flow. Raised §1B.26.4. Not blocking: `ENG-91` ships either way | Before seeding |
 | ~~**O5**~~ | ~~One release or two?~~ **CLOSED `a11aa144…` — one release.** The in-flight Slice 1 / MVP1 work folds into MVP-Comb | — |
 | ~~**O6**~~ | ~~Does `ENG-89` come into MVP-Comb?~~ **CLOSED `a11aa144…` — yes.** Instrumentation is in the MVP, moved to Phase 2.7 | — |
 | ~~**O7**~~ | ~~Distribution for the seeded combs?~~ **CLOSED `a11aa144…` — EAS internal distribution (`OPS-10`, Bumble).** TestFlight (`11.1`) stays MVP2 | — |
