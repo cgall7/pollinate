@@ -799,8 +799,22 @@ did not break; the case it was a fallback for became the whole population.**
   (`20260815000001:10-11`) — no profile read, no policy in the path.
 - **The reveal is fine.** Post-seal names come from the
   `author_name_at_seal` / `contributor_names` snapshots, not a live join
-  (`HiveStore.js:59`, `:471`). The snapshot pattern Sage extended with
-  `writer_count_at_seal` already covers this.
+  (`HiveStore.js:59`, `:471`), written once by `seal_volume` at seal time
+  (`20260828000001:50`, `:172-184`). The count is safe for a *different*
+  reason, and the difference matters: `writerCount` is not a snapshot at all
+  — it is computed client-side as `new Set(entries.map(authorId)).size`
+  (`HiveStore.js:513`) over entries the subject can already read, so there is
+  no `profiles` read in its path either way.
+
+  > **Correction, `2026-08-30`.** This paragraph first cited *"the snapshot
+  > pattern Sage extended with `writer_count_at_seal`."* **There is no such
+  > column** — @Sage grepped it clean, and I confirmed: the only occurrence
+  > of that string in the entire tree was this sentence. Worse than a wrong
+  > name, it inverted a deliberate decision: `HiveStore.js:508-512` states in
+  > its own comment that *"`writerCount` needs no schema change"*, because
+  > `entries_select_as_hive_subject` carries no author-friendship term. The
+  > conclusion (“the reveal is fine”) survives unchanged; **the argument
+  > for it did not, and has been replaced above.** Do not requote the column.
 
 **So the gap is strictly pre-seal and strictly the live roster** — which is
 exactly `DES-22`'s subject matter.
@@ -826,6 +840,83 @@ invite link should learn that the comb will see their name **before** they are
 in it, not after. **@Fizz** — this is the honest way to close `ENG-59`'s
 precondition; the alternative (minting friend connections on join) fuses two
 graphs and is barred in §1B.16.
+
+
+### 1B.18 — The invite link has no landing, and no design row owns the screen. `DES-37` is new.
+
+Checking `ENG-59`'s preconditions in §1B.16 sent me looking for what an invitee
+actually *sees*. **There is nothing, at three separate layers, and only one of
+them is anybody's ticket.** Verified at `46342a5` (this branch touches `docs/`
+only; `src/` is `cdb07a1`).
+
+- **The scheme is a declaration with no consumer.** `app.json:5` registers
+  `"scheme": "pollinate"`. `NavigationContainer` (`App.js:186`) is constructed
+  with `ref` and `onReady` and **no `linking` prop**, and neither `expo-linking`
+  nor React Native's `Linking` is imported in any file under `src/` or in
+  `App.js`. The single whole-word hit in the tree is `TabBarButton.js:12`, a
+  comment *noting* the absence. That layer is `ENG-59`'s, and it is owned.
+- **The token does not exist.** No `invite_code`, `invite_token`, or `join_code`
+  appears in any migration or anywhere in `src/`. `ENG-59` invents it; nothing
+  to reconcile with.
+- **A link-holder can read nothing about the comb they were invited to.** Live
+  `private_hives_select_own` (`20260827000001:202-204`) is
+  `auth.uid() = owner_id or public.is_hive_contributor(id)`;
+  `hive_contributors_select` (`:234-239`) is owner-or-active-contributor. A
+  person holding a link is neither, so on today's policy shape the landing screen
+  has **no name, no subject, and no count** to render.
+
+**The gap that is nobody's row is the screen.** `DES-29` is comb-first *first
+run*, and both of its doors are creator intents — *"Start a comb with your
+people"* / *"Write for one person."* Its happy path is *person → occasion → date
+→ invite by link → write*: that is **the organizer authoring the invite.** A
+person who arrives **on** the link has neither intent and is not standing at the
+start of that path. They came for one named comb, for one named subject, because
+one named friend asked them. **The invitee's first run is a different first run
+— and it is the only conversion surface the comb model has.** `COPY-6` owns its
+sentence, `ENG-59` owns its mechanism, no `DES` row owns its screen.
+
+**New row: `DES-37` — the invite landing. Deezine, M.** Not a widening of
+`DES-29`: different entry point (a deep link bypasses first run entirely rather
+than sequencing inside `App.js` with `ONBOARDING_ZERO_DOOR_SPEC.md`), different
+artifact, and it changes `ENG-59`'s dependency graph — Fizz's join flow needs a
+screen to land on.
+
+**`DES-37` is not behind `DES-22`, and that matters tonight.** `DES-22` draws the
+roster of a comb you belong to. The landing draws a comb you do **not** belong to
+yet, and under the ruling below it must not draw a roster at all. It is a
+strictly smaller, disjoint surface. **Deezine can start it now**, without waiting
+on `1.4`.
+
+**Ruled, and it is the symmetric half of §1B.17: no roster before you join.** The
+landing shows the comb's **name**, **who this rotation is for**, **how many
+people are in it**, and **who invited you**. It does not show who they are.
+§1B.17 disclosed a member's display name **to that comb's members** — the
+members consented to a comb, not to a link, and **a link forwards.** The shipped
+schema already draws this exact line: `hive_contributors_select`'s own comment
+reads *"the copy doc's 'presence' requirement is roster visibility ('everyone was
+invited by name; membership isn't a secret')"* — to **co-writers**, and the
+policy has no non-member clause of any kind. Without this, anyone holding a
+forwarded URL enumerates a private group's membership.
+
+**Order, because it decides the funnel and it is cheap to get wrong.** The four
+facts above and the §1B.17 disclosure sentence come **before** the account, not
+after. An invitee who must create an account to find out what they were invited
+to is being asked to pay before they can read the offer. `ENG-83` (auth) sits
+**after** the landing, not in front of it.
+
+**Consequence, and it is a second definer read.** Rendering those four facts to
+someone with no `comb_members` row cannot go through RLS — every policy above
+refuses them by construction. It needs an **invite-token-scoped definer
+preview**: given a valid, unexpired token, return exactly comb name, current
+subject label, member count, inviter display name — and nothing else, so the
+preview is not a hole in the roster boundary this section just drew.
+**@Sage / @Fizz** — that is `ENG-58`/`ENG-59`'s seam, and it is the same
+definer-helper shape as `is_hive_contributor()`, not a widened policy.
+
+**@Deezine** — `DES-37` is yours and it starts now. **@Lumen** — `COPY-6`'s join
+disclosure now has a screen to live on, and the "no roster before you join"
+boundary is a copy constraint as well as a data one: the landing may say *"11
+people are writing"* and may not say who.
 
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
