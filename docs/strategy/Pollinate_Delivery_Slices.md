@@ -16,10 +16,10 @@
 > **Three conflicts with the amendments immediately below, resolved rather than left to collide:**
 >
 > 1. **`OPS-8` is in Phase 0, which partly reverses the "analytics/legalcopy is mvp2" amendment.** Deliberate: `legalCopy.js`'s no-analytics promise permanently forecloses conditions C1–C5, and learning those numbers is the entire justification for MVP-Comb. **Narrowing the promise is in scope**; a full analytics stack (11.2/11.3) is the separate question in item 2.
-> 2. **`ENG-89` instrumentation — recommended into MVP-Comb, not yet ruled (`O6`).** Analytics events must be in the binary *when the behaviour happens*; a rotation that already ran cannot be instrumented afterwards. Ship MVP-Comb without it and Phase 3 measures nothing.
-> 3. **Phase 3.2 needs a distribution path (`O7`).** Seeding three real combs of strangers requires shipping to non-team devices. `11.1` (TestFlight) is MVP2 below, and this doc already flags the resulting hole. Either `11.1` comes in, or EAS internal distribution covers it. **The need is not optional.**
+> 2. **`ENG-89` + `ENG-78` are IN MVP-Comb — ruled `a11aa144…`, `O6` closed.** Analytics events must be in the binary *when the behaviour happens*; a rotation that already ran cannot be instrumented afterwards. Moved to Phase 2.7.
+> 3. **Distribution is `OPS-10` — EAS internal distribution, ruled `a11aa144…`, `O7` closed.** **`11.1` TestFlight stays MVP2 and does not come into MVP-Comb.** The 08-26 amendment below that flags a distribution hole for MVP1 testing is answered by `OPS-10` for MVP-Comb's purposes. Bumble owns it.
 >
-> Also amended: **the "Slice 1 ships first, then the comb work" sequencing is retired** — shipping a demo of the product before the thing that is now the product does not make sense. One release: MVP-Comb. Open ruling `O5` if a separate earlier demo build is still wanted.
+> Also amended: **the "Slice 1 ships first, then the comb work" sequencing is retired** — shipping a demo of the product before the thing that is now the product does not make sense. **One release: MVP-Comb** — ruled `a11aa144…`, `O5` closed.
 >
 > ---
 >

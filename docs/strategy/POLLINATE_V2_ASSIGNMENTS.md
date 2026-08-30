@@ -11,8 +11,10 @@ are routed by Lumen between **Pixel and Deezine**.
 **MVP-Comb = Phases 0, 1 and 2 of `POLLINATE_COMB_ROTATION.md` §8.6 — build to
 completion now.** Phase 3 is measurement; **Phase 4 (IAP, paywall, cap
 enforcement) does not start until Phase 3 returns.** Full scope and exclusions:
-that document's §1A. Note `ENG-89` is *recommended* into MVP-Comb but not yet
-ruled (`O6`) — instrumentation must ship with the features it measures. `POLLINATE_COMB_ROTATION.md` governs; its §7 is the design handoff
+that document's §1A. **`ENG-89` + `ENG-78` are IN MVP-Comb** (ruled `a11aa144…`, `O6` closed) — they
+moved to Phase 2.7, because instrumentation must ship in the same binary as the
+features it measures. **Distribution is `OPS-10` EAS internal distribution**
+(`O7` closed); `11.1` TestFlight stays MVP2. **One release** (`O5` closed). `POLLINATE_COMB_ROTATION.md` governs; its §7 is the design handoff
 and §8 the engineering handoff. **Project 18 moves from Cycle 11–12 to the
 critical path; `ENG-79` is repriced and promoted to the primary paid line;
 `ENG-76` is blocked on ruling O1.** New rows in §5A below.
@@ -146,6 +148,7 @@ Detail in `POLLINATE_COMB_ROTATION.md` §7 (design) and §8.3 (engineering).
 | **ENG-89** | Fizz | M | **Instrument conditions C1–C4** (ruling §6): rotation participation, reveal→install, comb survival, organizer conversion. Extends `ENG-78` | OPS-8, ENG-75 |
 | **ENG-85** | Sage | M | **Entitlement model.** Where a user's plan lives and how the two caps read it: `combs_written_in ≤ 1`, `comb_members ≤ 5` on free. Single server-side source of truth the client cannot spoof; **both limits tunable constants.** **Ships with caps DISABLED** — see the trap below | ENG-58 |
 | **ENG-90** | Fizz | M | **Short note + nectar, unscoped from the reveal.** Send a short note plus simulated nectar to a comb member *any time*, not only at a reveal (`POLLINATE_COMB_ROTATION.md` §5.2a). The daily register — and the C5 instrument | ENG-62, DES-32 |
+| **OPS-10** | Bumble | M | **EAS internal distribution** for MVP-Comb's seeded combs. The ruled mechanism for reaching non-team devices (`a11aa144…`, `O7`) — **not** TestFlight, which stays MVP2 | — |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` to open a rotation, notify, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime | ENG-58 |
 | **DES-32** | Deezine | M | **Short-note + nectar compose surface.** Eight words and a nectar amount, one-handed, closer to a reaction than an entry. Reuses the `DES-23` flight | DES-23 |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** `src/constants/legalCopy.js:159,207` promises *"no analytics, crash-reporting or tracking code"* — a published claim that permanently forecloses C1–C4. V2 §20.2 has the fix: **narrow the promise, do not delete it.** Blocks `ENG-89`/`ENG-78` from being honest | — |

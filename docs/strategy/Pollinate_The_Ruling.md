@@ -499,7 +499,12 @@ completion now.** Called **MVP-Comb** to keep it distinct from the narrower
   sends her a short note with nectar, and does it again next month for someone
   else. If that does not run end to end on a real device with real strangers,
   MVP-Comb is not done.
-- **Open, and both need your word:** `O6` — does `ENG-89` instrumentation come
-  into the MVP? (Recommended yes; without it Phase 3 measures nothing.) `O7` —
-  distribution for the seeded combs, since `11.1` TestFlight currently sits in MVP2.
+- **Closed same night (`a11aa144…`):** `O5` — **one release**, the in-flight
+  work folds in. `O6` — **`ENG-89` + `ENG-78` are in MVP-Comb**, moved to Phase
+  2.7; instrumentation ships in the same binary as the features it measures.
+  `O7` — **EAS internal distribution (`OPS-10`, Bumble)**; `11.1` TestFlight
+  stays MVP2.
+- **The definition of done above is ratified** — Colin: *"I agree with the
+  definition of done, i'll have the team anchor to that."* It is the acceptance
+  test; completion is not claimable from a ticket count.
 

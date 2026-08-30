@@ -67,6 +67,7 @@ conflated.
 | **Phase 0** | `OPS-8` (analytics promise), `ENG-84` (account deletion), `COPY-13` (sweep + ratify), `OPS-7`, `OPS-3` |
 | **Phase 1** | The rotation engine — `ENG-58`, `ENG-85` (caps **disabled**), `ENG-83`, `ENG-59`, `OPS-9`, `ENG-60`, `DES-21`, `DES-22`, `DES-29`, `DES-31`, `COPY-6` |
 | **Phase 2** | The daily layer — `ENG-62`, `ENG-90`, `ENG-65`, `ENG-66`, `DES-23`, `DES-32`, `COPY-7` |
+| **Phase 2, measurement** | `ENG-89` + `ENG-78` — instrumentation **is in the MVP** (ruled `a11aa144…`, closing `O6`). `OPS-10` — **EAS internal distribution**, the ruled mechanism for reaching seeded testers (`a11aa144…`, closing `O7`; **not** TestFlight, which stays MVP2) |
 | **Carried in-flight** | The approved merge queue and demo-gap items in `PLANS/MVP1_DEMO_READINESS_AUDIT.md`, and the GL1/GL2 luxury pass Colin ruled in scope 2026-08-26. **This ruling does not cancel any of it** |
 
 ### What is out
@@ -89,25 +90,24 @@ entire justification for MVP-Comb is learning those numbers. **Narrowing the
 promise is in scope; shipping a full analytics stack is a separate question
 (see conflict 2).**
 
-**2. `ENG-89` must ship in the MVP binary, or the measurement is lost.**
-**RECOMMENDED, NOT YET RULED — this is the one place I would widen Colin's scope
-and I will not do it silently.** Phase 3.1 is instrumentation. Analytics events
-have to be present in the build *when the behaviour happens*; a rotation that
-already occurred cannot be instrumented afterwards. If MVP-Comb ships without
-`ENG-89`, Phase 3 measures nothing and the seeded combs are spent for no data.
+**2. `ENG-89` is IN the MVP — ruled `a11aa144…`, closing `O6`.**
+Analytics events have to be present in the build *when the behaviour happens*; a
+rotation that already occurred cannot be instrumented afterwards. Shipping
+MVP-Comb without `ENG-89` would mean Phase 3 measures nothing and the seeded
+combs are spent for no data. **`ENG-89` and `ENG-78` are build tasks and moved
+into Phase 2** (rows 2.7). Seeding and waiting stay outside the MVP — those are
+operations, not build.
 
-> **Recommendation: pull `ENG-89` and `ENG-78` into the MVP** (they are build
-> tasks). Leave `3.2` (seed the combs) and `3.3` (wait eight weeks) outside it —
-> those are operations, not build. **Awaiting Colin.**
-
-**3. Phase 3.2 needs a distribution path that is currently MVP2.**
+**3. Distribution is EAS internal distribution — ruled `a11aa144…`, closing `O7`.**
 Seeding three real combs of strangers requires shipping to non-team devices.
-`11.1` (TestFlight / internal track) was moved to MVP2 on 2026-08-26, and the
-Slices doc already flags the resulting hole. **Either `11.1` comes into
-MVP-Comb, or Phase 3.2 needs EAS internal distribution.** Bumble's call on
-mechanism; the need is not optional.
+**`11.1` TestFlight stays in MVP2 and does not come into MVP-Comb**; `OPS-10`
+(EAS internal distribution) is the ruled mechanism instead. Bumble owns it.
 
-### The definition-of-done for MVP-Comb
+### The definition-of-done for MVP-Comb — **ratified by Colin, `a11aa144…`**
+
+> *"I agree with the definition of done, i'll have the team anchor to that."*
+> This is the acceptance test. **Completion is not claimable from a ticket
+> count.**
 
 A stranger can: install → arrive through an invite link without a password form →
 join a comb → see *"the comb is writing for Sarah — 6 days left"* → write an entry
@@ -463,7 +463,9 @@ consequence, and learn in between.**
 ### 8.6 Build sequence — who does what, in order
 
 > **Phases 0–2 are MVP-Comb (§1A), ruled 2026-08-30. Build to completion now.**
-> Phase 3 is what you do with it; Phase 4 is gated on Phase 3's numbers.
+> Instrumentation (2.7) and EAS distribution (2.8) are **in** — `O6`/`O7` closed
+> `a11aa144…`. Phase 3 is operations you run *with* the shipped MVP; Phase 4 is
+> gated on Phase 3's numbers.
 
 **Phase 0 — Unblock. Starts now, fully parallel, nothing depends on Phase 1.**
 
@@ -500,14 +502,15 @@ consequence, and learn in between.**
 | 2.4 | **Fizz** | `ENG-65` — honeyed hexagon (comb-as-wallet) | 2.1, `DES-24` |
 | 2.5 | **Fizz** | `ENG-66` — comb pot. **G2: direct-to-recipient, never pooled** | 2.1, 1.9 |
 | 2.6 | **Lumen** | `COPY-7` — nectar vocabulary. **"Drops," not "sats."** No "bitcoin" in default UI | — |
+| 2.7 | **Fizz** | `ENG-89` + `ENG-78` — **instrument C1–C5. In the MVP** (`O6` closed). Must ship in the same binary as the features it measures | 0.1, 1.9, 2.3 |
+| 2.8 | **Bumble** | `OPS-10` — **EAS internal distribution** for the seeded combs (`O7` closed; **not** TestFlight, which stays MVP2) | — |
 
-**Phase 3 — Measure. The point of everything above.**
+**Phase 3 — Measure. Operations, not build — this happens *with* the shipped MVP.**
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 3.1 | **Fizz** | `ENG-89` + `ENG-78` — instrument C1–C5 | 0.1, 1.9, 2.3 |
-| 3.2 | **Colin** | **Seed three real combs** — a run club, a small group, a group chat. Not friends of the team | 1.9, 3.1 |
-| 3.3 | **all** | **Wait eight weeks.** Read C1–C5 against §6's response table | 3.2 |
+| 3.1 | **Colin** | **Seed three real combs** — a run club, a small group, a group chat. Not friends of the team | MVP-Comb shipped via `OPS-10` |
+| 3.2 | **all** | **Wait eight weeks.** Read C1–C5 against §6's response table | 3.1 |
 
 **Phase 4 — Monetize. Does not start until Phase 3 returns.**
 
@@ -526,8 +529,8 @@ be cut without wasting Phases 1–3**, which is the point of ordering it last.
 ### 8.7 Critical path
 
 ```
-OPS-8 ─────────────────────────────────► ENG-89 ─┐
-                                                 ├─► SEED 3 COMBS ─► read C1–C5 ─► price ─► ENG-79
+OPS-8 ─────────────────────────────────► ENG-89 ─┐  (both IN the MVP)
+                                        OPS-10 ──┼─► SEED 3 COMBS ─► read C1–C5 ─► price ─► ENG-79
 ENG-58 ─┬─► ENG-85 (caps off)                    │
         ├─► ENG-59 ◄── ENG-83 (auth)             │
         ├─► OPS-9 ──┐                            │
@@ -575,9 +578,9 @@ Recorded so no one over-reads this ruling:
 | ~~**O2**~~ | ~~Free tier keeps unlimited personal hives?~~ **CLOSED** — yes, unchanged (§3.1) | — |
 | **O3** | Carried from V2: §5.5(4) rules *"no projected returns, ever"* while §5.2(e) pitches *"$50 in 2026 versus 50,000 sats in 2044."* Apple 3.1.1 and FTC-adjacent risk both bite | 19d marketing copy, `COPY-8` |
 | **O4** | **The price.** Ceiling ~$39/yr, annual preferred. Deliberately unruled until C1 and C5 return (§4) | Phase 4 only |
-| **O5** | **One release or two?** This encoding assumes the in-flight Slice 1 / MVP1 work folds into MVP-Comb and ships once (§9). The alternative is a separate earlier demo build without combs. Derived, not ruled | Release planning |
-| **O6** | **Does `ENG-89` come into MVP-Comb?** Recommendation: **yes** — instrumentation must ship with the features it measures (§1A conflict 2). Without it Phase 3 measures nothing | Phase 3 |
-| **O7** | **Distribution for Phase 3.2** — `11.1` TestFlight into MVP-Comb, or EAS internal distribution? Bumble's mechanism call; the need is not optional (§1A conflict 3) | Phase 3.2 |
+| ~~**O5**~~ | ~~One release or two?~~ **CLOSED `a11aa144…` — one release.** The in-flight Slice 1 / MVP1 work folds into MVP-Comb | — |
+| ~~**O6**~~ | ~~Does `ENG-89` come into MVP-Comb?~~ **CLOSED `a11aa144…` — yes.** Instrumentation is in the MVP, moved to Phase 2.7 | — |
+| ~~**O7**~~ | ~~Distribution for the seeded combs?~~ **CLOSED `a11aa144…` — EAS internal distribution (`OPS-10`, Bumble).** TestFlight (`11.1`) stays MVP2 | — |
 
 ---
 
