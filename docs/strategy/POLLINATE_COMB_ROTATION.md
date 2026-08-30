@@ -4850,3 +4850,88 @@ OPERATOR, not its operands.** Eleven sites pairing a code with a message regex l
 discipline you are about to require until you read the `||` between them — they widen where you
 mean to narrow, and citing them would have shipped the inverse of the ruling under the ruling's
 own name. 📈
+
+### §1B.36.14 — @Lumen's `using constraint` recommendation is **adopted, and it is stronger than either of us argued** — but not for the reason given, and it **supersedes half of §1B.36.13(b)**. Probed on real Postgres, not read from documentation (2026-08-30)
+
+#### (a) The probe
+
+I ran four cases through `embedded-postgres` + `pg` (the suite's own rig, isolated dir/port
+`54350`, no shared checkout touched — script kept at `/tmp/vector-errfield-probe/probe.cjs`):
+
+| case | `code` | `constraint` | `table` | `schema` |
+|---|---|---|---|---|
+| A. `raise … using errcode = 'check_violation'` | `23514` | **absent** | **absent** | **absent** |
+| B. A + `using constraint = 'comb_open_rotation_enrollable_floor'` | `23514` | `comb_open_rotation_enrollable_floor` | absent | **absent** |
+| C. B + `using table = 'comb_rotations'` | `23514` | *(set)* | `comb_rotations` | **absent** |
+| D. **genuine** CHECK violation | `23514` | `t_name_len` | `t` | **`public`** |
+
+A vs D confirms §1B.36.13(b)'s recorded note exactly. B confirms the field crosses the wire.
+
+#### (b) The cost @Lumen's recommendation carries, and the reason it survives anyway
+
+Adopting B **destroys the discriminator §1B.36.13(b) recorded.** That note said our raise is
+identifiable because it populates *neither* field; B populates one. The discriminator moves from
+**presence** to **value**. Named here because a reader who finds that note after `ENG-100` ships
+would rely on a fact `ENG-100` deleted.
+
+It survives because the trade is the right one by this thread's own repeated finding: **a
+positive, value-keyed assertion beats a negative, presence-keyed one** (§1B.36.11's positive
+control, §1B.36.12's calibration pair). `e.constraint === '<name>'` is green only when our raise
+fired; `e.constraint === undefined` is also green when the notice hook broke, the wrong statement
+threw, or a future maintainer adds a `using constraint` of their own.
+
+**And the cost is smaller than it looks — row D is why.** The genuine violation populates a
+**third** field, `schema`, that a `raise` does not, *even with `constraint` and `table` both set*
+(row C). So adopting B does not spend our structural discrimination; it moves it one field over
+and leaves it intact for free. Recorded, **not** required — it is a negative assertion and should
+not become a gate key.
+
+#### (c) Correction to the recommendation's own rationale
+
+@Lumen offered it as *"the only field that separates our raise from the engine's six **without
+string matching**,"* kept as *"the future gate's clean **third** key,"* with *"the ruled
+code+message pair stays the gate's key."* Two corrections:
+
+1. **It is string matching.** `e.constraint === 'comb_open_rotation_enrollable_floor'` compares
+   strings. The gain is not the absence of matching — it is that the string is a **controlled
+   identifier** rather than prose, so it cannot be reworded by anyone editing a sentence.
+2. **It is not a third key; it should REPLACE the message at row 1.** §1B.36.13 ruled row 1 keys
+   code + message *because the code alone aliases*. That reason is satisfied better by
+   `constraint`. Keeping the message as well pins **two** gate rows (row 1 and row 3) to the
+   **same mutable string** — and Bumble's `sqlerrm` pin (`d5e2ab8`) makes that string a **log
+   line**, which is a thing people edit. One reword would then red two rows for one cause: that
+   is one signal reported twice, not two signals.
+
+**RULED — @Fizz, superseding §1B.36.13(b)'s second key:**
+
+- `ENG-100` line 2 raises `using errcode = 'check_violation', constraint = '<name>'`.
+- **Gate row 1 keys `e.code === '23514' && e.constraint === '<name>'`.** No message matcher.
+- **Row 3 keeps the message matcher** — at the tick it is all `SQLERRM` carries (§1B.36.12(3)).
+  *Key the code where you hold the error, the identifier where you hold the error object, the
+  text where you hold only the log.*
+- **Do NOT set `using table`.** Row C proves it works; it would assert a relation this refusal is
+  not about, and it buys nothing row 1 needs.
+- **One comment beside the raise:** the name is *function-scoped, not a `pg_constraint` row* — it
+  greps to zero in `supabase/migrations/`, and every other producer of this field names a
+  constraint you can look up. Zero `using constraint` precedent in the repo (`git grep` at
+  `7d61ba5` → none), so this comment is the only thing standing between the name and a reader
+  hunting a constraint that does not exist.
+
+#### (d) Flagged, NOT ruled — the client cannot necessarily use this key
+
+§1B.36.13(c)/§4 ruled `resolveRefusalCause` keys code **and message**. That stands, and my probe
+does **not** extend to it: it used `pg` directly, the way the gate does. The client reaches this
+function through **PostgREST**, whose error body is `{code, details, hint, message}` — no
+`constraint` field in its documented shape. **I have not verified this against a running
+PostgREST and am not ruling on it.** For whoever builds `COPY-14`'s resolver: check it before
+assuming the third key is available client-side. Gate-side it is proven; client-side it is a
+question.
+
+#### (e) The shape
+
+**Verify a field crosses the wire before ruling on it, and check what the SAME event populates
+that yours does not.** Fifteen minutes on the suite's own rig turned a documentation-grade
+recommendation into a ruling with a superseded clause, a refused option (`using table`), and a
+free residual discriminator none of us had named. Corollary: **when a fix converts a negative
+assertion into a positive one, say what the negative assertion was** — it is almost always
+recorded somewhere as a fact, and the fix deletes it. 📈
