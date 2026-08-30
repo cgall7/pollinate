@@ -121,7 +121,7 @@ MVP-Comb is not done.**
 
 ## 1B. Amendments — 2026-08-30, after the #Collab handoff
 
-Ten corrections. Seven came from the builders reading the encoding against the
+Fifteen corrections. Seven came from the builders reading the encoding against the
 tree; one is a ruling Colin made after this doc was written; two are rulings the
 builders asked me for (§1B.8) or made themselves and I have upheld (§1B.9). **Verified against
 `github/main@cdb07a1`** — the tip moved from `080edd5` while the brief was being
@@ -248,6 +248,16 @@ should — then `ENG-84` can leave a live rotation pointing at nobody, which
 rotation state that tolerates a null subject** (void it and advance, do not
 stall), and `OPS-9` must skip it rather than fault. @Sage owns the column,
 @Bumble owns the tick, @Fizz's `ENG-84` is what fires it.
+
+> **AMENDED — see §1B.15. The paragraph above is superseded on its mechanism,
+> upheld on its conclusion.** `ENG-84` was ruled to **tombstone** the profile,
+> not delete the row (Colin, `34d96ff7…`). Nothing is deleted, so
+> `on delete set null` **never fires** and `subject_profile_id` stays non-null.
+> The state to tolerate is a **tombstoned** subject, not a null one — and
+> because the FK still resolves, **nothing in the schema stops a rotation from
+> sealing and delivering into a deleted account.** Void-and-advance survives as
+> the ruling and must now be *enforced* in `ENG-58`, not inherited from a null
+> FK. Read §1B.15 before building to this paragraph.
 
 ### 1B.7 — The tip moved. Pixel's glass prerequisite is already merged.
 
@@ -520,6 +530,128 @@ repo reference; flagged, not changed, because the specs are genuinely there.
 ---
 
 ---
+
+### 1B.14 — **Nothing in this schema can seal or send a rotation.** `ENG-91` is new, and it gates the ratified definition of done.
+
+Found while verifying the `ENG-84` tombstone against the seal path. Verified at
+`github/main@cdb07a1` in my own shell.
+
+| Function | Gate | Callable by |
+|---|---|---|
+| `seal_hive` | `if not found or v_owner_id <> auth.uid() then raise` (`20260826000004`) | `authenticated` — `HiveStore.js:196` |
+| `seal_volume` | same gate (`20260828000001`) | **revoked from `anon` and `authenticated`** (`20260826000004`) |
+| `send_hive` | same gate (`20260819000002`, body re-issued `20260828000001`) | `authenticated` — `HiveStore.js:205` |
+
+**All three require `auth.uid()` to equal the hive's owner.** In a `pg_cron` job,
+a service role, or an edge function, `auth.uid()` is null — so every one of them
+raises *"hive not found."* There is no `supabase/functions` directory, no
+`pg_cron` anywhere in `supabase/migrations/`, and the only callers in `src/` are
+`SealHive.js` and `SendHive.js`: **a human tapping a button, as the owner.**
+
+**`OPS-9` cannot seal or deliver a rotation.** Not "isn't wired yet" —
+structurally refused by the function bodies. The tick can advance a
+`comb_rotations` row all day; the month's keepsake sits unsealed until the
+organizer opens the app and presses Seal, then presses Send.
+
+**This is the rotation engine's core verb, and it does not exist.**
+
+> **A rotation that only advances when its organizer taps is not a rotation.
+> It's a reminder.**
+
+**It gates the definition of done.** §1A's ratified sentence contains *"watch
+Sarah's reveal bloom."* There is no reveal without a seal, and no seal without
+an owner session. On today's schema the acceptance test cannot run.
+
+**Three consequences:**
+
+1. **The ordinary case is worse than the deletion case.** An owner who tombstones
+   can never be `auth.uid()` again, so their comb's month freezes **permanently**
+   with everyone else's writing inside it — §1B.15's *"sealed writing survives"*
+   is true and never reaches those entries, because they never reach seal. But an
+   owner who merely **gets busy** produces the same frozen month, recoverably.
+   Deletion makes it undeniable; absence makes it common.
+2. **It contaminates `C1` a second time.** `C1` is *"share of an active comb who
+   write for that month's subject."* If the month only completes when the
+   organizer shows up, a failed rotation reads identically whether eleven people
+   stayed silent or eleven people wrote and the organizer never tapped Seal.
+   **Same number, opposite diagnoses, opposite responses** — the exact failure
+   shape §1B.9 upheld `DES-31` to prevent, arriving through a different door.
+3. **Delivery into a husk is reachable.** See §1B.15.
+
+**Correcting my own routing.** I first sent this to @Sage as *"a requirement on
+`ENG-58`."* **That was wrong, and it is the failure mode this document keeps
+finding:** `ENG-58` is a migration that creates tables, and it will be marked
+done when the tables land. A requirement buried inside another ticket is
+completed when that ticket is completed. This is not schema — it is **function
+bodies and grants** — and it changes `ENG-60`'s dependency graph and estimate.
+**It gets its own row: `ENG-91`** (§8.3, Phase 1 row 1.8a).
+
+**And it lengthens the critical path.** §8.7's *"the two longest poles are
+`ENG-58` and `DES-22`"* was true when written. `ENG-58 → ENG-91 → ENG-60` is now
+the longest chain, with `OPS-9` calling into `ENG-91` rather than into
+`seal_hive`. @Colin — this is a schedule fact, not a scope change: no new
+product surface, one new server-side path that the ritual already assumed
+existed.
+
+### 1B.15 — Account deletion: **ruled.** Keep-and-disclose, tombstone, and the defense of record.
+
+**Colin ruled keep-and-disclose** (`34d96ff7…`, 2026-08-30). `ENG-84`'s shape is
+final: tombstone the profile (clear `display_name` / `avatar_url` /
+`phone_hash`, drop the `auth.users` row), **delete unsealed authored entries**,
+end memberships (`removed_at` on `hive_contributors` and on `comb_members`), and
+anonymize the ledger. **Delivered keepsakes stay.** Lumen owns the deletion-screen
+copy; the ruled sentence is verbatim in their `OUTBOX/ENG84_DELETION_COPY.md`.
+
+**The defense of record — and the argument that does *not* work.** Apple's page
+(`developer.apple.com/support/offering-account-deletion-in-your-app/`, fetched
+2026-08-30) answers *"Does the content provided by a user need to be deleted in
+apps that display and share user-generated content?"* with **"Yes"** — *"This
+includes user-generated content that's shared with others, such as photos,
+video, text posts, and reviews."*
+
+The disclosure clause — *"**If local laws or regulations require that you
+maintain some data**, let your users know"* — sits under the CCPA/GDPR question
+and is a **legal-retention carve-out**, the mechanism for *"we must keep this,"*
+not *"we chose to."* No law requires us to retain a gratitude entry. **We are not
+sheltered by that clause; we are taking a position against an explicit "Yes."**
+*"The FAQ let us"* loses the moment a reviewer reads the same page.
+
+**What holds is precedent.** Apple's enumerated examples — photos, video, text
+posts, reviews — are **all broadcast content: an audience, no addressee.** A
+sealed keepsake is directed at exactly one person and was delivered to them.
+That line is one the store already runs on: **Discord** tombstones to a husk and
+keeps the messages, **Reddit** keeps comments under `[deleted]`, **Signal /
+WhatsApp / Slack** leave sent messages in the recipient's thread after the
+sender's account is gone. All shipping, all approved. **We are not asking for an
+exception; we are asking to be a messaging app, which is what we are.**
+
+**The delivery hole this leaves, which `ENG-58` must close.** Under tombstone
+nothing is deleted, so `subject_profile_id` stays non-null. `send_hive` checks
+exactly two things about the subject: **is it null** (no) and **is there an
+accepted `honeycomb_connections` row** (yes — that row wasn't deleted either).
+Both pass. **The schema will seal a comb's month and deliver it into a deleted
+account.** Lumen's snapshot rider closes the *render* (`"Writing for ______"` is
+unreachable because `subject_name` is a creation-time snapshot); it does not
+close the *send*. Void-and-advance is enforced behaviour in `ENG-58`, not an
+inherited FK effect. See the amendment note in §1B.6.
+
+**One citation corrected, because the older file draws the opposite line.**
+The ruling *"you may destroy a keepsake, you may not revise one"* is right and
+the phrase does live in `20260815000006`'s comment — but that file's
+`entries_delete_own` requires `h.owner_id = auth.uid()`, which a **contributor**
+deleting their own entry never satisfies. The live policy is
+`20260827000001`'s rewrite: `auth.uid() = user_id AND (hive_id is null OR
+is_volume_open(volume_id))`. In the comb world — where every entry is a
+contributor's — the cited file draws the opposite line from the ruling it was
+cited for. Lumen has accepted and re-cited.
+
+**`removed_at` on `comb_members` has a second, independent reason.** Lumen
+argued it as *"a husk cannot occupy a seat."* It is **also the only thing that
+keeps `C1` honest through a mid-month deletion**: deleting unsealed authored
+entries removes that person from `C1`'s **numerator**, and if the seat stays
+open the **denominator** does not move, so the comb reads as less participatory
+than it was. `removed_at` moves both. Two independent reasons for one column —
+same test §1B.9 applied to `DES-31`, same verdict: not a preference.
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
 
@@ -844,6 +976,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-85** | Sage | M | **Entitlement model.** Where a user's plan lives and how the two caps read it: `combs_written_in ≤ 1` and `comb_members ≤ 5` on free. Must be **a single server-side source of truth** the client cannot spoof, and **both limits must be tunable constants** (§4.2). Ships with the caps **disabled** — see §8.5 |
 | **ENG-90** | Fizz | M | **Short note + nectar, unscoped from the reveal** (§5.2a). Send a short note plus simulated nectar to a comb member at any time. Rides `ENG-62`'s ledger and the `DES-23` flight |
 | **ENG-89** | Fizz | M | **Instrument C1–C5** (§6). Extends `ENG-78`, which stays the highest-priority single event |
+| **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Gates the §1A definition of done** (there is no reveal without a seal) |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to open a rotation, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime |
 | **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays`. Follow `README.md`'s ritual — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
@@ -898,8 +1031,9 @@ consequence, and learn in between.**
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**no dependency; start now** — §1B.11) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
-| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler | 1.1 |
-| 1.9 | **Fizz** | `ENG-60` — rotation ritual: open → notify → collect → seal → reveal | 1.1, 1.6, 1.8 |
+| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
+| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`** | 1.1 |
+| 1.9 | **Fizz** | `ENG-60` — rotation ritual: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
 | 1.12 | **Pixel** | `DES-35` — glass prominence to ≥23% (Colin `a478c335…`, §1B.5). **Material prerequisite merged** — `13cf806` + `cdb07a1` are ancestors of the tip (§1B.7) | — (parallel; **gates nothing**) |
@@ -953,8 +1087,8 @@ OPS-8 ────────────────────────�
                                         OPS-10 ──┼─► SEED 3 COMBS ─► read C1–C5 ─► price ─► ENG-79
 ENG-58 ─┬─► ENG-85 (caps off)                    │
         ├─► ENG-59 ◄── ENG-83 (auth)             │
-        ├─► OPS-9 ──┐                            │
-        └───────────┴─► ENG-60 ◄── DES-33  ──────┤
+        ├─► ENG-91 ─► OPS-9 ──┐                  │   ◄── longest chain
+        └──────────────────────┴─► ENG-60 ◄── DES-33 ─┤
                             └─► ENG-66           │
 ENG-62 ─────► ENG-90 ◄── DES-32  ────────────────┘
  (shipped)
@@ -976,6 +1110,14 @@ named it a longest pole. Both were wrong:
 right: `COPY-6` and `DES-29` both sit behind comb identity, so `DES-22` has two
 people's rows queued on it while `DES-33` has none. Start `ENG-58` and `DES-22`
 immediately.
+
+**AMENDED again 2026-08-30 (§1B.14).** `ENG-91` is new and it sits **inside** the
+engineering pole rather than beside it: `ENG-58 → ENG-91 → ENG-60`, with `OPS-9`
+calling `ENG-91` instead of `seal_hive`. `DES-22` is unchanged and still the
+design pole. **The engineering pole is now one row longer than when this section
+was written**, and the added row gates §1A's definition of done — there is no
+reveal without a seal. Nothing new is being *designed*; a server-side path the
+ritual always assumed existed is being *built*.
 
 ## 9. What is explicitly NOT changing
 
