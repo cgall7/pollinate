@@ -4288,8 +4288,17 @@ or the next reader freezes a two-member class that already has three. Same failu
 `transaction_timestamp` **and** touching the same person — stands, and is negligible.
 One more, in the safe direction: a retry of `delete_own_account` after a partial first
 call would stamp a still-null `removed_at` at `T2` against a frozen `deleted_at = T1`,
-classifying an account deletion as *not* one. Unreachable in practice (`delete from
-auth.users` ends the session that could make the second call) and its error is
+classifying an account deletion as *not* one. **Ground corrected by @Lumen's
+ratification and adopted: this is not merely unreachable, it is unrepresentable.**
+`delete_own_account` is one PL/pgSQL function with no exception handler (its only
+`exception` tokens are its own `raise`s), so it is one transaction — a first call cannot
+commit `profiles.deleted_at` while leaving `hive_contributors` unswept, and the partial
+state the residual requires never exists on disk. *"Unreachable because sessions end"*
+invites someone to re-derive reachability the next time auth changes; *"unrepresentable
+while this is one transaction"* names the invariant **and the exact edit that breaks it**
+— splitting the function, or adding an exception block, which is a subtransaction and
+therefore the object `§1B.31.3` already warns rolls back one arm and retries forever.
+Its error is
 **over-inclusion in the denominator** — `C1` reads low, never high. `is not null` commits
 the opposite error, always, and reads high. When a discriminator can only be approximate,
 pick the one whose failure understates the metric that decides the business.
@@ -4314,3 +4323,99 @@ and then wrote a test that reads the reason's *residue* instead of its *event*. 
 recorded by the transaction that caused it; anything you read later is a state that has
 had time to change. **When you classify by cause, key on a fact frozen at the moment the
 cause fired — and prefer operands the schema forbids from moving.** 📈
+
+---
+
+### §1B.36.9 — the `C1` exclusion ranges over roster ROWS, and I enumerated the writers of a COLUMN. A third state exists: an OPEN roster row minted for a tombstoned profile (2026-08-30)
+
+`§1B.36.8` closed the class at three members and @Lumen's producer sweep confirmed it —
+three writers of `hive_contributors.removed_at`, no fourth. **Both sweeps are correct and
+both answer the wrong question.** `C1`'s exclusion is a rule about *which roster rows count*;
+enumerating the writers of `removed_at` enumerates only the rows the rule can *close*. It
+says nothing about who can **open** one. The producer sweep found the single `insert into
+public.hive_contributors` (`…0008:175`) and dismissed it — *"sets `hive_id, profile_id,
+invited_by`, never `removed_at`"* — which is exactly why it is the hazard: the row it mints
+has `removed_at` **null**, so neither the retired predicate (`deleted_at is not null`) nor
+the ruled one (`removed_at = deleted_at`) can ever fire on it. Both are keyed on a *closed*
+seat. This is an *open* seat belonging to an account that no longer exists.
+
+#### (a) The path, every leg verified at `main@22f9027`
+
+1. `delete_own_account` sweeps the caller's `comb_members` seats **except their own
+   organizer seat** — `not exists (… c.owner_id = v_uid)`, `…0007:271-279`. Deliberate and
+   load-bearing: `comb_members_owner_seat_permanent_trigger` (`…0002:250-252`) raises on any
+   `removed_at` set on an owner row, and that raise inside the deletion transaction would
+   abort the whole deletion. Part 5's header says so and defers the product question to `O8`.
+2. So a tombstoned organizer keeps a **live** `comb_members` row. `combs.owner_id` references
+   `profiles(id)`, and `profiles` survives deletion by construction — `profiles_id_fkey` was
+   **dropped** by `ENG-84` (`20260830000001:44`) precisely so `delete from auth.users` does not
+   take the tombstone with it. The comb, its owner row, and the organizer's seat all outlive
+   the account, whichever way `O8` lands.
+3. `comb_open_rotation` is `grant execute … to service_role` (`…0008:209`) and its ownership
+   gate is `if auth.uid() is not null and auth.uid() is distinct from v_owner_id` — a **null**
+   `auth.uid()` passes. This is not an oversight; `:103-118` argues at length that the clock
+   must pass, and `:200-202` names the caller: *"month N+1, the clock's future
+   `comb_advance_rotation` wrapper."*
+4. That mint's roster snapshot is `comb_members where removed_at is null and profile_id <>
+   subject` (`…0008:174-180`). The **subject** is checked for a tombstone at `:150-156`
+   (`raise … subject has deleted their account`). The **contributors are not checked at all.**
+
+**Therefore: once the clock's wrapper exists, every rotation it mints in a comb whose
+organizer deleted their account enrols the tombstoned organizer as a writer — a fresh
+`hive_contributors` row, `removed_at` null, `display_name = ''`.**
+
+#### (b) What it costs, in order
+
+| consumer | effect |
+|---|---|
+| `C1` | the denominator gains a person who **cannot authenticate**, so cannot write. Structural, every month, one whole person per affected comb — 8–20% of a 5–12 member comb, against a **60%** bar. |
+| `comb_rotation_writer_count` (`…0007:155-160`) | no `profiles` join, no `deleted_at` filter — verified. The member/organizer card reads *"12 people are writing for Sarah"* when 11 can. |
+| the reveal roster (`DES-21`) | a contributor whose live `display_name` is `''`. The mint's `coalesce(nullif(…),'Someone')` covers the **subject** name only. |
+
+Direction is **over-inclusion → `C1` reads low**, which satisfies `§1B.36.8(e)`'s own
+preference. That saves it from being a false-positive on the business decision, and does not
+save it from being wrong: this is a *systematic* low, not a residual, and it lands hardest on
+the smallest combs.
+
+#### (c) RULED — the roster snapshot must exclude tombstoned profiles, and this is not `ENG-94`
+
+The fix is one predicate on the snapshot: `and not exists (select 1 from public.profiles p
+where p.id = m.profile_id and p.deleted_at is not null)`.
+
+**Not the deletion path.** Closing the owner's seat in `delete_own_account` is the abort @Sage
+proved; the exemption stays.
+
+**Not folded into `ENG-94`'s acceptance.** `ENG-94` is the `create or replace` that repoints the
+**subject** predicate into `comb_subject_gone` (`§1B.34.2`), and it is the correct *migration*
+to carry this — same function, same file, an already-legitimate rewrite of the body. But the
+roster is a **different object** from the subject, and a requirement filed under a ticket titled
+*"subject-gone repoint"* is marked done when the subject line is repointed. **New row `ENG-100`,
+landing in `ENG-94`'s migration, with its own acceptance line** — shared artifact, separate
+acceptance. This is `§1B.34.2`'s own rule about not conjuring a function from the wrong
+migration, applied to the ticket boundary instead of the file boundary.
+
+**Write it as the general predicate, not as "exclude the organizer."** A non-owner member who
+deletes their account is already excluded — their `comb_members` seat *is* swept — so the
+tombstoned organizer is the only member of this class **today**, and the owner-seat exemption
+is the only reason the class is non-empty. Naming the class by its one current member is
+`§1B.32` again, one file over.
+
+**Free today.** `comb_advance_rotation` does not exist: `git grep -n comb_advance_rotation
+github/main -- supabase/ src/ scripts/` returns exactly one hit, the comment at `…0008:201`
+that names it as future work. `ENG-89` is unbuilt. Nothing on `main` can produce this row yet.
+
+#### (d) The shape
+
+The trigger that creates the hazard states its own justification: *"A comb without an organizer
+present is a broken invariant no downstream code (`comb_rotations`' subject check, **the roster
+read**) is written to handle"* (`…0002:232-236`). It is right, and it guarantees **the seat, not
+the person.** The roster read then consumes seat-presence as a proxy for *someone who can write*,
+and account deletion is the one event that separates those two facts.
+
+**When a rule filters a set, enumerate the writers of the SET, not the writers of the column the
+filter reads.** A producer sweep that dismisses an `insert` because *"it never sets the filtered
+column"* has found the one row the filter can never touch — that is the finding, not the
+all-clear. Corollary, third time tonight: an exemption granted to keep one transaction safe
+(`§1B.24.2`'s owner-seat skip) hands a new state to every consumer downstream of it, and the
+comment recording the exemption is written in the vocabulary of the transaction it saved, never
+of the consumers it changed. 📈
