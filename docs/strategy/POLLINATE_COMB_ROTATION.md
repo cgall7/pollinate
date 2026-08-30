@@ -3804,3 +3804,52 @@ It does not bite today, because she has no pre-seal count surface (b). It bites 
 **Open:** `O3`, `O4`, `O8`, `O9`. **No new rows.** `DES-33` gains the `for you` repair alongside its repoint; `ENG-92`'s comment pass gains one clause. No new `O`.
 
 **The transferable shape:** a rule and the surface it governs can live three lines apart and still be read as if the rule were general. `DES-33:41` was cited as a subject-facing constraint by everyone including me, and `:44` names its reader as the member while `:95` bars the subject outright — the doc answered the question two ways in one section, and the half that sounded like a principle won. **Before extending a defect to a second document, find the line in that document that names the surface — a precondition stated in the abstract is not evidence about who reads it.**
+
+---
+
+### §1B.36.2 — CORRECTION of my own `§1B.36.1(f)`: the card's roster and the count's roster are different tables, and one population sits between them
+
+**Date:** 2026-08-30. **Trigger:** re-reading `§1B.36.1` before publishing it. Paragraph **(e)** of that section states that both count definers gate on `is_comb_member`; paragraph **(f)**, forty lines later, argues `0` is unreachable on the contributor card from `hive_contributors`. **Those are two different tables, and I wrote both in one commit without crossing them.** Verified at `github/main@46ce848` plus `github/sage/eng92-postmerge-fixes@4632eec`.
+
+#### (a) Three predicates govern that card, and they read three different rosters.
+
+| the card... | predicate | table |
+|---|---|---|
+| exists | `private_hives_select_own` = `owner_id` **or** `is_hive_contributor(id)` (`20260827000001:202-204`), plus `listContributingHives`'s `hive_contributors!inner … removed_at is null` (`HiveStore.js:431-433`) | `hive_contributors` |
+| accepts a write | `entries_insert_own` → `is_hive_contributor(v.hive_id)` (`20260827000001:286`) | `hive_contributors` |
+| shows the rotation fold | `comb_rotations_select` = owner **or** `is_comb_member(comb_id)` (`20260830000002:498-503`) | `comb_members` |
+| shows the count | `comb_rotation_writer_count`'s guard clause (`…0007:102`) | `comb_members` |
+
+`§1B.36.1(f)`'s argument proves the reader is a member of the **counted set**. It does not prove the reader is **authorized to count**. The gap is one population: a non-owner member who leaves the comb mid-month.
+
+#### (b) That population is reachable, and the constraint set was run before this was written.
+
+`comb_members_update_owner_or_self` (`…0002:338-346`) admits an update by the comb's owner **or** by the member themselves; `comb_members_identity_immutable` (`:215-231`) permits exactly the `removed_at` null→timestamp transition. Nothing anywhere writes `hive_contributors.removed_at` in response — `git grep` over `supabase/migrations/` returns only the immutability trigger and `delete_own_account`'s own sweep.
+
+**Not** a hazard, checked and refused: the **organizer** cannot produce this state. `comb_members_owner_seat_permanent_trigger` (`:239-252`) raises on any `removed_at` set on a row whose `profile_id` owns the comb. The class is exactly one member shape, not three.
+
+**No client path exists today** — `git grep removed_at github/main -- src/` returns only `hive_contributors` reads. The state is policy-reachable and UI-unreachable, which is precisely when it is cheap to rule and expensive to discover.
+
+#### (c) What the departed writer actually sees, and it is larger than a missing count.
+
+Their `hive_contributors` seat is untouched, so the card renders and still accepts entries. `comb_rotations_select` refuses them, so `ENG-98` item 3's embedded rotation read returns **null** — the whole fold goes, not just the count line: no *"Writing for Sarah,"* no *"6 days left."* **A comb hive renders as a §18.1 1:1 hive.** And `comb_rotation_writer_count` returns `0` — `§1B.36`'s refusal-as-a-number, at the surface `§1B.36.1(f)` declared immune, where the honest answer is `N` (their own open row is still in the count).
+
+#### (d) RULED — leaving the comb closes that month's writing seat. `ENG-99` (@Sage, S).
+
+The model's own sentence is *membership is writing rights* (`§8`, "gate the giving, never the getting" — membership is what grants **writing**). A person who has left the comb holding an open writing seat is that sentence half-applied.
+
+**The precedent is already in the tree and it pairs the rosters:** `delete_own_account` closes `hive_contributors` (`20260830000001:160-162`) and, post-`…0007` Part 5, `comb_members` (`…0007:221-228`) — the one existing "a seat ends" path closes **both**. Comb departure closing one is the inconsistency, not the fix.
+
+**Build pins:**
+1. Scope the cascade to the **open** rotation only — `hive_id in (select hive_id from comb_rotations where comb_id = old.comb_id and sealed_at is null and voided_at is null)`. A sealed month's roster is historical record; `contributor_names` is frozen at send for exactly this reason (`§14.2`).
+2. **Departure ends the writing; it does not retract the written.** Verified, not assumed: `contributor_names` is aggregated from `entries.author_name_at_seal` (`…0009:208-216`), never from `hive_contributors`. A writer who leaves after writing still ships in the keepsake, named. Nothing about `entries` changes.
+3. Idempotency has the same shape as `delete_own_account`'s sweep — guard `removed_at is null`, because `hive_contributors_removed_at_immutable` raises on a re-stamp.
+4. If the departure empties the roster, the month has zero writers and seals to `voided` by `§1B.16`. Already ruled; no new behaviour.
+
+#### (e) `§1B.36.1(f)` is repaired by `ENG-99`, not refuted by it.
+
+Post-`ENG-99`, one roster governs: a departed member holds no open `hive_contributors` seat, so the card does not render, so its reader is `≥1` again and the construction argument becomes sound. @Lumen's claim and @Pixel's `§1.3` note are true **conditionally on `ENG-99`** and false without it — so the doc should carry the dependency, not the bare claim. Until it ships, `§1.3`'s *"unreachable by construction"* must read as *"unreachable once one roster governs (`ENG-99`)."*
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-99`. No new `O`.
+
+**The transferable shape:** *"the reader is necessarily in the set"* and *"the reader is necessarily permitted to read the set"* are different claims, and an unreachability argument needs the second. I made the first and shipped it as the second — forty lines after writing down, in the same commit, that the count's gate reads a different table than the card's. **When you argue a value is unreachable, name the predicate that produces it and the predicate that admits the surface, and check they read the same row.** The corollary that sized the finding: when two rosters disagree, look for the event that closes one and not the other — that event is the whole population.
