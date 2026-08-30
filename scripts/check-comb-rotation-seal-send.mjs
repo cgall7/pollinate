@@ -77,6 +77,11 @@ const CONTRIBUTOR2 = '77777777-7777-7777-7777-777777777777';
 // reordering tests around a shared mutable global.
 const SUBJECT_FOR_COMB_DEPARTURE = '44444444-4444-4444-4444-444444444444';
 const SUBJECT_INTACT = '55555555-5555-5555-5555-555555555555';
+// ENG-95: a subject who was organizer-chosen but never joined this comb at
+// all (no comb_members row, ever -- distinct from SUBJECT_FOR_COMB_DEPARTURE,
+// which has a row with removed_at set). Ruled legal by §1B.30.1/§8; must not
+// be confused with departure by seal_and_send_rotation's subject_gone check.
+const SUBJECT_NEVER_MEMBER = '66666666-6666-6666-6666-666666666666';
 
 let pass = 0;
 const failures = [];
@@ -161,6 +166,9 @@ async function main() {
         SUBJECT_INTACT, JSON.stringify({ display_name: 'Subject Intact' }),
       ]
     );
+    await client.query('insert into auth.users (id, raw_user_meta_data) values ($1, $2)', [
+      SUBJECT_NEVER_MEMBER, JSON.stringify({ display_name: 'Subject Never Member' }),
+    ]);
 
     // asPostgres: plain session role, superuser, bypasses RLS — used for
     // test fixture setup that would otherwise need ENG-59's not-yet-built
@@ -200,6 +208,19 @@ async function main() {
         throw e;
       }
     };
+    const asAnon = async (fn) => {
+      await client.query('begin');
+      try {
+        await client.query("select set_config('role', 'anon', true)");
+        await client.query("select set_config('request.jwt.claims', '', true)");
+        const result = await fn();
+        await client.query('commit');
+        return result;
+      } catch (e) {
+        await client.query('rollback');
+        throw e;
+      }
+    };
 
     // Fixture builder: one comb, one rotation hive, with whatever roster
     // and entries the test wants, closes_at already in the past unless
@@ -208,16 +229,30 @@ async function main() {
       contributors = [CONTRIBUTOR],
       closesAt = 'now() - interval \'1 hour\'',
       subject = SUBJECT,
+      subjectIsMember = true,
     }) {
       const { rows: combRows } = await asUser(OWNER, () =>
         client.query("insert into public.combs (owner_id, name) values ($1, 'Test Comb') returning id", [OWNER])
       );
       const combId = combRows[0].id;
 
+      // ENG-95's fixture needs a comb where the subject has NO comb_members
+      // row at all -- distinct from "joined then removed" -- so
+      // subjectIsMember gates whether the subject is included in this
+      // insert. CONTRIBUTOR/CONTRIBUTOR2 are always seated regardless.
+      // Params are built to match the placeholders actually in the text --
+      // an unreferenced trailing $N leaves Postgres unable to infer its
+      // type even though a value is still bound to it.
+      const memberRows = subjectIsMember
+        ? [[combId, subject], [combId, CONTRIBUTOR], [combId, CONTRIBUTOR2]]
+        : [[combId, CONTRIBUTOR], [combId, CONTRIBUTOR2]];
+      const memberValuesSql = memberRows
+        .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`)
+        .join(', ');
       await asPostgres(() =>
         client.query(
-          'insert into public.comb_members (comb_id, profile_id) values ($1, $2), ($1, $3), ($1, $4) on conflict do nothing',
-          [combId, subject, CONTRIBUTOR, CONTRIBUTOR2]
+          `insert into public.comb_members (comb_id, profile_id) values ${memberValuesSql} on conflict do nothing`,
+          memberRows.flat()
         )
       );
 
@@ -238,7 +273,18 @@ async function main() {
         );
       }
 
-      const { rows: rotRows } = await asUser(OWNER, () =>
+      // comb_rotations_insert_owner's WITH CHECK (20260830000002:522-534)
+      // still requires the subject to be an active comb_members row on
+      // this base -- ENG-92 (open, not yet merged) is what drops that
+      // clause, and ENG-93's SECURITY DEFINER mint (also not yet merged)
+      // is the production path that will bypass this policy entirely for
+      // exactly this case. Neither exists yet at 9bc6d04, so a
+      // never-member subject can only be seated in this fixture via the
+      // same superuser bypass already used for the comb_members insert
+      // above -- this gate's scope is seal_and_send_rotation's
+      // classification, not comb_rotations' insert-time authorization.
+      const mintAsRole = subjectIsMember ? (fn) => asUser(OWNER, fn) : asPostgres;
+      const { rows: rotRows } = await mintAsRole(() =>
         client.query(
           `insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at)
            values ($1, 1, $2, $3, ${closesAt}) returning id`,
@@ -562,7 +608,44 @@ async function main() {
     }
 
     // ---------------------------------------------------------------
-    // 6. coalesce('A writer') backstop: a blank display_name at seal time
+    // 6. Deliver — ENG-95: a subject who was NEVER a comb_members row (no
+    // row at all, not a removed one) is the organizer-chosen non-member
+    // subject ruled legal by §1B.30.1/§8, not a departure. Sharpest
+    // fixture: an entry is present, so the pre-fix predicate
+    // (`not v_subject_active_member`, true for an absent row exactly as
+    // for a removed one) would have voided this as subject_gone and
+    // silently dropped a written letter for someone who was always the
+    // intended, valid recipient.
+    const t5b = await mintRotation({
+      contributors: [CONTRIBUTOR],
+      subject: SUBJECT_NEVER_MEMBER,
+      subjectIsMember: false,
+    });
+    const t5bVolume = await volumeIdFor(t5b.hiveId);
+    await asUser(CONTRIBUTOR, () =>
+      client.query(
+        "insert into public.entries (user_id, hive_id, volume_id, content, entry_date) values ($1, $2, $3, 'For Subject', current_date)",
+        [CONTRIBUTOR, t5b.hiveId, t5bVolume]
+      )
+    );
+    await asService(() => client.query('select public.seal_and_send_rotation($1)', [t5b.rotationId]));
+    {
+      const { rows } = await client.query(
+        'select sent_at, voided_at, voided_reason from public.comb_rotations where id = $1',
+        [t5b.rotationId]
+      );
+      if (rows[0].sent_at && !rows[0].voided_at && !rows[0].voided_reason) {
+        ok('deliver: a subject who was never a comb_members row delivers, does not void as subject_gone');
+      } else {
+        bad(
+          'deliver: a subject who was never a comb_members row delivers, does not void as subject_gone',
+          JSON.stringify(rows[0])
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 7. coalesce('A writer') backstop: a blank display_name at seal time
     // (synthetic — the live account-deletion path cannot produce this, see
     // the migration's own citation of Vector's self-correction) must not
     // freeze '' into author_name_at_seal or contributor_names.
@@ -612,7 +695,7 @@ async function main() {
     await asPostgres(() => client.query("update public.profiles set display_name = 'Contributor' where id = $1", [CONTRIBUTOR]));
 
     // ---------------------------------------------------------------
-    // 7. Not-closed-yet gate: closes_at in the future refuses, no session
+    // 8. Not-closed-yet gate: closes_at in the future refuses, no session
     // check involved — time is the only gate.
     const t7 = await mintRotation({ contributors: [CONTRIBUTOR], closesAt: "now() + interval '1 day'" });
     try {
@@ -638,6 +721,82 @@ async function main() {
         ok('unknown rotation: raises rotation not found');
       } else {
         bad('unknown rotation: raises rotation not found', `wrong error: ${firstLine(e)}`);
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 9. comb_subject_gone: grant boundary + caller roster. Vector's
+    // §1B.34.3 post-merge review: the shared body is a construction, and
+    // tests 4/5/6 above assert outcomes that read identically whether
+    // seal_and_send_rotation calls comb_subject_gone() or reimplements
+    // one arm of it inline -- they proved the right ANSWER, not that it
+    // came from the shared body. These checks assert the construction
+    // directly, the same pg_get_functiondef idiom check-comb-preview.mjs
+    // uses to assert a body property no behavioural probe can see.
+    {
+      // 9a. Grant boundary: revoked from anon AND authenticated -- no
+      // client-facing role can call it directly. Every caller (this one
+      // today; comb_preview_by_invite_code and comb_open_rotation once
+      // ENG-94 repoints them) is itself SECURITY DEFINER, so a nested
+      // call runs as the caller's owner, not the original role. A direct
+      // grant would expose "has this person deleted their account or
+      // left this comb" via PostgREST to anyone who knows a
+      // (comb_id, subject_id) pair -- no invite-code or membership check
+      // in front of it.
+      try {
+        await asAnon(() => client.query('select public.comb_subject_gone($1, $2)', [t1.combId, SUBJECT]));
+        bad('grant boundary: anon cannot call comb_subject_gone directly', 'call succeeded');
+      } catch (e) {
+        if (/permission denied/i.test(e.message)) {
+          ok('grant boundary: anon cannot call comb_subject_gone directly');
+        } else {
+          bad('grant boundary: anon cannot call comb_subject_gone directly', `wrong error: ${firstLine(e)}`);
+        }
+      }
+      try {
+        await asUser(OWNER, () => client.query('select public.comb_subject_gone($1, $2)', [t1.combId, SUBJECT]));
+        bad('grant boundary: authenticated cannot call comb_subject_gone directly', 'call succeeded');
+      } catch (e) {
+        if (/permission denied/i.test(e.message)) {
+          ok('grant boundary: authenticated cannot call comb_subject_gone directly');
+        } else {
+          bad('grant boundary: authenticated cannot call comb_subject_gone directly', `wrong error: ${firstLine(e)}`);
+        }
+      }
+
+      // 9b. Caller roster: assert the construction, not just the count.
+      // Today's roster is exactly one name. ENG-94 repoints
+      // comb_preview_by_invite_code and comb_open_rotation to call this
+      // same body -- when it lands, this array must grow to all three or
+      // this test fails, forcing that edit instead of letting a fourth
+      // caller slide under it silently. A NEW site that reimplements the
+      // predicate inline instead of calling comb_subject_gone() is still
+      // invisible to this grep -- same blind spot as any behavioural
+      // test -- so this catches an existing caller reverting to inline,
+      // or the expected roster going stale, not every possible future
+      // reimplementation.
+      const EXPECTED_CALLERS = ['seal_and_send_rotation'];
+      const { rows: callerRows } = await asPostgres(() =>
+        client.query(
+          `select p.proname
+             from pg_proc p
+             join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public'
+              and p.prokind in ('f', 'p')
+              and p.proname <> 'comb_subject_gone'
+              and pg_get_functiondef(p.oid) ~ 'comb_subject_gone\\('
+            order by p.proname`
+        )
+      );
+      const actualCallers = callerRows.map((r) => r.proname).sort();
+      const expectedSorted = [...EXPECTED_CALLERS].sort();
+      if (JSON.stringify(actualCallers) === JSON.stringify(expectedSorted)) {
+        ok(`caller roster: comb_subject_gone called by exactly [${actualCallers.join(', ')}]`);
+      } else {
+        bad(
+          `caller roster: comb_subject_gone called by exactly [${expectedSorted.join(', ')}]`,
+          `got [${actualCallers.join(', ')}]`
+        );
       }
     }
 

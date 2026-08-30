@@ -272,4 +272,14 @@ export const SENTINELS = {
     },
     expect: '42501',
   },
+  // ENG-95 (Sage). comb_subject_gone(uuid, uuid) is revoked from public,
+  // anon, AND authenticated -- unlike every 'rpc' entry above, there is no
+  // role this function is ever meant to answer for directly (every caller
+  // is itself SECURITY DEFINER and reaches it through owner privilege, not
+  // a grant), so there is no anon/authenticated probe that would read
+  // differently before and after this migration. seal_and_send_rotation's
+  // own grants (service_role only) are unchanged by this migration's
+  // create-or-replace. No anon-visible surface, same class as
+  // nectar_sats_override above.
+  '20260830000009_eng95_seal_nonmember_subject': { kind: 'order', reason: 'new SECURITY DEFINER helper revoked from every client role; seal_and_send_rotation body replace only, grants unchanged' },
 };
