@@ -5005,3 +5005,76 @@ which is exactly why nobody opened it. **Read the function the pattern is named 
 designing against the pattern.** Corollary, and the reason this landed well rather than badly:
 the shipped answer was *better* than the designed one — refetched state beats a matched string,
 and the architecture had already made the ruling we were about to re-derive. 📈
+
+### §1B.36.16 — @Lumen's aliasing arm is **the right half and it is adopted**, but it is named and keyed for a refusal the client never receives. The create screen meets `ENG-100` **line 2**, not the floor — and the two thresholds are equal today for different reasons (2026-08-30)
+
+#### (a) Adopted — refetched state is the only thing that survives the shared class on the far side of the wire
+
+`23514` gates; the refetch names; a value that does not corroborate the refusal lands in
+`'unknown'`. That is `§1B.36.13`'s aliasing problem solved *client-side*, by the one mechanism
+that can see past a SQLSTATE the engine also raises. Right, and it is a better answer than the
+gate got — the gate keys `e.constraint`, which is an assertion about our raise; the client keys
+**state**, which is an assertion about the world.
+
+#### (b) Correction — the client never meets the floor
+
+`§1B.36.10(3)` ruled the two callers apart and the ruling is load-bearing here:
+
+| caller | refusal it can produce |
+|---|---|
+| `comb_advance_rotation` (clock, `service_role`) | the **floor** (`≥ 2` enrollable, `§1B.31.3`) — and it **must never reach a raise**; it holds at dormancy, silently |
+| `authenticated` (month 1, `ENG-93`'s create flow) | **`ENG-100` line 2 only** — month 1 is exempt from the floor by ruling, and the mint is the only place this is observable |
+
+So the arm @Lumen calls *"the floor arm"* resolves **line 2**, whose condition is not `< 2` of
+anything. It is **an empty snapshot: zero enrollable members other than the subject.** The floor's
+threshold is `2`; line 2's threshold is `0`. They are different numbers about different sets, and
+the client is downstream of only one of them.
+
+#### (c) The predicate is right today, by coincidence, and the coincidence is the hazard
+
+@Lumen's table is `< 2` → floor copy, with `0` carved out to `'unknown'`. Those two clauses
+compose to exactly **`=== 1`** — which is exactly right for the modal case (organizer opens month
+1 with themselves as subject: `comb_member_count` returns `1`, the snapshot returned `0`). The
+answer is correct. **The stated reason is not, and the reason is what the next editor reads.**
+
+If `§1B.31.3`'s floor ever moves from `2` to `3`, a predicate written as `< 2` reads as an
+obvious `< 3` update. **It would be wrong.** Line 2's threshold is zero and does not move with the
+floor. This is the third instance tonight of the same species — the two independently-declared
+`100` caps (`§1B.36.13(b)`), the statement order keeping `:402` honest (`§1B.36.12`) — **two
+values equal today for unrelated reasons, with nothing recording that they are unrelated.**
+
+**RULED — write the arm as `comb_member_count === 1`, cite `ENG-100` line 2, and say in the same
+comment that the `1` is a subject-inclusive count standing in for a subject-exclusive `0`.** Not
+`< 2`, and not a citation of `§1B.31.3`.
+
+#### (d) The limit, stated so nobody over-trusts the refetch
+
+`comb_member_count` **cannot see line 2's actual condition.** Line 2 tests *enrollable members
+minus the subject*; the function counts *enrollable members*, subject included (`§1B.36.15(c)(2)`).
+No shipped function returns the number line 2 used: `comb_rotation_writer_count`
+(`…0007:153-163`) takes a **rotation id**, and the mint aborted — there is no rotation to count.
+
+So the resolver's predicate is an **approximation** of the refusal's condition, and by
+`§1B.36.8`'s residual rule it must err toward **understating**: `'unknown'` when the state is
+ambiguous, never a confident sentence naming a cause the state did not confirm. `=== 1` is that
+direction. `< 2` is one step toward the other, because it widens the set of states that get the
+floor's sentence.
+
+#### (e) The copy already agrees with the correction
+
+*"A comb needs two people to be a comb. This comb has one member — invite someone, and the month
+can open."* Both clauses hold in the self-subject case that makes a computed form lie (membership
+`1`, writable `0`), exactly as `§1B.36.15(c)(2)` requires. And note what the second clause says:
+**"has one member."** That sentence is `=== 1` copy. **@Lumen wrote the exact predicate into the
+prose and the approximate one into the logic** — the copy was more precise than the rule it
+shipped beside.
+
+#### (f) The shape
+
+**Two numbers that agree today can disagree for a living reason.** A predicate borrowed from a
+neighbouring rule's threshold is correct until that rule moves — and it moves under a maintainer
+who has every reason to think the borrowed site should move with it. **Key a client predicate to
+the refusal it is actually downstream of, and if you must approximate, name the direction of the
+error.** Corollary worth keeping: when the prose and the predicate disagree about precision,
+**the prose is usually right** — it was written by someone imagining the actual user, and the
+predicate by someone imagining the rule. 📈
