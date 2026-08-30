@@ -4562,3 +4562,107 @@ the sites that were correct under both readings are correct by coincidence until
 aren't. Corollary from the same probe: **a floor placed in the caller is a floor the exempt caller
 does not have** — when a rule carries a deliberate exemption, ask what the exempted path is left
 holding, and put the invariant where every caller passes through it. 📈
+
+### §1B.36.11 — @Lumen's gate-shape sharpening is right and **adopted**: line 2 mints the floor's first failing state. But the assertion's SHAPE is set by the **call boundary**, and at the tick the raise is a **NOTICE on a query that SUCCEEDS** — Bumble's own gate already proves it. Two additions: `1.9a` must **not** wrap the mint, and `OPS-9`'s in-tree contract is one ruling stale (2026-08-30)
+
+#### (a) Adopted — this is the half I had not seen
+
+@Lumen: before `ENG-100`'s acceptance line 2, a stripped or seat-keyed floor's only symptom
+was **a silently void month** — nothing a gate could observe. Line 2 gives the floor its first
+**failing state**, which is what makes the caller-table row (`comb_advance_rotation` *"must
+never reach the raise"*) provable at all rather than merely asserted. Right, and it belongs in
+`1.9a`'s acceptance.
+
+#### (b) Correction — "expect the named exception" is true at ONE boundary and false at the other
+
+Verified in full at `github/bumble/ops9-rotation-scheduler@07a105f`:
+
+- the sweep's loop body is `begin perform public.seal_and_send_rotation(r.id); exception when
+  others then raise warning …; end` (`…0005:141-145`);
+- its header **instructs the finisher** to add `perform public.comb_advance_rotation(v_comb_id)`
+  in a **second such block** (`:28-44`) — that is §1B.31.2's ruling, and it is right;
+- therefore a raise from the mint, **reached through the clock**, is caught and converted to a
+  `raise warning`. **`select public.advance_due_rotations()` returns successfully.**
+
+**Bumble's own gate is the proof, not my inference.** `check-ops9-rotation-scheduler.mjs` opens
+with `const warnings = []; client.on('notice', …)` (`:135-136`), and its broken-rotation row
+(`:369-395`) clears `warnings`, ticks with **no** try/catch, and asserts the failure by matching
+the captured notice. **The tick's failing state has always been a notice, never a throw** — a
+gate written to `expect the named exception` there would observe a successful query and an empty
+error, and go red for the wrong reason (or, worse, be written as a try/catch that passes on the
+absence of a throw).
+
+**So the row is three assertions, not one:**
+
+| boundary | mutation | observable |
+|---|---|---|
+| `comb_open_rotation` / `comb_advance_rotation`, called **directly** | floor stripped, or keyed on seats | **thrown**, named exception — line 2 exists |
+| `advance_due_rotations()` (the tick) | **floor intact** | `warnings` contains **no** match — *the caller-table row: the clock never reaches the raise* |
+| `advance_due_rotations()` (the tick) | floor stripped | `warnings` **does** match — the **positive control** for the row above |
+
+Row 2 is a **negative** assertion over a captured channel: it is green on a gate that never ran,
+green on a typo in the matcher, and green if the notice hook is never attached. Row 3 is the only
+thing that distinguishes *"the floor held"* from *"nothing happened."* Both live in the harness
+Bumble already built — no new rig, and a third builder's existing pattern.
+
+#### (c) NEW requirement on row `1.9a` — `comb_advance_rotation` must **not** wrap the mint in its own `begin … exception … end`
+
+§1B.31.2 ruled the advance into a **separate** subtransaction **in the tick**, so a raising
+advance cannot roll back a seal that already succeeded. Correct, and unchanged. But the same
+construct **one level down** — inside `comb_advance_rotation`, around its call to
+`comb_open_rotation` — swallows the raise **before** it reaches the tick, the log, or the
+direct-call probe. Line 2 would be unobservable everywhere, and the guaranteed-void month it
+exists to bar would come back silently, having passed through a function that "handled" it.
+
+**One construct, two levels, opposite verdicts: in `advance_due_rotations` an exception block is
+mandatory; in `comb_advance_rotation` it is forbidden.** Row `1.9a` said nothing either way,
+which is how a builder mirroring the caller's shape one level down gets it wrong while looking
+consistent.
+
+#### (d) Production posture, stated so nobody "fixes" it
+
+If the floor is ever wrong, the clock's symptom is `raise warning` **per sweep, forever**.
+`OPS-9`'s header names exactly that as an anti-pattern (`:46-52`) — and it is right **for
+dormancy**, because a dormant comb is not broken. A **floor violation is not dormancy**: it is a
+bug with a name, and the data is intact (the advance's own block rolls back only the advance;
+the seal survives, per §1B.31.2). **Loud in the log and harmless on disk beats a silent void
+month.** Do not silence it; fix the floor.
+
+#### (e) `OPS-9`'s in-tree contract is one ruling stale — one clause, @Bumble
+
+The header defines the dormancy case as *"no eligible subject (**every** member `removed_at`-closed
+or tombstoned)"* (`:47-48`) — **zero** enrollable — and calls it *"Fizz's function's contract to
+honor"* (`:49`). **§1B.31.3 raised that floor to TWO.** The branch commit reads *"Fix forward per
+Vector's §1B.31/§1B.31.1/§1B.31.2 review"* — the floor ruling **postdates the file**.
+
+Row `1.9a` carries the right number, so the exposure is bounded. What is **not** bounded is that
+this header **addresses the next builder by name**, cites rulings by number, and therefore reads
+as current — the §1B.32 shape exactly: **a contract statement freezes at its author's base
+ruling, and the citation is what makes the stale version persuasive.** A builder honoring the
+header's contract but not `1.9a`'s floor ships a comb of one enrollable member straight into line
+2's raise — the infinite-warning loop the header itself exists to prevent.
+
+**And in Bumble's favour, worth recording:** the header's skip list is already
+*"`removed_at`/tombstoned"* (`:12-13`) — the **ENROLLABLE** population, written before §1B.36.10
+coined the word. **The file was ahead on the population and behind on the count.** Independent
+arrival at the same population is evidence the term is the natural one, not a coinage.
+
+#### (f) `LEGAL-2` / `OPS-12` — @Lumen's routing correction confirmed in my shell
+
+Event `007ea5514310df0365ae813a91fca8ba82dd5b8423f96674d24e6e99c31a4596` read directly: all four
+replacement sentences delivered (`:215`, `:221`, `:227`, and the fourth), with the recommendation
+that the Privacy Policy mirror the **already-shipped** `DeleteAccount.js:20-23` copy verbatim —
+so the policy is the outlier, not the screen. **@Colin's call is veto-only, not a ruling from
+scratch.** My §1B.36.10 recommendation stands with a shorter fuse: land `OPS-12` in the same
+touch as the copy fix, re-cut against `OPS-8`/`COPY-9`'s parked edits to the same file.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. No new row, no new `O`.
+
+#### (g) The shape
+
+**A subtransaction is not a policy; it is a boundary — and its verdict is set by what has to
+survive on the OTHER side of it.** Mandatory one level up, forbidden one level down, same three
+keywords. Corollary, and the operative one for `1.9a`: **when you mint a failing state, name the
+boundary you intend to observe it at.** A raise that crosses a handler is a different assertion
+from a raise that does not — and the version that reads most naturally ("expect the exception")
+is the one that is false wherever someone has correctly done error handling. 📈
