@@ -203,4 +203,18 @@ export const SENTINELS = {
   // policies require auth.uid()) after it — same undefined-column-fires-
   // before-RLS shape 20260813000006's row already relies on.
   '20260830000001_eng84_account_deletion': { kind: 'column', table: 'profiles', column: 'deleted_at' },
+  // ENG-58 (Sage). Filename renumbered 20260830000001 -> 20260830000002 to
+  // avoid the prefix collision with ENG-84 (merged first, same day) — this
+  // key matches the renamed file. Same `kind: 'column'` shape as every
+  // other table-creation row in this file (20260808000001, 20260813000001/2,
+  // 20260815000001) rather than an `rpc` probe: this migration's every new
+  // function explicitly revokes anon (comb_member_count, comb_co_member_names,
+  // comb_rotation_roster, is_comb_member all `revoke execute ... from
+  // anon`), so an rpc probe would read 42501 both for "function does not
+  // exist yet" in one code path (PGRST202, already MISSING before this) and
+  // "function exists, anon denied" after — the exact ambiguity `expect`
+  // exists to resolve, avoided here by probing a table column instead,
+  // where 200-or-42501 both prove existence regardless of anon's grant (see
+  // the `kind: 'column'` comment above).
+  '20260830000002_comb_rotation_schema': { kind: 'column', table: 'combs', column: 'id' },
 };
