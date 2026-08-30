@@ -32,14 +32,27 @@ const check = (label, ok) => {
 };
 
 const store = read('src/services/HiveStore.js');
-const selects = [...store.matchAll(/\.from\('private_hives'\)[\s\S]{0,120}?\.select\('([^']*)'\)/g)].map((m) => m[1]);
-// Five as of 8b.6 (`listReceivedPackages`/`getReceivedPackage` — the
-// recipient's two subject-scoped reads, joining the owner-scoped
-// createHive/listHives/getHive this gate originally counted). The count is
-// not a ceiling; it exists so a new private_hives select added later has to
-// touch this line, which is what keeps it from carrying sealed_at by
-// omission the way the original three did.
-check('HiveStore.js has exactly five private_hives selects', selects.length === 5);
+// Enumerator repaired 2026-08-30 (Vector, thread f2c15b7d msg ff0aab79):
+// the original `[\s\S]{0,120}?\.select\('` shape silently dropped any call
+// site whose from→select gap outgrew 120 chars (createHive, once
+// `is_collective` grew the insert block) or whose select argument wrapped
+// onto its own line (getHive) — 5 matched of 7 while the `=== 5` count
+// stayed green, because membership had changed by four under a constant
+// count. The window is gone and whitespace is tolerated; the completeness
+// row below is the actual repair — it converts a silent miss into a red,
+// so the count can be a membership tripwire instead of a coincidence.
+const fromSites = [...store.matchAll(/\.from\('private_hives'\)/g)].length;
+const selects = [...store.matchAll(/\.from\('private_hives'\)[\s\S]*?\.select\(\s*'([^']*)'\s*\)/g)].map((m) => m[1]);
+check(
+  'every private_hives call site is captured by this enumerator (a site this regex cannot parse must fail here, not vanish)',
+  selects.length === fromSites
+);
+// Seven as of COPY-14's repair: createHive, listHives, getHive, the two
+// contributing-hive reads (ENG-61 era), and the two received-packages
+// reads. The count is not a ceiling; it exists so a new private_hives
+// select added later has to touch this line, which is what keeps it from
+// carrying sealed_at by omission the way the original three did.
+check('HiveStore.js has exactly seven private_hives selects', selects.length === 7);
 check(
   'every private_hives select names sealed_at',
   selects.length > 0 && selects.every((cols) => cols.split(',').map((c) => c.trim()).includes('sealed_at'))
