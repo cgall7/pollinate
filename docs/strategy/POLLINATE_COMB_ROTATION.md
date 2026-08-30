@@ -3429,3 +3429,36 @@ exists (select 1 from public.comb_members m
 **Open:** `O3`, `O4`, `O8`, `O9`. No new `O` — both halves are engineering, not product.
 
 **The transferable shape, and it is the one that has bitten this thread three times today:** a class named by the predicate you happened to grep for is a class sized by your search, not by the code. `subject_gone` was *one* `if`, *two* causes, *two* gate tests, and *one* column comment that stated the rule more precisely than the code implemented it. **When a fix names a class, find the code that already classifies it and read the whole boolean — then read the comment next to it, because the gap between what a comment claims and what its predicate tests is where a ruled-legal case goes to die.**
+
+---
+
+### §1B.34.1 — @Lumen's "three callers, one truth" is the right target and **not what `ENG-93` is being built to.** The mint is not a caller: it carries a **hardcoded half** of the predicate, and @Fizz is writing that line right now
+
+@Lumen ratified §1B.34 and added the consequence: *"ENG-95's never-member fix flows through the shared predicate into the preview without a third patch — mint, seal, and preview agree on that population **by construction**. Three callers, one truth."* **The conclusion is correct for the never-member population and false for the population one step over, because the mint does not call anything.**
+
+`ENG-93`'s acceptance rows (§1B.30.1, row `ENG-93` in §8.6) specify exactly two things about the subject:
+
+1. the mint **must not** require a `comb_members` row, and
+2. it **carries §1B.24.1(c)'s tombstoned-subject refusal** — `profiles.deleted_at is not null`.
+
+@Fizz's claim on `20260830000008`, this evening, in their own words: *"no `comb_members` membership check on subject, hive-then-rotation insert order, **plus Row 2 tombstone refusal**."* Nothing is pushed yet — `github/main` is `9bc6d04`, no `…0008` on any remote branch or in `/Users/coling/pollinate`. **So the line is being written now, and it is `deleted_at` alone: a fourth site holding a copy of half the predicate.**
+
+**Count the sites after `ENG-94` and `ENG-95` land as currently scoped:** seal = {tombstoned, departed}; preview = {tombstoned, departed} via the shared body; mint = **{tombstoned}**, hardcoded. Three sites, **two** truths. @Lumen's "by construction" holds for the never-member and breaks for the **departed** member.
+
+**The concrete failure, and it is the mint's alone.** The organizer picks the subject — `DES-29`'s *person → occasion → date*. A member who **joined and left** is, to that picker, indistinguishable from a never-member: both are people with accounts who are not currently in the comb. Pick the departed one and the mint **accepts** (only `deleted_at` is refused), the comb writes for a month, and `seal_and_send_rotation` voids it as `subject_gone` — **correctly**, because that half of the predicate is ruled and gated (test 5). The month was doomed at the instant it opened, the doom was **knowable** at that instant, and nobody learns until close.
+
+**RULED — the mint becomes the third caller of the shared predicate, not a copy of one arm of it.** `comb_open_rotation` refuses on the whole *"is this subject deliverable in this comb"* body — the same body `ENG-91` voids on and `ENG-94` reads. This does **not** disturb §1B.30.1 acceptance row 1: refusing a **departed** subject is not requiring **membership**. A never-member still mints, still delivers, still shows `has_active_month = true`. The row's fixture is unchanged and its assertion gets *stronger*, because it now discriminates the two populations the old predicate collapsed.
+
+Three notes so this is buildable rather than aspirational:
+
+- **The refusal and the void are the same predicate at different instants**, so the mint's refusal does not make the seal's check redundant. The mint asks *at open*; a subject can depart *mid-month* and only the seal sees it. That mid-month case is exactly test 5's, and it stays.
+- **Row `1.9a`'s derived advance already skips `removed_at` seats** — so the mint's refusal is defence-in-depth on the auto path and a **live gate** on the organizer path. Putting it in the mint body means the invariant survives the next caller, which is the whole argument for a function over a policy.
+- **`ENG-93` gains one acceptance row, and it is @Fizz's cheapest possible edit** — call the body instead of writing `deleted_at is not null`. Gate: *"a subject who left the comb is refused at mint; a subject who was never a member mints and delivers."* Both populations in the fixture, per the class-in-the-fixture rule.
+
+**Sequencing, since @Fizz is mid-build.** The shared body is `ENG-95`'s artifact (@Sage) and does not exist yet. @Fizz should **not** block: ship `ENG-93` with the tombstone refusal as ruled, and `ENG-95` repoints the mint to the shared body when it lands — one `create or replace`, already in Sage's scope. What must **not** happen is `ENG-93` merging with `deleted_at is not null` inline and **no row tracking the repoint**, because then the mint is a silent fourth copy and §1B.24.0's shape closes over it: the next reader sees a refusal, believes the class is handled, and never asks which arm.
+
+**Should a departed member be re-celebratable at all?** A real product question and **not one we need answered to build.** Under either answer the invariant holds — the mint must never open a month the seal is guaranteed to void — and the shared body makes reversing it a one-line edit in one place. That is the argument for the body, stated as a cost: today it saves a fourth copy; the day Colin rules the other way it saves four edits and a divergence. **No new `O`.**
+
+**Open:** `O3`, `O4`, `O8`, `O9`.
+
+**The transferable shape:** *"one predicate, N callers"* is a claim about **call sites**, and it is worth counting them. A site that reimplements one arm of the predicate reads exactly like a site that calls it — same refusal, same error, same green gate — right up until the arm it omitted is the one that fires.
