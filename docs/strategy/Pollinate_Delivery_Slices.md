@@ -3,7 +3,7 @@
 **What changed:** Instead of a single Phase 1 MVP, we're slicing the work into two delivery milestones:
 
 1. **Slice 1: Demo Mode** — Full product works end-to-end for friends & family testing. No paywall. Every feature is free. No money — no payments, no tips (~~wallet is a shell~~ — superseded 2026-08-26: there is no Wallet tab at all; three-tab bar, see `POLLINATE_V2_NAVIGATION.md`). Distributed via TestFlight / internal track. Goal: validate the core loop with real users.
-2. **Slice 2: Public Launch** — After testing validates the loop, ship to App Store / Play Store with the V2 revenue model (`POLLINATE_V2_SPEC.md` §17.5, ruled 2026-08-24): unlimited hives and entries free forever, first delivery free forever, "Pollinate Plus" at $39.99/year (annual only) buying every delivery after the first. The Cash-App-via-iMessage gifting plan is cancelled (V2 §5.7); the money layer is nectar zaps (V2 §5).
+2. **Slice 2: Public Launch** — After testing validates the loop, ship to App Store / Play Store with the V2 revenue model (`POLLINATE_V2_SPEC.md` §17.5, ruled 2026-08-24): unlimited hives and entries free forever, first delivery free forever, "Pollinate Plus" at $39.99/year (annual only) buying every delivery after the first. The Cash-App-via-iMessage gifting plan is cancelled (V2 §5.7); the money layer is nectar zaps (V2 §5). *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
 
 > **Amendment, 2026-08-26 (Colin, CEO channel: "V2 is mvp1"):** The two-milestone split above no longer sets release order. Slice 2's money layer — Project 12 (Freemium Paywall) and the nectar zap system (V2 §5) — ships in the same MVP1 release as Slice 1, not deferred to a later public-launch phase. The "Slice 1 / Slice 2" headings below are now a work-breakdown convenience, not a sequencing gate — read both as one MVP1 scope. Project 15 (Cash App gifting) stays cancelled, superseded by nectar zaps per line above.
 >
@@ -313,6 +313,16 @@
 
 > **Moved to MVP2, 2026-08-26 (Colin, CEO channel: "do not include the freemium paywall for mvp1, that's another mvp2 item").** Nectar zaps are unaffected and remain MVP1 — see the amendments at the top of this doc. This project (12.1-12.8 below) does not build for the MVP1 release.
 
+> **Project 12's price and meter are superseded 2026-08-30** —
+> `POLLINATE_COMB_ROTATION.md` §4. Rows 12.1, 12.2, 12.3, 12.4 and 12.5 below are
+> written against the $39.99/yr delivery meter. **The paid line is now a comb
+> plan at $5.99/month**, organizer-paid, first rotation free, and the delivery
+> meter is retired as the primary mechanism (whether it survives at all is open
+> ruling O1). 12.3's *free tier* description stays accurate; only its
+> "delivery is the only meter" clause is retired. 12.6, 12.7 and 12.8 are
+> unaffected in substance — 12.8 should add rotation participation (condition
+> C1) to its tracked metrics. Build against `ENG-79`, not `ENG-76`.
+
 | #    | Issue                            | Description                                                                                                                | Est | Labels                |
 | ---- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --- | --------------------- |
 | 12.1 | Subscription engine              | In-app purchase (StoreKit 2 / Play Billing). **$39.99/yr, annual only** (V2 §17.5, 2026-08-24 — the monthly plan is retired, not repriced). Superseded by V2 assignments `ENG-76`. | M   | ios, android, backend |
@@ -327,7 +337,7 @@
 
 > **Monetization model (re-ruled 2026-08-24 — V2 §17.5 governs; the PRD-v3.1 model that stood here is superseded):**
 >
-> - **Freemium subscription, metered at delivery.** "Pollinate Plus" at **$39.99/year, annual only**.
+> - ~~**Freemium subscription, metered at delivery.** "Pollinate Plus" at **$39.99/year, annual only**.~~ **Superseded 2026-08-30: the paid line is a comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free (`POLLINATE_COMB_ROTATION.md` §4.1). Open ruling O1: whether individual Plus survives alongside it.
 > - **Free tier:** Unlimited hives and entries forever; first delivery free forever; export free forever (V2 §17.4); receive unlimited. Sealing unconditional on every tier. Cadence, friends and seeds ungated everywhere (V2 §17.5.2a — delivery is the only meter; seeds abuse-rate-limited, not priced).
 > - **Paid tier (Pollinate Plus):** Every delivery after the first. Second-order lines (gifted subscription, family/comb plan, legacy tier) are Slice 3 — V2 §17.5.4.
 > - **Nectar zaps (replaces Cash App gifting, V2 §5.7):** self-custodial, 100% to receiver, free on every tier, never revenue. Pollinate is NOT a money transmitter (V2 §5.6).
@@ -414,7 +424,7 @@
 | Timeline      | 3–4 weeks build, then public launch                                       |
 | Critical path | 15.4 (iMessage/share integration), 12.1 (Subscription engine), 12.5 (Feature gating) |
 | Distribution  | App Store + Play Store (public)                                           |
-| Monetization  | Freemium per V2 §17.5: writing free forever, first delivery free forever, Pollinate Plus $39.99/yr (annual only) for later deliveries. Nectar zaps replace Cash App gifting (V2 §5.7; not a money transmitter, V2 §5.6). |
+| Monetization  | Freemium per V2 §17.5: writing free forever, first delivery free forever, Pollinate Plus $39.99/yr (annual only) for later deliveries. Nectar zaps replace Cash App gifting (V2 §5.7; not a money transmitter, V2 §5.6). | *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
 | Success gate  | The reveal→signup rate (V2 §17.5.3 — `ENG-78` instruments it first); free→paid conversion target 4% |
 
 
@@ -520,4 +530,40 @@ Week 14+:   SLICE 2 LAUNCH
 | Backend Engineer | Subscription backend, Cash App link generation, gifting API, revenue tracking, demo→prod migration | 12, 15, 13 |
 | Designer         | Paywall design, gifting flow, App Store screenshots, landing page | 12, 15, 13 |
 | Growth/Community | App Store submission, landing page, public launch           | 13           |
+
+---
+
+## Amendment — 2026-08-30: comb rotation re-slicing
+
+**Ruled by Colin, #Strategy event `0effa81d…`. Governing document:
+`POLLINATE_COMB_ROTATION.md` (§8 is the engineering handoff).**
+
+**Slice 1 still ships first, unchanged.** This amendment re-slices what comes
+after it.
+
+| Was | Now |
+|---|---|
+| Project 18 (Collective Hives & Combs) — Cycle 11–12 | **On the critical path.** `ENG-58`/`59`/`60` (combs schema, invite-link join, rotation ritual) are the hero build. |
+| Slice 2 = delivery-metered paywall at $39.99/yr annual-only | **Slice 2 = the comb plan, $5.99/month** (`ENG-79`, repriced from $79/yr-6-seats and promoted from Slice 3). `ENG-76` is **blocked on ruling O1**. |
+| `ENG-79` Family/comb plan — Slice 3 | **The primary paid line.** |
+| Friend feed in the Hive tab | **Cut.** Hive tab becomes comb-first. |
+
+**Already shipped, do not re-slice:** V2 §18.1 collective hives —
+`hive_contributors` + `is_hive_contributor()` landed in
+`20260827000001_multi_writer_hives.sql` (+ `20260828000001`), with
+`InviteContributor.js` and `ContributingHive.js`. `ENG-56`/`57`/`61` are done.
+
+**Two release blockers that are independent of this ruling and belong in the
+Slice 1 → store transition, not in Slice 2:**
+
+- `ENG-84` — **in-app account deletion.** No such path exists in `src/`. App
+  Store **5.1.1(v)** is a hard rejection for any app with account creation.
+- `OPS-8` — **close the analytics contradiction before the privacy policy
+  publishes.** `src/constants/legalCopy.js:159,207` currently promises no
+  analytics will ever exist, which permanently forecloses the four conditions
+  the business rests on. V2 §20.2 has the fix: narrow the promise, do not delete it.
+
+Also still owed and still unbuilt: **digital export** (§17.4's durability
+promise — no `expo-print` / `expo-sharing` in `package.json`). Physical printing
+is now ruled out (`482eee85…`); the digital path is not.
 

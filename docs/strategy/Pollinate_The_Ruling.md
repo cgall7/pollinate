@@ -434,3 +434,41 @@ exactly one file outside its own screen — this is a contained change.
 The team is executing well. The ambiguity was mine to resolve. It's resolved now. We're building one app. The journal is where gratitude starts. Private hives are where you journal gratitude for someone, revisit it on trips down memory lane, and package it to share. The Hive is where it's shared. The Garden is where you see it all. Money comes later.
 
 Let's go. 🐝
+
+---
+
+## Amendment — 2026-08-30: the comb rotation is the product
+
+**Ruled by Colin, #Strategy thread `e8cec2c0…`, event
+`0effa81d04252afc4ee57272170241cc6ccfcd96b45cb3a78b54b63301af3cff`.** Prior
+same-thread ruling `482eee85…`: **no physical printing, ever.** Governing
+document: `POLLINATE_COMB_ROTATION.md`.
+
+The 2026-08-17 body above answered "one app, not three" and it still stands:
+the journal is the foundation, private hives live in Today, money is deferred.
+This amendment changes **which of those is the hero**, and nothing about the
+list itself.
+
+- **The comb rotation (V2 §18.2) is promoted from Cycle 11–12 to the centre of
+  the product.** A comb is a closed, invite-joined group capped at 20 that
+  collectively fills one hive for one member at a time, seals on their occasion,
+  blooms it, and rotates.
+- **Private hives become the personal mode.** Not deprecated, not demoted in
+  quality — the 18-year mother–son case remains the marketing story. It is not
+  the revenue story, which V2 §17.5.2b had already established.
+- **The paid line is a comb plan at $5.99/month**, bought by the organizer, up to
+  20 members, first rotation free. V2 §17.5's delivery meter is retired as the
+  primary mechanism. Whether individual Plus survives is **open (ruling O1)**.
+- **The friend feed is cut.** V2 §18.2's own caution — the weakest asset in the
+  app, competing for attention hives need — becomes binding. The Hive tab is
+  comb-first. No photo feed anywhere; that constraint is unchanged.
+- **Community without a feed is not a compromise.** A comb is closed, capped, and
+  *writes* rather than posts, with co-authors blind to each other until seal.
+  There is no audience to perform for — only a subject. This satisfies Colin's
+  "community around lifting others up" without touching V2 §0's ban on a public
+  gratitude feed.
+- **Unchanged:** three-tab navigation and the top-right account door (the
+  2026-08-26 amendment above), Slice 1 shipping first, 19a before 19b, every
+  money-transmitter guardrail, and the durability promise (which is still
+  *unbuilt* — digital export is owed; printing is now ruled out).
+

@@ -6,6 +6,11 @@ message (event `d99dd08d…`): **Bumble owns every infrastructure/ops row** (was
 UNOWNED); build rows are split by Sage between **Fizz and Pollen**; design rows
 are routed by Lumen between **Pixel and Deezine**.
 **Companion spec:** `POLLINATE_V2_SPEC.md` — every issue below cites a section there.
+**Amended 2026-08-30 — the Comb Rotation Ruling** (Colin, #Strategy event
+`0effa81d…`). `POLLINATE_COMB_ROTATION.md` governs; its §7 is the design handoff
+and §8 the engineering handoff. **Project 18 moves from Cycle 11–12 to the
+critical path; `ENG-79` is repriced and promoted to the primary paid line;
+`ENG-76` is blocked on ruling O1.** New rows in §5A below.
 **Estimates:** S / M / L / XL, matching `Pollinate_Linear_Breakdown.md` §Estimates.
 
 ---
@@ -93,7 +98,20 @@ work instead of an SDK integration, an Org enrollment and an App Review fight.
 
 ---
 
-## 5. Project 18 — Collective Hives & Combs (Cycle 11–12)
+## 5. Project 18 — Collective Hives & Combs (**Cycle 11–12 → CRITICAL PATH, 2026-08-30**)
+
+> **PROMOTED 2026-08-30.** The comb rotation is the hero of the product
+> (`POLLINATE_COMB_ROTATION.md`). **`ENG-58`/`59`/`60` are now the hero build**,
+> and `DES-21`/`DES-22`/`COPY-6` move with them.
+> **Already shipped — close, do not rebuild:** `ENG-56`, `ENG-57`, `ENG-61`.
+> `hive_contributors` + `is_hive_contributor()` landed in
+> `20260827000001_multi_writer_hives.sql` (+ `20260828000001`), with
+> `src/screens/InviteContributor.js` and `ContributingHive.js` (verified at
+> `github/main@080edd5`).
+> **Still unbuilt — this is the gap:** `ENG-58`. No `combs` / `comb_members` /
+> `comb_rotations` migration exists, and no `invite_code` or rotation path exists
+> in `src/` (both searched). `ENG-60` needs a scheduler — `pg_cron`, Bumble's lane.
+
 
 | ID | Owner | Est | Issue | Deps |
 |---|---|---|---|---|
@@ -106,6 +124,28 @@ work instead of an SDK integration, an Org enrollment and an App Review fight.
 | **DES-21** | Deezine | L | Collective reveal — N authors' entries blooming in one sequence. Attribution must be visible without turning it into a feed | — |
 | **DES-22** | Pixel | M | Comb identity: hexagon cluster, member states, rotation indicator ("writing for Sarah — 6 days left") | — |
 | **COPY-6** | Lumen | M | Comb naming + rotation copy. **Never "group," never "community," never "post."** The comb *writes together*; it does not post together | — |
+
+---
+
+## 5A. Comb Rotation Ruling — new rows (2026-08-30)
+
+Detail in `POLLINATE_COMB_ROTATION.md` §7 (design) and §8.3 (engineering).
+
+| ID | Owner | Est | Issue | Deps |
+|---|---|---|---|---|
+| **DES-29** | Deezine | L | **Comb-first first run.** The app opens on `TodayTab`, a solo journal (`src/navigation/MainTabs.js:115`), and `Onboarding` ends in a personal entry — teaching "journal app" in three seconds and hiding the pillar we sell. Two doors, **comb primary**: *"Start a comb with your people"* / *"Write for one person."* Comb happy path: person → occasion → date → invite by link → write. **Sequence with `ONBOARDING_ZERO_DOOR_SPEC.md`** — same `App.js` region | — |
+| **DES-30** | Pixel | M | **Comb-plan paywall surface**, shown when the *second* rotation opens (first rotation is free). Must not intrude on a seal or a reveal — same constraint as `DES-26`. Never "upgrade to unlock" | ENG-79, COPY-13 |
+| **DES-31** | Pixel | M | **Rotation state on the Hive tab**: subject, days remaining, contributor **count**. **Never contributor content** — blind-until-seal (spec §18.1) is a privacy boundary, not a nicety. Extends `DES-22` | DES-22 |
+| **ENG-83** | Fizz | M | **Magic-link and/or Sign in with Apple.** Auth is email + password only (`src/services/HoneycombStore.js:32-45`). A comb arrives as a *group through one link*; today each member hits a password form individually. Spec §18.2: *"friend-by-friend email matching is not how a real friend group arrives."* **Critical path for the pillar we sell** | — |
+| **ENG-84** | Fizz | S | **In-app account deletion.** No `deleteAccount` path in `src/`. **App Store 5.1.1(v) — hard rejection.** Release blocker, independent of this ruling | — |
+| **ENG-89** | Fizz | M | **Instrument conditions C1–C4** (ruling §6): rotation participation, reveal→install, comb survival, organizer conversion. Extends `ENG-78` | OPS-8, ENG-75 |
+| **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** `src/constants/legalCopy.js:159,207` promises *"no analytics, crash-reporting or tracking code"* — a published claim that permanently forecloses C1–C4. V2 §20.2 has the fix: **narrow the promise, do not delete it.** Blocks `ENG-89`/`ENG-78` from being honest | — |
+| **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only` / `annual-only`, `$79`, `metered at delivery`, `delivery is the only meter`, `first delivery free`. Follow `README.md`'s ritual — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" | — |
+
+> **C1 is the number that decides the business** (≥60% of a ~12-member comb
+> writing for the monthly subject, sustained 3 months). If it returns 20%, no
+> repricing and no design pass saves the model. Seed three real combs — a run
+> club, a small group, a group chat — and the answer arrives in eight weeks.
 
 ---
 
@@ -162,6 +202,24 @@ Small project, no dependencies, can run alongside Project 16.
 
 ## 8. Project 21 — Revenue (Slice 2)
 
+> **AMENDED 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §4 and §8.2 govern.**
+> - **`ENG-79` is repriced and promoted.** Was "Family / comb plan — $79/yr, up
+>   to 6 seats *(Slice 3)*." **Now: the comb plan — $5.99/month auto-renewing, up
+>   to 20 members, organizer pays, first rotation free — and it is the primary
+>   paid line.** Deps become `ENG-58` + a new IAP layer; no longer `ENG-76`.
+>   **Re-estimate before committing a cycle: there is no IAP layer in the build
+>   at all** (no RevenueCat, no `react-native-purchases`, no StoreKit wrapper in
+>   `package.json`), so this row is larger than M.
+> - **`ENG-76` is BLOCKED on ruling O1** — whether individual Plus survives at
+>   $39.99/yr. Recommendation on file is to retire it. Do not start. `DES-26` and
+>   `COPY-12` are blocked with it.
+> - **`OPS-7` (Apple Small Business Program) is unaffected and still urgent.**
+> - **§11's "no price change before `ENG-78` has data" was overridden by Colin's
+>   ruling.** Recorded, not hidden — see the ruling's §4.5. The rationale still
+>   binds every *future* change: diagnose rotation participation, then reveal
+>   quality, then price. Price is the last knob.
+
+
 Ruled 2026-08-24. Spec §17.5. `OPS-7` and `COPY-11` should move now; the rest
 lands with the Slice 2 paywall.
 
@@ -169,11 +227,11 @@ lands with the Slice 2 paywall.
 |---|---|---|---|---|
 | **OPS-7** | Colin | S | **Enroll in the Apple Small Business Program — 15% instead of 30% under $1M/yr.** A form, worth a third of revenue. Do this week | — |
 | **COPY-11** | Lumen | M | **Ruling sweep.** Retired tokens: `$2.99`, `/mo`, `monthly`, `1 hive`, `lifetime`. Sweep `Pollinate_PRD.md` §5.1, `Pollinate_Strategy.md` §4, `Pollinate_Delivery_Slices.md`. Follow the `README.md` ritual — eye-read cited rows first, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate" | — |
-| **ENG-76** | Fizz | L | **Paywall: meter volume delivery, and nothing else** (ruled 2026-08-25, spec §17.5.2a — review cadence, friend and seed gates all removed; seeds get a rate limit, not a paywall). Unlimited hives and entries free forever; **first delivery free forever**; every delivery after requires Plus. Annual-only IAP at $39.99 | ENG-48, ENG-49 |
+| **ENG-76** | Fizz | L | **BLOCKED 2026-08-30 on ruling O1** — do not start until Colin rules whether individual Plus survives; recommendation on file is to retire it (`POLLINATE_COMB_ROTATION.md` §4.3). Original scope: **Paywall: meter volume delivery, and nothing else** (ruled 2026-08-25, spec §17.5.2a — review cadence, friend and seed gates all removed; seeds get a rate limit, not a paywall). Unlimited hives and entries free forever; **first delivery free forever**; every delivery after requires Plus. Annual-only IAP at $39.99 | ENG-48, ENG-49 |
 | **ENG-78** | Fizz | M | **Reveal→signup funnel instrumentation. The single highest-priority analytics event in the app** — it is the number the business rests on (§17.5.3). Ships with `ENG-51`, not after | ENG-51, ENG-75 |
 | **ENG-76.1** | Fizz | S | Seed rate limit (~5/week, all tiers) — abuse control, explicitly **not** a paywall surface (§17.5.2a) | ENG-76 |
 | **ENG-77** | Fizz | M | **Gifted subscription** bundled with delivery, via Apple IAP | ENG-76 |
-| **ENG-79** | Fizz | M | Family / comb plan — $79/yr, up to 6 seats *(Slice 3)* | ENG-76, ENG-58 |
+| **ENG-79** | Fizz | **L+ (re-estimate)** | ~~Family / comb plan — $79/yr, up to 6 seats *(Slice 3)*~~ → **REPRICED + PROMOTED 2026-08-30: the comb plan — $5.99/month auto-renewing, up to 20 members, organizer pays, first rotation free. This is the primary paid line.** Carries the whole IAP layer, which does not exist in the build (no RevenueCat / `react-native-purchases` / StoreKit wrapper in `package.json`) | **ENG-58**, DES-30, COPY-13 |
 | **ENG-80** | Sage+Fizz | L | **Legacy tier — $199 one-time.** Escrowed delivery, verified beneficiary email, annual address-still-resolves confirmation. **Re-scope: closer to core than second-order** — per §17.5.2b this is the *only* capture point for the flagship 18-year use case, which otherwise pays $0 *(Slice 3)* | ENG-49, ENG-76 |
 | **DES-26** | Pixel | M | Paywall surfaces at the delivery moment — must not intrude on the seal/reveal emotion | ENG-76 |
 | **COPY-12** | Lumen | S | Pricing + gift copy. Never "upgrade to unlock" language at the reveal | ENG-76 |
@@ -240,6 +298,14 @@ Parallel and independent: all of Project 16, and 19a up to `ENG-65`.
 ---
 
 ## 11. Do not start
+
+> **Amended 2026-08-30.** Added: **`ENG-76`** (delivery-metered $39.99 paywall) —
+> blocked on ruling O1. **A friend feed in the Hive tab** — cut by the comb
+> rotation ruling; the tab is comb-first. **Any comb-plan price change before
+> `ENG-89` has C1 data** — same rationale as the `ENG-78` row below.
+> Removed: nothing. The `ENG-78` price-change row stands, with the note that
+> Colin's 2026-08-30 ruling overrode it once, knowingly (ruling §4.5).
+
 
 - **ENG-35 through ENG-40** (old Spark / Cash App iMessage Slice 2 issues) —
   **cancelled** by spec §5.6. Close them; do not migrate them.

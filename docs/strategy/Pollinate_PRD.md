@@ -45,7 +45,7 @@ The network grows. The honeycomb fills in. The garden accumulates.
 | Slice | Focus | Money? | Distribution |
 |---|---|---|---|
 | **Slice 1: Demo Mode** | Journal + private hives + social seeds + honeycomb + feed | No | TestFlight / internal track |
-| **Slice 2: Public Launch** | Revenue model per `POLLINATE_V2_SPEC.md` §17.5 (ruled 2026-08-24: $39.99/yr annual-only, paywall at *delivery*, first delivery free forever) + nectar zaps (V2 §5 — the Cash-App-via-iMessage plan is superseded, V2 §5.7) | Zaps are self-custodial, 100% to receiver (Pollinate is NOT a money transmitter — V2 §5.6) | App Store / Play Store |
+| **Slice 2: Public Launch** | Revenue model per `POLLINATE_V2_SPEC.md` §17.5 (ruled 2026-08-24: $39.99/yr annual-only, paywall at *delivery*, first delivery free forever) + nectar zaps (V2 §5 — the Cash-App-via-iMessage plan is superseded, V2 §5.7) | Zaps are self-custodial, 100% to receiver (Pollinate is NOT a money transmitter — V2 §5.6) | App Store / Play Store | *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
 | **Slice 3: Transaction Research** | Evaluate MDK/Lightning integration IF transaction fees make sense. Requires legal/compliance research. | TBD based on research | — |
 
 ---
@@ -76,7 +76,7 @@ Pollinate is not a utility app. It's an **emotional experience.** Every interact
 - 25–45 years old. Remembers birthdays, writes cards, plans surprises.
 - Wants to express gratitude that feels meaningful, not transactional.
 - The Private Hive concept is built for them: write gratitude about someone over months, revisit it on "trips down memory lane," and package the best moments to send when ready.
-- They'll pay for Pollinate Plus ($39.99/yr — V2 §17.5) because this replaces greeting cards, gifts, and "thinking of you" texts — and the renewal lands next to the ritual (a birthday, an anniversary), not in a dead month.
+- They'll pay for Pollinate Plus ($39.99/yr — V2 §17.5) because this replaces greeting cards, gifts, and "thinking of you" texts — and the renewal lands next to the ritual (a birthday, an anniversary), not in a dead month. *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
 
 ### Persona B: "The Community Builder"
 - 22–40 years old. Runs a maker group, church community, recovery circle, or tight friend group.
@@ -102,6 +102,8 @@ Today  |  Hive  |  Garden
 > **Amended 2026-08-26** (was `Today | Hive | Wallet | Garden`): the Wallet tab
 > is deleted — the comb is the wallet and the account door moves to the top
 > right. Ruling and design spec: `POLLINATE_V2_NAVIGATION.md`.
+
+> *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
 
 | Tab | What it is | Free tier | Paid tier (Pollinate Plus, $39.99/yr — V2 §17.5) | MVP1 status |
 |---|---|---|---|---|
@@ -195,6 +197,8 @@ The review prompt is the app's core re-engagement mechanic. It's not a notificat
 > metered). That model is reversed: writing is unmetered on every tier and the
 > paywall meters **delivery**. `POLLINATE_V2_SPEC.md` §17.5 governs; the table
 > below mirrors it and must not drift from it.
+
+> *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
 
 | | Free | Pollinate Plus ($39.99/yr, annual only) |
 |---|---|---|
@@ -374,7 +378,7 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | **Cash App links (Slice 2)** | Pollinate generates links, Cash App handles money | ❌ No — we don't touch money | Possible affiliate revenue (research) |
 | **MDK with platform fees** | Pollinate processes Lightning payments, takes 1% | ⚠️ Possibly — depends on structuring | 1% of tip volume |
 | **MDK as non-custodial wallet** | Users self-custody, Pollinate only provides UX | ⚠️ Possibly less risky, but untested legally | 1% of tip volume |
-| **Subscription only** | No transaction fees. Revenue from Pollinate Plus subscriptions only | ❌ No money movement at all | $39.99/user/yr (~$34 net of Apple 15% — V2 §17.5.3) |
+| **Subscription only** | No transaction fees. Revenue from subscription only *(2026-08-30: read "Pollinate Plus" as **the comb plan, $5.99/mo**. The no-transaction-fees rule itself is unchanged and binding, and is reinforced by guardrail G5 — no fee on zaps, ever)* | ❌ No money movement at all | $39.99/user/yr (~$34 net of Apple 15% — V2 §17.5.3) |
 
 **Recommendation for Slice 2 (superseded 2026-08-24):** ~~Start with Cash App links.~~ The Cash-App-links plan is cancelled (V2 §5.7). The money layer is nectar zaps — self-custodial, 100% to the receiver, never a revenue line (V2 §5, §17.5.5); revenue is subscription only.
 
@@ -406,7 +410,7 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | Daily journal | Full, unlimited |
 | Private hives | **Unlimited, forever** *(V2 §17.5, ruled 2026-08-24 — supersedes the 2026-08-19 "1 hive, lifetime" line; writing is the moat and is never metered)* |
 | Review cadence | **Monthly, yearly, or manual — ungated** (ruled 2026-08-25, V2 §17.5.2a) |
-| Delivery | **First delivery free, forever**; every later delivery requires Plus (V2 §17.5) |
+| Delivery | ~~**First delivery free, forever**; every later delivery requires Plus (V2 §17.5)~~ **Superseded 2026-08-30** — the delivery meter is retired as the primary mechanism; the paid line is the comb plan at $5.99/mo (first *rotation* free). Whether any delivery meter survives is open ruling O1 |
 | Export | Free, forever, on every tier (V2 §17.4) |
 | Social seeds | **Unlimited** — no count; abuse handled by rate limit (~5/week, a guard not a tier — V2 §17.5.2a) |
 | Public hives (social) | **Unlimited friends** (V2 §17.5.2a — the graph is never metered) |
@@ -416,6 +420,8 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | Gifting | Not available (Slice 2) |
 
 ### Paid Tier — "Pollinate Plus" ($39.99/year, annual only — V2 §17.5; the monthly plan is retired, not repriced)
+
+> **SUPERSEDED 2026-08-30.** Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.
 
 | Feature | Paid unlocks |
 |---|---|
@@ -432,7 +438,7 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 
 - **Receiving is always free.** The viral loop works: someone sends you a hive, you download Pollinate to read it, you're hooked. No paywall between you and receiving gratitude.
 - **The upgrade trigger is the delivery moment** (V2 §17.5, ruled 2026-08-24). Creation converts at the empty state — the moment of lowest emotional investment. Delivery is realized value and peak willingness to pay; writing stays unmetered because accumulated time is the entire moat.
-- **$39.99/yr, annual only.** A monthly bill on an episodic product churns in the quiet months before the payoff (V2 §17.5.1 — nobody in this category sells monthly). Annual lands the renewal next to the ritual: a birthday, an anniversary, a yearly review.
+- ~~**$39.99/yr, annual only.**~~ **Superseded 2026-08-30, by a change of premise rather than on the merits.** The episodic-value argument (V2 §17.5.1) assumed a reveal once a year with eleven quiet months. **A comb rotating monthly delivers a reveal every month**, so the quiet stretch this reasoning protects against does not exist inside an active comb. The corollary binds: monthly pricing is defensible only while rotations actually happen — a comb that stops rotating churns the next month (`POLLINATE_COMB_ROTATION.md` §4.2). Original text: a monthly bill on an episodic product churns in the quiet months before the payoff. Annual lands the renewal next to the ritual: a birthday, an anniversary, a yearly review.
 - **No transaction fees in the core model.** Revenue comes from subscriptions. If we add transaction fees later (Slice 3+), it's upside, not the foundation.
 
 ---
@@ -553,3 +559,41 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 6. **Package composition:** Should packages be limited to text, or support photos, voice notes, and other media? What's the MVP1 scope for package contents?
 7. **Bloom animation budget:** The bloom reveal — both for the author's "trip down memory lane" and the recipient's "package opened" — is the most important animation in the app. What's the engineering budget? It needs to be best-in-class. Consider Lottie or Rive for complex sequences.
 8. **Transaction fee legal research:** If we eventually want to process payments ourselves via MDK/Lightning, what's the legal structure that avoids money transmitter status? Need a fintech lawyer's opinion before any engineering work.
+
+---
+
+## Amendment — 2026-08-30: the comb rotation is the hero feature
+
+**Ruled by Colin, #Strategy event `0effa81d…`. Governing document:
+`POLLINATE_COMB_ROTATION.md`.**
+
+**§5.1 "Private Hives is the hero feature" is superseded.** The hero is the
+**comb rotation**: a closed, invite-joined group capped at 20 collectively fills
+one hive for one member at a time, seals it on their occasion, blooms it, and
+rotates. Private hives remain in full as the **personal mode** — the requirement
+set in §5.1 is still correct about what a hive *is*; it is no longer the top of
+the product.
+
+**Superseded here:**
+
+- Any free/paid tier table denominated in individual subscription at $39.99/yr
+  annual-only. The paid line is a **comb plan, $5.99/month**, organizer-paid,
+  first rotation free. Membership, writing, receiving and export stay free
+  forever on every tier.
+- The friend feed. Cut — the Hive tab is comb-first.
+
+**Not superseded:** §7's data-architecture rule (*if losing the phone destroys
+it, it belongs in Supabase*) — which now also covers `combs`, `comb_members` and
+`comb_rotations`; the durability promise; and every privacy boundary. One of
+those boundaries is now load-bearing for the hero flow and must not be softened
+in UI: **contributors see only their own entries until the volume seals**
+(V2 §18.1). Rotation surfaces may show a contributor *count*, never contributor
+*content* (`DES-31`).
+
+**New product requirements introduced by this ruling** (detail in the ruling's
+§7–§8): comb-first first run (`DES-29`), rotation state surface (`DES-31`),
+comb-plan paywall at the second rotation (`DES-30`), magic-link / Sign in with
+Apple (`ENG-83` — a comb arrives as a group through one link, and today every
+member hits a password form individually), and in-app account deletion
+(`ENG-84`, App Store 5.1.1(v)).
+

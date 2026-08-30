@@ -11,6 +11,19 @@ amendment in `Pollinate_The_Ruling.md`.
 **Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
+> **AMENDED 2026-08-30 — the Comb Rotation Ruling (Colin, #Strategy event
+> `0effa81d…`; prior same-thread ruling `482eee85…` bars physical printing).**
+> **`POLLINATE_COMB_ROTATION.md` governs where the two disagree.** The comb
+> rotation (§18.2) is promoted from Cycle 11–12 to the hero of the product;
+> private hives become the personal mode. The revenue model in §17.5 is
+> superseded: the paid line is a **comb plan at $5.99/month**, bought by the
+> organizer, first rotation free. §17.5.1's anti-monthly finding, §17.5.2's
+> $39.99 annual-only line, §17.5.3's install table and §17.5.4's `Family / comb
+> plan` row are superseded in place — annotated below, bytes untouched, per this
+> directory's append-only amendment discipline. **Not** superseded: §0's
+> positioning, Projects 16/17, §17.4's durability promise, §17.5.2a's metering
+> principle, §5.6's guardrails G1–G5, and 19a-before-19b phasing.
+
 ---
 
 ## 0. Positioning amendment (read first — everything below follows from it)
@@ -39,6 +52,14 @@ delivered — and nobody has productized it. That is the claim Pollinate owns.
 | "Gratitude letter" as the marketing story | "Gratitude journal" as the product noun |
 | The review ritual as the return mechanic | Streaks-with-guilt as the return mechanic |
 | Private, 1:1, for a named person | A public gratitude feed (performative gratitude kills this) |
+
+> **Amended 2026-08-30 (`POLLINATE_COMB_ROTATION.md` §5.1).** One row is *added*
+> to the table above, and nothing in it is removed: **lean IN on "the comb — a
+> closed group writing for one member at a time"; lean OUT on "community,"
+> "group feed," "social network," "post."** This resolves rather than softens the
+> lean-out against a public gratitude feed: a comb is closed, capped at 20, and
+> *writes* rather than posts, with co-authors blind to each other until seal
+> (§18.1). There is no audience to perform for — only a subject.
 
 Working pitch:
 
@@ -391,11 +412,35 @@ It is *more* load-bearing now than it was with a book in the plan, not less.
 
 ### 17.5 Revenue model (ruled 2026-08-24)
 
+> **SUPERSEDED IN PART, 2026-08-30 — see `POLLINATE_COMB_ROTATION.md` §4.**
+> The **comb plan at $5.99/month** (organizer pays, up to 20 members, first
+> rotation free) replaces $39.99/yr annual-only as the primary paid line, and
+> **the delivery meter is retired as the primary mechanism.** Everything below
+> is left byte-intact and remains the record of the 2026-08-24 reasoning.
+> Still live from this section, not superseded: **§17.5.2a's metering principle**
+> ("meter the artifact, never the practice, never the graph" — the comb plan
+> complies; see the ruling's §4.1), **§17.5.5's not-revenue list**, and the free
+> tier's unlimited hives/entries/export.
+> **Open, needs Colin (ruling O1):** whether individual Plus survives at all.
+> Recommendation on file is to retire it. **`ENG-76` does not start until that is ruled.**
+
+
 **Supersedes** the freemium table in `Pollinate_PRD.md` §5.1, the pricing rows in
 `Pollinate_Strategy.md` §4, and the 2026-08-19 "1 hive, lifetime" ruling. A
 vocabulary sweep across those files is owed — see `COPY-11`.
 
 #### 17.5.1 The diagnosis: the old price was the wrong *shape*
+
+> **Superseded by a change of premise, 2026-08-30, not overturned on its merits.**
+> The finding below — *"nobody in this category sells monthly"* — rests on the
+> premise that Pollinate's value is **episodic**: enormous at the reveal, quiet
+> for eleven months. A comb rotating monthly delivers a reveal every month, so
+> the quiet stretch this reasoning protects against does not exist inside an
+> active comb. **The corollary is binding:** monthly pricing is defensible only
+> while rotations actually happen. A comb that stops rotating churns the next
+> month — rotation cadence and subscription retention are one number
+> (`POLLINATE_COMB_ROTATION.md` §4.2, condition C1).
+
 
 Pollinate's value is **episodic** — enormous at the reveal, quiet for eleven
 months. Monthly subscriptions fit high-frequency utility (Spotify, Notion) where
@@ -447,6 +492,14 @@ the old free/paid splits for **review cadence**, **friend connections** and
 
 **Ruled: all three gates are removed. Volume delivery is the only meter.**
 
+> **Split 2026-08-30, because this sentence now carries two claims with different
+> fates.** The **principle stands**: meter the artifact, never the practice, never
+> the graph — and the comb plan complies (`POLLINATE_COMB_ROTATION.md` §4.1
+> explains why charging for the rotation engine is not charging for the graph).
+> The **"only meter" clause is superseded**: the comb plan is a second meter, and
+> volume delivery is no longer the primary one. The three gate removals below are
+> unaffected and remain ruled.
+
 | Old gate | Ruled | Why |
 |---|---|---|
 | Review cadence — yearly free / monthly Plus | **Removed. All cadences free.** | The review ritual is the return mechanic (§0). Gated to yearly, a free user has eleven months with no reason to open the app — they churn *before* accumulating enough to deliver, and never reach the meter. **The gate that maximizes conversion at delivery is no gate on the review.** A free user on monthly reviews arrives at the paywall with a fatter hive and more sunk investment. |
@@ -461,6 +514,16 @@ the old free/paid splits for **review cadence**, **friend connections** and
 > product, and it is the only thing that costs money.
 
 #### 17.5.2b The hole this exposes: the hero use case pays nothing
+
+> **Read forward, 2026-08-30: this section is the diagnosis that produced the
+> Comb Rotation Ruling.** It stays true and is not superseded — the 18-year
+> mother still pays $0, and gates on writing would still destroy the moat. What
+> changed is the answer. Point 1 below already named it: *"revenue comes from the
+> multi-hive, multi-delivery user — partner and kids and parents and **comb
+> rotations**."* The ruling promotes that clause to the whole model
+> (`POLLINATE_COMB_ROTATION.md` §2, problem P3). Point 2's legacy-tier answer
+> (`ENG-80`) is unaffected and remains Slice 3.
+
 
 Stating this plainly rather than letting it hide, because it was not visible when
 §17.5 was written and it changes what "success" looks like.
@@ -489,6 +552,15 @@ accumulated time that *is* the moat. It is a fact to plan around:
 
 #### 17.5.3 The number the business actually rests on
 
+> **Install table superseded 2026-08-30** (`POLLINATE_COMB_ROTATION.md` §4.4):
+> at $5.99/month, $1M **gross** is ~13,900 *steady-state active combs* (~167K
+> engaged users at 12/comb), not 730K installs at 4% conversion. **The
+> reveal→signup question below is NOT superseded** — `ENG-78` remains the
+> highest-priority single analytics event, and it is now condition **C2** of four
+> (§6 of the ruling). C1 — rotation participation — outranks it as the number
+> that decides the business.
+
+
 Net of Apple's 15% (see `OPS-7`), $39.99 yields ~$34/subscriber/year.
 
 | Installs | @ 4% conversion | Net ARR |
@@ -514,6 +586,13 @@ back at 5% rather than 25%, the monetization is not the problem — the reveal i
 and the correct response is `DES-17`, not a price change.
 
 #### 17.5.4 Second-order lines (Slice 3, not now)
+
+> **The `Family / comb plan` row below is superseded, 2026-08-30.** It is no
+> longer second-order, no longer Slice 3, no longer $79/yr, and no longer capped
+> at 6 seats: it is **the primary paid line at $5.99/month, up to 20 members**
+> (`ENG-79`, repriced). The **Gifted subscription** and **Legacy tier** rows are
+> untouched and remain Slice 3.
+
 
 | Line | Price | Why it fits |
 |---|---|---|
@@ -610,6 +689,19 @@ The case: dad writes into mom's hive for their son; they divorce.
   consistent with `20260815000006`.
 
 ### 18.2 Combs (the local friend group)
+
+> **PROMOTED TO HERO, 2026-08-30 (Colin, event `0effa81d…`).** This section is no
+> longer a Cycle 11–12 project — **the comb rotation is the product.** Private
+> hives become the personal mode. The two cautions below are now *binding rather
+> than advisory*: no photo feed, and **the friend feed is cut** — the Hive tab
+> becomes comb-first. Design and engineering handoff:
+> `POLLINATE_COMB_ROTATION.md` §7–§8. Build state, verified at
+> `github/main@080edd5`: the schema below is **not built** (no `combs` /
+> `comb_members` / `comb_rotations` migration, no `invite_code` path in `src/`),
+> while §18.1's collective hives **are** (`20260827000001_multi_writer_hives.sql`,
+> `InviteContributor.js`, `ContributingHive.js`). The foundation is in; the
+> rotation engine is the gap.
+
 
 Two honest cautions first: (1) **Locket and Retro own "small circle photo
 sharing"** — do not build a photo feed, we lose; (2) a friend feed is the weakest
@@ -719,7 +811,7 @@ can zap *that specific memory*. The author later gets:
 which memory landed — emotionally new, data no other app has, and a second return
 moment for the author.
 
-**(d) The comb pot.** A collective hive for one member carries nectar alongside
+**(d) The comb pot.** *(Promoted 2026-08-30 to the flagship nectar feature — `POLLINATE_COMB_ROTATION.md` §5.2. Guardrail G2 unchanged and binding: contributions settle direct-to-recipient, the pot is a display over ledger rows.)* A collective hive for one member carries nectar alongside
 entries. A birthday hive from six friends arrives with 30,000 drops in it. Group
 gifting is a large real behavior (Venmo/GoFundMe) with terrible UX; this is a
 Lightning-native version wrapped in something people actually want to open.
@@ -774,7 +866,7 @@ strategic payoff.
 |---|---|
 | **3.1.5(i)** | Self-custodial wallets permitted — **developer must be enrolled as an Organization**, not an Individual. Currently unset (`DEVELOPMENT_TEAM` empty). |
 | **3.2.1(vii)** | Optional P2P gifts are exempt from IAP if 100% goes to the receiver and nothing is unlocked. Zaps must be **purely optional and unlock nothing.** Damus is the precedent. |
-| **3.1.1** | Crypto may **not** unlock features. The Pollinate Plus subscription ($39.99/yr — §17.5) must use Apple IAP. Sats can never buy Pollinate Plus. |
+| **3.1.1** | Crypto may **not** unlock features. The paid subscription must use Apple IAP; sats can never buy it. *(Price reference updated 2026-08-30: the subscription is the **comb plan at $5.99/month**, not $39.99/yr — `POLLINATE_COMB_ROTATION.md` §4.1. **The constraint itself is unchanged and binding**, and now also reads: nectar can never buy a comb plan, and a comb plan can never be earned by zapping.)* |
 | **3.1.5(v)** | No currency for completing tasks. **"Earn sats for your streak" is banned.** No zap rewards for journaling. |
 | **2.3.1(a)** | No hidden or dormant features. The wallet is created **only on explicit consent**, when the user first chooses to zap — never at signup. |
 | **2.3 / 2.3.5** | Metadata must reflect the core experience. Stay in **Lifestyle**; the wallet is genuinely secondary. Precedent: Fountain (podcasts + Lightning) sits in Entertainment, not Finance. |
