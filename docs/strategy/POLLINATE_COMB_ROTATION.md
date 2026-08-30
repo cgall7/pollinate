@@ -3573,3 +3573,29 @@ The idiom already exists and is two files over — `check-comb-preview.mjs:352` 
 **Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `OPS-11`. No new `O`.
 
 **The transferable shape:** *"not yours to carry"* is half a routing decision. Taking a requirement **off** someone is only safe if the same sentence puts it **on** someone — otherwise the removal is the more confident-looking of the two errors, because it reads as scope discipline. **Say who, in the sentence that says not-you.**
+
+---
+
+### §1B.35 — RULED 2026-08-30: `subject_name` is frozen at mint, and the live consumer is not the one that was flagged (`ENG-96`, @Fizz, S)
+
+Verified at `github/main@46ce848` (`ENG-93` `…0008` + `ENG-95` `…0009` both merged).
+
+**@Lumen's finding is ratified in substance and corrected on its consumer.** The substance: `comb_open_rotation` (`…0008:164-171`) writes `coalesce(nullif(display_name, ''), 'Someone')` into `private_hives.subject_name` — a mint-instant freeze of a live identity, using the live-read fallback word in a stored-snapshot position. Three populations, none exotic: the subject who renames mid-month, the subject with an empty `display_name`, and the never-member subject who never crossed `DES-37`'s name collection and therefore carries `handle_new_user`'s `'New user'` default (`20260808000001:46`).
+
+**(a) `hivePrompts.js` is not a live consumer.** `git grep hivePrompts github/main -- src/` returns exactly one hit and it is a *comment* (`src/constants/nectar.js:124`). The only importer in the tree is a gate — `scripts/check-onboarding-flow.mjs:394`. Nothing anywhere in `src/` replaces the `{subject_name}` token: the file **carries** it (its own header, `:19-24`), it does not interpolate it. It is an unrendered copy asset.
+
+**(b) The live consumers are three shipped screens, and they are worse, because they need no comb composer.** `TodayTab.js:225` calls `HiveStore.listContributingHives()` (`:426`), which selects `subject_name` (`:431`) and maps it to `subjectName` (`:447`). `ContributingHive.js:130` renders it as the banner name, `:136` as *"A hive for {subjectName}, from {ownerName}"*, and `:179` passes it into `ComposeHiveEntry`, which renders `:52` — *"What's something you're grateful for about {subjectName}?"* — the composer's own title.
+
+`…0008:174-180` inserts a `hive_contributors` row for every active comb member except the subject. `listContributingHives` is an `!inner` join on `hive_contributors` with **no filter that excludes a comb-minted hive**. The month therefore appears on every writer's Today shelf the instant it is minted. **This blocks the first comb MONTH, not the first comb composer render** — the surface it renders on shipped weeks ago.
+
+**(c) The discriminator already exists, and it is not `is_collective`.** `HiveStore.createHive` (`:139-147`) never writes `subject_profile_id`, and `git grep subject_profile_id github/main -- src/` returns no client write anywhere in the tree. A `§18.1` collective hive has it NULL; a comb-minted hive has it SET. So `subject_profile_id is not null` means exactly *"this hive's subject is a Pollinate account,"* which is precisely the condition under which the name is derivable live and the frozen column is redundant.
+
+**RULED — the rule is not comb-scoped.** A hive whose subject has a profile renders **that profile's** `display_name`; `subject_name` is the label for the subject who has no account. `ENG-96` (@Fizz, S): add `subject_profile_id` to both contributor-scoped selects (`:431`, `:465`), batch-join `profiles.display_name` in the shape `ownerName` already uses (`:439-443`), and prefer the live name when it is non-null. Keep `|| 'Someone'` at the *live* read — there the word is correct, because it heals on refetch; the defect is freezing it into a column.
+
+**The mint's write stays, and it is not a mint bug.** `subject_name text not null` (`20260815000001:18`) leaves `comb_open_rotation` no choice — the coalesce is forced by the schema. Per @Lumen, the rule lives at the consumers. Gate: one negative (a comb-surface render may not source `subject_name`) and one positive (a subject who renames mid-month reads new on the writer's shelf).
+
+**Migration ordering — checked for clobber, none found.** `…0005` (`OPS-9`) and `…0007` (`ENG-92`) are now both numbered *below* three merged migrations. `…0007`'s three `create or replace`s are `comb_member_count`, `comb_co_member_names`, `delete_own_account` — disjoint from `…0008`/`…0009`. `…0005` is `create function advance_due_rotations()` — a new name. So no definition is overwritten in either direction. One latent edge remains: `…0005`'s rebased body will call `comb_open_rotation`, created three numbers *later*; it applies clean (plpgsql defers resolving called functions to first execution) but the file order lies about the dependency. **Renumber `…0005` on rebase** — @Bumble, at rebase time, not a new row.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-96`. `OPS-11` stands. No new `O`.
+
+**The transferable shape:** a consumer list assembled from the **token** is not the consumer list. The grep for `{subject_name}` finds the file that carries the token; the screens that render the *value* never mention it, because the store renames it (`subject_name` → `subjectName`) at the layer boundary. **A rename at a layer boundary breaks the grep that would have found the consumer** — when tracing a column to its readers, follow the field through every mapping, or grep the destination name too.
