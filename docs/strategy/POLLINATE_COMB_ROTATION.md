@@ -3853,3 +3853,39 @@ Post-`ENG-99`, one roster governs: a departed member holds no open `hive_contrib
 **Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `ENG-99`. No new `O`.
 
 **The transferable shape:** *"the reader is necessarily in the set"* and *"the reader is necessarily permitted to read the set"* are different claims, and an unreachability argument needs the second. I made the first and shipped it as the second — forty lines after writing down, in the same commit, that the count's gate reads a different table than the card's. **When you argue a value is unreachable, name the predicate that produces it and the predicate that admits the surface, and check they read the same row.** The corollary that sized the finding: when two rosters disagree, look for the event that closes one and not the other — that event is the whole population.
+
+---
+
+### §1B.36.3 — `ENG-99`'s trigger fires inside `delete_own_account`, and departure is a one-way door with two effects
+
+**Date:** 2026-08-30. **Trigger:** @Lumen ratified `ENG-99` and its four pins. Probing the hazard the fix introduces rather than re-running the defect it closes. Verified at `github/main@46ce848` and `github/sage/eng92-postmerge-fixes@4632eec`.
+
+#### (a) Pin 3 is not idempotency hygiene — it is what stops account deletion from aborting.
+
+`ENG-99` puts a trigger on `comb_members` update. **`delete_own_account` updates `comb_members`** (`…0007:221-228`, Part 5) — and three statements earlier it has already swept `hive_contributors` (`:213-215`, `set removed_at = now() where profile_id = v_uid and removed_at is null`). Statement order confirmed in the function body.
+
+So during account deletion the new trigger fires against rows that **already carry `removed_at`**. Without pin 3's `removed_at is null` guard, `hive_contributors_removed_at_immutable` (`20260827000001:62-76`) raises — inside a `security definer` function with no exception block — and **the entire deletion transaction aborts.** Account deletion is App Store 5.1.1(v)-required and is the one flow in this codebase that cannot be allowed to fail.
+
+**RULED: pin 3 is load-bearing, not polish.** With the guard on both statements the two become order-independent — `delete_own_account`'s own sweep also guards `removed_at is null`, so neither ordering breaks. @Sage: state that in the trigger's comment, because the next person to reorder those statements needs to know why they may.
+
+#### (b) Departure is irreversible, and nothing in `ENG-99` says so.
+
+`comb_join_by_invite_code` is idempotent for an **active** member and **deliberately not** for a removed one — `20260830000004:24-29`: *"A previously-removed member is NOT idempotent, deliberately: `comb_members_removed_at_immutable` and the table's own PK shape make re-joining unrepresentable ('not even expressible without a delete this table also doesn't allow'), so that path raises a named, distinct exception."*
+
+So post-`ENG-99`, a single tap does three things: ends the membership **permanently**, ends this month's writing seat, and removes the month's card from the shelf (@Lumen's stated consequence). **A leave-comb gesture is a one-way door, and the door is wider than the word "leave."**
+
+#### (c) And leaving does **not** retract the written word — which is the reason someone would tap it.
+
+Pin 2 already says the entry ships. The consequence for the leaver is stronger than "it ships": `entries_update_own` and `entries_delete_own` both gate on `is_hive_contributor(v.hive_id)` (`20260827000001:292-326` and the delete policy repaired in the same migration for exactly C4's contributor case). Once the seat closes, the leaver can **neither edit nor delete** their letter — and `private_hives_select_own` no longer admits the hive, so they cannot read it either.
+
+**Their words are frozen, invisible to them, and still scheduled for delivery.** If the reason a person leaves a comb is that they do not want their letter delivered, leaving is precisely the thing that guarantees it will be.
+
+#### (d) Delivered as a pre-build constraint, not filed as a row.
+
+No leave-comb UI exists (`git grep removed_at github/main -- src/` — `hive_contributors` reads only). Same shape as the `DES-29` picker constraint: state it before it is built, because all three effects are discovered by tapping.
+
+@Lumen — the flow consequence is yours. The honest gesture is either **"leave at the end of this month"** (seat runs out with the rotation, no mid-month vanish, no stranded letter) or a confirmation that names all three effects including the one that surprises people: *your letter still goes.* And if a person needs their letter **not** to be delivered, that is a different verb entirely — delete the entry, then leave — and the order matters, because after leaving they can no longer do it.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **No new rows.** `ENG-99` pin 3 upgraded to load-bearing with its abort path named; pin 5 added — the trigger comment states the order-independence. No new `O`.
+
+**The transferable shape:** a trigger added for a rendering concern fires inside every function that touches its table, including the one flow that must never fail. **When adding a trigger, enumerate the existing writers of that table before writing the trigger body — a `security definer` function with no exception block converts your raise into its own abort.** And the second half: a one-way door is sized by everything the same tap forecloses, not by the verb on the button. Three foreclosures here, and the doc named one.
