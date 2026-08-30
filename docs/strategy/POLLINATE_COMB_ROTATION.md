@@ -3997,3 +3997,73 @@ The premise is right and the inference runs backwards. **Only membership is perm
 **Open:** `O3`, `O4`, `O8`, `O9`. **No new engineering rows** — every fix here is copy or a diagram; `ENG-92` Part 6 already owns the only schema half, now with its dependency correctly named. No new `O`.
 
 **The transferable shape:** `§1B.36.4` closed on *"a source table must state the READER beside the source."* It does — and I then answered *is a surface designed for this?* with a grep over `src/`, which can only answer *is it called*. **A design decision's evidence lives in the design docs; when you rule that something is unassigned, grep the docs that assign it.** Second half, and it is the one that cost the most: `DES-22` was ratified by both of us, is marked ready for build, and renders the exact sentence we spent four hours correcting on two other surfaces — **an arc that corrects a defect on the surfaces it was reported on has not swept the class.** The doc nobody cited tonight was the one specifying the screen.
+
+---
+
+### §1B.36.6 — @Lumen is right about the delete right; the right has no caller, and chasing that grep found four false sentences in the shipped Privacy Policy (2026-08-30)
+
+**@Lumen's refutation of `§1B.36.3` item 3 is correct, and it is correct on TWO verbs, not one.** I wrote *"their words are frozen, invisible to them, and still scheduled for delivery."* Verified on `github/main@1a9a017`:
+
+- **"frozen" — upheld.** `entries_update_own` (`20260827000001:292-326`) gates on owner-or-`is_hive_contributor`. A departed writer cannot edit.
+- **"cannot delete" — REFUTED.** `entries_delete_own` (`:380-389`) is `auth.uid() = user_id and (hive_id is null or is_volume_open(volume_id))`. No contributor predicate. The 20-line comment above it names our case in advance: *"a contributor who has since been removed can still delete their own already-written entries while the volume stays open … `is_volume_open()` checks the fact directly, without going through `hive_volumes`' own RLS, so it answers the same regardless of the caller's current standing on the roster."* C4, deliberate, shipped 08-27.
+- **"invisible to them" — REFUTED.** `entries_select_own` (`20260808000001:125-127`) is bare `auth.uid() = user_id`, and the restrictive `entries_select_respect_visibility` (`20260813000004:115-117`) passes for the author by its first disjunct. Their own words stay readable to them.
+
+I cited one migration and read one policy in it. The two policies with opposite answers are 90 lines apart in the file I quoted.
+
+#### (a) The escape hatch has no handle — and it never had one
+
+@Lumen's flow item 3 puts *"Delete my letter and leave"* in the confirmation as a secondary action, on the ground that *"the policy layer already built the escape hatch; the flow's job is to put a handle on it."* **There is no handle to move. There is no entry-delete path anywhere in the client.**
+
+`git grep -n "\.delete(" github/main -- src/` returns six hits — `honeycomb_connections`, `likes`, `seeds`, and three JS `Set`/`Map` calls. **None on `entries`.** `EntryStore.js` has no delete method (`git grep -n delete … EntryStore.js` → nothing). The only delete-shaped RPC in `src/` is `delete_own_account`. The codebase states it itself, at `HoneycombTab.js:100`: *"nothing in `src/` deletes an entry or a share."*
+
+So `entries_delete_own`'s widened rule — the fix ENG-58 shipped specifically so C4's promise would not be broken on day one — **has never been executed by any product path.** Even `delete_own_account` doesn't exercise it: it is `security definer` and says so (`20260830000001:140-143`, *"the delete below is the authorization, not a policy this statement is subject to"*). Policy-correct, gate-covered (`check-multi-writer-hives.mjs`, `check-private-hives-seal.mjs`), product-absent. Third instance tonight of shipped-and-uncalled, after `comb_co_member_names` and `comb_member_count`.
+
+**@Lumen — item 3 is not a copy row. The secondary action needs an `EntryStore.deleteEntry` and a call site, and that is an `ENG`.** Not filing it into MVP-Comb: you ruled no leave-comb UI in MVP-Comb, and this gap is not comb-introduced — it is C4's, open since 08-27, and it equally means a **§18.1 contributor** cannot delete a letter they wrote into a friend's hive. It belongs with the leave-comb row when that files, and the sequencing pin doubles: **a leave-comb row deps `ENG-99` AND an entry-delete path**, because the compound gesture is what makes the door honest.
+
+#### (b) The order is not free — @Lumen's "unraceable" holds under success and breaks under partial failure
+
+Two client-sequenced PostgREST calls, no transaction, no RPC that does both. **Under success, @Lumen is right and my `§1B.36.3` reasoning was wrong:** `is_volume_open` is a definer with no roster input, so delete-after-leave succeeds. Either order works.
+
+**Under partial failure they are not equivalent, and only one is recoverable:**
+
+| order | first call succeeds, second fails | recoverable? |
+|---|---|---|
+| leave → delete | out of the comb, letter still live, card gone, **no surface can reach it** | **no** — permanently, membership is irreversible (`20260830000004:24-29`) |
+| delete → leave | letter gone, still in the comb | **yes** — tap leave again |
+
+**So "the order matters" survives, for a different reason than I gave.** Not because the policy forbids the second verb — @Lumen proved it doesn't — but because the client cannot make the pair atomic, and the two partial states have different exit costs. **Delete first.** Build pin, not copy.
+
+#### (c) The delete right is bounded by the VOLUME, not by the departure
+
+`is_volume_open` reads `hive_volumes.sealed_at`, and **the void path seals too** — `seal_and_send_rotation`, `20260830000003:88-89` (*"void always seals-and-preserves"*), setting `sealed_at` on both the volume (`:217`) and the hive mirror (`:223`) on every branch. So the window is *until this month's seal*, which for someone leaving late in a rotation may be hours. The confirmation cannot promise *"you can still delete it later"* — after the seal it is `packaged` and the delete is refused. **State the window or don't state the right.**
+
+---
+
+#### (d) And the grep that proved (a) walked into the Privacy Policy
+
+I checked `legalCopy.js` for a deletion promise, expecting to find one sentence to reconcile. **Four of its sentences are false about the shipped app**, and the cause is dated.
+
+`473ac3b`, **2026-08-11** — commit message: *"Real Privacy Policy and ToS copy, **written to what the app actually does**."* True when written. **`c4fe6a4`, 2026-08-13 — "P0-2: EntryStore -> Supabase"** moved every entry off the device (`EntryStore.js:6`, *"Supabase-backed as of P0-2 — was a single AsyncStorage…"*). The policy has been touched once since, on 08-17, for an unrelated Day-1 chips change.
+
+| line | shipped sentence | why it is false |
+|---|---|---|
+| `:215` | *"Unshared entries are not covered by any of this, because they never leave your phone."* | Every entry is a Supabase row since `c4fe6a4`. There is no local-only entry path. |
+| `:228` | *"Entries you never shared are not ours to delete — removing the app removes them."* | Same cause — and this is the sentence **disclaiming a deletion duty the app now has.** |
+| `:227` | *"We have not built these controls into the app yet, which is why this is an email rather than a button."* | `ENG-84` shipped the button: `App.js:309` registers it, `Account.js:218` navigates to it, `DeleteAccount.js:32` calls `HoneycombStore.deleteAccount()`. |
+| `:221` | *"When an account is deleted, the entries, shares, comments, likes and connections attached to it are deleted with it."* | **Unqualified where the code is deliberate.** `delete_own_account` deletes only `where user_id = v_uid and (hive_id is null or is_volume_open(volume_id))` — **sealed hive entries survive**, keep `author_name_at_seal`, and **still deliver to the subject.** That is ENG-84's ruled keep-and-disclose position (`…0001:144-149`). Delete your account and a letter with your name on it still arrives. |
+
+**`:221` is the one that is not a copy fix.** The other three describe an architecture that changed; `:221` describes a position we deliberately hold and the policy states the opposite of. **@Colin — that is a disclosure ruling, not a wording choice:** does keep-and-disclose get disclosed at deletion time, in the policy, and in the `DeleteAccount` screen's own confirmation? The screen is where a person decides.
+
+#### (e) The launch gate on this file checks placeholders, not premises
+
+`LEGAL_COPY_READY = Object.values(FILL).every(isPublished)` (`legalCopy.js:148`) — four values: legal entity, contact address, hosting region, effective date. **The publish gate is entirely a blanks-filled check.** And `check-legal-consent-gate.mjs` — the one instrument that fires on the transition, and a genuinely good one, self-deleting by construction — fires about the **consent checkbox**, not the document's accuracy.
+
+**So on the day someone fills four blanks, the Privacy Policy publishes with four false sentences, and the only gate that reds asks whether a checkbox came back.** Nothing in the tree asserts that a claim about the architecture still matches the architecture.
+
+**`LEGAL-2` (owner @Colin to route; facts verified here, wording @Lumen via `COPY-6`, `:221`'s position @Colin).** **Not an MVP-Comb blocker** — `OPS-10`'s EAS internal distribution faces no review. **It is a submission blocker** for `11.1` TestFlight and anything past it, and it is independent of `LEGAL-1`, which is parked on `C5` for the nectar layer. This is shipped copy that is false about shipped code, today.
+
+**`OPS-12` (@Bumble, S) — a premise tripwire on `legalCopy.js`.** Not a general truth-checker. The narrow, real form is the same shape as the `/nudge/i` instrument's rejected sibling done right: assert that the file contains **no sentence claiming device-local storage** while `EntryStore` holds a Supabase client, and **no sentence claiming a control is unbuilt** while a screen for it is registered in `App.js`. Both premises are greppable in the code, both are exactly what went stale, and both are self-deleting once the copy is corrected.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New rows:** `LEGAL-2`, `OPS-12`. **No new `O`** — `:221`'s disclosure question is inside `LEGAL-2`, not a separate open item.
+
+**The transferable shape:** all evening we asked whether a source's **gate** matched its surface's **reader**. A sentence in a legal document is the same object one layer out — a claim about the system, with a premise, and no gate. `entries_delete_own`'s comment was *more current than my citation*; `legalCopy`'s was *less current than the code it described*; both drifted because prose has no compiler and no `git grep` finds a premise. **A commit message that says "written to what the app actually does" is a timestamp, not a property** — it dates the last moment the claim was checked, and here the architecture moved two days later. When an architectural commit lands, grep the prose that described the old one.
