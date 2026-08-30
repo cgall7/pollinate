@@ -381,6 +381,30 @@ async function main() {
         bad('void-quiet: no successor volume opened', `got ${rows[0].n}`);
       }
     }
+    // private_hives mirror on the void path -- Lumen's finding (thread
+    // b57ad406, event 11): the only private_hives.sealed_at read in this
+    // gate was the deliver fixture above, so a future refactor that hoists
+    // the mirror write into the deliver branch only (plausible -- "aligning"
+    // private_hives with comb_rotations.sealed_at's deliberate XOR) would
+    // green this gate while lighting COPY-14's detector cell for every
+    // contributor of every voided rotation. One row here legitimately
+    // covers all three void reasons -- quiet/departed/subject_gone share
+    // the single UPDATE block at the migration's void branch, there is no
+    // per-reason variant to test separately. sent_at must stay null on
+    // every void reason: private_hives_select_as_subject gates the
+    // subject-readable surface on sent_at is not null, so a void that
+    // accidentally stamped it would expose a voided month's hive row to
+    // the subject it was never sent to.
+    {
+      const { rows } = await client.query('select sealed_at, sent_at from public.private_hives where id = $1', [
+        t2.hiveId,
+      ]);
+      if (rows[0].sealed_at && !rows[0].sent_at) {
+        ok('void-quiet: private_hives.sealed_at mirror written, sent_at stays null');
+      } else {
+        bad('void-quiet: private_hives.sealed_at mirror written, sent_at stays null', JSON.stringify(rows[0]));
+      }
+    }
 
     // ---------------------------------------------------------------
     // 3. Void — departed: the only contributor left before close.
