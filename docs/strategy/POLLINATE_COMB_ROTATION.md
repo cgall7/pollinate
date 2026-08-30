@@ -3623,3 +3623,38 @@ That inverts the ordering the column pair was built for. The real rule is **self
 **Open:** `O3`, `O4`, `O8`, `O9`. **New rows:** `DES-38`, `DES-39`. `ENG-96` re-scoped to six mappings. No new `O`.
 
 **The transferable shape:** @Lumen ran the boundary grep and stopped at the mappings their trace predicted. The two they missed are the two the trace never reached — the *subject's* reads, not the writer's or the owner's. **A grep is only exhaustive if you read every hit; the ones outside your mental model are precisely the ones the grep existed to find.** Corollary from the same file: when a fix lands next to a field that was deliberately frozen, state the asymmetry in the ruling — otherwise the adjacency argues the fix into the wrong shape.
+
+### §1B.35.2 — CORRECTION 2026-08-30: the live read is unreadable on four of the six mappings, and `'Someone'` is an authorization word, not a name word. **I was wrong in §1B.35.**
+
+Both `DES-38` and `DES-39` rulings are @Lumen's and I ratify their shape. But `DES-38`'s resolver has a premise that does not hold on the merged tree, and the premise is **mine** — §1B.35 ruled *"prefer live when `subject_profile_id` is non-null."* That is only executable where the reader may read the subject's profile row, and on four of the six mappings **they may not.**
+
+**Measured.** `git grep -rn "on public.profiles for select" github/main -- supabase/migrations/` returns **three** policies, total: `profiles_select_own` (`auth.uid() = id`), and two generations of `profiles_select_connections` (`honeycomb_connections`, status `pending`/`accepted`, superseding at `20260809000005`). **There is no comb-scoped `profiles` policy.** The team already faced this and chose the other door — `20260830000002:375`: *"comb you belong to. Not a widened profiles policy — keep the blast radius"* — which is why `comb_co_member_names` (`:391-404`) is a `security definer` that joins `profiles` and gates on `is_comb_member`.
+
+**So the six mappings split three ways, not one:**
+
+| mappings | reader → subject | live `display_name` readable? |
+|---|---|---|
+| `:529`, `:583` | subject → **self** | **Always** — `profiles_select_own`. |
+| `:447`, `:481` | contributor → subject | **No**, unless honeycomb-connected. A comb writer joins by **invite code**; a connection is not implied and usually absent. |
+| `:185`, `:222` | organizer → subject | **Conditional** on `DES-29`'s picker source, which is unbuilt. |
+
+**`'Someone'` in this codebase is already spoken for, and not as a name-placeholder.** Both existing uses say so in-file: `listContributingHives:437-439` — *"the owner may not be a honeycomb connection of every contributor they invite"*; `listReceivedPackages:518-524` — *"drops silently (zero rows, not an error) once the sender is unfriended."* **`'Someone'` is the "I am not permitted to read this person" word.** `DES-38`'s placeholder class makes it the output of *"nobody produced a name."* Those are different causes wearing one word, and a resolver that merges them cannot distinguish the unfixable case from the fixable one.
+
+**The consequence that inverts §1B.35: the mint's coalesce write is not the defect. It is the RLS bridge.** `comb_open_rotation` copies the subject's name across the profiles wall at mint, exactly as `send_hive` copies contributor names across at send. `private_hives.subject_name` is to the subject what `contributor_names` is to the writers — the same pattern, for the same reason. My §1B.35.1 accepted `contributor_names`' in-file reason (*"stays correct even if a name changes"*) at face value; **the stronger reason is that a non-connected subject cannot read her writers' profiles at all.** That strengthens the asymmetry ruling — the freeze is load-bearing, not stylistic — and it means `subject_name` is not vestigial.
+
+**AMENDED RULING — `ENG-96` is two fixes, not one.**
+
+1. **`:529`/`:583` — live first, exactly as @Lumen ruled.** Readable by `profiles_select_own`, it heals, and the reader is the person. Unchanged, and it is still the cheapest pair.
+2. **`:447`/`:481`/`:185`/`:222` — `subject_name` STAYS the source.** A live-preferring branch here silently degrades to `'Someone'` for the modal comb writer. Do not add a `profiles` join to these four; it buys nothing and hides an authorization failure inside a name resolver.
+
+**What actually fixes the four is the mint's write, in two parts, and both are cheap:**
+- **(a) Never freeze a placeholder.** This is where `DES-38` point 4 becomes load-bearing rather than a nicety: when the subject's live name is placeholder-class, the organizer's typed word is **the only word any writer will ever see**. @Lumen's *conditional* collection is the right trigger and the right copy; the stakes are higher than "the organizer's word is truest" — for four of six mappings it is the **sole** source.
+- **(b) Re-copy at every mint.** Month N+1's `comb_open_rotation` re-reads `display_name`, so a rename heals at the next rotation without a refresh path, a job, or a schema change. The organizer's manual edit (`private_hives_update_own`, unsealed only) stays as the immediate correction.
+
+**A design constraint for `DES-29`, delivered before it is built:** if the picker lets the organizer choose a **non-connected** profile, the organizer cannot read that person's name either — the picker needs its own name source (a definer in the `comb_co_member_names` shape, or restriction to connections). Otherwise it renders a list of `'Someone'`.
+
+**`DES-39` — ratified, discriminator verified.** `comb_rotations.hive_id` carries `unique (hive_id)` (`20260830000002:480`) and `comb_rotations_select` (`:498`) exists, so *"a hive referenced by `comb_rotations`"* is well-defined and readable by the organizer. One build note: PostgREST expresses this as an embedded left join filtered `is null`, not a SQL `not exists`. *Writer sees the month, organizer sees the comb* is ratified as stated.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. No new rows — `ENG-96` amended in place, `DES-38` point 4 promoted from conditional-nicety to sole-source. No new `O`.
+
+**The transferable shape, and it is mine to own:** I ruled *"prefer the live value"* without asking **who is permitted to read it.** A live read and a snapshot are not two implementations of one answer — the snapshot exists **because** the live read is refused, and the fallback word that hid the refusal was the same word I was trying to eliminate. **Before ruling that a stored value should be replaced by a live one, run the read policy for every reader — and check what the existing fallback was actually built to absorb.**
