@@ -3503,3 +3503,43 @@ I told `ENG-95` to repoint the mint. It cannot. `create or replace function` on 
 **Open:** `O3`, `O4`, `O8`, `O9`. No new `O`.
 
 **The transferable shape, and it is mine tonight:** an amendment that *relocates* a requirement only relocates it for readers who arrive after it. Everyone already building is working from the first naming — so **when an amendment moves an unbuilt artifact's owner, name the builders who claimed under the old naming and address them by name**, or the requirement is homeless in exactly the way the amendment was written to prevent. Second half: before assigning a repoint, ask what the repointing *statement* does when its target is absent. `create or replace` answers "creates it," which is the one answer that produces no error and no diff to read.
+
+---
+
+### §1B.34.3 — `ENG-95`'s shared body is right and its **grant argument is load-bearing, not belt-and-braces**. Two gaps: the `authenticated` revoke has no assertion anywhere in the repo, and **no gate can tell a caller from a re-implementer**
+
+@Sage rewrote `…0009` while §1B.34.2 was being written and landed the shared body independently: `comb_subject_gone(p_comb_id, p_subject_id)`, `language sql stable security definer`, both arms, seal repointed to a single call (`:149`), mint and preview explicitly left alone with the reason stated in the header. **Ratified.** The never-joined fall-through is reasoned correctly and the gate gained the population — `check-comb-rotation-seal-send.mjs:614`, *"a subject who was never a `comb_members` row delivers, does not void as `subject_gone`."* Class in the fixture, as ruled.
+
+**Their grant paragraph deserves upgrading from cautious to necessary, and the evidence is in our own schema.** `20260813000005`'s header records a *measured* finding: on PG 18.4, `alter default privileges in schema public revoke execute on functions from public` **is accepted and records nothing** — `pg_default_acl` stays empty and *"every future function starts open to anon."* So `revoke execute … from anon` / `from authenticated` on a new definer is not defensive styling; **it is the only thing standing between `comb_subject_gone` and the exposure @Sage described** — *"has this person deleted their account or left this comb,"* answerable for any `(comb_id, subject_id)` pair.
+
+---
+
+**Gap 1 — the `authenticated` half of that revoke is asserted nowhere.**
+
+`check-share-visibility.mjs` is the guard `20260813000005` names as *"the only durable guard."* It enumerates **every** definer in `public` (`:361-367`, no allowlist filter on the enumeration — exhaustive by construction) and then asks exactly one question per function:
+
+```js
+has_function_privilege('anon', sig, 'execute')
+```
+
+**`anon` only** (`:369-374`). There is no catalog assertion for `authenticated` in the repo. Where that boundary is covered at all it is covered **per function, in that function's own ticket gate** — `check-comb-rotation-seal-send.mjs` carries *"grant boundary: `authenticated` cannot call `seal_and_send_rotation`."* So a new definer's `authenticated` revoke is protected only if its author remembers to write the row.
+
+**And the re-opening mechanism is documented and measured in the same file:** `create or replace` preserves `proacl` — the revoke survives — but **`drop` + `create` loses it silently, and any signature change forces `drop` + `create`.** `comb_subject_gone(uuid, uuid)` is one day old and its signature is the most plausible thing about it to change.
+
+**Asked of `ENG-95`, in the gate @Sage already has open:** a grant-boundary row for `comb_subject_gone` asserting **both** `anon` and `authenticated` cannot execute it — the same shape `seal_and_send_rotation` already has, in the same file. The catalog-wide `authenticated` assertion is a separate, larger question and is **not** `ENG-95`'s to carry.
+
+---
+
+**Gap 2 — and it is the ruling's own blind spot. `git grep comb_subject_gone scripts/` returns nothing.**
+
+Every behavioural row in the gate goes through `seal_and_send_rotation` and asserts outcomes. **All of them stay green if a future edit re-inlines the predicate.** That is §1B.34.1's sentence turned back on the fix that implemented it: *a site that reimplements one arm reads exactly like a site that calls it — same refusal, same error, same green gate.* The gate proves the seal **behaves** right today; nothing proves the construction is **shared**, which is the entire content of "one predicate, N callers."
+
+The idiom already exists and is two files over — `check-comb-preview.mjs:352` asserts against `pg_get_functiondef(oid)` directly. **Asked:** assert each caller's definition **contains the call**, and — per the count-tripwire rule — assert the caller **roster**, not a count of matches, so adding a fourth caller forces the line rather than sliding under it. Today that roster is one name; `ENG-94` makes it three.
+
+---
+
+**Gap 3 — the mint repoint is tracked in prose, not in a row.** @Sage's header says the repoint is *"tracked in-channel, not silently left as a fourth copy."* In-channel is not an artifact, and this is §1B.29(a)'s shape a third time tonight. **§1B.34.2 assigns it: `ENG-94`'s migration (@Fizz), which repoints the preview and the mint together** — by number it lands after both `…0008` and `…0009`, so the body and the mint both exist and nothing is conjured. The header comment at `:41-47` should name **`ENG-94`** so the next reader of the file has a resolvable address, not a channel to search.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. No new `O`.
+
+**The transferable shape:** a shared body is a *construction*, and behavioural tests cannot see constructions — they see outcomes, which are identical whether the sharing happened or not. **When the ruling is "one predicate, N callers," the gate has to assert the calls, not the answers.** And when a security argument rests on a `revoke`, find the assertion that fails if the revoke disappears; if the enumeration only asks about one role, the other role's revoke is a comment.
