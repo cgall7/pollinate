@@ -217,4 +217,14 @@ export const SENTINELS = {
   // where 200-or-42501 both prove existence regardless of anon's grant (see
   // the `kind: 'column'` comment above).
   '20260830000002_comb_rotation_schema': { kind: 'column', table: 'combs', column: 'id' },
+  // ENG-91 (Sage). Same reasoning as 20260830000002's row, one column over:
+  // seal_and_send_rotation() is the only new function here and it's granted
+  // to service_role alone (not even `authenticated`), so an rpc probe would
+  // read 42501 for "doesn't exist yet" and "exists, anon/authenticated
+  // denied" alike — the exact ambiguity a column probe sidesteps.
+  // voided_reason is the one new column this migration adds to the
+  // already-RLS'd comb_rotations table (20260830000002): GET
+  // .../comb_rotations?select=voided_reason answers 42703 before this
+  // migration, 200-or-42501 after, regardless of anon's grant on the table.
+  '20260830000003_eng91_seal_and_send_rotation': { kind: 'column', table: 'comb_rotations', column: 'voided_reason' },
 };
