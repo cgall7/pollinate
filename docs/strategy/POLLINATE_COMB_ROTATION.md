@@ -3889,3 +3889,50 @@ No leave-comb UI exists (`git grep removed_at github/main -- src/` — `hive_con
 **Open:** `O3`, `O4`, `O8`, `O9`. **No new rows.** `ENG-99` pin 3 upgraded to load-bearing with its abort path named; pin 5 added — the trigger comment states the order-independence. No new `O`.
 
 **The transferable shape:** a trigger added for a rendering concern fires inside every function that touches its table, including the one flow that must never fail. **When adding a trigger, enumerate the existing writers of that table before writing the trigger body — a `security definer` function with no exception block converts your raise into its own abort.** And the second half: a one-way door is sized by everything the same tap forecloses, not by the verb on the button. Three foreclosures here, and the doc named one.
+
+---
+
+### §1B.36.4 — row 1 of the four-row table names a function revoked from the reader it serves
+
+**Date:** 2026-08-30. **Trigger:** @Pixel wrote the four-row count-source table into both design docs. Re-reading the row everyone called *"unaffected, correct today."* Verified at `github/main@46ce848`.
+
+#### (a) `comb_member_count` cannot answer the landing.
+
+`20260830000002:426-442`:
+
+```sql
+select count(*)::integer from public.comb_members m
+where m.comb_id = p_comb_id and m.removed_at is null
+  and public.is_comb_member(p_comb_id);
+...
+revoke execute on function public.comb_member_count(uuid) from anon;
+```
+
+Two independent refusals of the landing's reader. **`anon` cannot call it at all** — the pre-auth invite landing is the anon surface by definition, so this is `42501`, not a wrong number. And a signed-in non-member who taps someone's invite link hits the `is_comb_member` predicate **inside the WHERE** and gets `0` — `§1B.33`'s fails-open-on-aggregate shape, the one that returns a plausible number instead of an error.
+
+The row read *"how big is this comb → `comb_member_count` → landing, outsiders only."* **Its gate admits exactly the population the surface excludes.** Third instance tonight of one shape: a source named for a surface whose reader its gate refuses (`comb_rotation_writer_count`/never-member subject, `comb_rotations_select`/departed writer, and now this).
+
+#### (b) The landing already has its own source, built for it, granted to `anon`.
+
+`comb_preview_by_invite_code` (`20260830000006`) carries its own inline leg — `count(*) from comb_members where comb_id = v_comb_id and removed_at is null`, **no membership predicate** — and is granted to `anon` *and* `authenticated`, with the reason stated in-file (`:107-109`): *"Anon-callable by design (the pre-auth landing's whole point) … this function's only authorization input is the code, same for both roles."*
+
+**RULED — row 1 repoints:**
+
+| question | source | surface |
+|---|---|---|
+| how big is this comb | **`comb_preview_by_invite_code`'s `member_count`** | pre-auth landing; the code is the only authorization |
+| this rotation's writing roster | `comb_rotation_writer_count(p_rotation_id)` | member + organizer surfaces only |
+| the delivered roster | `contributor_names.length` | subject, post-seal only |
+| participation | — | barred everywhere |
+
+**Carry the row's known defect with it:** that leg counts tombstoned members. `ENG-92` **Part 6** (`§1B.32`) already owns the `deleted_at` predicate for it — the landing count is wrong-by-tombstone today, tracked, unmerged in `…0007`. A table row that reads clean when its source has a filed defect is how a defect gets un-filed.
+
+#### (c) The repoint leaves `comb_member_count` with no surface at all.
+
+`git grep -rn "comb_member_count" github/main -- src/` → nothing (`§1B.35.3`). The landing is served by the preview; the member and organizer cards moved to `comb_rotation_writer_count` in `§1B.36`. **Row 1 was the last thing keeping it assigned, and it was assigned to the one surface it cannot serve.**
+
+**RULED: keep the function, unassigned.** Its gate is exactly right for an in-app, member-facing *"this comb has N people"* line — `is_comb_member` matches that reader precisely — and no such surface is designed. It is shipped, uncalled, correct, and **must never be cited for the landing.** `OPS-11`'s grant map documents it either way.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **No new rows** — `ENG-92` Part 6 already owns (b)'s tombstone half. No new `O`.
+
+**The transferable shape:** the row of a source table that nobody argues about is the row to check. Rows 2, 3 and 4 were fought over all evening and are right; row 1 was carried forward as background three times — by @Lumen, by me, by @Pixel — and it was the one naming a function `revoke`d from its own surface's reader. **A source table must state the READER beside the source, because that is the column where a gate mismatch becomes visible.** The table now has it.
