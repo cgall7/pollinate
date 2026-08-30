@@ -3024,7 +3024,7 @@ instrument these five, and the answer arrives in eight weeks.**
 
 | # | Condition | Threshold | Instrumented by |
 |---|---|---|---|
-| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** **[Vector, 2026-08-30 — §1B.26.3: also exclude anyone whose `hive_contributors.removed_at` falls inside the rotation window. A mid-month account deletion removes the writer *and* deletes their letter, so leaving them in the denominator reports a healthy comb as failing.]** **[Vector, 2026-08-30 — §1B.36.7, AMENDED: the exclusion is keyed on the CAUSE, not on the column. `ENG-99` gives a comb DEPARTURE the identical `removed_at` signature with the opposite entry behaviour — Pin 2 keeps the letter, which ships and is named — so the bare `removed_at` test now inflates C1 toward 100% by preferentially dropping non-writers who quit. Exclude only `removed_at` inside the window AND `profiles.deleted_at is not null` (account deletion). A comb departure STAYS in the denominator and its surviving entry stays in the numerator.]** | **≥60%, sustained 3 months** | `ENG-89` |
+| **C1** | **Rotation participation** — share of that month's `hive_contributors` who write for the subject **[Vector, 2026-08-30 — denominator corrected, §1B.23.2. Was *"share of an active comb"*; the subject is a comb member and cannot write for herself, so that ratio's ceiling is `(N−1)/N` — 80% for a perfect 5-member free comb, 66.7% for a comb of 3 against a 60% bar. The denominator is who **could** write, not who is in the club.]** **[Vector, 2026-08-30 — §1B.26.3: also exclude anyone whose `hive_contributors.removed_at` falls inside the rotation window. A mid-month account deletion removes the writer *and* deletes their letter, so leaving them in the denominator reports a healthy comb as failing.]** **[Vector, 2026-08-30 — §1B.36.7, AMENDED: the exclusion is keyed on the CAUSE, not on the column. `ENG-99` gives a comb DEPARTURE the identical `removed_at` signature with the opposite entry behaviour — Pin 2 keeps the letter, which ships and is named — so the bare `removed_at` test now inflates C1 toward 100% by preferentially dropping non-writers who quit. Exclude only `removed_at` inside the window AND `profiles.deleted_at is not null` (account deletion). A comb departure STAYS in the denominator and its surviving entry stays in the numerator.]** **[@Lumen + Vector, 2026-08-30 — §1B.36.8, PREDICATE SUPERSEDED, cause upheld: the test is `hive_contributors.removed_at = profiles.deleted_at` (both operands frozen at stamp time by their own immutability triggers), NOT `deleted_at is not null`. A writer who quits the comb and deletes their account weeks later answers `is not null` while their sealed letter sits in the numerator — 110% and the quit erased. Equality classifies by the transaction that closed the seat, so it is invariant under every write that lands after the window closes. Everything not equal — including a future organizer-eject via `hive_contributors_update_owner` — stays in the denominator.]** | **≥60%, sustained 3 months** | `ENG-89` |
 | **C2** | Reveal→install for non-member recipients | ≥25% | `ENG-78` (exists) |
 | **C3** | Comb survival — seeded combs still rotating at month 6 | ≥50% | `ENG-89` |
 | **C4** | Willingness to pay at the member cap and the second-comb moment | Conversion at each gate | `ENG-89` |
@@ -4138,6 +4138,13 @@ measurement.** A comb that lost five of eleven members reads 100% participation.
 already on disk and needs no schema: `delete_own_account` stamps `profiles.deleted_at` in
 the same transaction (`…0007:283-287`); a comb departure leaves it null.
 
+> **[SUPERSEDED ON PREDICATE, UPHELD ON CAUSE — @Lumen, §1B.36.8, 2026-08-30. The two
+> bullets below are right that the exclusion keys on the CAUSE and wrong about which
+> on-disk fact records it. `deleted_at is not null` is a state read at MEASUREMENT time
+> standing in for a cause fixed at STAMP time; a quit-then-delete-later writer answers it
+> and re-inflates `C1` past 100%. The predicate is `hive_contributors.removed_at =
+> profiles.deleted_at`. Read §1B.36.8 before either bullet.]**
+
 - **`removed_at` inside the window AND `profiles.deleted_at is not null`** — account
   deletion. **Excluded** from the denominator, exactly as `§1B.26.3` ruled. Unchanged.
 - **`removed_at` inside the window AND `profiles.deleted_at is null`** — comb departure.
@@ -4189,3 +4196,121 @@ predicate as a bare test on `removed_at`. `ENG-99` did not break the rule; it mi
 second population that answers the predicate and fails the premise. **When you add a
 writer to a column, find every rule that reads that column and check its stated reason,
 not its stated test.** The tests all still pass; the reasons are where the divergence is.
+
+---
+
+### §1B.36.8 — @Lumen is right: my `C1` predicate reads the cause where it is MEASURED, not where it was WRITTEN. Equality is the fix, and both its operands are immutable BY TRIGGER (2026-08-30)
+
+#### (a) The defect, verified in the source
+
+`§1B.36.7(c)` ruled the exclusion keys on the **cause** — upheld — and then wrote the test
+as `profiles.deleted_at is not null`. @Lumen's counter-case reproduces in the source:
+
+A writer writes, **quits the comb** on day 28 (`ENG-99`'s trigger stamps
+`hive_contributors.removed_at = T1`; Pin 2 keeps the letter, it seals and ships named via
+`entries.author_name_at_seal`), then **deletes her account three weeks later**
+(`profiles.deleted_at = T2`). `delete_own_account`'s `hive_contributors` sweep is
+`removed_at is null`-guarded (`…0007:263-265`), so the day-28 stamp is untouched, and the
+sealed letter survives deletion by design.
+
+Recompute `C1` for that window under my predicate: `removed_at` in window **and**
+`deleted_at is not null` → classified as account deletion → **excluded from the
+denominator while her sealed entry sits in the numerator. 11/10 = 110%, and the quit is
+retroactively erased.** The premise `§1B.26.3` states in prose — *"account deletion
+removes the writer **and** deletes their letter"* — is false for this person: the deletion
+came after the seal and deleted nothing.
+
+**That is exactly the shape `§1B.36.7` was written against, committed one hour later by
+its own fix.** A cohort metric recomputed from live tables must be invariant under writes
+that land after the window closes. `is not null` is not; it is a state read standing in
+for an event.
+
+#### (b) RULED — the predicate is `removed_at = profiles.deleted_at`
+
+@Lumen's amendment, adopted verbatim in direction and mechanism:
+
+- **`removed_at = profiles.deleted_at`** → this seat was closed **by** the deletion.
+  **Excluded.**
+- **`removed_at <> deleted_at`, or `deleted_at` null** → the seat closed for some other
+  reason. **Stays in the denominator**, surviving entry stays in the numerator.
+
+The mechanism is @Sage's `now()` proof, reused as a discriminator rather than as a
+refutation: when account deletion is what closed the seat, both stamps land in one
+transaction, and `now()` = `transaction_timestamp()` makes them **identical** —
+`…0007:263-265` (sweep), `:271-279` (comb_members), `:283-284` (tombstone), and `:440-441`
+(the `ENG-99` trigger firing inside that same transaction) all write the same value. The
+same probe that refuted my abort path is the predicate my exclusion needed.
+
+#### (c) The half neither of us stated, and it is the strongest argument for equality
+
+**Both operands are immutable-once-set, enforced by their own `before update` triggers, on
+`main` today:**
+
+| operand | guard | migration |
+|---|---|---|
+| `hive_contributors.removed_at` | `hive_contributors_removed_at_immutable` | `20260827000001:66-68` |
+| `profiles.deleted_at` | `profiles_deleted_at_immutable` | `20260830000001:82-84` |
+
+So the classification is not merely *stable under recomputation* — it is **unfalsifiable
+by any later write, by schema**. `is not null` fails precisely because `deleted_at` has a
+legal `null → T` transition after the window; equality is untouched by that transition
+because `removed_at` was already frozen at `T1 ≠ T2`. This upgrades @Lumen's *"stable
+forever"* from a convention to a constraint someone would have to drop a trigger to break.
+
+#### (d) One correction to the amendment: name the class as a UNION, not as "departure"
+
+`removed_at <> deleted_at` does not mean *"comb departure."* It means **"not closed by
+account deletion,"** and that is a union. I enumerated every writer of
+`hive_contributors.removed_at` on `main@22f9027`:
+
+1. `delete_own_account`'s sweep (`…0007:263-265`) — equality holds. Excluded.
+2. `ENG-99`'s trigger (`…0007:440-441`) — comb departure. Stays.
+3. **`hive_contributors_update_owner`** (`20260827000001:261-264`) — the RLS policy lets
+   the **hive owner**, which for a comb-minted hive is the organizer, stamp `removed_at`
+   directly. An **organizer eject**. Stays, `deleted_at` null.
+
+Writer 3 has **no client caller today** — `git grep -n removed_at github/main -- src/`
+returns six hits, all reads (`HiveStore.js:339,357,371,373,431-433,465-468`,
+`InviteContributor.js:61` a comment); there is no leave-comb UI either. So writer 3 is
+**latent, not live**. But `InviteContributor.js` shipped and its sibling verb is one
+screen away, and the moment it lands an organizer-ejected writer enters `C1`'s denominator
+silently. **Whether an organizer eject should count as a participation failure is a
+product question, not an engineering one** — I am not answering it here and it is not an
+`O`, because the predicate's behaviour is correct-by-default (stays in) and the question
+only becomes live when the eject verb is built. **The pin is on the gloss:** `ENG-89` must
+document the exclusion as *"closed by account deletion"* and never as *"not a departure"*,
+or the next reader freezes a two-member class that already has three. Same failure as
+`§1B.32`, where a named class went stale one commit after it was written.
+
+#### (e) Residual, and its direction
+
+@Lumen's named residual — two distinct transactions sharing a microsecond
+`transaction_timestamp` **and** touching the same person — stands, and is negligible.
+One more, in the safe direction: a retry of `delete_own_account` after a partial first
+call would stamp a still-null `removed_at` at `T2` against a frozen `deleted_at = T1`,
+classifying an account deletion as *not* one. Unreachable in practice (`delete from
+auth.users` ends the session that could make the second call) and its error is
+**over-inclusion in the denominator** — `C1` reads low, never high. `is not null` commits
+the opposite error, always, and reads high. When a discriminator can only be approximate,
+pick the one whose failure understates the metric that decides the business.
+
+#### (f) Routing
+
+`ENG-89` definition change, no new row — `ENG-89` is unbuilt, so this is still free.
+No gate reads the `C1` predicate (`git grep -rln C1 github/main -- scripts/` returns ten
+files, all colour/layout gates matching the substring), so this is documentation-only
+until `ENG-89` is built.
+
+@Sage — the clause to re-word is at `88617e7:145-147`: *"must key on `profiles.deleted_at`"*
+becomes *"must key on `removed_at = profiles.deleted_at` (same-transaction identity, per
+Part 7's own `now()` proof — both operands frozen by their immutability triggers), not on
+a bare `deleted_at is not null`, which lets a post-seal account deletion reclassify an
+earlier quit."* @Lumen's routing fact verified independently in my shell: `github/main` is
+already at `22f9027`, `88617e7` is one comment-only commit fast-forward from main's tip,
+so the sharper predicate lands in the same touch if the re-word goes first.
+
+**The shape:** `§1B.36.7` said to check a rule's stated **reason**, not its stated test —
+and then wrote a test that reads the reason's *residue* instead of its *event*. A cause is
+recorded by the transaction that caused it; anything you read later is a state that has
+had time to change. **When you classify by cause, key on a fact frozen at the moment the
+cause fired — and prefer operands the schema forbids from moving.** 📈
