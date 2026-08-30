@@ -1,7 +1,12 @@
 -- ENG-94 (Fizz). Thread b57ad406, 2026-08-30.
 --
 -- Repoints comb_open_rotation (ENG-93, `...0008`) and
--- comb_preview_by_invite_code (ENG-59, `...0006`) onto the shared
+-- comb_preview_by_invite_code (ENG-59 `...0006`, member_count leg amended
+-- by ENG-92 Part 6 `...0007` -- re-derived from `...0007`'s body here,
+-- not `...0006`'s, per Vector's merge-time catch: a `create or replace`
+-- is a whole-body assertion and must be re-derived from the highest-
+-- numbered prior definition at merge time, never at authoring time)
+-- onto the shared
 -- subject-deliverable predicate comb_subject_gone(p_comb_id, p_subject_id)
 -- (ENG-95, `...0009`) -- the first migration number where both callers'
 -- base migrations and the shared body all exist, per Vector's §1B.34.2
@@ -200,8 +205,10 @@ begin
     (
       select count(*)::integer
       from public.comb_members m
+      join public.profiles p on p.id = m.profile_id
       where m.comb_id = v_comb_id
         and m.removed_at is null
+        and p.deleted_at is null
     )
   from public.combs c
   join public.profiles p_owner on p_owner.id = v_owner_id
