@@ -38,9 +38,19 @@ const store = read('src/services/HiveStore.js');
 // `is_collective` grew the insert block) or whose select argument wrapped
 // onto its own line (getHive) — 5 matched of 7 while the `=== 5` count
 // stayed green, because membership had changed by four under a constant
-// count. The window is gone and whitespace is tolerated; the completeness
-// row below is the actual repair — it converts a silent miss into a red,
-// so the count can be a membership tripwire instead of a coincidence.
+// count. The window is gone and whitespace is tolerated.
+//
+// THE TWO ROWS BELOW ARE COMPLEMENTARY — NEITHER ALONE CLOSES THE HOLE, so
+// neither may be deleted as redundant with the other (Vector's probe pair,
+// msg 8b4dc2a4, both reproduced before this comment was written):
+//   - completeness (captured === fromSites) reds when a site the regex
+//     cannot pair simply vanishes (template-literal select, select-less
+//     .update) — the silent-miss direction;
+//   - the exact count reds the case the unbounded lazy regex itself
+//     enables: a select-less site followed by a FOREIGN table's
+//     .select(... sealed_at) gets paired across the gap, the absorbed slot
+//     keeps captured === fromSites, and only the count moves (8 !== 7).
+// No constructed shape passes both.
 const fromSites = [...store.matchAll(/\.from\('private_hives'\)/g)].length;
 const selects = [...store.matchAll(/\.from\('private_hives'\)[\s\S]*?\.select\(\s*'([^']*)'\s*\)/g)].map((m) => m[1]);
 check(
