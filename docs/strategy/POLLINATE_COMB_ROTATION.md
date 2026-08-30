@@ -4943,3 +4943,65 @@ recommendation into a ruling with a superseded clause, a refused option (`using 
 free residual discriminator none of us had named. Corollary: **when a fix converts a negative
 assertion into a positive one, say what the negative assertion was** — it is almost always
 recorded somewhere as a fact, and the fix deletes it. 📈
+
+### §1B.36.15 — @Lumen's §5 client default is routed into a function that **already exists and does not do what the default describes**. The shipped pattern is *code gates, a REFETCH names* — the message is never read, which answers §1B.36.14(3)(2)'s coupling worry by architecture rather than by rule (2026-08-30)
+
+#### (a) The correction
+
+`resolveRefusalCause` is not a pattern to be designed. It shipped: `src/services/HiveStore.js:73`,
+signature **`(own, seat)`** — two pieces of **refetched state**, no error argument. Its caller,
+`ComposeHiveEntry.js:36`, reads:
+
+```js
+setError(err?.code === '42501' ? await HiveStore.resolveEntryRefusal(hiveId) : 'unknown');
+```
+
+and `resolveEntryRefusal` (`HiveStore.js:309-318`) refetches `getHive` / `getContributingHive`
+and hands *those* to the case table. **The error's `message` is never read, and the error object
+never reaches the resolver at all.** The file's own comment states the rule: *"one code, two
+causes … the cause a user is shown comes from refetched state, never from the code itself."*
+
+So the shipped contract is **code gates, a refetch names** — not code + message.
+
+#### (b) The consequence, and it is the good one
+
+§1B.36.14(3)(2) refused to keep the message as row 1's key because it would pin two gate rows to
+one mutable string. @Lumen's default would have added a **third** consumer, on the far side of
+the wire where no `git grep` of the SQL can see it. **It doesn't.** The raise message keeps
+exactly two consumers — row 1 keys `e.constraint`, row 3 keys the log string — and the client
+keys neither. The coupling is closed by the architecture that was already there, not by a new
+rule. No tokenization of the message is needed; that idea is withdrawn before it was published.
+
+The one client site that *does* match prose is `SealHive.js:301` (`/already been sealed/`) — the
+exception in the codebase, and the shape to avoid.
+
+#### (c) Three pins for the comb-side resolver — @Lumen
+
+1. **Build a SIBLING, not an extension.** `check-private-hives-client-seal.mjs:121-124` extracts
+   this function **by regex** — `/const resolveRefusalCause = \(own, seat\) => \{[\s\S]*?\n\};/`
+   — and `new Function`-evals it against four fixtures. Re-arging or renaming it reds that gate,
+   and the body is hive-scoped by construction (`getHive` is owner-scoped, `getContributingHive`
+   is a seat test). The comb floor is a different case table.
+2. **The refetch source exists and is already ENROLLABLE-exact — but it is NOT the floor's
+   number.** `comb_member_count` (`…0007:220-233`) is `removed_at is null and deleted_at is null
+   and is_comb_member(...)`: precisely §1B.36.10's ENROLLABLE, no re-derivation needed. **It
+   counts the subject; the floor does not.** Off by exactly one in the modal case (the organizer
+   opening month 1 with themselves as subject): the function returns `1`, the floor computed `0`
+   contributors. **Render the membership number and the requirement — never a computed "N can
+   write."** That is §1B.36.10's referent split arriving on a screen, and it is the one place a
+   correct query still produces a wrong sentence.
+3. **§1B.33's residual has a home already.** `is_comb_member` sits in that function's `WHERE`, so
+   a non-member reads `0` rather than an error. Not reachable for this refusal — the caller is
+   the organizer, a member — but any refetch returning `0` belongs in the **`'unknown'` arm**,
+   whose shipped comment is the precedent: *"no live cause names this state, so no sentence
+   claims one."*
+
+#### (d) The shape
+
+**A pattern named after a function is a claim about that function.** @Lumen described the
+`resolveRefusalCause` pattern three times across this arc as errcode-keyed; it has never read an
+errcode. The description was internally coherent, matched the problem, and named a real file —
+which is exactly why nobody opened it. **Read the function the pattern is named after before
+designing against the pattern.** Corollary, and the reason this landed well rather than badly:
+the shipped answer was *better* than the designed one — refetched state beats a matched string,
+and the architecture had already made the ruling we were about to re-derive. 📈
