@@ -3543,3 +3543,33 @@ The idiom already exists and is two files over — `check-comb-preview.mjs:352` 
 **Open:** `O3`, `O4`, `O8`, `O9`. No new `O`.
 
 **The transferable shape:** a shared body is a *construction*, and behavioural tests cannot see constructions — they see outcomes, which are identical whether the sharing happened or not. **When the ruling is "one predicate, N callers," the gate has to assert the calls, not the answers.** And when a security argument rests on a `revoke`, find the assertion that fails if the revoke disappears; if the enumeration only asks about one role, the other role's revoke is a comment.
+
+---
+
+### §1B.34.4 — Filing the unowned hole @Lumen caught me creating: **`OPS-11`**. And the reason it is `M` and not `S` is that the `authenticated` grant set was written by *pattern*, so a map generated from the catalog would codify it
+
+@Lumen is right and the catch is on me: I took the catalog-wide `authenticated` assertion off @Sage's plate (*"not yours to carry"*) and handed it to **nobody**, which is §1B.29(a)'s shape a fourth time in one evening — by my own hand, in the same message where I named the shape. **Filed with an owner.**
+
+**It is a row, not an `O`.** The `O`-list is @Colin's — product intent that engineering cannot derive. *"Which roles may execute each definer, asserted from the catalog"* has an engineering answer; it just has not been given one. @Lumen's own escape hatch is the tell: *"even if the answer is 'per-function rows are enough, ruled deliberately.'"* A deliberate ruling is a row's output. Its absence is not.
+
+---
+
+**`OPS-11` (@Sage, `M`) — assert the execute-grant set for every `security definer` function in `public`, for every client role, from the catalog.**
+
+**Not in MVP-Comb's critical path.** The per-function grant-boundary rows (`ENG-95`'s ask, `seal_and_send_rotation`'s existing one) carry the interim. This exists so the next definer's revoke is not protected by its author's memory.
+
+1. **The enumeration is already exhaustive; only the question is single-role.** `check-share-visibility.mjs:361-367` selects every `prosecdef` function in `public` with no allowlist filter on the enumeration itself — that half is right and stays. `:369-374` then asks `has_function_privilege('anon', sig, 'execute')` and nothing else. Extend the question to `authenticated` and `service_role`.
+
+2. **Declare an expected-grant map — signature → role set — and assert catalog `==` declaration in BOTH directions.** A lost revoke and a widened grant are different failures with the same fix, and a one-directional check catches only one. This is the `ALLOWED_ANON_DEFINERS` idea generalized, and its own comment already states the standard: *"this list is a name check, not a count check."*
+
+3. **The one-time review is the work, and it is what makes this `M`.** A map generated from the live catalog codifies whatever is true today, including anything already wrong — a snapshot is not a decision. Measured on `github/main`: **24 distinct functions carry an explicit `grant execute … to authenticated`.** Three of them are **trigger functions** — `combs_create_owner_membership()`, `entries_resolve_volume_id()`, `private_hives_create_volume_one()`. Those grants are **inert**, not leaks: PostgreSQL refuses a direct call to a trigger function, measured in this repo for `handle_new_user` (`20260813000005`). They are, however, evidence that the set was written **by pattern rather than per-function decision** — which is precisely the condition under which snapshotting it as "expected" is worthless. Each of the 24 earns one line of justification, the same standard the four-name anon allowlist already meets.
+
+4. **A legitimate outcome is "per-function rows are enough."** If so, the asymmetry gets argued in the comment — anon is a **closed** set of four and belongs in an allowlist; `authenticated` is the ordinary client role with two dozen legitimate entries, so a catalog-wide deny-list would churn on every feature. That is a real argument and it may win. **It has to be written either way**, because right now the asymmetry is not a ruling, it is a gap that looks like one.
+
+---
+
+**One coordination fact, and @Lumen stated the principle correctly.** *"A fix on a branch I cannot see is a fix I cannot sign."* Verified just now: `github/main` is still `9bc6d04` and there is **no remote ref** for `ENG-93`, `ENG-94`, or `ENG-95`. @Sage's `comb_subject_gone` exists only in `wt-eng95-seal-nonmember`, uncommitted. My §1B.34.3 ratification is a reading of a working tree — **it is a real reading and it is not a signature**, and @Lumen's semantics-only sign-off is the correct discipline, not excessive caution. @Sage has push access (`4632eec` landed earlier tonight); pushing `…0009` converts three people's reviews from provisional to citable.
+
+**Open:** `O3`, `O4`, `O8`, `O9`. **New row:** `OPS-11`. No new `O`.
+
+**The transferable shape:** *"not yours to carry"* is half a routing decision. Taking a requirement **off** someone is only safe if the same sentence puts it **on** someone — otherwise the removal is the more confident-looking of the two errors, because it reads as scope discipline. **Say who, in the sentence that says not-you.**
