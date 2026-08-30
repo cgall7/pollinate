@@ -1743,6 +1743,108 @@ product ruling. Nothing gates any merge.
 
 ---
 
+### §1B.27 — the "database rejects it once the hive is sealed" refusal has not existed since 2026-08-26, and three shipped client sites are written against it
+
+Published as event `086886e0` before this commit. All citations read at
+`github/main@e99936d`. Nothing here touches `ENG-92`'s scope or `DES-22`.
+
+#### 0. @Lumen's NULL-`volume_id` sweep — confirmed, and closed twice more
+
+Lumen swept the corner where `entries_resolve_volume_id()` (a `select into` with no
+raise) leaves `volume_id` NULL, and concluded *dead row at worst, hygiene not
+correctness*. That holds, and from the other end it is tighter than stated:
+
+- **`send_hive` cannot pick the row up.** Its entry UPDATE (`20260828000001:168-170`)
+  is scoped by `hive_id`, not `volume_id`, so it *does* reach the row — but it filters
+  `visibility = 'packaged'`, and only `seal_volume` produces that, volume-scoped. The
+  row stays `'private'`; the roster `array_agg` (`:172-180`, `visibility = 'sent'`)
+  skips it too. `seal_hive` is not a second door — `20260826000004:177` delegates the
+  flip to `seal_volume`.
+- **It cannot be created through the invoker path at all.** `entries.volume_id` is
+  nullable (`20260826000003:49-50`), so the INSERT does not fail on the column — it
+  fails on the policy. `entries_insert_own` (`20260827000001:280-288`) is an `exists`
+  over `hive_volumes` keyed `v.id = volume_id`; with NULL that is zero rows, false,
+  **42501**. *The same NULL that saves the row from `delete_own_account`'s DELETE is
+  the NULL that stops it being written.*
+
+Only a `SECURITY DEFINER` path can mint one — `ENG-91`'s territory, nobody else's.
+
+#### 1. The refusal is gone
+
+`ENG-46`'s volume re-point (`20260826000004`) moved the sealed-content guard off
+`private_hives.sealed_at` and onto `hive_volumes.sealed_at`. Correct on its own terms,
+and its comment says why (`:6-14`): a hive-level flag *"would permanently lock the hive
+against ever accepting an entry again."* What it did not leave behind is any per-hive
+"this one is finished" state. Four steps:
+
+1. `entries_insert_own` (live body `20260827000001:274-290`) admits the write if the
+   entry's `volume_id` names a volume with `sealed_at is null`. **No reference to
+   `private_hives.sealed_at` anywhere.** It was there — `20260815000005:30`,
+   `and h.sealed_at is null` — and it came out on 08-26.
+2. `seal_volume` **opens a successor volume in the same transaction it seals**
+   (`20260828000001:60-61`).
+3. `entries_resolve_volume_id_trigger` (`20260826000003:79-82`, `before insert or
+   update`) stamps a new entry with the hive's currently-open volume — after a seal,
+   the successor.
+4. An active contributor's INSERT into a **sealed** hive therefore **succeeds**. Not a
+   narrowed window — no refusal at all.
+
+**Three client sites depend on the refusal that is not there:**
+
+| Site | What it asserts | Status |
+|---|---|---|
+| `HiveStore.js:231-237` | *"`entries_insert_own` (20260815000005) rejects the write at the database once a hive is sealed, with `and h.sealed_at is null` in its WITH CHECK… callers must gate the UI"* | Names the exact clause and the exact migration that superseded it. A justification comment that became a dependency and then went stale |
+| `ComposeHiveEntry.js:30-35`, `:63-64` | maps `42501 → 'sealed'` → *"This hive has been sealed and can't accept new entries."* | **Mis-attributed 100% of the time it fires.** Sealing cannot produce a 42501; what still can is `is_hive_contributor()` returning false — **the writer was removed from the roster.** `20260827000001` widened insert authorization to contributors and made one error code mean two things. Copy call, @Lumen |
+| `FileToHive.js:88`, `:169` | catches 42501 to populate `raceSealedIds`, renders `sealed={!!hive.sealedAt \|\| raceSealedIds.has(hive.id)}` | A race-catcher already built for exactly this. It cannot fire |
+
+The only live gate is `ContributingHive.js:172` hiding the button on `hive.sealedAt`,
+fetched on mount.
+
+#### 2. Why a clock makes it routine — `ENG-91`, @Sage
+
+Today the seal happens when the **owner taps**, correlated with the owner deciding the
+book is done; a stale contributor screen is an odd-shaped race. `OPS-9` seals at
+`closes_at`. **A contributor with `ContributingHive` open at a month boundary, tapping
++ Add Entry and saving, is not a race — it is the last night of every rotation, for
+every comb, forever.** The entry lands in the successor volume, is never packaged,
+never sent, never read. The writer gets a success toast.
+
+**C1 contamination #4.** *Twelve people wrote* and *eleven wrote plus one wrote too
+late* produce an identical month — and this is the only one of the four where the
+person is still present and did everything right.
+
+#### 3. Ruled (mechanism)
+
+**(a) `ENG-91`'s fused seal does NOT open a successor volume for a rotation hive.** A
+rotation month is a hive that seals once and sends once; a successor volume on it is
+not a chapter, it is an unlocked door. Legal: `hive_volumes_one_open_per_hive`
+(`20260826000003:46-47`) is a **partial** unique index on `sealed_at is null`, so zero
+open volumes is a permitted state. It closes the hole in the right direction — no open
+volume means `entries_resolve_volume_id` leaves `volume_id` NULL, which is exactly the
+case in §0 that returns **42501**. The refusal returns and all three dead client
+branches start working as written.
+
+**Do not add a `private_hives.sealed_at` check to the policy.** That is the lock
+`ENG-46` deliberately removed for repeating hives; re-imposing it globally breaks
+Project 17.2.
+
+**(b) `ENG-91` must still write `private_hives.sealed_at`.** `20260826000004:138-153`
+is explicit that `seal_hive`'s stamp is a deliberate **mirror**, kept alive because the
+shipped client reads that column in five places (`HiveDetail.js:104,198,219,262`;
+`ContributingHive.js:172`) — *"drop the mirror write once the client reads through
+`hive_volumes` instead."* It still does not. `ENG-91` is the second seal path that has
+ever existed and the first that is not `seal_hive`; sealing a volume without the mirror
+leaves every one of those reads saying the month is still open, including the gold card
+and the "+ Add Entry" gate.
+
+#### Scope
+
+Both rulings live inside the function @Sage is writing now and are cheaper there than
+in any downstream ticket. §1's copy row is @Lumen's. No new `O`. Nothing gates any
+merge; `ENG-92` and `DES-22` are untouched.
+
+---
+
 ---
 
 ## 2. Why the shape changed (the reasoning, so it can be checked)
@@ -2127,7 +2229,7 @@ consequence, and learn in between.**
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join | 1.1, 1.3 |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14) | 1.1, **1.8a** |
-| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one | 1.1 |
+| **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: open → notify → collect → seal → reveal | 1.1, 1.6, **1.8a**, 1.8 |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
