@@ -240,6 +240,13 @@ export const SENTINELS = {
     args: { p_invite_code: 'calibration-invalid-code' },
     expect: '42501',
   },
+  // OPS-9 (Bumble). No anon-visible surface at all: advance_due_rotations()
+  // is revoked from anon and authenticated (service_role only, same as
+  // seal_and_send_rotation), and the pg_cron schedule itself lives in the
+  // `cron` schema, which is never exposed through PostgREST — there is no
+  // column, rpc, or storage probe that could distinguish before/after this
+  // migration through the anon key. Status comes from version order alone.
+  '20260830000005_ops9_rotation_scheduler': { kind: 'order', reason: 'service_role-only function + pg_cron schedule, no anon-visible surface' },
   // ENG-59 (Fizz). comb_preview_by_invite_code is the opposite grant shape
   // from comb_join_by_invite_code above -- anon is meant to reach it (the
   // whole point of a pre-auth landing), so 42501 is never a LIVE reading
