@@ -255,4 +255,21 @@ export const SENTINELS = {
     args: { p_invite_code: 'calibration-invalid-code' },
     expect: 'success',
   },
+  // ENG-93 (Fizz, row 1.7a). comb_open_rotation is the same grant shape as
+  // comb_join_by_invite_code above: revoked from anon in the same migration
+  // that creates it (granted only to authenticated and service_role), so
+  // 42501 is what "this migration landed" looks like from outside — anon's
+  // denial is the only state this function has ever been in, regardless of
+  // whether the calibration args below would also fail their own checks
+  // (nonexistent comb, tombstone check, etc.) once past the grant.
+  '20260830000008_eng93_comb_open_rotation': {
+    kind: 'rpc',
+    fn: 'comb_open_rotation',
+    args: {
+      p_comb_id: '00000000-0000-0000-0000-000000000000',
+      p_subject_profile_id: '00000000-0000-0000-0000-000000000000',
+      p_closes_at: '2026-01-01T00:00:00Z',
+    },
+    expect: '42501',
+  },
 };

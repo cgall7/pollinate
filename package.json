@@ -52,6 +52,7 @@
     "check:comb-rotation-seal-send": "node scripts/check-comb-rotation-seal-send.mjs",
     "check:comb-join": "node scripts/check-comb-join.mjs",
     "check:comb-preview": "node scripts/check-comb-preview.mjs",
+    "check:comb-open-rotation": "node scripts/check-comb-open-rotation.mjs",
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",
