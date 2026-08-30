@@ -5298,3 +5298,58 @@ structurally red, or blocked — none of which look different from a passing sui
 Corollary, the one that bit here: **a negative assertion's positive control has to land in the same
 ticket, or the negative assertion ships alone and green.** `§1B.36.11` ruled the pair undeletable
 and I split it across tickets without noticing the pair was the point. 📈
+
+### §1B.36.20 — I ran @Lumen's composed question across the class instead of ratifying it, and it lands on `§1B.36.19`: **that split emptied row `1.9a`.** The three assertions were `1.9a`'s; I gave one to `1.7b` and two to `1.8`, and the ticket that actually implements the floor kept none (2026-08-30)
+
+#### (a) The question, applied per row
+
+*"What makes you red on the day this lands?"* — @Lumen's composition of the builder's-table
+question and the runnable-when column. Run across every row this arc touched:
+
+| row | ticket | red on the day it lands? |
+|---|---|---|
+| `1.7b` | `ENG-100` | **yes** — direct mint, comb of one, self-subject; fixture reachable on `main` today, and the raise is in the same migration |
+| `1.8` | `OPS-9` finisher | **yes** — deps are `1.1, 1.8a, 1.9a`, so `comb_advance_rotation` **exists** by the time rows 2+3 arrive. `§1B.36.19`'s move is sound; I checked rather than assumed |
+| `1.9a` | `comb_advance_rotation` | **NO — it has no assertions left at all** |
+
+#### (b) `1.9a` was the owner of all three, and `§1B.36.19` distributed every one of them away
+
+`§1B.36.11` wrote the three-assertion table as **`1.9a`'s row** (@Lumen: *"that's one sentence in
+1.9a's acceptance"*). `§1B.36.19` then moved row 1 to `1.7b` and rows 2–3 to `1.8` — and row 1 was
+never a floor test in the first place: it asserts the **mint's** empty-snapshot refusal, which is
+`ENG-100`'s invariant, not `§1B.31.3`'s.
+
+**Net: the floor is implemented in `1.9a` and tested in two other people's tickets, both of which
+land after it.** `1.9a` can be marked done with its own central invariant unexercised. That is the
+same species as `ENG-100` having no row — a requirement whose home moved out from under it — and I
+created it while fixing that one.
+
+#### (c) RULED — @Fizz: `1.9a` gets its own pair, runnable at its own landing
+
+`comb_advance_rotation` is `service_role`-only, and a gate connecting as `service_role` can call it
+**directly**. Deps `1.1, 1.7a` put the mint in place, so both of these run at `1.9a`'s landing with
+nothing else built:
+
+| # | call | comb | assert |
+|---|---|---|---|
+| A | `comb_advance_rotation` **directly** | **1** enrollable member | **no new `comb_rotations` row, and no raise** — dormancy is silent (`§1B.31.2iv`) |
+| B | `comb_advance_rotation` **directly** | **2** enrollable members | **a new row appears** — the **positive control** |
+
+**A is a negative assertion and B is its positive control; they are a pair on the same terms as
+rows 2–3, and they must land together in `1.9a`.** Without B, A is green on a function that does
+nothing at all — including one that raises before it reaches the floor, or one nobody wired up.
+The floor's failing state at this boundary is **silence**, not an exception (that is `§1B.36.11`'s
+whole point about boundaries), so the only way to distinguish *"the floor held"* from *"nothing
+ran"* is a fixture where the advance is required to **succeed**.
+
+Rows 2–3 on `1.8` stay as ruled — they assert the floor **through the clock**, which is a different
+boundary and a different claim.
+
+#### (d) The shape
+
+**Redistributing a gate table can leave its owner with nothing, and the owner is the only ticket
+whose landing the assertions were scheduled against.** I moved three rows by asking *where can each
+one run* and never asked *what does the ticket they came from still prove.* Corollary, third time
+tonight and the sharpest form: **every negative assertion needs its positive control in the same
+ticket** — I ruled that in `§1B.36.19`, applied it to the pair I was moving, and did not notice the
+pair I was creating. A rule you have just published is not thereby applied. 📈
