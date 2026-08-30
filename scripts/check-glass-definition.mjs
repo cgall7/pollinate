@@ -36,9 +36,16 @@
 //   D4  ROLES: the hairline is an alpha of `ink`, the rim an alpha of
 //       `surface`. Without this, D5/D6's arithmetic could stay green while
 //       measuring two colours that no longer play those parts.
-//   D5  DERIVATION, recomputed from theme.js's live tokens: on the spec's own
-//       composite carrier, the hairline's contribution (rim alone vs rim over
-//       hairline) lands inside the blur rung's measured rim band.
+//   C1  the style/veil PAIR is the ruled one — `glassEffectStyle` and
+//       `glassLens` are solved together on device frames, so half a retune
+//       invalidates the other half AND D5's measured carrier range
+//   D5  DERIVATION, recomputed from theme.js's live tokens: across the whole
+//       MEASURED carrier range (GL7(b′) — the `clear` rung's body tracks its
+//       ground, so this stopped being one pinned number), the hairline's
+//       contribution (rim alone vs rim over hairline) lands inside the blur
+//       rung's measured rim band
+//   D5b that band keeps stated HEADROOM below the measured dark carrier, so a
+//       future retune cannot spend the last of it silently
 //   E1  the stack is declared in exactly ONE file — keyed on its two border
 //       COLOURS, so a copy under new style names is still caught
 //   E2  the tab capsule CONSUMES that shared stack rather than owning it
@@ -116,9 +123,34 @@ const bad = (label, detail) => {
 // The blur rung's own measured rim. External to every token this gate reads.
 const BAND_MIN = 1.67;
 const BAND_MAX = 3.19;
-// Composite carrier for the GlassView rung, pinned from
-// GUIDES/POLLINATE_GL2_VEIL_DERIVATION.md's sweep (§ Veil & Composite State).
-const CARRIER = 'rgb(254, 254, 254)';
+// The composite carrier for the GlassView rung — the capsule's own body, which
+// is what the rim stack is painted on top of.
+//
+// GL7(b′), 2026-08-30: THIS STOPPED BEING A CONSTANT. It was pinned at
+// `rgb(254, 254, 254)` from GL2's sweep, and that was honest arithmetic while
+// the rung was `regular`, which flattens almost everything it sees to
+// near-white (measured: a pure black ground reads L* 80.24 through it). On the
+// `clear` rung the body tracks what is behind it, so the carrier is an
+// INTERVAL, and re-pinning it to whatever the first `clear` capture happened to
+// show would rebuild the original defect one material later — Lumen's
+// refinement of the rider, and the reason this is two endpoints and not a new
+// single number.
+//
+// Both endpoints are MEASURED, on device, not derived: the capsule photographed
+// over a calibrated target at the ruled veil, sampled inside the capsule.
+// `GUIDES/POLLINATE_GL7_MATERIAL_TRANSMISSION.md` §3b; frames in
+// `.scratch/gl7-material/`. The dark end is the pure-black bound and the light
+// end is any of `surface`/`washSky`/`backgroundWriting`, which all clip to
+// white through the veil.
+//
+// The dark end is 199 on BOTH rungs, and that is structural rather than lucky:
+// the veil is solved so the inactive glyph holds its floor at the darkest
+// column, and that darkest column IS the carrier's dark end. The constraint
+// that sets the alpha pins the carrier with it.
+const CARRIER_RANGE = [
+  ['dark end — pure black behind the capsule', 'rgb(199, 199, 199)'],
+  ['light end — surface / washSky / backgroundWriting', 'rgb(255, 255, 255)'],
+];
 
 // ── tokens, read from theme.js rather than restated here ────────────────────
 const themeSrc = fs.readFileSync(path.join(SRC, 'constants/theme.js'), 'utf8');
@@ -300,15 +332,43 @@ const contribution = (bodyColor) => {
 if (!hairTok || !rimTok) {
   bad('D5 derivation recomputes', 'glassHairline or glassRim did not resolve — see D4');
 } else {
-  const d = contribution(CARRIER);
-  if (d >= BAND_MIN && d <= BAND_MAX) {
-    ok(`D5 hairline contribution on the spec carrier = ΔE00 ${d.toFixed(4)} — inside the ` +
-       `blur rung's band [${BAND_MIN}, ${BAND_MAX}], so the two rungs read as one material`);
+  const seen = CARRIER_RANGE.map(([label, c]) => [label, c, contribution(c)]);
+  const outOfBand = seen.filter(([, , d]) => d < BAND_MIN || d > BAND_MAX);
+  const shown = seen.map(([label, c, d]) => `${label} ${c} -> ΔE00 ${d.toFixed(4)}`).join('; ');
+  if (outOfBand.length === 0) {
+    ok(`D5 hairline contribution stays in band across the whole measured carrier range ` +
+       `(${shown}) — band [${BAND_MIN}, ${BAND_MAX}], so the two rungs read as one material ` +
+       `at every body the capsule can present`);
   } else {
-    bad('D5 hairline contribution is inside the blur rung\'s rim band',
-      `ΔE00 ${d.toFixed(4)} on carrier ${CARRIER}, band [${BAND_MIN}, ${BAND_MAX}] — ` +
-      `below it the edge is weaker than the material it is supposed to match; above ` +
-      `it the chrome edge outweighs the rung the material is meant to be lightest on`);
+    bad('D5 hairline contribution is in band across the measured carrier range',
+      `${shown}; band [${BAND_MIN}, ${BAND_MAX}] — below it the edge is weaker than the ` +
+      `material it is supposed to match; above it the chrome edge outweighs the rung the ` +
+      `material is meant to be lightest on`);
+  }
+
+  // D5b — HOW MUCH ROOM IS LEFT, stated as a number rather than left implicit.
+  // The contribution falls with the carrier (an alpha of ink on a darker body
+  // is a smaller step), so the band's lower edge is the one that can be
+  // reached. Walking neutral carriers down from the measured dark end says how
+  // far the body would have to fall before the hairline stops matching the
+  // blur rung — i.e. how much a future veil or style retune can spend before
+  // D5 turns red. Asserted, so the headroom cannot quietly evaporate.
+  const MIN_HEADROOM = 40;
+  let breakAt = null;
+  for (let v = 199; v >= 0; v -= 1) {
+    if (contribution(`rgb(${v}, ${v}, ${v})`) < BAND_MIN) { breakAt = v; break; }
+  }
+  if (breakAt === null) {
+    ok('D5b hairline contribution never leaves the band above a black carrier — unbounded headroom');
+  } else if (199 - breakAt >= MIN_HEADROOM) {
+    ok(`D5b the band survives down to carrier ${breakAt} — ${199 - breakAt} levels below the ` +
+       `measured dark end (199), against a ${MIN_HEADROOM}-level minimum. A darker rung has ` +
+       `room before the hairline stops matching the blur rung`);
+  } else {
+    bad('D5b the hairline keeps headroom below the measured dark carrier',
+      `band breaks at carrier ${breakAt}, only ${199 - breakAt} levels below the measured dark ` +
+      `end (199), minimum ${MIN_HEADROOM} — the next veil or style retune would land on a ` +
+      `hairline that no longer matches the blur rung, and D5 would only say so afterwards`);
   }
 
   // D6 — every cover theme, enumerated live from hiveThemes.js. These are the
@@ -660,6 +720,61 @@ if (fillStyles.length === 0) {
       `does NOT say the new one is wrong. It says a surface started wearing the specular ` +
       `half of the stack without the substrate, and whether that reads depends entirely on ` +
       `what it is framing`);
+  }
+}
+
+// ── C1 — the style/veil COUPLING ────────────────────────────────────────────
+// GL7(b′). `glassEffectStyle` and `glassLens` are one setting wearing two
+// names. The style decides how much of the ground reaches the surface; the veil
+// is then solved so the inactive glyph still holds its floor at the darkest
+// column. 0.35 was the answer for `regular`; 0.76 is the answer for `clear`.
+// Neither number means anything without the other, and the solve that ties them
+// is a DEVICE MEASUREMENT — frames at 0.76 / 0.78 / 0.80, smallest one clearing
+// both GL2 bars. Nothing in this repo can re-derive it, which is exactly why it
+// needs a row: an un-gated pair is a pair that gets half-retuned.
+//
+// So this row PINS both and fails naming the re-solve. It is deliberately not
+// clever: it does not try to check that the veil is "right" for the style,
+// because that would mean re-running the sweep, and a gate that cannot do the
+// measurement must not pretend the measurement is still valid. It says the
+// inputs moved, so the answer is stale — same job D5's carrier range does one
+// layer up, and the same shape as D1's coincident widths.
+//
+// It also guards D5 from a subtler direction than a retune: the carrier range
+// D5 tests was photographed under THIS pair. Change the style and those two
+// endpoints describe a material that is no longer mounted, while D5 goes on
+// computing happily against them and staying green.
+{
+  const RULED_STYLE = 'clear';
+  const RULED_VEIL = 0.76;
+
+  const capsuleSrc = fs.readFileSync(CAPSULE, 'utf8');
+  const styleMatches = [...capsuleSrc.matchAll(/glassEffectStyle=\{?["']([a-z]+)["']\}?/g)].map((m) => m[1]);
+  const lens = alphaTokens.get('glassLens');
+
+  if (styleMatches.length !== 1) {
+    bad('C1 the glass style/veil pair is the ruled one',
+      `found ${styleMatches.length} \`glassEffectStyle\` literals in ${rel(CAPSULE)} ` +
+      `(${styleMatches.join(', ') || 'none'}) — this row needs exactly one to pin, and more ` +
+      `than one means the rung is chosen somewhere this gate cannot see`);
+  } else if (!lens) {
+    bad('C1 the glass style/veil pair is the ruled one',
+      '`glassLens` did not resolve to a direct `withAlpha(pigment.X, n)` in theme.js — the ' +
+      'veil half of the pair is unreadable, so the pair cannot be checked and this row ' +
+      'fails closed rather than checking the half it can see');
+  } else if (styleMatches[0] === RULED_STYLE && lens.alpha === RULED_VEIL) {
+    ok(`C1 style/veil pair is the ruled one (\`${RULED_STYLE}\` + glassLens ${RULED_VEIL}) — ` +
+       `solved together on frames, so D5's measured carrier range still describes the ` +
+       `material that is actually mounted`);
+  } else {
+    bad('C1 the glass style/veil pair is the ruled one',
+      `found \`${styleMatches[0]}\` + glassLens ${lens.alpha}, ruled \`${RULED_STYLE}\` + ` +
+      `${RULED_VEIL}. This row does NOT say the new value is wrong. It says the pair was ` +
+      `solved as a pair on measured frames — the smallest alpha whose glyph floor at the ` +
+      `darkest column clears 3:1 AND does not regress against the rung it replaced — so ` +
+      `moving either half re-opens that solve. Re-sweep, re-measure the carrier range D5 ` +
+      `reads, and update all three together ` +
+      `(GUIDES/POLLINATE_GL7_MATERIAL_TRANSMISSION.md §3b)`);
   }
 }
 

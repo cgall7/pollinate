@@ -76,9 +76,26 @@ export const GlassBackground = ({ radius }) => {
 
   if (LIQUID_GLASS) {
     return (
-      <GlassView glassEffectStyle="regular" style={[StyleSheet.absoluteFill, clip]}>
-        {/* GL2: 0.35 here, 0.55 on the blur rung below. The pair is ruled; the
-            number is not a token that moved. */}
+      // GL7(b′), 2026-08-30 — `regular` -> `clear`, ruled by Lumen on measured
+      // frames. `clear` is the more transparent of UIGlassEffect's two styles,
+      // and the reason to take it is NOT that more gets through: at equal
+      // legibility that is worth 11%, which is why GL7(b) first declined it.
+      // It is that the KERNEL is half the width. Measured on device, 10-90
+      // transition width across a step behind the capsule: 6.085pt on
+      // `regular`, 3.172pt on `clear`, at the same 3.7311:1 glyph floor —
+      // 1.9x, and corroborated by two more instruments (25-75 1.70x, gradient
+      // RMS 2.08x). Colin asked for "defined", and definition is an edge
+      // property that no alpha can reach: edge width came out FLAT in the veil
+      // on both rungs.
+      //
+      // `glassEffectStyle` AND `theme.colors.glassLens` ARE ONE SETTING. The
+      // style decides what the veil has to hold back; the veil is re-solved
+      // against it. Moving either alone re-opens a floor that was solved on
+      // frames, so `check-glass-definition.mjs` C1 pins the pair and fails
+      // with the re-solve named. Same defect class as D1's coincident widths.
+      <GlassView glassEffectStyle="clear" style={[StyleSheet.absoluteFill, clip]}>
+        {/* GL2/GL7(b′): 0.76 here, 0.55 on the blur rung below. The pair is
+            ruled; the number is not a token that moved. */}
         <View style={[StyleSheet.absoluteFill, styles.lensVeil]} />
         {rim}
       </GlassView>
