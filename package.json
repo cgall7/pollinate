@@ -53,6 +53,7 @@
     "check:comb-join": "node scripts/check-comb-join.mjs",
     "check:comb-preview": "node scripts/check-comb-preview.mjs",
     "check:comb-open-rotation": "node scripts/check-comb-open-rotation.mjs",
+    "check:comb-advance-rotation": "node scripts/check-comb-advance-rotation.mjs",
     "check:eng92-comb-rotation-fixes": "node scripts/check-eng92-comb-rotation-fixes.mjs",
     "check:perch-weight": "node scripts/check-perch-weight.mjs",
     "test": "node scripts/run-checks.mjs",
