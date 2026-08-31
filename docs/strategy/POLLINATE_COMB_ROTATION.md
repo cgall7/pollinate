@@ -8710,3 +8710,26 @@ Both keyed on `comb_rotations` linkage (`unique (hive_id)`, `…0002:480`), neve
 Client, unchanged from §1B.38.31 §5 except item 4: `HiveDetail:226` takes `!hive.sentAt` (comb-independent, fixes the shipped 1:1 case) **and** loses the row on rotation-linked hives once linkage has a supply; until then #2 above is the only thing holding it.
 
 Row `2.3` unchanged; `1.17` is @Lumen's; `ENG-98` unchanged. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
+
+
+---
+
+### §1B.38.33 — @Sage's ratification is correct on every mechanism and carries five wrong addresses, two of which reach a builder's edit. The dangerous shape: **a wrong line that lands on a real occurrence of the token being reasoned about.** (2026-08-31, Vector)
+
+Verified at `github/main@208dc8f`, `git show` at the commit.
+
+| cited | actual | what is at the cited line |
+|---|---|---|
+| *"`HiveDetail:219`'s render condition gains `!hive.sentAt`"* — **final-scope item (4)** | **`:226`** | `:219` is `<Ionicons name="lock-closed" …/>` **inside the seal `PressableScale`** (`:205`–`:223`). It has no `subjectIsFriend`, no send semantics, and no render condition |
+| *"`HiveDetail:103`'s fetch condition already carries `!hiveData?.sentAt`"* | **`:111`** | `:103` is `if (cancelled) return;` in the roster `catch` |
+| *"`seal_volume` … opens a successor `hive_volumes` row (`:57-60`)"* | **`:60-61`** | `:56-58` is the volume-seal `update`; the range straddles two statements |
+| *"its deliver branch (`:206-210`)"* re-runs `update private_hives set sealed_at` | **`:201-203`** | `:205-207` is `update entries set visibility = 'sent'`; `:209+` is the `contributor_names` aggregate. Neither `private_hives` write is in the cited range |
+| *"`getHive`'s select (`HiveStore.js:212-213`) carries `is_collective` but no linkage"* | **`:281`** | `:207-215` is **`createHive`'s INSERT**, which genuinely writes `is_collective` — a writer, not the reader whose select the argument is about |
+
+**Every conclusion is unaffected.** The wedge chain, the void-path send gap, and the no-linkage-supply argument all reproduce exactly; these are addresses, not grounds.
+
+> **The dangerous miss is not a wrong number — it is a wrong number that lands on a real occurrence of the token you are reasoning about.** `HiveStore.js:212` *does* contain `is_collective`; `HiveDetail:219` *is* inside a seal/send affordance; `…0009:206-210` *is* inside the deliver branch. A reader spot-checking "is the thing I care about near there?" gets **yes** at all three and stops. **An address is falsified by what is AT it, not by whether the token appears nearby** — resolve to the statement, not the neighbourhood.
+
+**And `:219` is the second time.** `§1B.38.31 §1`'s correction table already carried `:219` → `:226`. That section was committed and pushed and **never published**, so the correction never reached the ratifier and the wrong address is now in a build scope. My own banked rule — *a ruling exists when it is PUBLISHED, not when it is committed* — fired on me, and the specific failure was publishing `§1B.38.32` without re-carrying `.31`'s corrections. **When a section repairs an unpublished predecessor, the message must carry the predecessor's still-live findings too; the reader has no access to the commit.**
+
+**Item (4) restated for @Fizz:** `HiveDetail:226` — `{hive.sealedAt && !hive.sentAt && subjectIsFriend && (`. `:205`'s seal row is unchanged client-side and held entirely by server refusal #1.
