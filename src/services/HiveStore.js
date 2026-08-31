@@ -172,6 +172,85 @@ const resolveDirectName = (names, id) => {
   return isPlaceholderName(name) ? null : name;
 };
 
+const enrichOrganizerCombs = async (client, combs) => {
+  const combIds = combs.map((comb) => comb.id);
+  const { data: rotations, error: rotationsError } = await client
+    .from('comb_rotations')
+    .select('id, comb_id, ordinal, hive_id, subject_profile_id, closes_at, sealed_at, sent_at, voided_at')
+    .in('comb_id', combIds)
+    .order('ordinal', { ascending: false });
+  if (rotationsError) throw rotationsError;
+
+  const hiveIds = [...new Set((rotations ?? []).map((rotation) => rotation.hive_id))];
+  const { data: hives, error: hivesError } =
+    hiveIds.length === 0
+      ? { data: [], error: null }
+      : await client.from('private_hives').select('id, subject_name, cover_theme, sealed_at').in('id', hiveIds);
+  if (hivesError) throw hivesError;
+
+  const hiveById = new Map((hives ?? []).map((hive) => [hive.id, hive]));
+  const countsByRotationId = new Map();
+  const memberCountsByCombId = new Map();
+  await Promise.all(
+    (rotations ?? []).map(async (rotation) => {
+      const { data, error } = await client.rpc('comb_rotation_writer_count', { p_rotation_id: rotation.id });
+      if (error) throw error;
+      countsByRotationId.set(rotation.id, data);
+    })
+  );
+  await Promise.all(
+    combIds.map(async (combId) => {
+      const { data, error } = await client.rpc('comb_member_count', { p_comb_id: combId });
+      if (error) throw error;
+      memberCountsByCombId.set(combId, data);
+    })
+  );
+
+  return combs.map((comb) => {
+    const combRotations = (rotations ?? []).filter((rotation) => rotation.comb_id === comb.id);
+    const rotation = combRotations.find((row) => row.sealed_at == null && row.voided_at == null);
+    const hive = rotation ? hiveById.get(rotation.hive_id) : null;
+    return {
+      id: comb.id,
+      name: comb.name,
+      inviteCode: comb.invite_code,
+      createdAt: comb.created_at,
+      memberCount: memberCountsByCombId.get(comb.id) ?? null,
+      openRotation:
+        rotation && hive
+          ? {
+              id: rotation.id,
+              hiveId: rotation.hive_id,
+              subjectProfileId: rotation.subject_profile_id,
+              subjectName: hive.subject_name,
+              coverTheme: hive.cover_theme,
+              sealedAt: hive.sealed_at,
+              closesAt: rotation.closes_at,
+              writerCount: countsByRotationId.get(rotation.id) ?? null,
+            }
+          : null,
+      chapters: combRotations
+        .filter((row) => row.sealed_at != null || row.voided_at != null)
+        .map((row) => {
+          const chapterHive = hiveById.get(row.hive_id);
+          return {
+            id: row.id,
+            ordinal: row.ordinal,
+            hiveId: row.hive_id,
+            subjectProfileId: row.subject_profile_id,
+            subjectName: chapterHive?.subject_name ?? null,
+            coverTheme: chapterHive?.cover_theme ?? null,
+            sealedAt: chapterHive?.sealed_at ?? row.sealed_at,
+            closesAt: row.closes_at,
+            sentAt: row.sent_at,
+            voidedAt: row.voided_at,
+            writerCount: countsByRotationId.get(row.id) ?? null,
+          };
+        }),
+    };
+  });
+};
+
 export const HiveStore = {
   // The complete creation act against today's schema (§30.9.3): a hive IS
   // its subject's name plus its owner, plus (as of 20260817000002) the
@@ -248,7 +327,15 @@ export const HiveStore = {
       counts.set(row.hive_id, (counts.get(row.hive_id) ?? 0) + 1);
     }
 
-    return hives.map((h) => ({
+    const hiveIds = hives.map((h) => h.id);
+    const { data: rotationRows, error: rotationError } = await client
+      .from('comb_rotations')
+      .select('hive_id')
+      .in('hive_id', hiveIds);
+    if (rotationError) throw rotationError;
+    const combRotationHiveIds = new Set((rotationRows ?? []).map((row) => row.hive_id));
+
+    return hives.filter((h) => !combRotationHiveIds.has(h.id)).map((h) => ({
       id: h.id,
       subjectName: h.subject_name,
       coverTheme: h.cover_theme,
@@ -257,6 +344,34 @@ export const HiveStore = {
       createdAt: h.created_at,
       entryCount: counts.get(h.id) ?? 0,
     }));
+  },
+
+  async listOrganizerCombs() {
+    const client = requireSupabase();
+    const ownerId = await requireUserId(client);
+    const { data: combs, error } = await client
+      .from('combs')
+      .select('id, name, invite_code, created_at')
+      .eq('owner_id', ownerId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!combs || combs.length === 0) return [];
+    return enrichOrganizerCombs(client, combs);
+  },
+
+  async getOrganizerComb(combId) {
+    const client = requireSupabase();
+    const ownerId = await requireUserId(client);
+    const { data: comb, error } = await client
+      .from('combs')
+      .select('id, name, invite_code, created_at')
+      .eq('owner_id', ownerId)
+      .eq('id', combId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!comb) return null;
+    const [enriched] = await enrichOrganizerCombs(client, [comb]);
+    return enriched ?? null;
   },
 
   // Carries subject_profile_id + sent_at (beyond what listHives needs) —

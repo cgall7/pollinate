@@ -57,12 +57,13 @@ check(
   'every private_hives call site is captured by this enumerator (a site this regex cannot parse must fail here, not vanish)',
   selects.length === fromSites
 );
-// Seven as of COPY-14's repair: createHive, listHives, getHive, the two
-// contributing-hive reads (ENG-61 era), and the two received-packages
-// reads. The count is not a ceiling; it exists so a new private_hives
-// select added later has to touch this line, which is what keeps it from
-// carrying sealed_at by omission the way the original three did.
-check('HiveStore.js has exactly seven private_hives selects', selects.length === 7);
+// Eight as of DES-39's organizer-comb read: createHive, listHives, getHive,
+// organizer comb chapter hydration, the two contributing-hive reads
+// (ENG-61 era), and the two received-packages reads. The count is not a
+// ceiling; it exists so a new private_hives select added later has to touch
+// this line, which is what keeps it from carrying sealed_at by omission the
+// way the original three did.
+check('HiveStore.js has exactly eight private_hives selects', selects.length === 8);
 check(
   'every private_hives select names sealed_at',
   selects.length > 0 && selects.every((cols) => cols.split(',').map((c) => c.trim()).includes('sealed_at'))
