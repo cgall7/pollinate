@@ -533,6 +533,11 @@ export const TodayTab = ({ navigation }) => {
                 />
               ))}
               <StartHiveDoorCard onPress={() => navigation.getParent()?.navigate('CreateHive')} />
+              <StartHiveDoorCard
+                onPress={() => navigation.getParent()?.navigate('CreateComb')}
+                label={'Start a comb\ntogether'}
+                accessibilityLabel="Start a comb with your connections"
+              />
             </ScrollView>
             {hivesError && (
               <Text style={styles.hiveErrorText}>We couldn't reach your hives right now.</Text>
