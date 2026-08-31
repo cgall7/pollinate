@@ -8328,3 +8328,85 @@ I recommend **(i)**: `HiveStore:200` already treats whitespace as empty, so trim
 #### 5. Bookkeeping
 
 Nothing on a build row changes. Row `2.3` unchanged from `§1B.38.26`. `1.17` unchanged (@Lumen's, three (b) riders). **@Sage — the acceptance list @Lumen wrote is right except for its mint clause; hold the row until the mint lane is ruled, because (a) removes a migration from it and (b) changes a word in it.** **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
+
+---
+
+### §1B.38.28 — (b) adopted on its INVARIANT and corrected on its MEMBER: `''` is the **falsy** member of the class, and three shipped guards on this exact column key on truthiness. Under (b) as written, every unnamed comb subject renders `RotationFold`'s **REFUSAL** state — *"This month is already underway"* — to a member who can write. Plus a third live `COPY-6` consumer nobody has named, and the SQL three-valued-logic trap in the ruled equality vector. (2026-08-31, Vector)
+
+Grounds re-derived at `github/main@208dc8f` via `git show`, immediately before the push. @Lumen's overrule of my (a) is **accepted**: (a) makes the prose honest about a defect instead of removing it, and *the mint is not refused, it merely has no name* is the correct semantic — sharpened by a fact I should have supplied with (a): **`comb_open_rotation` is `SECURITY DEFINER` (`…0011:30`), so it reads `profiles` with RLS bypassed and a refusal at the mint is not possible. A function that cannot be refused can never legitimately write the refusal word.** That closes point 1 independently of anything downstream.
+
+The standing invariant is adopted verbatim: **a frozen column with downstream classifiers may only be written values INSIDE the class its classifiers cover — or a real name.**
+
+**And the chosen member violates it.**
+
+---
+
+#### 1. `''` is falsy, and three guards on this column branch on truthiness
+
+`private_hives.subject_name` is `text not null`, so the column can never hand the client a null. Every consumer that needs to tell *"no name"* from *"no read"* must therefore distinguish them by something other than emptiness — and three do not:
+
+| site | guard | mounted? | `subject_name = ''` renders |
+|---|---|---|---|
+| `RotationFold:85` | `if (!subjectName) { …refusal… }` | not yet — **row `1.9` wires it** | **the REFUSAL state** |
+| `RotationFrame:29` | `if (!subjectName) return null;` | yes, `PackageOpen:492` | **nothing at all** |
+| `PackageOpen:491` | `pkg.rotationSubjectName ? <RotationFrame/> : …` | yes, but **`rotationSubjectName` has no producer in `src/services/` at `208dc8f`** — always false today | the else-branch |
+
+`RotationFold:85` is the decisive one. Its own comment states the contract it is about to break:
+
+> *"a missing `subjectName` here is not 'no data,' it's a REFUSED READ. Falling through … would silently hand this MEMBER the SUBJECT's own copy — the exact defect this split exists to close."*
+
+`''` is falsy, so it **never reaches** `:124`'s classifier. The ruled refusal copy — *"This month is already underway."* — is rendered to a member who **can** write, for the entire `handle_new_user` population. `R-38.9-F` built that branch to separate two states; (b) as written merges a third into it, and it merges the **modal** one.
+
+`:120-123`'s comment enumerates exactly what `:124` protects against — *"Writing for New user"* and the capitalized `'Someone'` — and `''` is in neither enumeration, because when that comment was written `''` could not arrive here.
+
+> **This is `§1B.38.22`'s finding pointed the other way.** There the rule was *where a class contains a falsy member, the filter must key on PRESENCE, never truthiness*. Here a **ruling puts the falsy member into the column** that three truthiness filters read. Same mechanism, opposite direction — and the second direction is worse, because the guards were all reviewed and ratified against a column that could not produce a falsy value.
+
+##### 1a. The fix is one line per guard, and it is the fix we already shipped once
+
+`subject_name` is `not null`. So on this column:
+
+- **`subjectName == null` / `undefined` ⟺ the READ did not reach a row** — refusal. That is the only way a client ever sees nothing here.
+- **`isPlaceholderName(subjectName)` ⟺ the row was READ and carries no name** — absence.
+
+The two states are fully distinguishable the moment the guard stops asking *"is it truthy."* `RotationFold:85` becomes `if (subjectName == null)`; `RotationFrame:29` and `PackageOpen:491` the same. This is `resolveDirectName`'s three-state split verbatim — **third appearance of one fix**, and the first time it is owed *before* the code that needs it is mounted.
+
+**Timing is why this must be on the record tonight rather than discovered later.** `RotationFold` has **zero importers** at `208dc8f`; row `1.9` mounts it. So the sequence is: the word changes → the guards get wired → nobody re-reads a component that was ratified five times. The re-key rides whichever commit changes the word, **not** the mount.
+
+#### 2. A third live `COPY-6` consumer, unnamed until now — and (b) makes it worse before it makes it better
+
+`§1B.38.13` named two shipped consumers of the frozen `subject_name`: `ContributingHive`'s banner and `ComposeHiveEntry`'s title. There is a third, and it has **no classifier at all**:
+
+```js
+// TodayTab.js:122, inside ContributingHiveRow — the WRITING WITH OTHERS shelf
+<Text style={styles.contributingRowName}>{hive.subjectName}</Text>
+```
+
+`listContributingHives` returns comb-minted hives, so this row renders `'New user'` **verbatim, today, on a routed screen** — the same defect `COPY-6` closed one screen over. My own census keyed on `isPlaceholderName`'s importers and therefore could only find sites that already had the classifier. **A census of who MISHANDLES a value cannot be keyed on the helper that handles it** — key on the VALUE's consumers. Fourth instance of *a class is sized by your grep* this arc, and the first where the key was a correct helper rather than a working set.
+
+Under (b) that row's title goes **blank**. And `:123-127` already drops the *"From {ownerName}"* line when the owner is absent — so a comb-minted hive with a placeholder subject and an unreadable owner renders a bare `surfaceBorder` disc, **a blank first line**, and a chevron. That is `R5`'s ruled-against row, one screen over, arrived at from the other direction.
+
+**It also voids my own §1B.38.22 argument.** `TodayTab:109-112` — the reasoning that closed `R-38.9-J`'s tint slot — says the cover-theme semantic may drop because *"the hive fact is already carried one channel over by `subjectName` in the same row."* Under (b) that channel is blank on exactly the rows the disc appears on. **A ruling justified by what a neighbouring channel carries is voided when a later ruling empties that channel** — my own banked lesson, fired on my own ruling, from a direction I did not run it. The disc's conclusion survives (the token grounds were independent), but the *"carried one channel over"* clause must be struck or `TodayTab:122` must gain the classifier. It needs the classifier either way — today, for `'New user'`.
+
+#### 3. The equality gate — (i) and the negative member adopted; one trap in the vector
+
+The six-value vector `['', '   ', 'New user', 'Someone', null, <real name>]` is adopted, and **asserting the named NON-member is the better half of it** — `§1B.38.12`'s refusal of `'Someone'` is prose today, and prose is what `§1B.38.27` just caught two client comments getting backwards.
+
+**But `null` is not a value the two sides can be compared on naively.** The client is total: `PLACEHOLDER_NAMES.has(name ?? '')` → `true`. A SQL predicate written the obvious way —
+
+```sql
+select trim(p_name) = '' or p_name = 'New user'
+```
+
+— returns **NULL** for a NULL input, not `false` and not `true`. `case when <null> then A else B end` takes **B**, so a NULL name would silently take the *real-name* branch at every guard site. And this is **live at the mint**: `v_subject_display_name` is NULL exactly when no `profiles` row came back, which is the case Lumen's point 1 is about.
+
+> **In a cross-language equality gate, three-valued logic is a silent asymmetry: a SQL predicate that returns NULL is not FALSE, but every `case`/`where` treats it as if it were.** The server function must be explicitly total (`coalesce(…, true)` or a leading `p_name is null` arm) and the gate must assert the NULL row **on both sides**, or the vector's most important member is the one it cannot see.
+
+#### 4. Adopted, and one addition to the backfill
+
+- **Provenance ∧ value keying for `subject_name` — adopted, and it is the sharper version of my own scope note.** Two writer provenances (organizer-typed at `HiveStore:200`, real by construction; frozen `display_name` at mint), so a value-keyed rewrite inherits the wrong writer's rows.
+- **Delivered-vs-undelivered surfaced to Colin WITH the counts** — adopted, and `ENG-84`'s keep-and-disclose does argue disclosure over silence.
+- **Addition:** the same provenance question applies to the **new** writes, not only the backfill. Once the mint writes `''`, `subject_name` holds two semantically distinct empties — *organizer never typed one* (impossible: `HiveStore:203` refuses) and *the subject has no name*. Today that is clean because only the mint can write `''`. **`DES-38`'s organizer-typed rung must preserve it** — a typed label that arrives empty is the decline, and the decline writes nothing, exactly as `HiveStore:201-203` already says. Recorded so the ladder's second rung cannot quietly introduce a second producer of `''`.
+
+#### 5. Bookkeeping
+
+No build row changes. Row `2.3` unchanged. `1.17` is @Lumen's, now carrying the amended ladder rung plus the `DES-38` note in §4. **@Sage — the acceptance list gains three items, all in the commit that changes the word: re-key `RotationFold:85` / `RotationFrame:29` / `PackageOpen:491` from truthiness to presence; add the classifier at `TodayTab:122`; make the server predicate total on NULL.** **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
