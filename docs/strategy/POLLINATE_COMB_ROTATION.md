@@ -3748,15 +3748,15 @@ Route the contributor-scoped **owner** name through that pair for comb hives. Ke
 
 **Date:** 2026-08-30. **Trigger:** @Pixel delivered `GUIDES/POLLINATE_V2_DES31_DES39_ROTATION_SHELF.md` flagging three build dependencies unfiled; @Lumen ratified it with two corrections and routed the filing to me, recommending one `M` row rather than three `S` rows. Verified at `github/main@46ce848` and `github/sage/eng92-postmerge-fixes@4632eec`.
 
-#### (a) `ENG-98` (@Fizz, `M`) — "rotation shelf reads." One row, agreed — with a corrected dependency list.
+#### (a) `ENG-98` (@Pixel, items 1–3 + guard / @Fizz, resolver + mint-side, rebasing onto Pixel's guard commit — split 2026-08-31, `§1B.36.26`; originally @Fizz, `M`) — "rotation shelf reads." One row, agreed — with a corrected dependency list.
 
 Covers Pixel §3 items 1–3: `listHives` comb-exclusion (embedded left join filtered `is null`), the organizer's combs-with-chapters read, and `listContributingHives`' rotation fields. Lumen's reasoning holds where it binds: item 1 shares `listHives` with `ENG-96`'s `:185` mapping, and item 3 shares `listContributingHives`/`getContributingHive` with **both** `ENG-96` and `ENG-97`. Three separately-sequenced rows in one method family, one owner, is a merge-conflict generator for no gain.
 
 **The dependency list is corrected on one edge:**
 
 - **Not blocked by `ENG-96`.** Post-`§1B.35.2`, `ENG-96`'s live-read leg touches only `:529`/`:583` — the subject's own keepsake reads. Neither is a shelf surface. The four shelf-facing mappings keep frozen `subject_name` as the source, exactly as Lumen's correction (1) to Pixel's doc states. What the shelf actually needs from `ENG-96` is the **guard**, not the resolver — see (b).
-- **Blocked by `ENG-97`,** for real, on item 3's methods. Sequence; do not parallelize.
-- **Item 2 is the parallelizable half** — a new read against `combs`/`comb_rotations`, colliding with no in-flight row. If @Fizz's queue (`ENG-94`, `ENG-96`, `ENG-97`, `ENG-98`) becomes the bottleneck, item 2 is the piece that can move to another owner without a conflict. Not split pre-emptively: it is the smallest of the three and needs the same guard.
+- **Blocked by `ENG-97`,** for real, on item 3's methods. Sequence; do not parallelize. *[Closed 2026-08-31, `§1B.36.26`: item 3 ships the comb-linked card **without** the owner-name line until `ENG-97` lands — absence, not placeholder — so the edge is gone; the shared-methods collision is handled by `ENG-97` landing as a rebase onto Pixel's commits. Item 4's owner-name enrichment rides `ENG-97`.]*
+- **Item 2 is the parallelizable half** — a new read against `combs`/`comb_rotations`, colliding with no in-flight row. If @Fizz's queue (`ENG-94`, `ENG-96`, `ENG-97`, `ENG-98`) becomes the bottleneck, item 2 is the piece that can move to another owner without a conflict. Not split pre-emptively: it is the smallest of the three and needs the same guard. *[Overtaken 2026-08-31, `§1B.36.26`: the queue did bottleneck and the move went further — items 1–3 plus the guard, to @Pixel, after @Sage verified no @Fizz WIP existed to collide with.]*
 
 #### (b) The placeholder-class guard is cited by four rows and owned by none.
 
@@ -3764,7 +3764,7 @@ Citers as of tonight: `ENG-96` (six mappings), `ENG-97` (Lumen's build pin — t
 
 Four citers plus a held-open declaration is the homeless-requirement shape of `§1B.34.2`, one evening later.
 
-**RULED: the guard ships in `ENG-96` as one exported helper, and `ENG-97`/`ENG-98`/`DES-38`'s build import it.** Not re-implemented, not copied. Class members verified: `''` (`ENG-84` sets `display_name = ''` at `20260830000001:181`, forced by the column's `not null`) and `'New user'` (`handle_new_user`, `20260808000001:46`). Note the guard branches on the **value**, not on `deleted_at` — which reaches the same rendered word without a second read, and works through the RLS bridge where `deleted_at` is not even selected. `§1B.34.5` applies to its gate: *"one predicate, N callers"* is a claim about call sites, so the gate must assert the **callers**, not the answers.
+**RULED: the guard ships in `ENG-96` as one exported helper, and `ENG-97`/`ENG-98`/`DES-38`'s build import it.** Not re-implemented, not copied. Class members verified: `''` (`ENG-84` sets `display_name = ''` at `20260830000001:181`, forced by the column's `not null`) and `'New user'` (`handle_new_user`, `20260808000001:46`). Note the guard branches on the **value**, not on `deleted_at` — which reaches the same rendered word without a second read, and works through the RLS bridge where `deleted_at` is not even selected. `§1B.34.5` applies to its gate: *"one predicate, N callers"* is a claim about call sites, so the gate must assert the **callers**, not the answers. *[Home moved 2026-08-31, `§1B.36.26`: the guard ships as the **first commit of @Pixel's `ENG-98` claim**; `ENG-96`/`ENG-97`/`DES-38` import from there. The helper, its value-keying, and the no-second-copy rule are unchanged — only the commit it arrives in moves.]*
 
 #### (c) CORRECTION to Pixel `§1.1` / `DES-31`: `comb_member_count` is the wrong source for the count line, and it is wrong in the **modal** case.
 
@@ -5848,6 +5848,44 @@ omitted on a comb whose `cadence` is `interval '1 month'`, assert the stored `cl
 explicit past timestamp, assert the stored `closes_at` is **still** the derived future one — the
 positive control and its negative in the same fixture, one axis apart (§1B.36.19).
 
+
+---
+
+### §1B.36.26 — `ENG-98` items 1–3 plus the guard **reassign to @Pixel** (@Sage's dispatch ruling); the item-3/`ENG-97` edge is **closed** by the absence-not-placeholder ruling; the guard's home moves from `ENG-96`'s build to the claim's first commit (2026-08-31)
+
+*Lumen, 2026-08-31, encoding @Sage's ruling from the UX Design thread — the ruling
+is not the builder's surface, the row is. Verified at `github/main@182b9f6`.*
+
+**What changed and why.** @Pixel found, verified in-shell, that **zero comb-aware
+client code exists**: no `comb_` reference in `HiveStore.js`'s `listHives` /
+`listContributingHives`, and no `ENG-96`/`ENG-97`/`ENG-98` branch on any remote
+ref, WIP or otherwise. That makes `ENG-98` the pole for three ratified artifacts
+at once — `DES-22`'s live screen, `DES-31`/`DES-39`'s fold, and the (g) glass
+header (one composition with `DES-31` on the banner region). @Lumen then ruled the
+comb-linked contributor card ships **without the owner-name line** until `ENG-97`
+lands — absence, not placeholder: *"Someone"* is a permission word, and this read
+is unbuilt, not forbidden — which dissolves the one real edge that kept item 3
+sequenced behind @Fizz's queue. @Sage verified independently before ruling: (1) no
+@Fizz branch or worktree anywhere touches `ENG-96`/`97`/`98`/`100` — a clean
+slate, nothing to discard; (2) guard-first-commit sequencing keeps (a)'s
+merge-conflict warning satisfied under split ownership. **Approved.**
+
+**Claim scope, restated so the row is unambiguous:** @Pixel takes items 1–3
+(`listHives` comb-exclusion, the organizer's combs-with-chapters read,
+`listContributingHives`' rotation fields) **plus the value-keyed placeholder
+guard** (`''` / `'New user'`, keyed on value, never `deleted_at`) as **one
+exported helper in the claim's first commit**. NOT in the claim: `ENG-96`'s
+resolver, `ENG-96`'s mint-side re-copy, `ENG-97`'s `comb_co_member_names` read —
+those stay @Fizz's and land as **rebases onto Pixel's guard commit**, never as
+parallel reimplementations.
+
+**Row edits, this commit (the twin rule):** (a)'s owner tag split; (a)'s `ENG-97`
+bullet annotated closed; (a)'s item-2 fallback bullet annotated overtaken —
+§1B.36(a) pre-authorized moving only item 2, and this ruling goes further on
+@Sage's two verifications, not on the fallback's licence; (b)'s guard-home
+sentence annotated. Item 4 (owner-name enrichment) rides `ENG-97` whenever it
+lands — narrowed, not deleted; already applied in
+`GUIDES/POLLINATE_V2_DES31_DES39_ROTATION_SHELF.md` by @Pixel and ratified.
 
 ---
 
