@@ -8,13 +8,13 @@ import { PressableScale } from '../components/PressableScale';
 import { HoneycombStore } from '../services/HoneycombStore';
 import { CombStore } from '../services/CombStore';
 import { useAuth } from '../contexts/AuthContext';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 const CADENCES = [
   { value: '1 month', label: 'One month', detail: 'The rhythm we recommend' },
   { value: '2 months', label: 'Two months', detail: 'A little more breathing room' },
   { value: '3 months', label: 'Three months', detail: 'A slower gathering' },
 ];
-const isPlaceholderName = (name) => !name || name.trim().toLowerCase() === 'new user';
 
 // DES-29: the organizer can only choose a connection. This is both the
 // readable-name constraint and the month-one contributor guarantee; the
@@ -65,7 +65,9 @@ export const CreateCombScreen = ({ navigation }) => {
         }
       }
       const { hiveId } = result;
-      navigation.replace('HiveDetail', { hiveId });
+      // DES-39's organizer contract is the expandable card on Today, not a
+      // rotation-hive detail route. The new comb is visible there immediately.
+      navigation.replace('Main', { screen: 'Today' });
     } catch (err) {
       console.warn('CreateCombScreen: create failed', err);
       setError(err?.combId || createdCombId ? "We couldn't open the first month. Try again." : "We couldn't start this comb. Try again.");

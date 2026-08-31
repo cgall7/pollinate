@@ -8,6 +8,8 @@ const checks = [
   ['organizer name commits before create', screen.includes('await CombStore.saveOrganizerName(organizerName)')],
   ['self exclusion exists', store.includes('subjectProfileId === ownerId')],
   ['same comb retries mint', screen.includes('openFirstRotation({ combId: createdCombId')],
+  ['uses the shared placeholder class', screen.includes("import { isPlaceholderName } from '../utils/placeholderName'" )],
+  ['success returns to the organizer card on Today', screen.includes("navigation.replace('Main', { screen: 'Today' })")],
 ];
 let failed = 0;
 for (const [label, ok] of checks) { console.log(`${ok ? 'ok' : 'FAIL'} ${label}`); if (!ok) failed += 1; }
