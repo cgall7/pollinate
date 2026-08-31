@@ -179,7 +179,7 @@ check("the other side is the string literal 'true'", literalSide?.value, 'true')
 // identifiers on both sides) rather than sampled: an inline expression is
 // pinned exactly by its AST, and any other shape — a literal, a lone
 // `__DEV__`, a re-read of process.env — is a different gate than the one
-// the three build profiles were enumerated against.
+// the build profiles were enumerated against.
 const demoContentDecl = topLevelConst(constantsAst, 'DEMO_CONTENT');
 check('demoMode.js declares a top-level DEMO_CONTENT const', Boolean(demoContentDecl), true);
 
