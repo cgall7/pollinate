@@ -90,10 +90,17 @@ const gateFiles = fs
 let pgGatesSeen = 0;
 
 for (const file of gateFiles) {
-  const src = fs.readFileSync(path.join(SCRIPTS_DIR, file), 'utf8');
-  const loadsEmbeddedPg = /require\(\s*['"]embedded-postgres['"]\s*\)/.test(src);
+  const rawSrc = fs.readFileSync(path.join(SCRIPTS_DIR, file), 'utf8');
+  const loadsEmbeddedPg = /require\(\s*['"]embedded-postgres['"]\s*\)/.test(rawSrc);
   if (!loadsEmbeddedPg) continue;
   pgGatesSeen += 1;
+
+  // Strip comments before pattern-matching — a gate's own prose describing
+  // the hazard (e.g. "uses process.exit(1) rather than process.exitCode = 1")
+  // contains the literal pattern and must not trip the sweep it's explaining.
+  const src = rawSrc
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
 
   const setsExitCode = /process\.exitCode\s*=\s*1/.test(src);
   if (!setsExitCode) {
