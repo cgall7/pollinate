@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Text, View } from 'react-native';
 import { theme } from '../constants/theme';
+import { useDaysLeft } from './useDaysLeft';
 
 // §1B.38.1: no `organizerName` prop. Order is a mechanism, not a rendered
 // promise — a client sentence naming next month's writer either reimplements
@@ -8,23 +9,7 @@ import { theme } from '../constants/theme';
 // (skips, dormancy, revival). A future line is licensed only by an existing
 // rotation row (see comb_advance_rotation, migration 20260830000011).
 export const RotationFrame = ({ subjectName, closesAt, sealedAt }) => {
-  const [daysRemaining, setDaysRemaining] = useState(null);
-
-  useEffect(() => {
-    if (!closesAt || sealedAt) return;
-
-    const updateDays = () => {
-      const now = Date.now();
-      const closesAtMs = typeof closesAt === 'string' ? new Date(closesAt).getTime() : closesAt;
-      const msRemaining = closesAtMs - now;
-      const days = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
-      setDaysRemaining(Math.max(0, days));
-    };
-
-    updateDays();
-    const interval = setInterval(updateDays, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, [closesAt, sealedAt]);
+  const daysRemaining = useDaysLeft(sealedAt ? null : closesAt);
 
   if (!subjectName) return null;
 

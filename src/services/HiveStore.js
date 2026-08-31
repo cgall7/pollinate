@@ -172,16 +172,43 @@ const resolveDirectName = (names, id) => {
   return isPlaceholderName(name) ? null : name;
 };
 
-const toCombCollectRotation = ({ rotation, hive, writerCount }) => ({
-  id: rotation.id,
-  combId: rotation.comb_id,
-  hiveId: rotation.hive_id,
-  subjectName: hive.subjectName,
-  coverTheme: hive.coverTheme,
-  closesAt: rotation.closes_at,
-  sealedAt: rotation.sealed_at,
-  sentAt: rotation.sent_at,
-  writerCount,
+const resolveOpenCombRotations = async (client, hives) => {
+  const hiveIds = hives.map((h) => h.id);
+  if (hiveIds.length === 0) return new Map();
+
+  const { data: rotations, error } = await client
+    .from('comb_rotations')
+    .select('id, comb_id, hive_id, closes_at')
+    .in('hive_id', hiveIds)
+    .is('sealed_at', null)
+    .is('voided_at', null);
+  if (error) throw error;
+
+  const byHiveId = new Map();
+  await Promise.all(
+    (rotations ?? []).map(async (rotation) => {
+      const { data: writerCount, error: writerCountError } = await client.rpc('comb_rotation_writer_count', {
+        p_rotation_id: rotation.id,
+      });
+      if (writerCountError) throw writerCountError;
+      byHiveId.set(rotation.hive_id, {
+        id: rotation.id,
+        combId: rotation.comb_id,
+        closesAt: rotation.closes_at,
+        writerCount,
+      });
+    })
+  );
+  return byHiveId;
+};
+
+const toContributingHive = (hive, ownerName, openRotationByHiveId) => ({
+  id: hive.id,
+  subjectName: hive.subject_name,
+  coverTheme: hive.cover_theme,
+  sealedAt: hive.sealed_at,
+  ownerName,
+  combRotation: openRotationByHiveId.get(hive.id) ?? null,
 });
 
 export const HiveStore = {
@@ -526,14 +553,15 @@ export const HiveStore = {
     // name (`null` in the map) stays absent instead of falling through to
     // the direct join or `'Someone'`.
     const combOwnerNames = await resolveCombOwnerNames(client, hives);
+    const openRotationByHiveId = await resolveOpenCombRotations(client, hives);
 
-    return hives.map((h) => ({
-      id: h.id,
-      subjectName: h.subject_name,
-      coverTheme: h.cover_theme,
-      sealedAt: h.sealed_at,
-      ownerName: combOwnerNames.has(h.id) ? combOwnerNames.get(h.id) : resolveDirectName(ownerNames, h.owner_id),
-    }));
+    return hives.map((h) =>
+      toContributingHive(
+        h,
+        combOwnerNames.has(h.id) ? combOwnerNames.get(h.id) : resolveDirectName(ownerNames, h.owner_id),
+        openRotationByHiveId
+      )
+    );
   },
 
   // One contributing hive's header facts, for ContributingHive.js — same
@@ -567,54 +595,13 @@ export const HiveStore = {
     const ownerNames = owner ? new Map([[hive.owner_id, owner.display_name]]) : new Map();
     // ENG-97/Finding A: same `.has()` resolution as listContributingHives.
     const combOwnerNames = await resolveCombOwnerNames(client, [hive]);
+    const openRotationByHiveId = await resolveOpenCombRotations(client, [hive]);
 
-    return {
-      id: hive.id,
-      subjectName: hive.subject_name,
-      coverTheme: hive.cover_theme,
-      sealedAt: hive.sealed_at,
-      ownerName: combOwnerNames.has(hive.id) ? combOwnerNames.get(hive.id) : resolveDirectName(ownerNames, hive.owner_id),
-    };
-  },
-
-  // Comb collect route contract (Pixel, MVP-Comb): Lumen's invite/auth lane
-  // may hand off either the joined rotation id or the comb id. This resolver
-  // turns that identity into the single current writing hive, and then proves
-  // the caller has an active contributor seat by reusing `getContributingHive`
-  // for the resolved `hive_id`. A joined member who is not enrolled into the
-  // open rotation's `hive_contributors` row returns null here, which is the
-  // client-visible failure O10's server lane must close.
-  async getCombCollectRotation({ rotationId, combId } = {}) {
-    const client = requireSupabase();
-    await requireUserId(client);
-    if (!rotationId && !combId) throw new Error('Comb collect needs a rotationId or combId');
-
-    let query = client
-      .from('comb_rotations')
-      .select('id, comb_id, hive_id, closes_at, sealed_at, sent_at, voided_at');
-
-    if (rotationId) {
-      query = query.eq('id', rotationId);
-    } else {
-      query = query
-        .eq('comb_id', combId)
-        .is('sealed_at', null)
-        .is('voided_at', null);
-    }
-
-    const { data: rotation, error } = await query.maybeSingle();
-    if (error) throw error;
-    if (!rotation || rotation.sealed_at || rotation.voided_at) return null;
-
-    const hive = await this.getContributingHive(rotation.hive_id);
-    if (!hive) return null;
-
-    const { data: writerCount, error: writerCountError } = await client.rpc('comb_rotation_writer_count', {
-      p_rotation_id: rotation.id,
-    });
-    if (writerCountError) throw writerCountError;
-
-    return toCombCollectRotation({ rotation, hive, writerCount });
+    return toContributingHive(
+      hive,
+      combOwnerNames.has(hive.id) ? combOwnerNames.get(hive.id) : resolveDirectName(ownerNames, hive.owner_id),
+      openRotationByHiveId
+    );
   },
 
   // 8b.6 — the recipient's side of the send act (`docs/strategy/

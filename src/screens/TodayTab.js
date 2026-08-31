@@ -18,6 +18,8 @@ import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { Avatar } from '../components/Avatar';
 import { PressableScale } from '../components/PressableScale';
+import { RotationFold } from '../components/RotationFold';
+import { useDaysLeft } from '../components/useDaysLeft';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 
@@ -111,24 +113,38 @@ const GREETING_ANCHOR = 'greeting';
 // the unnamed-owner row — the absence row would become the loudest row on
 // the shelf. No ring: `glassRim` is white-on-white here, and a
 // `surfaceBorder` ring on a `surfaceBorder` fill is doubling.
-const ContributingHiveRow = ({ hive, onPress }) => (
-  <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
-    {hive.ownerName ? (
-      <Avatar name={hive.ownerName} size={40} />
-    ) : (
-      <View style={styles.ownerAbsentDisc} />
-    )}
-    <View style={styles.contributingRowText}>
-      <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
+const ContributingHiveRow = ({ hive, onPress }) => {
+  const daysLeft = useDaysLeft(hive.combRotation?.closesAt);
+
+  return (
+    <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
       {hive.ownerName ? (
-        <Text style={styles.contributingRowSubject} numberOfLines={1}>
-          From {hive.ownerName}
-        </Text>
-      ) : null}
-    </View>
-    <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
-  </PressableScale>
-);
+        <Avatar name={hive.ownerName} size={40} />
+      ) : (
+        <View style={styles.ownerAbsentDisc} />
+      )}
+      <View style={styles.contributingRowText}>
+        <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
+        {hive.ownerName ? (
+          <Text style={styles.contributingRowSubject} numberOfLines={1}>
+            From {hive.ownerName}
+          </Text>
+        ) : null}
+        {hive.combRotation ? (
+          <RotationFold
+            variant="member"
+            subjectName={hive.subjectName}
+            daysLeft={daysLeft}
+            count={hive.combRotation.writerCount}
+            countKind="writers"
+            style={styles.contributingRotationFold}
+          />
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
+    </PressableScale>
+  );
+};
 
 const greeting = (date) => {
   const hour = date.getHours();
@@ -682,5 +698,8 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     marginTop: 2,
+  },
+  contributingRotationFold: {
+    marginTop: 10,
   },
 });

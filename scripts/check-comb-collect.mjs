@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
 
 let pass = 0;
 const failures = [];
@@ -16,50 +17,73 @@ const bad = (label, detail) => {
   console.log(`  FAIL ${label} — ${detail}`);
 };
 
-const screen = read('src/screens/CombCollect.js');
 const store = read('src/services/HiveStore.js');
 const app = read('App.js');
+const today = read('src/screens/TodayTab.js');
+const contributing = read('src/screens/ContributingHive.js');
+const rotationFrame = read('src/components/RotationFrame.js');
+const useDaysLeft = read('src/components/useDaysLeft.js');
 
-if (/export const CombCollectScreen/.test(screen) && /export const COMB_COLLECT_ROUTE = 'CombCollect'/.test(screen)) {
-  ok('C1 CombCollect exports a screen and route contract');
+if (!exists('src/screens/CombCollect.js') && !/CombCollect/.test(app)) {
+  ok('C1 no standalone CombCollect screen or navigator route');
 } else {
-  bad('C1 route contract', 'expected exported CombCollectScreen and COMB_COLLECT_ROUTE');
+  bad('C1 inherited route', 'CombCollect file or App.js route still exists');
 }
 
-if (!/CombCollect/.test(app)) {
-  ok('C2 App.js is not edited for route registration');
+if (
+  /resolveOpenCombRotations/.test(store) &&
+  /\.from\('comb_rotations'\)/.test(store) &&
+  /\.is\('sealed_at', null\)/.test(store) &&
+  /\.is\('voided_at', null\)/.test(store)
+) {
+  ok('C2 contributing-hive store resolves open comb rotations');
 } else {
-  bad('C2 navigator ownership', 'CombCollect appears in App.js; Lumen owns navigator integration');
-}
-
-if (/getCombCollectRotation/.test(store) && /\.from\('comb_rotations'\)/.test(store) && /\.is\('sealed_at', null\)/.test(store) && /\.is\('voided_at', null\)/.test(store)) {
-  ok('C3 store resolves the open comb rotation');
-} else {
-  bad('C3 open rotation resolver', 'expected comb_rotations query gated to the open row');
-}
-
-if (/getContributingHive\(rotation\.hive_id\)/.test(store) && /if \(!hive\) return null/.test(store)) {
-  ok('C4 resolver proves current contributor access before returning a collect hive');
-} else {
-  bad('C4 contributor proof', 'expected getContributingHive(rotation.hive_id) and null on missing seat');
+  bad('C2 open rotation enrichment', 'expected open comb_rotations enrichment on contributing hives');
 }
 
 if (/comb_rotation_writer_count/.test(store) && /if \(writerCountError\) throw writerCountError/.test(store)) {
-  ok('C5 resolver reads writer count with thrown RPC errors');
+  ok('C3 writer-count read errors are thrown');
 } else {
-  bad('C5 writer count', 'expected comb_rotation_writer_count with error handling');
+  bad('C3 thrown read errors', 'expected writer-count errors to throw');
 }
 
-if (/variant="member"/.test(screen) && /countKind="writers"/.test(screen) && /daysLeft=\{daysLeft\}/.test(screen)) {
-  ok('C6 screen mounts RotationFold in member mode with days-left state');
+if (/combRotation:\s*openRotationByHiveId\.get\(hive\.id\) \?\? null/.test(store)) {
+  ok('C4 store returns explicit combRotation discriminator mapping');
 } else {
-  bad('C6 RotationFold mount', 'expected member variant, writers countKind, and daysLeft');
+  bad('C4 explicit return mapping', 'expected contributing hive payload to include combRotation or null');
 }
 
-if (/navigation\.navigate\('ComposeHiveEntry'/.test(screen) && /hiveId: rotation\.hiveId/.test(screen)) {
-  ok('C7 write CTA routes to ComposeHiveEntry for the resolved hive');
+if (/ContributingHiveRow[\s\S]*RotationFold/.test(today) && /variant="member"/.test(today) && /countKind="writers"/.test(today)) {
+  ok('C5 Today contributing-hive card mounts the DES-31 member fold');
 } else {
-  bad('C7 write CTA', 'expected ComposeHiveEntry navigation with rotation.hiveId');
+  bad('C5 Today fold', 'expected RotationFold member/writers mount in ContributingHiveRow');
+}
+
+if (/ContributingHiveScreen[\s\S]*RotationFold/.test(contributing) && /variant="member"/.test(contributing) && /countKind="writers"/.test(contributing)) {
+  ok('C6 ContributingHive banner mounts member RotationFold');
+} else {
+  bad('C6 ContributingHive fold', 'expected member RotationFold in existing contributor screen banner');
+}
+
+if (/navigation\.navigate\('ComposeHiveEntry', \{ hiveId, subjectName: hive\.subjectName \}\)/.test(contributing)) {
+  ok('C7 existing ComposeHiveEntry CTA remains hiveId-based');
+} else {
+  bad('C7 compose CTA', 'expected existing ContributingHive CTA to route with the same hiveId');
+}
+
+if (
+  /export const daysUntil/.test(useDaysLeft) &&
+  /export const useDaysLeft/.test(useDaysLeft) &&
+  /useDaysLeft/.test(today) &&
+  /useDaysLeft/.test(contributing) &&
+  /useDaysLeft/.test(rotationFrame) &&
+  !/Math\.ceil/.test(rotationFrame) &&
+  !/Math\.ceil/.test(today) &&
+  !/Math\.ceil/.test(contributing)
+) {
+  ok('C8 days-left math uses the shared hook only');
+} else {
+  bad('C8 single-clock invariant', 'expected shared useDaysLeft and no local Math.ceil day math in touched renderers');
 }
 
 console.log(`\ncheck-comb-collect: ${pass} passed, ${failures.length} failed`);

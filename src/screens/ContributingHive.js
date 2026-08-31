@@ -10,6 +10,8 @@ import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
+import { RotationFold } from '../components/RotationFold';
+import { useDaysLeft } from '../components/useDaysLeft';
 import { isPlaceholderName } from '../utils/placeholderName';
 
 const longDate = (isoDate) => {
@@ -75,6 +77,7 @@ export const ContributingHiveScreen = ({ navigation, route }) => {
   const [hive, setHive] = useState(null);
   const [entries, setEntries] = useState([]);
   const [contributors, setContributors] = useState([]);
+  const daysLeft = useDaysLeft(hive?.combRotation?.closesAt);
 
   useFocusEffect(
     useCallback(() => {
@@ -160,7 +163,18 @@ export const ContributingHiveScreen = ({ navigation, route }) => {
             <>A hive for {subjectDisplayName}</>
           )}
         </Text>
-        <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
+        {hive.combRotation ? (
+          <RotationFold
+            variant="member"
+            subjectName={hive.subjectName}
+            daysLeft={daysLeft}
+            count={hive.combRotation.writerCount}
+            countKind="writers"
+            style={styles.rotationFold}
+          />
+        ) : (
+          <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
+        )}
       </View>
 
       <View style={styles.rosterContainer}>
@@ -244,6 +258,9 @@ const styles = StyleSheet.create({
   bannerCount: {
     ...theme.type.bodySm,
     marginTop: 4,
+  },
+  rotationFold: {
+    marginTop: 12,
   },
   rosterContainer: {
     marginHorizontal: 24,
