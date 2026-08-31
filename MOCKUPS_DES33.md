@@ -4,7 +4,7 @@
 ## Component: RotationFrame.js
 - Location: `src/components/RotationFrame.js`
 - Integration: `PackageOpen.js` (reveal screen)
-- Props: `subjectName`, `organizerName`, `closesAt`, `sealedAt`
+- Props: `subjectName`, `closesAt`, `sealedAt` (no `organizerName` — struck, §1B.38.1)
 
 ---
 
@@ -57,7 +57,6 @@
 │  • Rotation frame (state line)  ← DES-33   │
 ├────────────────────────────────────────────┤
 │  "You received Sarah's journal"             │
-│  "Next month: Maya leads"                   │
 │                                             │
 │  (Entry card & ending visible)              │
 │                                             │
@@ -71,12 +70,7 @@
   - Layout: Full width, single line, truncate if needed
   - Meaning: Past tense, celebrates the gift
 
-- **"Next month: [Name] leads"** *(placeholder noun pending COPY-13)*
-  - Style: `theme.type.bodySm` (system font, weight: 400)
-  - Color: `theme.colors.inkSoft` (dimmed secondary)
-  - Layout: Full width, single line
-  - Spacing: 12pt (`theme.spacing.sm`) below first line
-  - Note: `organizerName` prop is used, but copy pending COPY-13 — likely should be next subject, not organizer
+- **No future-rotation line.** §1B.38.1 (Lumen, ratified by Vector): order is a mechanism, not a rendered promise — a client sentence naming next month's writer either reimplements `comb_advance_rotation`'s ordering or promises a schedule the tick may change (skips, dormancy, revival). The sealed state renders no future line in v1. A rendered future is licensed only by an existing rotation row; when that read path exists, a next-subject line may fold in from the minted row, adopting the record rather than the ordering.
 
 ### Static After Seal
 - No timer updates (rotation is complete)
@@ -96,7 +90,7 @@
 ### What is Rendered (Both Surfaces)
 - ✅ Subject identity ("Writing for Sarah")
 - ✅ Time remaining ("6 days left")
-- ✅ On sealed: completion statement + next rotation preview
+- ✅ On sealed: completion statement only — no next-rotation preview (struck, §1B.38.1; see State 2 above)
 - ✅ Anticipation framing, not participation metrics
 
 ---
@@ -109,7 +103,6 @@
 ```javascript
 {
   subjectName: string,        // e.g., "Sarah"
-  organizerName: string|null, // e.g., "Maya" (placeholder)
   closesAt: string (ISO),     // e.g., "2026-09-01T00:00:00Z"
   sealedAt: string (ISO)|null // null = active, non-null = sealed
 }
@@ -128,8 +121,7 @@ if (!sealedAt && closesAt) {
 ```javascript
 if (sealedAt) {
   // Display: "You received [subject]'s journal"
-  // Display: "Next month: [organizer] leads" (if organizerName provided)
-  // No updates
+  // No future-rotation line (struck, §1B.38.1) — no updates
 }
 ```
 
@@ -169,9 +161,9 @@ if (sealedAt) {
 
 ---
 
-## Notes for Future Updates (COPY-13 / Next Release)
+## Notes for Future Updates
 
-1. **Organizer name placeholder:** Current prop says `organizerName`, but spec indicates the copy may need the next *subject* instead. Awaiting COPY-13 ruling. Component structure supports either with no changes.
+1. **Organizer/next-subject line:** resolved, not pending — §1B.38.1 struck it outright (neither noun renders). `COPY-13` closed as a sweep that produced no such copy; this item does not wait on it. A future line is licensed only by an existing rotation row (see `comb_advance_rotation`), not by this spec.
 
 2. **Date range (sealed state):** Spec mentions showing rotation span (e.g., "August 15 – September 12") when sealed. This is a separate render beyond the state-line slot, not part of DES-33.
 
@@ -181,4 +173,4 @@ if (sealedAt) {
 
 ## Visual Reference
 
-See device screenshots in this PR for live rendering at real resolution (393×852 iPhone 16 frame).
+See device screenshots in this PR for live rendering at real resolution (393×852 iPhone 16 frame). **Note:** those screenshots predate the §1B.38.1 strike and show the retired "Next month: Maya leads" line — the "Device verified" acceptance row above is true of the layout, not of that line's continued existence. Re-shoot before relying on them to describe the sealed state.

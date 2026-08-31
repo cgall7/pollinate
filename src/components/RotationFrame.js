@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { theme } from '../constants/theme';
 
-export const RotationFrame = ({ subjectName, organizerName, closesAt, sealedAt }) => {
+// §1B.38.1: no `organizerName` prop. Order is a mechanism, not a rendered
+// promise — a client sentence naming next month's writer either reimplements
+// comb_advance_rotation's ordering or promises a schedule the tick may change
+// (skips, dormancy, revival). A future line is licensed only by an existing
+// rotation row (see comb_advance_rotation, migration 20260830000011).
+export const RotationFrame = ({ subjectName, closesAt, sealedAt }) => {
   const [daysRemaining, setDaysRemaining] = useState(null);
 
   useEffect(() => {
@@ -31,11 +36,6 @@ export const RotationFrame = ({ subjectName, organizerName, closesAt, sealedAt }
         <Text style={{ ...theme.type.label, color: theme.colors.ink }}>
           You received {subjectName}'s journal
         </Text>
-        {organizerName && (
-          <Text style={{ ...theme.type.bodySm, color: theme.colors.inkSoft }}>
-            Next month: {organizerName} leads
-          </Text>
-        )}
       </View>
     );
   }

@@ -491,7 +491,6 @@ export const PackageOpenScreen = ({ navigation, route }) => {
           {pkg.rotationSubjectName ? (
             <RotationFrame
               subjectName={pkg.rotationSubjectName}
-              organizerName={pkg.rotationOrganizerName}
               closesAt={pkg.rotationClosesAt}
               sealedAt={pkg.rotationSealedAt}
             />
