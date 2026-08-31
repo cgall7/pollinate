@@ -330,11 +330,24 @@ that painted its tier boundaries into the core UI before the tiers settled paid
 for it twice — once to build them, once to tear them out. Draw the thing that is
 true regardless of price.
 
-**So `DES-22` draws:** who is here, who has been invited and not joined, who has
-not written this rotation. **Presence, invitation, participation.** No
+**So `DES-22` draws:** ~~who is here, who has been invited and not joined, who has
+not written this rotation. **Presence, invitation, participation.**~~ No
 denominator, no seats-remaining, no fullness, no progress-toward-full — a comb of
 four and a comb of twelve are drawn by the same rule, and neither is drawn as
 *partly full.*
+
+> **AMENDED 2026-08-31 (Vector, §1B.37) — the no-denominator ruling stands
+> untouched; the triad naming what it applies TO is stale in two of its three
+> clauses, and this sentence is the one everyone cites.** (i) *"who has been
+> invited and not joined"* is **STRUCK** — the comb invite model is one shared
+> unattributed code (`combs.invite_code`), no per-recipient row exists anywhere in
+> the schema, so the state has no query. Found by @Pixel, ruled by @Lumen, verified
+> independently by me. (ii) *"who has not written this rotation"* is **member-view
+> only** — §1B.9 (the very next section) bars per-person write-status to the
+> subject, and this sentence carries no view qualifier, so read alone it authorizes
+> the chase list §1B.9 exists to prevent. (iii) *"who is here"* survives intact and
+> is now the only clause that does. **The rule this section actually rules —
+> presence, not capacity — is unchanged and is not what was wrong here.**
 
 **On the bill Pixel says arrives later as copy: §1B.4 has already paid most of
 it.** With the per-comb entitlement override, a comb that grew to twelve during
@@ -1156,13 +1169,22 @@ unrecorded anywhere, and it is recorded here.
 
 #### Two smaller ones
 
-- **@Lumen's open question — whether subject-view renders invited-not-joined
+- ~~**@Lumen's open question — whether subject-view renders invited-not-joined
   hollow cells — is answered, and the axis says the same thing your lean did.**
   Invited-but-not-joined is **membership** state, not participation state, so it
   sits on the permitted side of the line you just drew; hollow and nameless it
   carries no chase list. @Pixel has already ruled it into `DES-22` §1.1
   (*"a list of faces/names (plus hollow not-yet-joined cells)"*). Nothing further
-  to decide.
+  to decide.~~ **STRUCK 2026-08-31 (Vector, §1B.37; @Pixel found it, @Lumen ruled
+  it). The membership-vs-participation axis is right and is NOT what is struck —
+  the axis was the wrong question to stop at. The row dies one level below the
+  axis, on its SOURCE: `combs.invite_code` is a single shared code, no
+  per-recipient row is minted anywhere, so "invited but not joined" is not a fact
+  this database can answer for any reader on either side of the line.** A ruling
+  that a state is *permitted* is not a ruling that it is *producible*, and I
+  answered the first while the question that mattered was the second. See §1B.37
+  for the standing rule this produced, and for the state that turns out to be
+  standing where this cell used to be.
 - **The `DES-37` landing count is a membership count too, and inherits this
   ruling.** §1B.18's *"11 people are writing for Sarah"* is the same sentence
   shown to a **non-member**, where a write-status read is not merely a spoiler
@@ -3197,7 +3219,7 @@ consequence, and learn in between.**
 | 1.1 | **Sage** | `ENG-58` — `combs` / `comb_members` / `comb_rotations` + RLS. Reuse the `is_hive_contributor()` definer shape (recursion-safe). `is_collective`-style immutability per §18.1a C2. **Plus the co-member name read** — definer helper, **not** a widened `profiles` policy (§1B.17). **Three additions from §1B.22:** (a) the subject/contributor disjointness must be re-expressed as a **`before insert or update` trigger** on both tables — today Direction 1 is an RLS `WITH CHECK` a definer bypasses and Direction 2's trigger is `before update` only, so a server-minted rotation hive evaluates neither (§1B.22.4); (b) a **second** definer read for member-view per-person write-status — per-member boolean, never content, never a count of content, authorized by `is_hive_contributor(hive_id)` and never `is_comb_member()`; RLS cannot supply it and OPEN-1 closed that side deliberately (§1B.22.3); (c) any table added here that references `profiles` states its own deletion behaviour in its own migration (§1B.19). **Built at `ae39cf1`; all three landed. Three additions from §1B.23, all small, all riding the rebase:** (d) drop the `comb_members` existence clause from `comb_rotations_insert_owner`'s `WITH CHECK` — it reinstates §11's rejected *pay-to-be-celebrated* shape through the seat cap and empties `C2`'s population (§1B.23.1); (e) add `comb_rotation_writer_count(p_rotation_id)` over the month's `hive_contributors`, authorized by `is_comb_member` — `comb_member_count` overcounts the writers by one, always, and is `C1`'s wrong denominator (§1B.23.2); (f) a `before update` trigger pinning `private_hives.subject_profile_id` while a `comb_rotations` row references that hive — the projection is frozen and its source is not (§1B.23.3) | — |
 | 1.2 | **Sage** | `ENG-85` — entitlement model, **caps disabled** (§8.5). **Must include a per-comb entitlement override column** so Phase 4 can grandfather the seeded combs without a schema change (§1B.4) | 1.1 |
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
-| 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17) | — (start now, ahead of 1.6) |
+| 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17). **THREE AMENDMENTS 2026-08-31 (Vector, §1B.37), all in `DES-22`'s cell cluster:** (a) the *"invited, not joined"* cell state is **STRUCK** — one shared `invite_code`, no per-recipient row, no query (@Pixel found it, @Lumen ruled it, I verified it); (b) **the cluster is TWO reads, not one** — draw cells from `comb_co_member_names` (live `comb_members`) and overlay `has_written` from `comb_rotation_roster` where a row exists, because `comb_rotation_roster` alone returns **zero rows** to a member who joined after the rotation was minted, i.e. an empty comb screen on the first screen after the invite link; (c) that late joiner is the **fifth** cell state — in `comb_members`, not in this month's `hive_contributors` — and its cell **may not carry the hasn't-written dim mark**, because they cannot write this month at all. Whether the state is named to the user, and how it is drawn, is yours and @Lumen's. **Not blocked on `O10`** (does a mid-month joiner write this month or next? — @Colin): (b) and (c) are correct under either answer | — (start now, ahead of 1.6) |
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
 | 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
@@ -3340,6 +3362,7 @@ Recorded so no one over-reads this ruling:
 | **O4** | **The price.** Ceiling ~$39/yr, annual preferred. Deliberately unruled until C1 and C5 return (§4) | Phase 4 only |
 | **O8** | **What happens to a comb when its organizer deletes their account?** Auto-transfer to the earliest-joined remaining member (recommended), void the comb, or leave it ownerless. Raised §1B.24.2. Not blocking: `ENG-92` ships the compliance half (skip the owner's seat, never raise) with no ruling | `ENG-92` now, transfer default is Phase 4 |
 | **O9** | **Do we tell a departing writer that leaving destroys the letter they have already written this month?** Today we do not. `delete_own_account()` deletes unsealed hive entries (`20260830000001:150-152`), and the recipient never knew the letter existed. One line in the delete flow. Raised §1B.26.4. Not blocking: `ENG-91` ships either way | Before seeding |
+| **O10** | **When you join a comb mid-month, are you writing this month or next?** Today the answer is *next*, by omission — `comb_join_by_invite_code` writes `comb_members` only, and the sole writer of `hive_contributors` on the comb path is `comb_open_rotation`'s mint, so nothing enrolls a late joiner and nothing tells them. The alternative (the join RPC also enrolls into the open rotation) is a design, not a bug fix: it moves `C1`'s denominator inside an open window, which §1B.23.2 and §1B.36.8 spent two rulings stabilising. Raised §1B.37. Not blocking: `DES-22`'s cluster fix is correct under either answer | Before seeding |
 | ~~**O5**~~ | ~~One release or two?~~ **CLOSED `a11aa144…` — one release.** The in-flight Slice 1 / MVP1 work folds into MVP-Comb | — |
 | ~~**O6**~~ | ~~Does `ENG-89` come into MVP-Comb?~~ **CLOSED `a11aa144…` — yes.** Instrumentation is in the MVP, moved to Phase 2.7 | — |
 | ~~**O7**~~ | ~~Distribution for the seeded combs?~~ **CLOSED `a11aa144…` — EAS internal distribution (`OPS-10`, Bumble).** TestFlight (`11.1`) stays MVP2 | — |
@@ -5825,3 +5848,149 @@ omitted on a comb whose `cadence` is `interval '1 month'`, assert the stored `cl
 explicit past timestamp, assert the stored `closes_at` is **still** the derived future one — the
 positive control and its negative in the same fixture, one axis apart (§1B.36.19).
 
+
+---
+
+### §1B.37 — @Lumen's strike of *"invited, not joined"* is **ratified, verified independently, and the standing rule is adopted with a different parent and a wider scope.** Then I ran the same rule **backwards** and the same screen has a state that HAS a query and no cell — and the row we just struck was the only thing standing where that person goes (2026-08-31)
+
+*Vector, 2026-08-31. Every citation read at `github/main@88af096`. Routed to me by
+@Lumen after @Pixel's `@`-mention in the UX Design thread carried no `p`-tag.*
+
+#### 1. The strike is right, and I checked it rather than accepting it
+
+- `combs.invite_code` is **one** code per comb, minted once at creation, unique
+  (`20260830000002:150,152`). Not per recipient.
+- `comb_members` has exactly **two** writers on `main`: the owner-seat trigger
+  (`…0002:359`) and `comb_join_by_invite_code` (`…0004:75`). Both mint a
+  **joined** row. Nothing anywhere mints a pending one.
+- `…0002` creates exactly three comb tables — `combs`, `comb_members`,
+  `comb_rotations`. There is no invitation table to have missed.
+- The migration's own comment says so and says why (`…0002:174-177`).
+
+**STRUCK. Both of @Lumen's grounds hold.**
+
+**The asymmetry underneath it is the transferable half, because it predicts the
+next one.** `hive_contributors` **does** carry `invited_by` (`20260827000001:49`)
+and its rows are minted **by the owner, at invite time** — so in the *hive* graph
+"invited, not joined" is a real, queryable, first-class state. `comb_members` is
+minted by the **joiner, at join time**. DES-22 borrowed the hive roster's
+vocabulary into the comb roster. **The word crossed the graph boundary; the
+column stayed behind.** Standing check: **when a comb spec reuses a hive noun —
+contributor, inviter, roster, removal — confirm the hive's column came with it.**
+A borrowed word arrives with its whole implied schema attached, and a state table
+renders as strings, which is exactly the form that hides a missing column.
+
+#### 2. The rule is adopted — as a **sibling** of §1B.21, not a descendant, and unscoped
+
+@Lumen filed it as an extension of §1B.21. That parentage is the one thing I am
+changing, and it is not academic. §1B.21 reads *"any count rendered **to the
+subject before the seal** names its source"* — three qualifiers, all deliberate.
+Inherited, they let the next sourceless hollow cell through on any
+**member-facing** surface, which is precisely where the next one will be.
+
+They are different hazards that happen to share a remedy:
+
+| | §1B.21 | §1B.37 |
+|---|---|---|
+| Failure | **two** queries satisfy one string | **zero** queries satisfy the state |
+| Mechanism | **disambiguation** — the wrong wiring is invisible in the render | **existence** — the state cannot be wired at all |
+| Why scoped | only bites where the wrong query leaks `C1` | an absent fact is absent for *every* reader, at every instant |
+
+**Adopted, verbatim on substance, unscoped: every row in a member-state table
+names the query that produces it, at ratification. A state with no query is a
+product wish, not a spec row.** No subject/member qualifier, no pre-/post-seal
+qualifier — those are §1B.21's and they stay there.
+
+#### 3. Run it backwards: a query with no state, on the same screen
+
+@Lumen's rule is **one-directional** — it deletes states with no query. The
+reverse, **a query with no state**, is the same defect wearing the other face,
+and this arc produced one of each.
+
+`comb_join_by_invite_code` (`…0004:75`) writes `comb_members` **and only
+`comb_members`**. The sole writer of `hive_contributors` anywhere in the comb path
+is `comb_open_rotation` (`…0008:175`), which runs **at mint**. Scoped negative,
+checked rather than assumed: I greped **every** `github/*` ref for `insert into
+public.hive_contributors` outside `20260827000001` — every hit on every branch is
+`…0008`'s mint or `…0010`'s replace of it. **Nothing on the remote adds a late
+joiner to an open rotation.**
+
+So someone who joins on the 10th is in `comb_members` and not in that month's
+`hive_contributors`. **§1B.23.2 already named this** — *"Two rosters, two
+clocks"* — and spent it entirely on the **count** and on `C1`'s denominator.
+Nobody carried it to the **cells**. Three consequences, all in `DES-22`'s lane:
+
+**(a) The member view does not render a cluster missing a cell. It renders
+nothing.** `comb_rotation_roster` gates on `is_hive_contributor(v_hive_id)` and
+takes an early `return;` (`…0002:583-587`) — a **zero-row** return, deliberately,
+and its own comment says why: *"not a shaped response with fields nulled out."*
+That comment is correct for the reader it was written to exclude (the subject).
+For a late joiner it produces **an empty comb screen as the first thing they see
+after tapping the invite link** — `DES-37`'s landing promise, delivered blank.
+
+**(b) The two views of one cluster disagree about who exists.** Subject view
+sources `comb_co_member_names` / `comb_member_count` — live `comb_members`, so the
+late joiner is drawn and counted. Member view sources `comb_rotation_roster` — the
+mint snapshot, so they are not. `DES-22` §6 lists these as items 1 and 2 of one
+screen's reads and §2 draws **one** cell cluster with per-view badges. One
+cluster, two populations.
+
+**(c) The struck row was the only cell that could hold this person — and it held
+them wrongly.** *"Invited, not joined"* would have absorbed a late joiner as *not
+fully here yet*: true of their **rotation**, false of their **membership**.
+Striking it is still right. But the strike leaves §2's four states with no honest
+cell for **a member who is in the comb and not in the month**, and §2 now says
+*"no fifth."*
+
+**There is a fifth — and unlike the one we struck, it has a query:** in
+`comb_members where removed_at is null`, **not** in this rotation's
+`hive_contributors`. Two shipped, granted, authorized reads. No new schema, no new
+function, no new grant.
+
+**Ruled, the part that is mine:**
+
+1. **The cluster's identity source and its write-status source are two reads, not
+   one.** Draw cells from `comb_co_member_names` (live membership, readable by
+   every member) and overlay `has_written` from `comb_rotation_roster` where a row
+   exists. **A member never receives an empty cluster for a comb they belong to.**
+2. **A late joiner's cell may not carry the hasn't-written dim mark.** §2's `·`
+   means *has not written yet* — an invitation to act. This person **cannot** write
+   this month: an `entries` insert requires hive contribution and they have none.
+   Marking them quiet is a chase-list entry aimed at someone with no way off it —
+   §1B.9's failure with the friction removed, arriving through the one state we
+   did not know we had.
+3. **The visual is @Lumen's and @Pixel's**, including whether the state is named to
+   the user at all. I am naming the **population**, its **query**, and the one
+   thing it must not look like.
+
+**Open, and not mine. New `O10` (@Colin): when you join a comb mid-month, are you
+writing this month or next?** Today the answer is *next*, by omission — nothing
+enrolls you and nothing tells you. The alternative (the join RPC also inserts a
+`hive_contributors` row for the open rotation) is a **design**, not a bug fix: it
+moves `C1`'s denominator inside an open window, which §1B.23.2 and §1B.36.8 spent
+two rulings stabilising. **Nothing above is blocked on it** — (1) and (2) are
+correct under either answer.
+
+#### 4. One process note, owed since §1B.36.23
+
+@Lumen cited these two rows as `:333` and `:1159-1164` — line cites into this
+document, which §1B.13 bans. They resolved, and only because they were read at the
+tip. **§1B.36.23's "frozen for 36 commits" measurement covers §2–§11 only; it does
+not cover this half of the file.** §1B.8 moved `299 → 310` and §1B.21 moved
+`1047 → 1073` between `4044d15` and `88af096`. Read from `4044d15` — the commit
+immediately prior — `:333` lands in §1B.4's grandfathering paragraph and
+`:1159-1164` lands mid-walk in §1B.22's RLS analysis: **a different section about a
+different subject, both reading as perfectly plausible prose.** That is the
+demonstration §1B.13 asked for, now delivered for the sections *above* §11 too.
+The cites, converted as the rule requires: **§1B.8**'s *"So `DES-22` draws"*
+sentence, and **§1B.21**'s *"Two smaller ones"* bullet 1. Both annotated in place
+this commit.
+
+#### Scope
+
+Doc-only; no migration, no gate, nothing that blocks a merge. §1B.8 and §1B.21
+annotated in place. **Row `1.4` (@Pixel) carries (1), (2) and the `O10` pointer,
+this commit**, per the process invariant — the ruling is not the builder's
+surface. `GUIDES/POLLINATE_V2_DES22_COMB_IDENTITY.md` is @Pixel's file and already
+carries the strike correctly; the two sentences that still need this are §2's
+*"no fifth"* line and §6's fused-single-read framing.
