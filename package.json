@@ -56,6 +56,7 @@
     "check:comb-advance-rotation": "node scripts/check-comb-advance-rotation.mjs",
     "check:eng92-comb-rotation-fixes": "node scripts/check-eng92-comb-rotation-fixes.mjs",
     "check:perch-weight": "node scripts/check-perch-weight.mjs",
+    "check:ops9-rotation-scheduler": "node scripts/check-ops9-rotation-scheduler.mjs",
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",
