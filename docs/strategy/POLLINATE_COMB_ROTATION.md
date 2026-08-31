@@ -6494,3 +6494,47 @@ WORKAROUND been superseded?**
 - The other 17 workspace files carrying acceptance rows were **not** swept here. This
   section's claim is scoped to `POLLINATE_TESTFLIGHT_ACCEPTANCE.md`, which is the one
   whose *title* names a retired path.
+
+---
+
+### §1B.38.6 — @Lumen's `Strategy:34` ruling encoded; one citation completed; and a scoped negative worth recording so nobody "repairs" it (2026-08-31)
+
+**Ruling adopted verbatim in substance:** `Pollinate_Strategy.md:34` is a defect of
+**CONTRAST, not of content.** The `> **Build Slices:**` block header at `:26-31`
+genuinely does reach the bullet — it supersedes the whole block *as a release plan* —
+so the bullet is not live. What makes it a defect is that its **Slice-2 sibling
+carries an inline amendment and it carried none**. **Annotation asymmetry inside one
+block reads as deliberate distinction:** a scanning reader infers the unamended
+sibling is the current one, which inverts the block header. Encoded at `:34`.
+
+**One citation completed, per *check the citations, not the argument*.** Lumen's
+clause read *"one release per §9"*; I verified all three legs and added the ruling
+token the bullet's actual defect is keyed to:
+
+| leg | verified at |
+|---|---|
+| one release, Slice 1 is not one | `COMB_ROTATION` §9 `:3339-3340`; **`O5` CLOSED** `:3371` (*"one release. The in-flight Slice 1 / MVP1 work folds into MVP-Comb"*) |
+| TestFlight is MVP2 | `:74`, `:107` (`O7` closed; `OPS-10` is the path) |
+| the friend feed is cut | `:2989` (*"Consequence: cut the friend feed"*), `:3185` |
+
+`O5` is the token: the bullet's defect is **presenting Slice 1 as a release**, and
+`O5` is the ruling that closed exactly that. Naming §9 alone gives the reader the
+section without the ruling ID.
+
+#### Scoped negative — `Pollinate_The_Ruling.md:125` is correctly untouched, and that needs saying
+
+The Build-Slices claim has a second container: `The_Ruling.md:125` — *"**Why:** Slice 1
+(Demo Mode) validates the social-gratitude loop…"* — under `## Wallet & Money:
+Deferred to Slice 2`. **It is in the 2026-08-17 original body, which is under
+append-only amendment discipline** (`docs/strategy/README.md:27` records the same
+call for `:117`, `:237`, `:246` during the navigation sweep: *"left byte-untouched
+under append-only amendment discipline and superseded by the amendment's own first
+line"*). **Leave it.** The amendment layer is where that file gets corrected, and
+that layer is already clean — `COPY-13` repaired `:478`'s *"Unchanged: Slice 1
+shipping first"* in the 2026-08-30 amendment section.
+
+**Recording this as a negative rather than silently skipping it, because a
+convention-protected stale line is indistinguishable from an unswept one.** The next
+person to run a Slice-1 census hits `:125`, finds no annotation, and either repairs it
+(breaking the discipline) or re-raises it. **A file with an append-only body needs its
+exemption stated in the sweep's own record, not only in the README.**
