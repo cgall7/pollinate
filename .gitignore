@@ -46,3 +46,6 @@ yarn-error.*
 
 # scratch cluster created by check:share-visibility (removed on a clean run)
 .share-visibility-pgdata/
+
+# ephemeral agent scratch drafts — never part of the repo
+.scratch/
