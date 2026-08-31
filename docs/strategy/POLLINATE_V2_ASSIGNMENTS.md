@@ -41,8 +41,17 @@ actually depend on.
 
 ## 2. Sequencing
 
-Slice 1 ships first, unchanged. Nothing below starts until the Project 11 launch
-blockers clear (TestFlight credentials, `legalCopy.js` placeholders, repo privacy).
+~~Slice 1 ships first, unchanged. Nothing below starts until the Project 11 launch
+blockers clear (TestFlight credentials, `legalCopy.js` placeholders, repo privacy).~~
+
+*[Retired 2026-08-31 — `POLLINATE_COMB_ROTATION.md` §9 (`O5` closed `a11aa144…`): there
+is ONE release, MVP-Comb (§1A). The Slice-1-first gate this line places on everything
+below it is superseded; the inventory stays as the record of V2's scoping. **Both
+sentences go, not only the first** — the second enforces the same gate by a different
+mechanism (a launch-blocker precondition) and would have survived an annotation scoped
+to the sequencing clause. Its blocker list is itself re-homed: `legalCopy.js` is
+`OPS-8`, a Phase 0 row of MVP-Comb; TestFlight moved to MVP2 when `O7` closed, with EAS
+internal distribution (`OPS-10`) taking its place.]*
 
 | Cycle | Weeks | Project | Why here |
 |---|---|---|---|

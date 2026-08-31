@@ -8,7 +8,7 @@ correction; tab bar 4 → 3 per `POLLINATE_V2_NAVIGATION.md` and the 2026-08-26
 amendment in `Pollinate_The_Ruling.md`.
 **Date:** 2026-08-24 (adopted 2026-08-25, amended 2026-08-25 and 2026-08-26)
 **Amendments:** §16.5 rewritten 2026-08-25 (Lumen) — filing moved from RPC/move to copy semantics after Pixel's read-path finding; see the section's amendment block. This changes the file's content hash relative to Colin's Amendment 2026-08-25 bytes; commit `384d35e` preserves those verbatim.
-**Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
+**Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — ~~Slice 1 ships first, unchanged.~~ *[Amended 2026-08-31 — the final clause is retired: `POLLINATE_COMB_ROTATION.md` §9 (`O5` closed, `a11aa144…`) rules ONE release, MVP-Comb. The supersession scope above (wallet direction, Slice 2 rows) is unchanged; only "Slice 1 ships first, unchanged" is withdrawn.]*
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
 > **AMENDED 2026-08-30 — the Comb Rotation Ruling (Colin, #Strategy event

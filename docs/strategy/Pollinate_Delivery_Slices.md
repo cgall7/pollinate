@@ -556,8 +556,13 @@ Week 14+:   SLICE 2 LAUNCH
 **Ruled by Colin, #Strategy event `0effa81d…`. Governing document:
 `POLLINATE_COMB_ROTATION.md` (§8 is the engineering handoff).**
 
-**Slice 1 still ships first, unchanged.** This amendment re-slices what comes
+~~**Slice 1 still ships first, unchanged.**~~ This amendment re-slices what comes
 after it.
+
+*[Retired 2026-08-31 — `POLLINATE_COMB_ROTATION.md` §9 (`O5` closed): one release,
+MVP-Comb. This file's own amendment at `:22` governs and contradicts this line; kept as
+the record of the 08-26 re-slicing. (`:22` cites `a11aa144…` and `O5` directly, not
+§1A.)]*
 
 | Was | Now |
 |---|---|
