@@ -556,6 +556,7 @@ const AccountStep = ({
   onNext,
   onBeforeFinish,
   initialMode = 'signup',
+  waitForSession = false,
   navigation,
 }) => {
   const [mode, setMode] = useState(initialMode);
@@ -730,7 +731,7 @@ const AccountStep = ({
             We couldn't save who this year is for — we'll try again next time you open Pollinate.
           </Text>
         </View>
-        <PrimaryButton onPress={onNext}>Continue</PrimaryButton>
+        {!waitForSession ? <PrimaryButton onPress={onNext}>Continue</PrimaryButton> : null}
       </StepShell>
     );
   }
@@ -1063,6 +1064,7 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
           onNext={finish}
           onBeforeFinish={flushPendingWrites}
           initialMode={accountMode}
+          waitForSession={startAt === 'invite'}
           navigation={navigation}
         />
       );
