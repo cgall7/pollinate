@@ -30,6 +30,12 @@ check(
 );
 
 check(
+  'chapters are sealed rotations only, never voided rows',
+  /\.filter\(\(row\) => row\.sealed_at != null\)/.test(hiveStore) &&
+    !/\.filter\(\(row\) => row\.sealed_at != null \|\| row\.voided_at != null\)/.test(hiveStore)
+);
+
+check(
   'organizer comb read uses rotation writer count and member count RPCs',
   /client\.rpc\('comb_rotation_writer_count', \{ p_rotation_id: rotation\.id \}\)/.test(hiveStore) &&
     /client\.rpc\('comb_member_count', \{ p_comb_id: combId \}\)/.test(hiveStore)
@@ -59,13 +65,21 @@ check(
 );
 
 check(
-  'expanded organizer card exposes invite code and past chapters in place',
+  'expanded organizer card exposes invite link and all past chapters in place',
   /expanded &&/.test(card) &&
     /getCombInviteUrl\(comb\.inviteCode\)/.test(card) &&
     /Share\.share\(\{ message: inviteUrl \}\)/.test(card) &&
     /Share invite link/.test(card) &&
     /Past chapters/.test(card) &&
-    /comb\.chapters\.slice\(0, 3\)/.test(card)
+    /comb\.chapters\.map\(\(chapter\)/.test(card) &&
+    !/comb\.chapters\.slice/.test(card)
+);
+
+check(
+  'chapter labels use the shared placeholder classifier for empty and New user names',
+  /import\s*{\s*isPlaceholderName\s*}\s*from\s*'\.\.\/utils\/placeholderName'/.test(card) &&
+    /export const organizerChapterSubjectName = \(name\) => \(isPlaceholderName\(name\) \? 'someone' : name\)/.test(card) &&
+    /organizerChapterSubjectName\(chapter\.subjectName\)/.test(card)
 );
 
 check(
@@ -82,6 +96,16 @@ check(
 );
 
 check('package exposes the DES-39 check script', /"check:des39-organizer-comb": "node scripts\/check-des39-organizer-comb\.mjs"/.test(packageJson));
+
+const placeholderValues = new Set(['', 'New user', null, undefined]);
+const fixtureChapterSubjectName = (name) => (placeholderValues.has(name ?? '') ? 'someone' : name);
+
+check(
+  'chapter placeholder fixtures render generic subject copy',
+  fixtureChapterSubjectName('') === 'someone' &&
+    fixtureChapterSubjectName('New user') === 'someone' &&
+    fixtureChapterSubjectName('Maya') === 'Maya'
+);
 
 let failed = 0;
 for (const result of checks) {

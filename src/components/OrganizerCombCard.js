@@ -7,8 +7,11 @@ import { PressableScale } from './PressableScale';
 import { RotationFold } from './RotationFold';
 import { useDaysLeft } from './useDaysLeft';
 import { getCombInviteUrl } from '../services/combInviteLinking';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 const ROTATION_WRITER_COUNT_KIND = 'writers';
+
+export const organizerChapterSubjectName = (name) => (isPlaceholderName(name) ? 'someone' : name);
 
 export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite }) => {
   const rotation = comb.openRotation;
@@ -54,9 +57,9 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite }) => {
             {comb.chapters?.length > 0 && (
               <View style={styles.chapterList}>
                 <Text style={styles.metaLabel}>Past chapters</Text>
-                {comb.chapters.slice(0, 3).map((chapter) => (
+                {comb.chapters.map((chapter) => (
                   <Text key={chapter.id} style={styles.metaLine} numberOfLines={1}>
-                    Month {chapter.ordinal}: {chapter.subjectName || 'someone'}
+                    Month {chapter.ordinal}: {organizerChapterSubjectName(chapter.subjectName)}
                   </Text>
                 ))}
               </View>

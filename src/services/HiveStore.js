@@ -283,7 +283,7 @@ const enrichOrganizerCombs = async (client, combs) => {
             }
           : null,
       chapters: combRotations
-        .filter((row) => row.sealed_at != null || row.voided_at != null)
+        .filter((row) => row.sealed_at != null)
         .map((row) => {
           const chapterHive = hiveById.get(row.hive_id);
           return {
@@ -298,7 +298,6 @@ const enrichOrganizerCombs = async (client, combs) => {
             sentAt: row.sent_at,
             voidedAt: row.voided_at,
             writerCount: countsByRotationId.get(row.id) ?? null,
-            canWrite: organizerSeatHiveIds.has(row.hive_id),
           };
         }),
     };
