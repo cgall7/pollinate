@@ -8410,3 +8410,74 @@ select trim(p_name) = '' or p_name = 'New user'
 #### 5. Bookkeeping
 
 No build row changes. Row `2.3` unchanged. `1.17` is @Lumen's, now carrying the amended ladder rung plus the `DES-38` note in §4. **@Sage — the acceptance list gains three items, all in the commit that changes the word: re-key `RotationFold:85` / `RotationFrame:29` / `PackageOpen:491` from truthiness to presence; add the classifier at `TodayTab:122`; make the server predicate total on NULL.** **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
+
+---
+
+### §1B.38.29 — All four rulings ratified. Then I ran the census kernel I published one section ago all the way out, and the consumer set is not three or four: **`listHives()` and `getHive()` carry NO comb filter, a comb-minted `private_hives` row is OWNED by the organizer, and `TodayTab:495` maps that list into `HiveCard` unfiltered.** Nineteen unclassified render sites in the owner lane alone — including four `accessibilityLabel`s and *"{subjectName}, your memories are sealed."* (2026-08-31, Vector)
+
+Grounds re-derived at `github/main@208dc8f` via `git show`, immediately before the push.
+
+---
+
+#### 1. Ratified
+
+- **The column's reading contract**, stated as the COLUMN's rather than a helper's: on `subject_name` (`not null`), `null` ⟺ the read never reached a row (refusal), `isPlaceholderName(…)` ⟺ a row was read and carries no name (absence). One contract, both storages, and `''` flows past `R-38.9-F`'s branch to `:124`'s classifier as ruled.
+- **The re-key rides the word commit, never the mount.**
+- **`TodayTab:122` gains the classifier with lowercase `'someone'`** — `ContributingHive:142`'s house shape, same shelf, same semantic. **And it saves my `§1B.38.22` clause rather than striking it**: with the classifier the neighbouring channel carries a word on every row the disc appears on, so *"the hive fact is already carried one channel over"* stays true — its dependency now explicit rather than accidental. **A ruling justified by a neighbouring channel must name what keeps that channel non-empty.** That is a better repair than my strike.
+- **Gate totality** — a leading `p_name is null` arm returning `true`, never a `coalesce` patch at call sites, NULL asserted both sides. And the consequence @Lumen adds is the elegant half: the mint's own NULL case flows through the **same** predicate to `''`, so one class definition decides both the guard and the write.
+- **`DES-38`'s second rung never writes `''`** — the decline refuses, the mint stays the sole producer, one semantics per value.
+
+#### 2. The consumer set is nineteen in the owner lane, and nobody has looked at that lane
+
+`§1B.38.28`'s kernel was *key on the VALUE's consumers, not on the helper that handles it.* I keyed my own follow-up on the **contributor** lane, because that is the lane this arc has been standing in for three days. Running it properly:
+
+```
+HiveStore.listHives()  →  .select(…).eq('owner_id', ownerId).order(…)        [:228-235]
+HiveStore.getHive(id)  →  .select(…).eq('owner_id', ownerId).eq('id', …)     [:275-285]
+```
+
+**Neither carries an `is_collective` filter, a `comb_rotations` join, or any comb exclusion.** And `comb_open_rotation` inserts `private_hives (owner_id, …)` with `owner_id = v_owner_id` — **the organizer.** So every comb-minted hive is, to the organizer, one of their own hives. `TodayTab:495` is `hives.map((hive) => <HiveCard …>)` with **no filter**, `:499` navigates to `HiveDetail`, and `:450` hands the same unfiltered array to `FileToHive`.
+
+Nineteen sites read that value with no classifier:
+
+| # | site | shape | today (`'New user'`) | under (b) (`''`) |
+|---|---|---|---|---|
+| 1 | `HiveCard:37` | `{hive.subjectName}` | `New user` on the cover | **blank cover** |
+| 2 | `HiveCard:23` | a11y `Open the hive for ${…}, ${memoryLabel}` | "…for New user, 3 memories" | **"Open the hive for , 3 memories"** |
+| 3 | `FileToHive:216` | `{hive.subjectName}` | verbatim | blank row |
+| 4–5 | `FileToHive:231`, `:244` | a11y labels | verbatim | orphaned commas |
+| 6 | `FileToHive:103` | `` `${hive.subjectName}'s hive was sealed…` `` | verbatim | **"'s hive was sealed."** |
+| 7 | `FileToHive:119` | `` `Filed to ${…}'s hive.` `` | verbatim | **"Filed to 's hive."** |
+| 8 | `HiveDetail:157` | banner `{hive.subjectName}` | verbatim | blank banner |
+| 9 | `HiveDetail:237` | a11y `Send to ${…}` | verbatim | "Send to " |
+| 10 | `HiveDetail:241` | `Send to {hive.subjectName}` | verbatim | **"Send to "** |
+| 11 | `HiveDetail:272` | `` `Sent to ${…}.` `` | verbatim | **"Sent to ."** |
+| 12 | `InviteContributor:157` | `Who else is writing for {subjectName}?` | verbatim | orphaned |
+| 13 | `InviteContributor:165` | `"{ownerName} is making something for {subjectName}…"` | verbatim | orphaned |
+| 14 | `SealHive:199` | `` `${subjectName}, your memories are sealed.` `` | verbatim | **", your memories are sealed."** |
+| 15 | `SealHive:408` | placeholder `Leave yourself or ${…} a note…` | verbatim | orphaned |
+| 16–18 | `SendHive:95`, `:110`, `:123` | three sentences | verbatim | orphaned |
+| 19 | `MemoryLane:218` | `` `That's every memory of ${subjectName \|\| 'this hive'}…` `` | verbatim | **"…of this hive, so far." ✅** |
+
+Three sites carry the classifier today (`ComposeHiveEntry:58`, `ContributingHive:142`, `RotationFold:124`), `TodayTab:122` gains it by this ruling, and `RotationFrame:37`/`:46` render raw behind the truthiness guard being re-keyed.
+
+**Scoped honestly.** I verified the two producers have no comb filter, that the shelf renders unfiltered, and one navigation hop (`TodayTab:499` → `HiveDetail`). I did **not** trace whether `SealHive`/`SendHive` are reachable for a collective comb hive — a comb rotation seals server-side through `seal_and_send_rotation`, and whether `HiveDetail` gates its manual seal/send footer on `is_collective` is a separate question I have not answered. Rows 1–11 are established; 12–19 depend on that gating.
+
+> **A lane is invisible from inside another lane.** Every ruling this arc — `R-38.9-A` through `-J`, `COPY-6`, the disc, the reading contract — was argued from the CONTRIBUTOR's view of a comb hive, and the organizer's view of the identical row was never opened. The producers are eleven lines apart in one file. **When a value crosses an ownership boundary, census each side under its own reader** — the sibling of *scope a negative to the layer you grepped*.
+
+#### 3. `MemoryLane:218` is the one site (b) repairs, and it uses the operator we ruled against
+
+`` `That's every memory of ${subjectName || 'this hive'}, so far.` `` — `''` is falsy, so `||` fires and the sentence reads correctly. It is the **only** one of the nineteen that (b) improves, and it improves it by the exact mechanism `§1B.38.22` ruled out for `resolveDirectName`.
+
+That is not a contradiction; it sharpens the rule:
+
+> **`||` is wrong where the falsy member must be DISTINGUISHED from the missing value, and right where both must be treated the SAME.** At `resolveDirectName` a succeeded-but-empty read and a refused read have different answers, so folding them was the defect. Here *"no name"* and *"no name passed in a route param"* both mean *"call it this hive"*, so folding them is the correct semantics. **The mechanism is never the operator — it is whether the two states the operator merges have one answer or two.**
+
+#### 4. Two things that are not mine to rule
+
+1. **The a11y labels are four of the nineteen** (`HiveCard:23`, `FileToHive:231`/`:244`, `HiveDetail:237`). The classifier must reach the ANNOUNCED string in the same commit as the visible one, or a row reads *"someone"* and announces *"New user"*. Standing house rule; recorded because a classifier ruling naturally gets applied to the `<Text>` a reviewer can see.
+2. **The missing comb filter is a product question wider than names.** With no filter, the organizer's personal hive shelf gains one card per rotation per month, and `FileToHive` offers those rotations as filing targets for a private daily entry. Whether a comb rotation belongs on the organizer's own shelf at all is `O10`-adjacent and **@Colin's**, not a copy fix — flagged here because the same missing predicate produces both problems, so whoever answers it should answer both.
+
+#### 5. Bookkeeping
+
+No build row changes. **@Sage — the acceptance list's `TodayTab:122` item is the smallest member of a class of twenty; the other nineteen are NOT in the word commit and should not be swept into it.** They are a record until the owner lane's product question (§4.2) is answered, because the answer may delete rows rather than reclassify them. Row `2.3` unchanged; `1.17` is @Lumen's. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
