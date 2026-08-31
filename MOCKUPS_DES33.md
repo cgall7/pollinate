@@ -4,11 +4,13 @@
 ## Component: RotationFrame.js
 - Location: `src/components/RotationFrame.js`
 - Integration: `PackageOpen.js` (reveal screen)
-- Props: `subjectName`, `closesAt`, `sealedAt` (no `organizerName` — struck, §1B.38.1)
+- Props: none after §1B.38.16 — `subjectName`/`closesAt`/`sealedAt` all come out with the active-branch strike (each prop's only reader dies with it; rides row 1.9 line (1)); `organizerName` already struck §1B.38.1. Until that commit lands, `main` still carries all three
 
 ---
 
 ## State 1: Active Writing (Before Seal)
+
+**SUPERSEDED — R-38.9-A/-D (Lumen, 2026-08-31; `POLLINATE_COMB_ROTATION.md` §1B.38.11):** the active state is not this component's. `RotationFrame`'s only mount is `PackageOpen`, whose subject-scoped, post-send read means the active branch can never legally fire there — the collect surface belongs to `RotationFold` (variant by reader), and the active branch is deleted from `RotationFrame` in row 1.9 line (1)'s commit. This section stays as record only; do not build from it. Its header's "Subject name (h1, ink)" slot also fails R-38.9-H on this mount (the reader is the subject) — see State 2's note.
 
 ### Layout Structure
 ```
@@ -53,22 +55,24 @@
 ┌────────────────────────────────────────────┐
 │  [←]         Header (Glass)         [  ]   │
 │  • Back button (44pt touch target)          │
-│  • Subject name (h1, ink)                   │
+│  • (no name slot — retired, R-38.9-H)       │
 │  • Rotation frame (state line)  ← DES-33   │
 ├────────────────────────────────────────────┤
-│  "You received Sarah's journal"             │
+│  "Written for you"                          │
 │                                             │
 │  (Entry card & ending visible)              │
 │                                             │
 └────────────────────────────────────────────┘
 ```
 
+**AMENDED R-38.9-H (Lumen, 2026-08-31 — `POLLINATE_COMB_ROTATION.md` §1B.38.15/.16):** State 2's only mount is `PackageOpen`, whose read (`getReceivedPackage`) filters `subject_profile_id` to the caller — the reader IS the subject. A reader-is-referent surface speaks second person: it never renders its reader's own name back at her, in the state line or the header. Two retirements in the diagram above, both previously licensed here where no code strike reaches: (1) the header's "Subject name (h1, ink)" slot — with `subject_name` placeholder-class for every no-name signup, it would render "New user" in the largest type on the reveal; any future title in that slot must pass R-38.9-H (second person, or a non-person object) and be ruled before build. (2) The sealed state line — now "Written for you"; second person needs no name, so the placeholder class is unexpressible rather than guarded. The code change rides row 1.9 line (1)'s subject-path commit — this file describes the ruled target, not what `main` renders today.
+
 ### Typography
-- **"You received [Subject]'s journal"**
+- **"Written for you"** *(was "You received [Subject]'s journal" — R-38.9-H, above)*
   - Style: `theme.type.label` (system font, weight: 600)
   - Color: `theme.colors.ink` (full strength)
-  - Layout: Full width, single line, truncate if needed
-  - Meaning: Past tense, celebrates the gift
+  - Layout: Full width, single line
+  - Meaning: Past tense, second person — celebrates the gift to the reader it belongs to
 
 - **No future-rotation line.** §1B.38.1 (Lumen, ratified by Vector): order is a mechanism, not a rendered promise — a client sentence naming next month's writer either reimplements `comb_advance_rotation`'s ordering or promises a schedule the tick may change (skips, dormancy, revival). The sealed state renders no future line in v1. A rendered future is licensed only by an existing rotation row; when that read path exists, a next-subject line may fold in from the minted row, adopting the record rather than the ordering.
 
@@ -88,7 +92,7 @@
 - ❌ NO membership roster before seal
 
 ### What is Rendered (Both Surfaces)
-- ✅ Subject identity ("Writing for Sarah")
+- ✅ Subject identity — member/collect surface only: "Writing for Sarah" (`RotationFold`). The subject's sealed reveal renders "Written for you" (R-38.9-H) — this row's "Both Surfaces" scope narrowed 2026-08-31
 - ✅ Time remaining ("6 days left")
 - ✅ On sealed: completion statement only — no next-rotation preview (struck, §1B.38.1; see State 2 above)
 - ✅ Anticipation framing, not participation metrics
