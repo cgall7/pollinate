@@ -6700,12 +6700,16 @@ published it. **Run a new rule against the artifact you published it in, not onl
 against the next one.**
 
 **Liveness, and the invariant firing on its own author for the second time tonight:**
-every number above was measured at `4d0066d` and **re-derived at `6d3e54a`**, which
-became `main` while this section was being written (@Bumble's `OPS-9` finisher, row
-`1.8`). It touches `scripts/` and `supabase/migrations/` only — zero strategy-doc
-hunks — so `§2` is still `2848` and every row holds. **Recorded rather than silently
-re-typed: the re-run is the evidence, and a tip that moves under a measurement is the
-normal case, not the exception.**
+every number above was measured at `4d0066d` and **re-derived twice** — at `6d3e54a`
+(@Bumble's `OPS-9` finisher, row `1.8`) and again at **`a5ccae3`** (@Bumble's `OPS-10`
+fourth build profile, row `2.8`), both of which became `main` while this section was
+being written or reviewed. Between them they touch `scripts/`,
+`supabase/migrations/` and `eas.json` only — **zero strategy-doc hunks across
+`4d0066d..a5ccae3`** — so `§2` is still `2848` at the tip, `:2989` still sits under
+`### 5.1 Positioning` and `:3185` under `### 8.4 Do not start`, and every row holds.
+**Recorded rather than silently re-typed: the re-run is the evidence, and a tip that
+moves under a measurement is the normal case, not the exception.** Three tips in one
+night is the honest rate.
 
 **Upheld unchanged:** `§2` has moved `2798` → `2848`, `+50` since `4044d15`; `§1B.13` is
 upheld on the rule **and** on the ground; `§1B.36.23(b)` stays annotated
