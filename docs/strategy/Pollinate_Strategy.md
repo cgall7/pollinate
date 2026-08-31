@@ -403,22 +403,37 @@ This captures the full core loop: writing gratitude + packaging/sharing/delaying
 | Free-to-paid conversion rate | Freemium business viability |
 | Monthly Active Users (MAU) | Top-line growth |
 | 30-day retention | Product stickiness |
-| Entries shared to Hive feed | Social engagement |
+| ~~Entries shared to Hive feed~~ | *Dead 2026-08-31 — the friend feed is cut (2026-08-30 ruling); not a supporting metric, there is no surface* |
 
 > **North Star superseded 2026-08-30.** WAHA is replaced by **rotation
 > participation** — the share of an active comb who write for that month's
 > subject. It is condition **C1** in `POLLINATE_COMB_ROTATION.md` §6 and it is
 > the single number that decides the business. The supporting-metric table above
-> stays useful; the four conditions C1–C4 outrank all of it.
+> stays useful; ~~the four conditions C1–C4~~ the conditions of §6 outrank all of it.
+>
+> *[Amended 2026-08-31 — two corrections to this annotation, neither touching its
+> conclusion. (1) **There are FIVE conditions, `C1`–`C5`** —
+> `POLLINATE_COMB_ROTATION.md` §6 is titled "The five conditions that decide this."
+> The omitted one is `C5` (note + nectar frequency), and it is not a minor member:
+> `C1` **and** `C5` are the pair the open price ruling `O4` is gated on (§4), so an
+> enumeration stopping at `C4` drops half the gate on the price. (2) **"Stays
+> useful" does not reach the last row** — "Entries shared to Hive feed" measures a
+> surface the same 2026-08-30 ruling **cut** (`Pollinate_The_Ruling.md`: the Hive
+> tab is comb-first, no photo feed anywhere). That row is dead, not supporting.
+> Same shape as `Pollinate_Strategy.md` §11 and `Pollinate_PRD.md` §8, repaired the
+> same day: a blanket survives-as-inventory clause has to be checked row by row.]*
 
 ### Key Results (12-Month Targets)
 
 > **SUPERSEDED 2026-08-30.** These targets are denominated in individuals and a
 > free→paid conversion that no longer exists in this shape. The replacement is
-> four falsifiable conditions with thresholds, not a quarterly ladder:
+> ~~four~~ **five** falsifiable conditions with thresholds, not a quarterly ladder:
 > **C1** rotation participation ≥60% sustained 3 months; **C2** reveal→install
 > ≥25%; **C3** comb survival ≥50% at month 6; **C4** organizer willingness to
-> pay. **None are measurable today** — there is no analytics SDK in the build.
+> pay; **C5** note + nectar frequency — short notes per active member per week,
+> baseline to establish *(added 2026-08-31: omitted when this annotation was
+> written; `C5` is half the gate on the price, `O4`/§4, and gates all 19b work)*.
+> **None are measurable today** — there is no analytics SDK in the build.
 > Seed three real combs, instrument, and the answer arrives in eight weeks
 > (`POLLINATE_COMB_ROTATION.md` §6).
 

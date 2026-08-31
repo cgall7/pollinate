@@ -512,6 +512,25 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 
 ## 8. Success Metrics
 
+*[Retired as a measurement frame 2026-08-31 (wording @Lumen, encoded @Vector) —
+`POLLINATE_COMB_ROTATION.md` §6 governs: the five conditions `C1`–`C5` decide the
+business, and there is one release, MVP-Comb (§9, `O5` closed). Both tables below
+target releases that no longer exist; none of their numbers is a condition, and
+hitting or missing them decides nothing. They stay as the record of what the slices
+would have measured — engagement-health telemetry of this shape may return under
+Phase 2.7 instrumentation (`ENG-89`/`ENG-78`), as telemetry, never as a gate beside
+§6. **Three rows are dead outright, not inventory, and are struck in place below:**
+"Entries shared to feed" (the feed is cut — `Pollinate_The_Ruling.md`, 2026-08-30),
+"Annual subscription rate" (the annual/monthly structure is retired — the paid line
+is the per-user comb subscription, price unruled until `C1` and `C5`, §4/`O4`), and
+"Cash App gifts sent" (Project 15 was **cancelled** 2026-08-24, superseded by nectar
+zaps — V2 §5.7; there is no such transaction to count). One further row,
+"Private hives created **per paid user**", survives only as a thermometer with a
+retired denominator: private hives are free under §3, so "paid user" no longer
+selects the population it was written to select. Strategy §11's go/no-go annotation
+and §9's North-Star supersession are this frame's siblings; the three together close
+the retired-measurement class.]*
+
 ### Slice 1 (Demo Mode — No Money)
 
 | Metric | Target | What it validates |
@@ -519,7 +538,7 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 | Active testers | 30+ across 3+ groups | Cold-start viability |
 | Daily journal entries per tester/week | 3+ | The journal sticks |
 | Friends added per tester | 3+ | Network formation begins |
-| Entries shared to feed | 20%+ of entries | Solo → social bridge |
+| ~~Entries shared to feed~~ | ~~20%+ of entries~~ | *Dead 2026-08-31 — the feed is cut; there is no surface to measure* |
 | Private hives created | 10+ total | The hero feature lands |
 | Private hive reviews completed ("trips down memory lane") | 5+ total | The review mechanic engages |
 | Packages sent from private hives | 5+ total | The sharing loop works |
@@ -538,8 +557,8 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 | Monthly active users | 1,000+ within 60 days |
 | Private hives created per paid user | 2+ per year |
 | 30-day retention (paid) | 50%+ |
-| Annual subscription rate (% of paid who choose yearly) | 40%+ |
-| Cash App gifts sent (if launched) | Track but no target |
+| ~~Annual subscription rate (% of paid who choose yearly)~~ | ~~40%+~~ *Dead 2026-08-31 — no annual/monthly structure; the paid line is the per-user comb subscription, price unruled (`O4`)* |
+| ~~Cash App gifts sent (if launched)~~ | ~~Track but no target~~ *Dead 2026-08-31 — Project 15 cancelled 2026-08-24, superseded by nectar zaps (V2 §5.7)* |
 
 ---
 
