@@ -46,8 +46,11 @@ const PackageRow = ({ pkg, onPress }) => (
       <Text style={styles.rowName} numberOfLines={1}>
         {pkg.isCollective ? formatRoster(pkg.contributorNames) : pkg.senderName}
       </Text>
+      {/* R-38.9-H: `listReceivedPackages` filters `subject_profile_id` =
+          the caller, so the reader IS the referent on every row — second
+          person, never the (possibly placeholder-class) stored name. */}
       <Text style={styles.rowSubject} numberOfLines={1}>
-        A hive for {pkg.subjectName}
+        A hive for you
       </Text>
     </View>
     <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />

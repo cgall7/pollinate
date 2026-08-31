@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "check:demo-hive": "node scripts/check-demo-hive.mjs",
     "check:comb-identity": "node scripts/check-comb-identity.mjs",
+    "check:placeholder-name": "node scripts/check-placeholder-name.mjs",
     "check:type-choreography": "node scripts/check-type-choreography.mjs",
     "check:text-pigment": "node scripts/check-text-pigment.mjs",
     "check:seeds-rls": "node scripts/check-seeds-rls.mjs",

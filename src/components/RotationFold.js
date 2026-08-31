@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../constants/theme';
 import { numberInWordsCapped } from '../utils/numberWords';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 // DES-22 §5 / DES-31+DES-39 §0 — "the shared fold". One rotation object,
 // worn by three surfaces (the comb screen's own indicator, the contributor's
@@ -111,6 +112,16 @@ export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind 
   // line (§5: "may appear adjacent to this line, not fused into it" —
   // DES-31/39 render it, DES-22's own §8 diagram doesn't, and both are
   // spec-legal). `countKind` only ever matters here.
+  //
+  // R-38.9-G (Lumen, COPY-6): a present-but-placeholder-class `subjectName`
+  // ('New user', the signup default; frozen 'Someone' via the mint's own
+  // backstop) is a different case from the refused-read branch above — a
+  // record DID land here, it just carries no name. Rendering it verbatim
+  // would either print a false name ("Writing for New user") or misuse the
+  // capitalized 'Someone' AUTHORIZATION word (§1B.35.2) as a name-absence
+  // marker, which §1B.38.12 refused. Lowercase, embedded, the house shape
+  // `NectarConsentSheet` already ships — never the stored value.
+  const subjectLine = isPlaceholderName(subjectName) ? 'Writing for someone' : `Writing for ${subjectName}`;
   const countLine =
     count == null || count <= 0
       ? null
@@ -124,7 +135,7 @@ export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind 
 
   return (
     <View style={style}>
-      <Text style={styles.subjectLine}>Writing for {subjectName}</Text>
+      <Text style={styles.subjectLine}>{subjectLine}</Text>
       {daysLine && <Text style={styles.daysLine}>{daysLine}</Text>}
       {countLine && <Text style={styles.countLine}>{countLine}</Text>}
     </View>

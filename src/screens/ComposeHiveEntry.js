@@ -6,6 +6,7 @@ import { tagEntry } from '../utils/themeTagger';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
 import { PaperPicker } from '../components/PaperPicker';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 // 8b.3 — compose a new entry into an existing hive (Design Language §3's
 // Compose Entry Screen). Date is always today, read-only, matching the spec
@@ -49,7 +50,15 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.title}>What's something you're grateful for about {subjectName}?</Text>
+        {/* ENG-96/COPY-6: a placeholder-class subjectName ('New user', or
+            'Someone' via the mint's own backstop) can't be named — the
+            title stays antecedent-free because the screen cannot vouch for
+            a name it could not read. */}
+        <Text style={styles.title}>
+          {isPlaceholderName(subjectName)
+            ? "What's something you're grateful for about this person?"
+            : `What's something you're grateful for about ${subjectName}?`}
+        </Text>
         <Text style={styles.dateLabel}>Today</Text>
         <TextInput
           style={styles.textArea}

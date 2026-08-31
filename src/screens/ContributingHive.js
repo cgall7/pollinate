@@ -10,6 +10,7 @@ import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 const longDate = (isoDate) => {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -122,18 +123,23 @@ export const ContributingHiveScreen = ({ navigation, route }) => {
 
   const cover = hiveCoverTheme(hive.coverTheme);
   const memoryLabel = entries.length === 1 ? '1 memory' : `${entries.length} memories`;
+  // ENG-96/COPY-6: a comb-minted hive's subject_name can be placeholder-
+  // class ('New user', or 'Someone' via the mint's own backstop) — never
+  // render the stored value verbatim here. Lowercase 'someone', the same
+  // house shape as RotationFold's member line.
+  const subjectDisplayName = isPlaceholderName(hive.subjectName) ? 'someone' : hive.subjectName;
 
   return (
     <View style={styles.container}>
       <View style={[styles.banner, { backgroundColor: cover.base }]}>
         <BackButton onPress={() => navigation.goBack()} variant="glass" color={cover.textColor} style={styles.backButton} />
-        <Text style={[styles.bannerName, { color: cover.textColor }]}>{hive.subjectName}</Text>
-        {/* ReceivedPackagesScreen's "A hive for {subjectName}" attribution
-            pattern, adapted the other direction — this screen's subject is
-            already the banner's own name, so what's missing is whose it is,
-            not what it's for. */}
+        <Text style={[styles.bannerName, { color: cover.textColor }]}>{subjectDisplayName}</Text>
+        {/* ReceivedPackagesScreen renders "A hive for you" — second person,
+            R-38.9-H — because its reader IS the subject. This screen's
+            reader is a contributor, not the subject, so third person is
+            still right; only the placeholder-class guard applies here. */}
         <Text style={[styles.bannerAttribution, { color: cover.textColor }]}>
-          A hive for {hive.subjectName}, from {hive.ownerName}
+          A hive for {subjectDisplayName}, from {hive.ownerName}
         </Text>
         <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
       </View>

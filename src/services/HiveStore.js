@@ -104,6 +104,45 @@ const resolveRefusalCause = (own, seat) => {
   return 'unknown';
 };
 
+// ENG-97 (§1B.35.3): a comb writer joins the organizer's hive by invite
+// code, so no honeycomb connection to the organizer is implied and
+// usually none exists — the direct `profiles` join below returns nothing
+// for a comb-minted hive and 'Someone' unnames the very person who
+// invited them. For a comb-minted hive (one `comb_rotations` row
+// references its `hive_id`), the organizer IS always a `comb_members` row
+// (`combs_create_owner_membership` fires at comb creation), so
+// `comb_co_member_names` reaches them where the direct join can't. A
+// §18.1 hive has no `comb_rotations` row and keeps the direct join below —
+// there is no better source for that case, and `'Someone'` there is the
+// honest answer to a real authorization refusal, not a name bug.
+const resolveCombOwnerNames = async (client, hives) => {
+  const hiveIds = hives.map((h) => h.id);
+  if (hiveIds.length === 0) return new Map();
+  const { data: rotations } = await client
+    .from('comb_rotations')
+    .select('hive_id, comb_id')
+    .in('hive_id', hiveIds);
+  const combIdByHiveId = new Map((rotations ?? []).map((r) => [r.hive_id, r.comb_id]));
+  const combIds = [...new Set(combIdByHiveId.values())];
+
+  const memberNamesByCombId = new Map();
+  await Promise.all(
+    combIds.map(async (combId) => {
+      const { data: members } = await client.rpc('comb_co_member_names', { p_comb_id: combId });
+      memberNamesByCombId.set(combId, new Map((members ?? []).map((m) => [m.profile_id, m.display_name])));
+    })
+  );
+
+  const ownerNameByHiveId = new Map();
+  for (const h of hives) {
+    const combId = combIdByHiveId.get(h.id);
+    if (combId == null) continue;
+    const name = memberNamesByCombId.get(combId)?.get(h.owner_id);
+    if (name) ownerNameByHiveId.set(h.id, name);
+  }
+  return ownerNameByHiveId;
+};
+
 export const HiveStore = {
   // The complete creation act against today's schema (§30.9.3): a hive IS
   // its subject's name plus its owner, plus (as of 20260817000002) the
@@ -441,13 +480,16 @@ export const HiveStore = {
     const ownerIds = [...new Set(hives.map((h) => h.owner_id))];
     const { data: owners } = await client.from('profiles').select('id, display_name').in('id', ownerIds);
     const ownerNames = new Map((owners ?? []).map((p) => [p.id, p.display_name]));
+    // ENG-97: overrides the direct join above for comb-minted hives, where
+    // it is refused rather than merely absent.
+    const combOwnerNames = await resolveCombOwnerNames(client, hives);
 
     return hives.map((h) => ({
       id: h.id,
       subjectName: h.subject_name,
       coverTheme: h.cover_theme,
       sealedAt: h.sealed_at,
-      ownerName: ownerNames.get(h.owner_id) || 'Someone',
+      ownerName: combOwnerNames.get(h.id) || ownerNames.get(h.owner_id) || 'Someone',
     }));
   },
 
@@ -475,13 +517,15 @@ export const HiveStore = {
       .select('display_name')
       .eq('id', hive.owner_id)
       .maybeSingle();
+    // ENG-97: overrides the direct join above for a comb-minted hive.
+    const combOwnerNames = await resolveCombOwnerNames(client, [hive]);
 
     return {
       id: hive.id,
       subjectName: hive.subject_name,
       coverTheme: hive.cover_theme,
       sealedAt: hive.sealed_at,
-      ownerName: owner?.display_name || 'Someone',
+      ownerName: combOwnerNames.get(hive.id) || owner?.display_name || 'Someone',
     };
   },
 
