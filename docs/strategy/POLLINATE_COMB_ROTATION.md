@@ -30,7 +30,11 @@ part), §17.5.2 (the $39.99 annual-only line), §17.5.3 (the install table),
 durability promise (§17.4), the metering principle (§17.5.2a), the
 money-transmitter guardrails (§5.6 G1–G5), the navigation ruling
 (`POLLINATE_V2_NAVIGATION.md` — **no Wallet tab**, reconfirmed 2026-08-30), or
-19a-before-19b phasing. Slice 1 still ships first.
+19a-before-19b phasing. ~~Slice 1 still ships first.~~ **Retired 2026-08-30,
+same day: §9 retires the "Slice 1 ships first, *then* the comb work"
+sequencing and `O5` closed it — there is ONE release, MVP-Comb (§1A). This
+sentence was left standing when §9 was written; it is the most-read paragraph
+in this document, so it is annotated here rather than only there.**
 
 ---
 
@@ -3171,7 +3175,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Semantics ruled in §1B.16: seal-and-send, one event, idempotent.** **Cannot wrap `send_hive`** — its friend-connection precondition makes a comb undeliverable; authorization is **comb membership**. **Must refuse to deliver a zero-entry rotation.** **Gates the §1A definition of done** (there is no reveal without a seal) |
 | **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to **open a rotation**, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime. **§1B.31 — the open half is missing from the shipped branch and was routed to `ENG-60` in the migration's own comment; it cannot live there, because `OPS-9` *is* `ENG-60`'s runtime.** Also carries §1B.31's two unruled product decisions now ruled: next subject = `comb_members` by `joined_at` wrapping (skipping closed/tombstoned seats and **nobody else**), and `closes_at + cadence`, never `now() + cadence` |
-| **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays`. Follow `README.md`'s sweep procedure — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
+| **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays` / `organizer[- ]paid` *(amended 2026-08-31: the hyphenated participle is the form every 08-30 defect site actually used — a list carrying only the verb form is blind to the adjective)*, `Slice 1 (still )?ship(s|ping) first` *(added 2026-08-31: a retired sequencing claim. The token was first written `ships first`; widened to the participle the same pass, because `Pollinate_The_Ruling.md`'s **"Unchanged:"** bullet says "Slice 1 shipping first" and is invisible to the verb form — the same blindness as `organizer pays` vs `organizer-paid`, one inflection over. census at `0077dce` with the widened token: 11 hits, 7 machinery, **4 live**, all repaired this pass)*. Follow `README.md`'s sweep procedure — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
 
 ### 8.4 Do not start
 
@@ -3332,8 +3336,9 @@ Recorded so no one over-reads this ruling:
   into MVP-Comb (§1A). *Amended 2026-08-30:* the earlier "Slice 1 ships first,
   **then** the comb work" sequencing is retired — shipping a demo of the product
   before the thing that is now the product does not make sense. **There is one
-  release: MVP-Comb.** See open ruling **O5** if a separate earlier demo build
-  is still wanted.
+  release: MVP-Comb.** ~~See open ruling **O5** if a separate earlier demo
+  build is still wanted.~~ **`O5` is CLOSED (`a11aa144…`, §10) — one release;
+  this pointer described it as open and is corrected 2026-08-30.**
 - **§0's positioning amendment** — gratitude is the mechanic, not the category.
 - **The metering principle** (§17.5.2a) — meter the artifact, never the practice,
   never the graph. §3.1 complies: the paid line prices **breadth and size**, and

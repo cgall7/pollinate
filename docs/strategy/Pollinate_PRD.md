@@ -44,8 +44,8 @@ The network grows. The honeycomb fills in. The garden accumulates.
 
 | Slice | Focus | Money? | Distribution |
 |---|---|---|---|
-| **Slice 1: Demo Mode** | Journal + private hives + social seeds + honeycomb + feed | No | TestFlight / internal track |
-| **Slice 2: Public Launch** | Revenue model per `POLLINATE_V2_SPEC.md` §17.5 (ruled 2026-08-24: $39.99/yr annual-only, paywall at *delivery*, first delivery free forever) + nectar zaps (V2 §5 — the Cash-App-via-iMessage plan is superseded, V2 §5.7) | Zaps are self-custodial, 100% to receiver (Pollinate is NOT a money transmitter — V2 §5.6) | App Store / Play Store | *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+| **Slice 1: Demo Mode** | Journal + private hives + social seeds + honeycomb + ~~feed~~ | No | ~~TestFlight / internal track~~ | *(Amended 2026-08-31 — **three retired claims in this row**, and the annotation on the Slice 2 row below does not reach it: (1) **Slice 1 is not a separate release** — `POLLINATE_COMB_ROTATION.md` §9, `O5` closed `a11aa144…`: there is one release, MVP-Comb; (2) the **feed is cut** — `Pollinate_The_Ruling.md` 2026-08-30, the Hive tab is comb-first and there is no photo feed anywhere; (3) distribution is **EAS internal via `OPS-10`** — `O7` closed; `11.1` TestFlight is MVP2. The row stays as the record of the original slicing.)*
+| **Slice 2: Public Launch** | Revenue model per `POLLINATE_V2_SPEC.md` §17.5 (ruled 2026-08-24: $39.99/yr annual-only, paywall at *delivery*, first delivery free forever) + nectar zaps (V2 §5 — the Cash-App-via-iMessage plan is superseded, V2 §5.7) | Zaps are self-custodial, 100% to receiver (Pollinate is NOT a money transmitter — V2 §5.6) | App Store / Play Store | *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 | **Slice 3: Transaction Research** | Evaluate MDK/Lightning integration IF transaction fees make sense. Requires legal/compliance research. | TBD based on research | — |
 
 ---
@@ -76,7 +76,7 @@ Pollinate is not a utility app. It's an **emotional experience.** Every interact
 - 25–45 years old. Remembers birthdays, writes cards, plans surprises.
 - Wants to express gratitude that feels meaningful, not transactional.
 - The Private Hive concept is built for them: write gratitude about someone over months, revisit it on "trips down memory lane," and package the best moments to send when ready.
-- They'll pay for Pollinate Plus ($39.99/yr — V2 §17.5) because this replaces greeting cards, gifts, and "thinking of you" texts — and the renewal lands next to the ritual (a birthday, an anniversary), not in a dead month. *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+- They'll pay for Pollinate Plus ($39.99/yr — V2 §17.5) because this replaces greeting cards, gifts, and "thinking of you" texts — and the renewal lands next to the ritual (a birthday, an anniversary), not in a dead month. *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 
 ### Persona B: "The Community Builder"
 - 22–40 years old. Runs a maker group, church community, recovery circle, or tight friend group.
@@ -103,7 +103,7 @@ Today  |  Hive  |  Garden
 > is deleted — the comb is the wallet and the account door moves to the top
 > right. Ruling and design spec: `POLLINATE_V2_NAVIGATION.md`.
 
-> *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+> *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §3/§4 governs: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 
 | Tab | What it is | Free tier | Paid tier (Pollinate Plus, $39.99/yr — V2 §17.5) | MVP1 status |
 |---|---|---|---|---|
@@ -198,7 +198,7 @@ The review prompt is the app's core re-engagement mechanic. It's not a notificat
 > paywall meters **delivery**. `POLLINATE_V2_SPEC.md` §17.5 governs; the table
 > below mirrors it and must not drift from it.
 
-> *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+> *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §3/§4 governs: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 
 | | Free | Pollinate Plus ($39.99/yr, annual only) |
 |---|---|---|
@@ -378,7 +378,7 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | **Cash App links (Slice 2)** | Pollinate generates links, Cash App handles money | ❌ No — we don't touch money | Possible affiliate revenue (research) |
 | **MDK with platform fees** | Pollinate processes Lightning payments, takes 1% | ⚠️ Possibly — depends on structuring | 1% of tip volume |
 | **MDK as non-custodial wallet** | Users self-custody, Pollinate only provides UX | ⚠️ Possibly less risky, but untested legally | 1% of tip volume |
-| **Subscription only** | No transaction fees. Revenue from subscription only *(2026-08-30: read "Pollinate Plus" as **the comb plan, $5.99/mo**. The no-transaction-fees rule itself is unchanged and binding, and is reinforced by guardrail G5 — no fee on zaps, ever)* | ❌ No money movement at all | $39.99/user/yr (~$34 net of Apple 15% — V2 §17.5.3) |
+| **Subscription only** | No transaction fees. Revenue from subscription only *(2026-08-30: read "Pollinate Plus" as **the per-user subscription** — `POLLINATE_COMB_ROTATION.md` §3/§4. The no-transaction-fees rule itself is unchanged and binding, and is reinforced by guardrail G5 — no fee on zaps, ever)* | ❌ No money movement at all | ~~$39.99/user/yr (~$34 net of Apple 15% — V2 §17.5.3)~~ **Price deliberately unruled until `C1` and `C5` return** (`POLLINATE_COMB_ROTATION.md` §4, `O4`); Apple's 15% cut still applies whatever the number |
 
 **Recommendation for Slice 2 (superseded 2026-08-24):** ~~Start with Cash App links.~~ The Cash-App-links plan is cancelled (V2 §5.7). The money layer is nectar zaps — self-custodial, 100% to the receiver, never a revenue line (V2 §5, §17.5.5); revenue is subscription only.
 
@@ -417,7 +417,7 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 | Daily journal | Full, unlimited |
 | Private hives | **Unlimited, forever** *(V2 §17.5, ruled 2026-08-24 — supersedes the 2026-08-19 "1 hive, lifetime" line; writing is the moat and is never metered)* |
 | Review cadence | **Monthly, yearly, or manual — ungated** (ruled 2026-08-25, V2 §17.5.2a) |
-| Delivery | ~~**First delivery free, forever**; every later delivery requires Plus (V2 §17.5)~~ **Superseded 2026-08-30** — the delivery meter is retired as the primary mechanism; the paid line is the comb plan at $5.99/mo (first *rotation* free). Whether any delivery meter survives is open ruling O1 |
+| Delivery | ~~**First delivery free, forever**; every later delivery requires Plus (V2 §17.5)~~ **Superseded 2026-08-30** — the delivery meter is retired as the primary mechanism; the paid line is the per-user subscription, price deliberately unruled until `C1` and `C5` return (`POLLINATE_COMB_ROTATION.md` §3/§4, `O4`). `O1` is closed — free for everything except the comb; no delivery meter survives |
 | Export | Free, forever, on every tier (V2 §17.4) |
 | Social seeds | **Unlimited** — no count; abuse handled by rate limit (~5/week, a guard not a tier — V2 §17.5.2a) |
 | Public hives (social) | **Unlimited friends** (V2 §17.5.2a — the graph is never metered) |
@@ -428,7 +428,7 @@ If we eventually want to earn transaction fees on tips, we'd need to integrate M
 
 ### Paid Tier — "Pollinate Plus" ($39.99/year, annual only — V2 §17.5; the monthly plan is retired, not repriced)
 
-> **SUPERSEDED 2026-08-30.** Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.
+> **SUPERSEDED 2026-08-30.** Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §3/§4 governs: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.
 
 | Feature | Paid unlocks |
 |---|---|
@@ -512,6 +512,25 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 
 ## 8. Success Metrics
 
+*[Retired as a measurement frame 2026-08-31 (wording @Lumen, encoded @Vector) —
+`POLLINATE_COMB_ROTATION.md` §6 governs: the five conditions `C1`–`C5` decide the
+business, and there is one release, MVP-Comb (§9, `O5` closed). Both tables below
+target releases that no longer exist; none of their numbers is a condition, and
+hitting or missing them decides nothing. They stay as the record of what the slices
+would have measured — engagement-health telemetry of this shape may return under
+Phase 2.7 instrumentation (`ENG-89`/`ENG-78`), as telemetry, never as a gate beside
+§6. **Three rows are dead outright, not inventory, and are struck in place below:**
+"Entries shared to feed" (the feed is cut — `Pollinate_The_Ruling.md`, 2026-08-30),
+"Annual subscription rate" (the annual/monthly structure is retired — the paid line
+is the per-user comb subscription, price unruled until `C1` and `C5`, §4/`O4`), and
+"Cash App gifts sent" (Project 15 was **cancelled** 2026-08-24, superseded by nectar
+zaps — V2 §5.7; there is no such transaction to count). One further row,
+"Private hives created **per paid user**", survives only as a thermometer with a
+retired denominator: private hives are free under §3, so "paid user" no longer
+selects the population it was written to select. Strategy §11's go/no-go annotation
+and §9's North-Star supersession are this frame's siblings; the three together close
+the retired-measurement class.]*
+
 ### Slice 1 (Demo Mode — No Money)
 
 | Metric | Target | What it validates |
@@ -519,7 +538,7 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 | Active testers | 30+ across 3+ groups | Cold-start viability |
 | Daily journal entries per tester/week | 3+ | The journal sticks |
 | Friends added per tester | 3+ | Network formation begins |
-| Entries shared to feed | 20%+ of entries | Solo → social bridge |
+| ~~Entries shared to feed~~ | ~~20%+ of entries~~ | *Dead 2026-08-31 — the feed is cut; there is no surface to measure* |
 | Private hives created | 10+ total | The hero feature lands |
 | Private hive reviews completed ("trips down memory lane") | 5+ total | The review mechanic engages |
 | Packages sent from private hives | 5+ total | The sharing loop works |
@@ -538,8 +557,8 @@ Row-level security (RLS) policies in Supabase enforce this at the database level
 | Monthly active users | 1,000+ within 60 days |
 | Private hives created per paid user | 2+ per year |
 | 30-day retention (paid) | 50%+ |
-| Annual subscription rate (% of paid who choose yearly) | 40%+ |
-| Cash App gifts sent (if launched) | Track but no target |
+| ~~Annual subscription rate (% of paid who choose yearly)~~ | ~~40%+~~ *Dead 2026-08-31 — no annual/monthly structure; the paid line is the per-user comb subscription, price unruled (`O4`)* |
+| ~~Cash App gifts sent (if launched)~~ | ~~Track but no target~~ *Dead 2026-08-31 — Project 15 cancelled 2026-08-24, superseded by nectar zaps (V2 §5.7)* |
 
 ---
 
