@@ -35,6 +35,12 @@
 //       `countKind` — it renders the size sentence unconditionally, so
 //       `variant: 'subject', countKind: 'writers'` can't reach a
 //       participation claim. R-38.9 hardening requirement 2 (Lumen)
+//   R8  `RotationFold.js`'s nameless branch's count is unreachable by a
+//       writers-declared value — gated on `countKind === 'size'` ABOVE the
+//       branch split, so a degraded member mount (missing `subjectName`,
+//       `countKind` at its 'writers' default) can't leak the writer count
+//       into the size sentence. R-38.9-E (Lumen), probe-the-fix's-new-
+//       surface on hardening requirement 1
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -236,6 +242,54 @@ walk(foldAst.program, (n) => {
       );
     } else {
       ok('R7 nameless/subject branch never reads countKind — no participation claim is reachable from it');
+    }
+  }
+}
+
+// ── R8. nameless branch's count is unreachable by a writers-declared value
+//       — gated on countKind === 'size' ABOVE the branch split (R-38.9-E) ─
+{
+  if (!rotationIf) {
+    bad('R8 count source gate', 'could not find the variant branch in RotationFold — FAILS CLOSED');
+  } else {
+    // Find whatever identifier the nameless branch's zero-suppression guard
+    // compares against 0 (its `<name> <= 0` half) — that identifier is
+    // whatever feeds the branch's count line, by construction of R5's own
+    // pattern — then trace it back to its own declaration, which must sit
+    // OUTSIDE the branch and gate on `countKind === 'size'` with a `null`
+    // alternate. A bare reference to the raw `count` prop has no such
+    // declaration and fails this by construction, same as a rename would.
+    let countRef = null;
+    walk(rotationIf.consequent, (n) => {
+      if (countRef) return;
+      if (n.type === 'BinaryExpression' && n.operator === '<=' && n.left.type === 'Identifier') {
+        countRef = n.left.name;
+      }
+    });
+    if (!countRef) {
+      bad('R8 count source gate', "could not find the nameless branch's `<name> <= 0` zero-suppression guard to trace — FAILS CLOSED");
+    } else if (countRef === 'count') {
+      bad(
+        'R8 count source gate',
+        "the nameless branch reads the raw `count` prop directly — a countKind: 'writers' caller (the default) can reach it undeclared; gate it through a `countKind === 'size' ? count : null` derivation declared above the branch"
+      );
+    } else {
+      let decl = null;
+      walk(foldAst.program, (n) => {
+        if (n.type === 'VariableDeclarator' && n.id?.name === countRef) decl = n.init;
+      });
+      const declOutsideBranch =
+        decl && !(decl.start >= rotationIf.consequent.start && decl.end <= rotationIf.consequent.end);
+      const declSrc = decl ? foldSrc.slice(decl.start, decl.end) : '';
+      const gatesOnSize = /countKind\s*===\s*['"]size['"]/.test(declSrc) && /:\s*null\b/.test(declSrc);
+      if (decl && declOutsideBranch && gatesOnSize) {
+        ok(`R8 nameless branch's count (\`${countRef}\`) is gated on countKind === 'size' above the branch — unreachable by a writers-declared value`);
+      } else {
+        bad(
+          'R8 count source gate',
+          `\`${countRef}\` feeds the nameless branch's count line but its declaration (\`${declSrc || '<not found>'}\`) doesn't gate on countKind === 'size' with a null alternate, declared outside the branch`
+        );
+      }
     }
   }
 }

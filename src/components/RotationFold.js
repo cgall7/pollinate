@@ -32,6 +32,19 @@ export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind 
   // name to the subject herself.
   const isMember = variant === 'member' && !!subjectName;
 
+  // R-38.9-E (Lumen): derived above the branch split, not inside it. A
+  // fail-closed fallback inherits every CALLER's inputs, not just the one
+  // it was built for — a degraded member mount (`subjectName` missing,
+  // `countKind` left at its 'writers' default, `count` sourced from
+  // `comb_rotation_writer_count`) lands in the nameless branch by
+  // hardening requirement 1, and without this gate would render the
+  // writer count as a comb-size claim ("Four people are in this comb")
+  // from two individually-true inputs. Only an explicit `countKind:
+  // 'size'` declaration reaches the nameless branch's count line; every
+  // other declared source — 'writers' or its default — resolves to `null`
+  // here and the line is withheld, never mislabeled.
+  const sizeCount = countKind === 'size' ? count : null;
+
   if (!isMember) {
     // §5 (subject-view) — also the fail-closed default per hardening
     // requirement 1. Hardening requirement 2 (Lumen): `countKind` is not
@@ -44,11 +57,11 @@ export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind 
     // a branch that can't reach the other branch's interpretation of
     // `count` rather than as a second component.
     const countLine =
-      count == null || count <= 0
+      sizeCount == null || sizeCount <= 0
         ? null
-        : count === 1
+        : sizeCount === 1
           ? 'One person is in this comb.'
-          : `${numberInWordsCapped(count)} people are in this comb.`;
+          : `${numberInWordsCapped(sizeCount)} people are in this comb.`;
 
     return (
       <View style={style}>
