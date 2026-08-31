@@ -427,6 +427,7 @@ async function main() {
     ['combs_create_owner_membership()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['comb_members_departure_closes_writing_seat()', { roles: ['authenticated', 'service_role'], why: 'ENG-99 trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['entries_mark_shared()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
+    ['enforce_comb_entitlements()', { roles: ['authenticated', 'service_role'], why: 'ENG-85 trigger, inert by direct call; server-owned plan tables are read inside the definer' }],
     ['entries_resolve_volume_id()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['handle_new_user()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
     ['private_hives_create_volume_one()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],

@@ -247,6 +247,10 @@ export const SENTINELS = {
   // column, rpc, or storage probe that could distinguish before/after this
   // migration through the anon key. Status comes from version order alone.
   '20260830000012_ops9_rotation_scheduler': { kind: 'order', reason: 'service_role-only function + pg_cron schedule, no anon-visible surface' },
+  // ENG-85 adds server-owned plan tables plus this nullable comb column.
+  // The column is the stable live-schema signal; enforcement remains dormant
+  // while both seeded plan limits are NULL.
+  '20260830000013_eng85_entitlements': { kind: 'column', table: 'combs', column: 'member_limit_override' },
   // ENG-59 (Fizz). comb_preview_by_invite_code is the opposite grant shape
   // from comb_join_by_invite_code above -- anon is meant to reach it (the
   // whole point of a pre-auth landing), so 42501 is never a LIVE reading
