@@ -312,6 +312,15 @@ export const SENTINELS = {
   // Anon's denial is the only state this function has ever been in, so
   // 42501 is what "this migration landed" looks like from outside, same
   // reasoning as ENG-93's row.
+  //
+  // §1B.36.25: this migration also body-replaces comb_open_rotation
+  // (adds the p_closes_at derivation/discriminator) — grants unchanged,
+  // same class as `...0010`'s entry above: a DEFAULT param doesn't
+  // change pg_get_function_identity_arguments, so the signature this
+  // sentinel would otherwise probe is untouched. One entry per file is
+  // this gate's shape (existence/shape only, not full-file coverage —
+  // see this file's header); comb_advance_rotation's rpc probe below
+  // stands for the migration as a whole.
   '20260830000011_eng60_comb_advance_rotation': {
     kind: 'rpc',
     fn: 'comb_advance_rotation',

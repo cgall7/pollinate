@@ -519,6 +519,93 @@ async function main() {
       }
     }
 
+    // ---------------------------------------------------------------
+    // §1B.36.25 (row 1.9a): p_closes_at derivation. Own combs, own
+    // fixture -- every comb above this point already carries an open
+    // rotation, and comb_rotations_one_open_per_comb refuses a second
+    // mint without resolving the first. MEMBER_B has not been seated
+    // anywhere yet in this file.
+    {
+      const { rows: closesCombRows } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.combs (owner_id, name) values ($1, 'Closes-At Comb A') returning id",
+          [OWNER]
+        )
+      );
+      const closesComb = closesCombRows[0];
+      await asPostgres(() =>
+        client.query('insert into public.comb_members (comb_id, profile_id) values ($1, $2)', [
+          closesComb.id,
+          MEMBER_B,
+        ])
+      );
+
+      // Positive: p_closes_at omitted, authenticated owner — derived
+      // value is now() + the comb's own cadence (default 1 month).
+      // Subject is a non-member (MEMBER_A, per Row 1's ruled organizer
+      // choice) so the roster (MEMBER_B) stays non-empty regardless.
+      {
+        const { rows } = await asUser(OWNER, () =>
+          client.query('select public.comb_open_rotation($1, $2) as id', [closesComb.id, MEMBER_A])
+        );
+        const { rows: rotRows } = await asPostgres(() =>
+          client.query(
+            `select extract(epoch from (closes_at - now())) as delta_seconds
+             from public.comb_rotations where id = $1`,
+            [rows[0].id]
+          )
+        );
+        const deltaDays = Number(rotRows[0].delta_seconds) / 86400;
+        // Cadence default is 1 month (~30 days); allow a wide band since
+        // this only needs to distinguish "derived" from "omitted/garbage",
+        // not pin an exact interval-to-days conversion.
+        if (deltaDays > 25 && deltaDays < 35) {
+          ok('§1B.36.25: p_closes_at omitted — derived to now() + cadence');
+        } else {
+          bad('§1B.36.25: p_closes_at omitted — derived to now() + cadence', JSON.stringify(rotRows[0]));
+        }
+      }
+
+      // Negative: an authenticated owner's EXPLICIT past timestamp is
+      // ignored outright, not floored — stored closes_at is still the
+      // derived future value. Second comb: the first already holds an
+      // open rotation.
+      const { rows: closesCombRows2 } = await asUser(OWNER, () =>
+        client.query(
+          "insert into public.combs (owner_id, name) values ($1, 'Closes-At Comb B') returning id",
+          [OWNER]
+        )
+      );
+      const closesComb2 = closesCombRows2[0];
+      await asPostgres(() =>
+        client.query('insert into public.comb_members (comb_id, profile_id) values ($1, $2)', [
+          closesComb2.id,
+          MEMBER_B,
+        ])
+      );
+      {
+        const { rows } = await asUser(OWNER, () =>
+          client.query(
+            "select public.comb_open_rotation($1, $2, now() - interval '1 day') as id",
+            [closesComb2.id, MEMBER_A]
+          )
+        );
+        const { rows: rotRows } = await asPostgres(() =>
+          client.query('select closes_at > now() as in_future from public.comb_rotations where id = $1', [
+            rows[0].id,
+          ])
+        );
+        if (rotRows[0].in_future === true) {
+          ok('§1B.36.25: authenticated caller\'s explicit past closes_at is ignored, not floored — stored value is still future-derived');
+        } else {
+          bad(
+            '§1B.36.25: authenticated caller\'s explicit past closes_at is ignored, not floored — stored value is still future-derived',
+            JSON.stringify(rotRows[0])
+          );
+        }
+      }
+    }
+
     console.log(`\ncheck-comb-open-rotation: ${pass} passed, ${failures.length} failed`);
     if (failures.length > 0) {
       console.log('\nFailures:');

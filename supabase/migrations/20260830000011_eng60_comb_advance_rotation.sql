@@ -1,5 +1,129 @@
 -- ENG-60, row 1.9a (Fizz). Thread b57ad406/f2c15b7d, 2026-08-30.
 --
+-- §1B.36.25: month-1's closes_at base derives here, in the mint, not in
+-- the client. Re-derived from `...0010`'s body of comb_open_rotation --
+-- the highest-numbered prior definition at authoring time -- per this
+-- table's own standing rule (§1B.36.8/.24): a create or replace is a
+-- whole-body assertion, never a diff against the previous one.
+--
+-- p_closes_at becomes optional (default null). Omitted (the ordinary
+-- case -- DES-29's create screen stops computing a timestamp at all), the
+-- derived value is now() + the comb's own cadence -- the base case of
+-- §1B.31.1iii's closes_at + k*cadence recurrence, reading the SAME
+-- cadence column this row's own advance (below) already reads, so there
+-- is exactly one number, not three (client, mint, advance).
+--
+-- An explicit p_closes_at is honoured ONLY when auth.uid() is null --
+-- i.e. no session, which on this schema means service_role: this row's
+-- own advance path (comb_advance_rotation, below) supplying
+-- closes_at + k*cadence for month N+1. A real session's explicit
+-- argument is IGNORED, not floored -- ignoring needs no threshold and
+-- makes an organizer-supplied clock unrepresentable outright, rather
+-- than merely bounded (§1B.36.25's own framing).
+create or replace function public.comb_open_rotation(
+  p_comb_id uuid,
+  p_subject_profile_id uuid,
+  p_closes_at timestamptz default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_owner_id uuid;
+  v_cadence interval;
+  v_closes_at timestamptz;
+  v_subject_display_name text;
+  v_hive_id uuid;
+  v_ordinal int;
+  v_rotation_id uuid;
+  v_contributor_count int;
+begin
+  select c.owner_id, c.cadence into v_owner_id, v_cadence
+  from public.combs c
+  where c.id = p_comb_id;
+
+  if v_owner_id is null then
+    raise exception 'comb_open_rotation: comb not found' using errcode = '42501';
+  end if;
+
+  if auth.uid() is not null
+    and auth.uid() is distinct from v_owner_id then
+    raise exception 'comb_open_rotation: caller does not own this comb' using errcode = '42501';
+  end if;
+
+  -- §1B.36.25: derive the base case of the clock's own recurrence, or
+  -- honour an explicit value ONLY from the caller with no session.
+  if p_closes_at is not null and auth.uid() is null then
+    v_closes_at := p_closes_at;
+  else
+    v_closes_at := now() + v_cadence;
+  end if;
+
+  -- ENG-94: repointed onto the shared subject-deliverable predicate
+  -- (ENG-95). See `...0010`'s header -- this is the tombstone check plus
+  -- the departure arm it was missing, not a new rule; unchanged here.
+  if public.comb_subject_gone(p_comb_id, p_subject_profile_id) then
+    raise exception 'comb_open_rotation: subject is gone (deleted account or left this comb)';
+  end if;
+
+  select p.display_name into v_subject_display_name
+  from public.profiles p
+  where p.id = p_subject_profile_id;
+
+  -- Leg (b) deliberately absent: no check that p_subject_profile_id is an
+  -- active row in comb_members. Gated at comb_open_rotation's own suite.
+  insert into public.private_hives (owner_id, subject_name, is_collective, subject_profile_id)
+  values (
+    v_owner_id,
+    coalesce(nullif(v_subject_display_name, ''), 'Someone'),
+    true,
+    p_subject_profile_id
+  )
+  returning id into v_hive_id;
+
+  -- Roster snapshot: every ENROLLABLE comb member except the subject --
+  -- active (removed_at is null) AND not tombstoned (ENG-100, §1B.36.9/.18).
+  -- Unchanged from `...0010`.
+  insert into public.hive_contributors (hive_id, profile_id, invited_by)
+  select v_hive_id, m.profile_id, v_owner_id
+  from public.comb_members m
+  where m.comb_id = p_comb_id
+    and m.removed_at is null
+    and m.profile_id <> p_subject_profile_id
+    and not exists (
+      select 1
+      from public.profiles p
+      where p.id = m.profile_id
+        and p.deleted_at is not null
+    );
+
+  get diagnostics v_contributor_count = row_count;
+
+  -- ENG-100 (row 1.7b): month 1 is exempt from §1B.31.3's ≥2-ENROLLABLE
+  -- floor, so this is the only place an empty writing roster is
+  -- observable. Unchanged from `...0010`.
+  if v_contributor_count = 0 then
+    raise exception 'comb_open_rotation: no enrollable contributors for this rotation'
+      using errcode = 'check_violation', constraint = 'comb_open_rotation_enrollable_floor';
+  end if;
+
+  select coalesce(max(r.ordinal), 0) + 1 into v_ordinal
+  from public.comb_rotations r
+  where r.comb_id = p_comb_id;
+
+  insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at)
+  values (p_comb_id, v_ordinal, v_hive_id, p_subject_profile_id, v_closes_at)
+  returning id into v_rotation_id;
+
+  return v_rotation_id;
+end;
+$$;
+
+-- create or replace preserves the existing grants (authenticated,
+-- service_role, revoked from anon) unaffected by a body-only replace.
+
 -- comb_advance_rotation(p_comb_id): the server-side advance POLICY, carved
 -- out of ENG-60 per §1B.31.1(ii) so OPS-9 (row 1.8) can depend on it
 -- without a cycle (1.8 -> 1.9a -> ENG-93, not 1.8 -> 1.9 -> 1.8). Computes
