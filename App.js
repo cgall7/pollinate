@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import * as Linking from 'expo-linking';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as SplashScreen from 'expo-splash-screen';
@@ -28,6 +29,8 @@ import { MemoryLaneScreen } from './src/screens/MemoryLane';
 import { ReceivedPackagesScreen } from './src/screens/ReceivedPackages';
 import { PackageOpenScreen } from './src/screens/PackageOpen';
 import { PollinateWrapped } from './src/screens/PollinateWrapped';
+import { CombInviteLandingScreen, CombInviteNameScreen } from './src/screens/CombInvite';
+import { COMB_COLLECT_ROUTE, CombCollectScreen } from './src/screens/CombCollect';
 import { MainTabs } from './src/navigation/MainTabs';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -39,6 +42,8 @@ import { DEMO_MODE } from './src/constants/demoMode';
 import { resolveInitialRouteWithTimeout } from './src/utils/resolveInitialRoute';
 import { isNudgeResponse } from './src/services/dailyNudge';
 import { rearmDailyNudge } from './src/services/rearmDailyNudge';
+import { parseCombInviteUrl } from './src/services/combInviteLinking';
+import { PendingCombInvite } from './src/services/pendingCombInvite';
 
 const Stack = createStackNavigator();
 
@@ -109,9 +114,24 @@ export default function App() {
   // onto the same instances that just threw — a plain setState re-render
   // wouldn't touch component state a crash left in a bad shape.
   const [resetKey, setResetKey] = useState(0);
+  const pendingInviteNavigation = useRef(null);
 
   useEffect(() => {
     Font.loadAsync(fontAssets).then(() => setFontsLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    const handleInviteUrl = async (url) => {
+      const inviteCode = parseCombInviteUrl(url);
+      if (!inviteCode) return;
+      await PendingCombInvite.set(inviteCode);
+      const destination = { name: 'CombInvite', params: { inviteCode } };
+      if (navigationRef.current?.isReady()) navigationRef.current.navigate(destination.name, destination.params);
+      else pendingInviteNavigation.current = destination;
+    };
+    Linking.getInitialURL().then(handleInviteUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleInviteUrl(url));
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {
@@ -172,6 +192,11 @@ export default function App() {
       if (isNudgeResponse(lastResponse)) {
         navigationRef.current?.navigate('Main', { screen: 'Today' });
       }
+      if (pendingInviteNavigation.current) {
+        const destination = pendingInviteNavigation.current;
+        pendingInviteNavigation.current = null;
+        navigationRef.current?.navigate(destination.name, destination.params);
+      }
     }
   }, [fontsLoaded]);
 
@@ -197,7 +222,11 @@ export default function App() {
                 <OnboardingFlow
                   {...props}
                   startAt={props.route.params?.startAt}
-                  onDone={() => props.navigation.replace('Main')}
+                  onDone={async () => {
+                    const inviteCode = await PendingCombInvite.get();
+                    if (inviteCode) props.navigation.replace('CombInviteName', { inviteCode });
+                    else props.navigation.replace('Main');
+                  }}
                   splashHidden={splashHidden}
                 />
               )}
@@ -268,6 +297,9 @@ export default function App() {
                 its "PRIVATE HIVES" shelf already uses. */}
             <Stack.Screen name="InviteContributor" component={InviteContributor} />
             <Stack.Screen name="ContributingHive" component={ContributingHiveScreen} />
+            <Stack.Screen name="CombInvite" component={CombInviteLandingScreen} />
+            <Stack.Screen name="CombInviteName" component={CombInviteNameScreen} />
+            <Stack.Screen name={COMB_COLLECT_ROUTE} component={CombCollectScreen} />
             {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
                 found: the 8b.2-8b.7 arc was live at the data layer with no
                 button anywhere to trigger it). Design Language §5-6, condensed
