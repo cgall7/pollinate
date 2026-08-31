@@ -3204,7 +3204,7 @@ consequence, and learn in between.**
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
 | 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE. **ACCEPTANCE ADDED §1B.36.19: this row inherits the CLOCK-BOUNDARY pair** (moved off `1.9a`, which could not run them). In `check-ops9-rotation-scheduler.mjs`, with the second block built: **row 2** — tick with the floor intact → `warnings` contains **no** match; **row 3** — tick with the floor stripped → `warnings` **does** match, the **positive control**. **Undeletable pair, with the in-gate comment saying so** — row 3 is the only thing separating *the floor held* from *nothing ran*, and row 2 alone is green on a tick that never advances. Runnable here because `1.9a` is already a dep. **MERGE-TIME REQUIREMENTS ADDED §1B.36.24 — this branch is 11 behind `main`, so its gate set is a snapshot of a stale merge-base:** (i) `OPS-11` landed inside the gap and `check-share-visibility` now asserts a catalog-wide `EXPECTED_DEFINER_GRANTS` map whose rule is *“no row at all is also a failure”* — `advance_due_rotations()` is `security definer` with **no row**, so it reds on merge until one is added; (ii) `…0005` now sorts **below** `main`'s `0006`–`0010` — **renumber to `…0011`** (the target moved once already tonight, so re-read `main` at rebase time rather than reusing this number); (iii) re-derive **then** re-count — whatever `npm test` says on that tip is scoped to a suite three gates behind | 1.1, **1.8a**, **1.9a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
-| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ENROLLABLE MEMBERS** — `removed_at is null` AND `profiles.deleted_at is null`, **adopted from `ENG-100`'s predicate, never re-implemented** (§1B.36.10; @Lumen's coupling pin, R12 adopt-don't-copy). A floor that counts a different population from the mint it green-lights green-lights a month with zero contributors (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv. **ACCEPTANCE ADDED §1B.36.20 + §1B.36.21 — read both before building.** (a) **In-body pre-launch dormancy:** *no resolved rotation* returns **quietly**, in this function, not only in the tick's `WHERE` — the derivation is UNDEFINED without a prior rotation (no subject cursor, no base `closes_at`), and this function has two direct callers that are not the tick's `SELECT`. Comment carries the **mechanism** *and* the **hazard** (a `now()` fallback would silently mint month 1 over the organizer's choice, §1B.31.3(i)) — otherwise the silence reads as unfinished. (b) **Its gate is a 2×2 with ONE green cell, all three runnable at this row's landing via a direct `service_role` call, sharing ONE base varying one axis:** **A** (1 enrollable, ≥1 resolved) → no row, no raise; **B** (2, ≥1 resolved) → **a row appears, the shared positive control**; **C** (2, no prior) → no row, no raise. A and C each differ from B on exactly one axis; neither negative substitutes for the other | 1.1, **1.7a** |
+| **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ENROLLABLE MEMBERS** — `removed_at is null` AND `profiles.deleted_at is null`, **adopted from `ENG-100`'s predicate, never re-implemented** (§1B.36.10; @Lumen's coupling pin, R12 adopt-don't-copy). A floor that counts a different population from the mint it green-lights green-lights a month with zero contributors (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv. **ACCEPTANCE ADDED §1B.36.20 + §1B.36.21 — read both before building.** (a) **In-body pre-launch dormancy:** *no resolved rotation* returns **quietly**, in this function, not only in the tick's `WHERE` — the derivation is UNDEFINED without a prior rotation (no subject cursor, no base `closes_at`), and this function has two direct callers that are not the tick's `SELECT`. Comment carries the **mechanism** *and* the **hazard** (a `now()` fallback would silently mint month 1 over the organizer's choice, §1B.31.3(i)) — otherwise the silence reads as unfinished. (b) **Its gate is a 2×2 with ONE green cell, all three runnable at this row's landing via a direct `service_role` call, sharing ONE base varying one axis:** **A** (1 enrollable, ≥1 resolved) → no row, no raise; **B** (2, ≥1 resolved) → **a row appears, the shared positive control**; **C** (2, no prior) → no row, no raise. A and C each differ from B on exactly one axis; neither negative substitutes for the other. **PLUS §1B.36.25 — MONTH 1'S BASE, ~4 LINES, AND IT DELETES CLIENT WORK.** `comb_open_rotation`'s `p_closes_at` becomes `default null` and derives `now() + c.cadence` from the comb row the function already selects; an explicit argument is honoured **only when `auth.uid() is null`** (`service_role`, i.e. this function's own advance) and a real session's argument is **ignored, not floored**. Today the parameter is unchecked in the live body (`…0010:66-155`), unconstrained on the column (`…0002:474`), and a past value is not an error but an **immediate void of month 1** (`…0009:129-131`) — the one state `C1` cannot afford to confuse with a quiet month. The client stops computing a timestamp entirely; `DES-29` keeps cadence as a visible choice. Lands here rather than on merged `ENG-93` because **this row already owns every other boundary in the clock** (`closes_at + k·cadence`, the half-cadence floor) and one clock belongs in one ticket. **Gate:** derive-when-omitted (positive) and ignore-an-explicit-past-value as `authenticated` (negative) in ONE fixture, one axis apart | 1.1, **1.7a** |
 | **1.7b** | **Fizz** | **`ENG-100` — the mint's roster hole + empty-snapshot refusal.** NEW (§1B.36.9). **Rides `ENG-94`'s `create or replace` of `comb_open_rotation`; SEPARATE acceptance** — `ENG-94` is titled *subject-gone repoint* and is done when the SUBJECT line is repointed, so the roster requirement dies with it if folded in (§1B.36.9). **Full consolidated acceptance at §1B.36.18 — build from that block, not from the six sections that produced it.** Two lines: (1) the roster snapshot excludes tombstoned CONTRIBUTORS via a general predicate (`not exists … p.deleted_at is not null`), written as the general rule, NOT *"exclude the organizer"*; (2) `get diagnostics` the snapshot's `row_count` and refuse at zero, `using errcode = 'check_violation', constraint = '<name>'` (§1B.36.12/.13/.14). **Month 1 is EXEMPT from §1B.31.3's floor, so the mint is the only place an empty writing roster is observable** — 1.9a's floor does not cover this and cannot. **CLOSED §1B.36.24 — landed on `github/main@52a9733`**, verified independently (50 gates, 0 FAIL, 1,690 assertions, `rev-parse HEAD` confirmed in the same shell). **The near-miss is the part to carry:** the branch was **6 behind `main`** and `…0010`'s `create or replace` of `comb_preview_by_invite_code` was derived from `…0006`'s body, so merging it would have **reverted `ENG-92` Part 6** — reproduced at 18/18 on `main` vs 17/18 on the merge commit. **Standing requirement for every migration on this table: a `create or replace` must be re-derived from the HIGHEST-NUMBERED prior definition at MERGE time, never at authoring time**, and the full suite runs on the merge commit with the per-gate `FAIL` lines read, never `$?` | **1.7a**, and lands in `ENG-94`'s migration |
 | 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
@@ -5740,3 +5740,88 @@ function at a moment in time. Re-derive it from the highest-numbered prior defin
 never at authoring time.** Same family as §1B.36.8's *a fix that names its class freezes that class
 at the author's base commit*, one layer down — here the "class" is the function body itself, and the
 enumeration that goes stale is not a list in a comment but every line the author did not retype.
+
+---
+
+### §1B.36.25 — @Lumen's month-1 `closes_at` derivation is **right as a rule and wrong as a location.** The arithmetic is confirmed; the **site** is refused. `p_closes_at` is a caller-supplied parameter with no floor, no future check and no CHECK constraint, so a client-computed timestamp puts the rotation clock on **device time** — and this document's own argument for storing `cadence` once already forbids it (2026-08-30)
+
+**The flag,** `GUIDES/POLLINATE_DES29_CREATE_COMB_SPEC.md` §4.2, raised for ratification rather than
+assumed:
+
+> **Month-1 `closes_at` = creation moment + the chosen cadence** — *derived*, no contrary ruling
+> found; flagged for ratification rather than silently assumed.
+
+**Ratified on the arithmetic.** Month 1 is the base case of §1B.31.1iii's `closes_at + k·cadence`
+recurrence; a recurrence needs a base, and `creation + cadence` is the only base consistent with
+every later boundary. Nothing else was ever ruled, and I found no contrary ruling either.
+
+**Refused on the site.** Three findings, verified at `github/main@57df6d1`, all in the **live**
+bodies rather than the authoring migrations:
+
+1. **The mint never inspects the parameter.** `comb_open_rotation(p_comb_id, p_subject_profile_id,
+   p_closes_at)` — current body `20260830000010_eng94_repoint_subject_gone.sql:66-155` — carries no
+   floor, no `> now()` test, no clamp. `p_closes_at` travels from the signature to
+   `insert into public.comb_rotations (… closes_at) values (… p_closes_at)` untouched.
+2. **The column does not catch it either.** `comb_rotations.closes_at timestamptz not null`
+   (`20260830000002_comb_rotation_schema.sql:474`); the table's `constraint` block holds
+   `comb_rotations_sealed_xor_voided` and `comb_rotations_sent_requires_sealed` and nothing about
+   time.
+3. **A past `closes_at` is not an error — it is an immediate void.**
+   `seal_and_send_rotation`'s only earliness gate is
+   `if v_closes_at > now() then raise` (`20260830000009_eng95_seal_nonmember_subject.sql:129-131`).
+   At-or-before `now()` passes straight through. The tick then finds zero entries and **voids month
+   1**, which is precisely the state §1B.26.3 spent an evening teaching this system to distinguish
+   from a quiet month — and it is `C1`'s denominator. **A wrong clock does not raise; it manufactures
+   a failed comb.**
+
+**So what actually goes wrong, with the client holding the pen:**
+
+- **Device clock.** A phone an hour behind, or a user who set the date back, mints a rotation that is
+  already closed. Silent. No refusal at any layer above.
+- **The type does not survive the trip.** `combs.cadence` is
+  `interval not null default interval '1 month'` (`20260830000008_eng93_comb_open_rotation.sql:70-71`).
+  JavaScript has no month interval. `setMonth(+1)` on 31 Jan yields **3 Mar**; Postgres's
+  `timestamptz + interval '1 month'` yields **28 Feb**. Month 1's boundary is the base every
+  subsequent boundary derives from, so the divergence is **inherited, not one-off.**
+
+**And the decisive argument was already written, by `ENG-93`, in the commit that created the
+column** (`…0008` header):
+
+> `closes_at + cadence` (the clock rule, §1B.31 ratified) needs the number stored **ONCE** rather
+> than hard-coded in this function and `OPS-9`/`ENG-60`'s future advance — *"two hard-coded copies in
+> two callers is the drift class this team keeps burying."*
+
+A client that computes `creation + cadence` is **the third copy**, in the one language that cannot
+express the type. The ruling that put `cadence` on `combs` decides this question; it just had not
+been asked at the client boundary yet.
+
+**RULING — derive it in the mint, and make the client unable to set it.**
+
+- `p_closes_at` becomes `p_closes_at timestamptz default null`.
+- When it is null, derive `now() + c.cadence` from the comb row the function **already selects** —
+  add `c.cadence` to the existing `select c.owner_id into v_owner_id from public.combs c where
+  c.id = p_comb_id`. No extra round trip, no second read.
+- **An explicit `p_closes_at` is honoured only when `auth.uid() is null`** — i.e. `service_role`, the
+  advance supplying its own `closes_at + k·cadence` boundary. A real session's argument is **ignored,
+  not floored.** A floor needs a threshold and still lets a session choose; ignoring needs neither
+  and makes the hazard unrepresentable. Same shape as the fused CTA making an unnamed organizer
+  unrepresentable, one layer down.
+
+**This is a net DELETION of work.** It removes a requirement from `DES-29` rather than adding one:
+the create screen keeps cadence as a **visible choice** (it writes `combs.cadence`) and stops
+computing or sending a timestamp entirely. @Lumen — that is §4.2 and the step-2 signature line in
+`GUIDES/POLLINATE_DES29_CREATE_COMB_SPEC.md`; open flag 1 closes here.
+
+**Home: row `1.9a`, @Fizz** — stated in that row this commit, per the process invariant. Not
+`ENG-93`: that migration is merged, and its row is done when the mint exists. Not a new row: this
+does not change an artifact type — `1.9a` is already a migration that will `create or replace` next
+to the mint, and it already owns **every other boundary in the clock** (`closes_at + k·cadence`, the
+half-cadence floor). Month 1's base belongs with the recurrence that consumes it, in one ticket, or
+the two halves of one clock drift the way two copies of one number do.
+
+**Gate row (runnable at `1.9a`'s landing, `service_role` direct call):** mint with `p_closes_at`
+omitted on a comb whose `cadence` is `interval '1 month'`, assert the stored `closes_at` is
+`now() + interval '1 month'` within tolerance; and mint as an `authenticated` owner passing an
+explicit past timestamp, assert the stored `closes_at` is **still** the derived future one — the
+positive control and its negative in the same fixture, one axis apart (§1B.36.19).
+
