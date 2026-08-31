@@ -3232,7 +3232,7 @@ consequence, and learn in between.**
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ENROLLABLE MEMBERS** — `removed_at is null` AND `profiles.deleted_at is null`, **adopted from `ENG-100`'s predicate, never re-implemented** (§1B.36.10; @Lumen's coupling pin, R12 adopt-don't-copy). A floor that counts a different population from the mint it green-lights green-lights a month with zero contributors (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv. **ACCEPTANCE ADDED §1B.36.20 + §1B.36.21 — read both before building.** (a) **In-body pre-launch dormancy:** *no resolved rotation* returns **quietly**, in this function, not only in the tick's `WHERE` — the derivation is UNDEFINED without a prior rotation (no subject cursor, no base `closes_at`), and this function has two direct callers that are not the tick's `SELECT`. Comment carries the **mechanism** *and* the **hazard** (a `now()` fallback would silently mint month 1 over the organizer's choice, §1B.31.3(i)) — otherwise the silence reads as unfinished. (b) **Its gate is a 2×2 with ONE green cell, all three runnable at this row's landing via a direct `service_role` call, sharing ONE base varying one axis:** **A** (1 enrollable, ≥1 resolved) → no row, no raise; **B** (2, ≥1 resolved) → **a row appears, the shared positive control**; **C** (2, no prior) → no row, no raise. A and C each differ from B on exactly one axis; neither negative substitutes for the other. **PLUS §1B.36.25 — MONTH 1'S BASE, ~4 LINES, AND IT DELETES CLIENT WORK.** `comb_open_rotation`'s `p_closes_at` becomes `default null` and derives `now() + c.cadence` from the comb row the function already selects; an explicit argument is honoured **only when `auth.uid() is null`** (`service_role`, i.e. this function's own advance) and a real session's argument is **ignored, not floored**. Today the parameter is unchecked in the live body (`…0010:66-155`), unconstrained on the column (`…0002:474`), and a past value is not an error but an **immediate void of month 1** (`…0009:129-131`) — the one state `C1` cannot afford to confuse with a quiet month. The client stops computing a timestamp entirely; `DES-29` keeps cadence as a visible choice. Lands here rather than on merged `ENG-93` because **this row already owns every other boundary in the clock** (`closes_at + k·cadence`, the half-cadence floor) and one clock belongs in one ticket. **Gate:** derive-when-omitted (positive) and ignore-an-explicit-past-value as `authenticated` (negative) in ONE fixture, one axis apart | 1.1, **1.7a** |
 | **1.7b** | **Fizz** | **`ENG-100` — the mint's roster hole + empty-snapshot refusal.** NEW (§1B.36.9). **Rides `ENG-94`'s `create or replace` of `comb_open_rotation`; SEPARATE acceptance** — `ENG-94` is titled *subject-gone repoint* and is done when the SUBJECT line is repointed, so the roster requirement dies with it if folded in (§1B.36.9). **Full consolidated acceptance at §1B.36.18 — build from that block, not from the six sections that produced it.** Two lines: (1) the roster snapshot excludes tombstoned CONTRIBUTORS via a general predicate (`not exists … p.deleted_at is not null`), written as the general rule, NOT *"exclude the organizer"*; (2) `get diagnostics` the snapshot's `row_count` and refuse at zero, `using errcode = 'check_violation', constraint = '<name>'` (§1B.36.12/.13/.14). **Month 1 is EXEMPT from §1B.31.3's floor, so the mint is the only place an empty writing roster is observable** — 1.9a's floor does not cover this and cannot. **CLOSED §1B.36.24 — landed on `github/main@52a9733`**, verified independently (50 gates, 0 FAIL, 1,690 assertions, `rev-parse HEAD` confirmed in the same shell). **The near-miss is the part to carry:** the branch was **6 behind `main`** and `…0010`'s `create or replace` of `comb_preview_by_invite_code` was derived from `…0006`'s body, so merging it would have **reverted `ENG-92` Part 6** — reproduced at 18/18 on `main` vs 17/18 on the merge commit. **Standing requirement for every migration on this table: a `create or replace` must be re-derived from the HIGHEST-NUMBERED prior definition at MERGE time, never at authoring time**, and the full suite runs on the merge commit with the per-gate `FAIL` lines read, never `$?` | **1.7a**, and lands in `ENG-94`'s migration |
-| 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop. **ACCEPTANCE ADDED §1B.38 — two lines this row now owns that no other row does.** **(1) The COLLECT MOUNT for `RotationFrame`.** Row `1.6` shipped the component into the reveal screen, where its active state cannot fire (subject-scoped, post-send). *"the comb is writing for Sarah — 6 days left"* is a **step of the ratified definition of done**, and it renders only off an **open-rotation** read on the collect surface — that read is this row's. The component takes `subjectName`/`closesAt`/`sealedAt` unchanged; what is missing is the query and the mount. **(2) Ride @Lumen's §1B.38.1 strike:** delete `RotationFrame.js:34-38`'s *"Next month: {organizerName} leads"* block, the `organizerName` prop at `:5`, **and** its pass-through at `PackageOpen.js:494` — a rendered future is licensed only by an existing rotation row, and `getReceivedPackage` carries none. **AMENDED §1B.38.2 — the in-repo mockup is EIGHT sites, not three:** `MOCKUPS_DES33.md` `:7` (prop list), `:60`, `:74`, `:79`, `:112`, `:131`, **`:172` (a section HEADING titled *"Notes for Future Updates (COPY-13 / Next Release)"*)** and `:174`. **`:79` and `:174` must be struck as ARGUMENTS, not annotated as pending** — both frame the open question as *which noun* (*"likely should be next subject, not organizer"*) and `:174` reassures the reader *"component structure supports either with no changes,"* which is true of the swap and **false of the strike**. The ruling is that there is **no noun**. **Fourteen sites total across the four containers.** **SCORING CAVEAT: row `1.8` is genuinely partial, so this row can be BUILT and MERGED but cannot be SCORED done against the full sentence** — clause 8 needs the `OPS-9` finisher, which is not this row's to build | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
+| 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop. **ACCEPTANCE ADDED §1B.38 — two lines this row now owns that no other row does.** **(1) The COLLECT MOUNT for `RotationFrame`.** Row `1.6` shipped the component into the reveal screen, where its active state cannot fire (subject-scoped, post-send). *"the comb is writing for Sarah — 6 days left"* is a **step of the ratified definition of done**, and it renders only off an **open-rotation** read on the collect surface — that read is this row's. The component takes `subjectName`/`closesAt`/`sealedAt` unchanged; what is missing is the query and the mount. **(2) Ride @Lumen's §1B.38.1 strike:** delete `RotationFrame.js:34-38`'s *"Next month: {organizerName} leads"* block, the `organizerName` prop at `:5`, **and** its pass-through at `PackageOpen.js:494` — a rendered future is licensed only by an existing rotation row, and `getReceivedPackage` carries none. **AMENDED §1B.38.2 — the in-repo mockup is EIGHT sites, not three:** `MOCKUPS_DES33.md` `:7` (prop list), `:60`, `:74`, `:79`, `:112`, `:131`, **`:172` (a section HEADING titled *"Notes for Future Updates (COPY-13 / Next Release)"*)** and `:174`. **`:79` and `:174` must be struck as ARGUMENTS, not annotated as pending** — both frame the open question as *which noun* (*"likely should be next subject, not organizer"*) and `:174` reassures the reader *"component structure supports either with no changes,"* which is true of the swap and **false of the strike**. The ruling is that there is **no noun**. **AMENDED §1B.38.4 — add `MOCKUPS_DES33.md:99`, and it is the highest-register site in the file:** `- ✅ On sealed: completion statement + next rotation preview`, sitting under **`## Design Constraints (Locked by DES-31 & §1B.36.1)`** in the `### What is Rendered (Both Surfaces)` sub-block, four lines below the Subject Mask's `❌` entries. It matches **none** of the three census tokens — it names the spec ITEM (*next rotation preview*), not the sentence. **Strike it: an affirmative `✅` in a block headed *Locked* is a render PERMISSION, not a placeholder** — leaving it licenses the line the code strike removes. **Container 3 is NINE sites** (`:7`, `:60`, `:74`, `:79`, `:99`, `:112`, `:131`, `:172`, `:174`); **twelve across containers 1–3, 23 across all four.** Non-blocking note for whoever re-shoots: `:184`'s device screenshots and the checked QA row `:168` still RENDER the struck line — an image is a container no strike reaches. `:159` checked and is **not** a defect (the completion statement survives). **SCORING CAVEAT: row `1.8` is genuinely partial, so this row can be BUILT and MERGED but cannot be SCORED done against the full sentence** — clause 8 needs the `OPS-9` finisher, which is not this row's to build | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
 | 1.12 | **Pixel** | `DES-35` — glass prominence to ≥23% (Colin `a478c335…`, §1B.5). **Material prerequisite merged** — `13cf806` + `cdb07a1` are ancestors of the tip (§1B.7) | — (parallel; **gates nothing**) |
@@ -6252,8 +6252,7 @@ hit must be read, because the sites that never quote the sentence are exactly th
 ones arguing about it.** Corollary: **a section HEADING can carry a deferral** —
 `:172` names a closed ticket in a header, which no line-level annotation reaches.
 
-**Full site count for the strike: fourteen.** Container 1 = 2 (`:5`, `:34-38`),
-container 2 = 1 (`:494`), container 3 = **8**, container 4 = 3 (repaired by @Lumen).
+**Site count for the strike at the time of this section: fourteen** (container 1 = 2 — `:5`, `:34-38`; container 2 = 1 — `:494`; container 3 = 8; container 4 = 3). **SUPERSEDED BY §1B.38.4 — the true count is 23, and the token union is a FLOOR, not a census.**
 
 ---
 
@@ -6302,3 +6301,82 @@ whether the **file carrying the rows** was reachable from the builder's `HEAD`.
 `git ls-tree <their-ref> <path>` / `git grep <section> <their-ref>`.** A row is
 delivered when it is on the builder's ref, not when it is ratified — and **not when
 it merges either, if they started before it did.**
+
+---
+
+### §1B.38.4 — @Lumen's eye-read clause, run forward on my own container, finds the token the union structurally cannot see: **the spec item's own SECTION TITLE**. It is live in BOTH files, including the one just declared clean (2026-08-31)
+
+**@Lumen's amendment, adopted:** *the token union is a **floor**, not a census — every
+section a token lands in gets eye-read whole, because the argument blocks are exactly
+the prose that discusses the claim in the feature's own name.* Their `:255-258`
+question block matched none of the three tokens and was found only by reading the
+neighbourhood of a hit.
+
+**I ran it forward on `MOCKUPS_DES33.md` — eye-read all 184 lines — and it produces a
+fourth token, not just a residue.** Containers 1 and 2 are clean at the eye-read
+(`RotationFrame.js` is 55 lines with no prose; `PackageOpen.js:490-500` is the mount
+and nothing else). Container 3 is not:
+
+**`MOCKUPS_DES33.md:99` — `- ✅ On sealed: completion statement + next rotation preview`**
+
+Zero matches on the claim string, zero on `organizerName`, zero on `COPY-13`. It sits
+under **`## Design Constraints (Locked by DES-31 & §1B.36.1)`**, in the sub-block
+**`### What is Rendered (Both Surfaces)`**, four lines below the Subject Mask's four
+`❌` entries.
+
+**This is the strongest form the defect has taken tonight, and the register is why.**
+`:79` and `:174` are *arguments* about which noun. `:99` is an **affirmative render
+permission** — a `✅` in a list whose siblings are the `❌` constraints a builder
+treats as authority, under a header that says **Locked**, with **borrowed
+attribution** to `DES-31` and `§1B.36.1`. A builder reading the mask block does not
+read it as a placeholder to resolve; they read it as the licensed render set. The
+strike removes the line from the code and leaves the constraints block **licensing
+it**.
+
+#### The fourth token: the spec item's own section title
+
+The surviving phrase is `next rotation preview` — **verbatim identical in both
+files** — and it is the **name of the spec item**, which is the vocabulary every
+acceptance row and constraints row uses. @Lumen created that title themselves at
+`:148` (`§Next Rotation Preview`). **A spec's own section titles are the token set
+its checklists refer to it by; the rendered string is what the SCREEN says, and no
+checklist quotes the screen.**
+
+**And it is live in the file @Lumen declared at zero after the union re-census:**
+
+`GUIDES/POLLINATE_DES33_ROTATION_FRAME_SPEC.md:264` —
+`- [ ] Sealed state shows completion statement + next rotation preview`
+
+**`:264` and the repaired `:271` are rows 4 and 8 of the same `## Acceptance
+Criteria` checklist.** The eye-read *did* cover that section. `:271` matched a token
+(`COPY-13`) and was repaired; `:264` matched none and was read past inside a section
+already under the eye. **That is the precise limit of the eye-read clause: reading a
+section does not suspend the reader's token-keying** — the eye scans for what it
+knows the defect looks like. Same species as 2026-08-31's *classify the CLAIM, not
+the container*, arriving at the reader instead of the classifier.
+
+**Standing form, final:** a strike's census is **claim string ∪ supplying symbol ∪
+deferred-to ticket ∪ the item's own SECTION TITLE**, then the eye-read of every
+section any of the four lands in. The fourth token is the one that reaches
+**acceptance rows and constraints blocks**, and those are where a struck line is not
+merely pending but **licensed**.
+
+#### The container with no text
+
+`MOCKUPS_DES33.md:184` (*"See device screenshots in this PR for live rendering"*) and
+its checked acceptance row `:168` (*"[x] Device verified on iPhone 16 QA"*) both point
+at **images that render `Next month: Maya leads`**. No grep reaches them and no
+in-prose strike repairs them. Flagged, not counted — the honest terminus of *the union
+is a floor*: the last container has no tokens at all, and a checked QA box vouches for
+a frame that now shows a struck sentence. **Not a blocker; a note for whoever re-shoots.**
+Scoped negative: I checked `:159` (*"renders both active and sealed states
+correctly"*) and it is **not** a defect — the completion statement survives the strike,
+so the row stays true.
+
+#### Count and routing
+
+**True count: 23.** Container 1 = 2 (`RotationFrame.js:5`, `:34-38`) · container 2 = 1
+(`PackageOpen.js:494`) · container 3 = **9** (`:7`, `:60`, `:74`, `:79`, **`:99`**,
+`:112`, `:131`, `:172`, `:174`) · container 4 = **11** (@Lumen's 3 + 7 + `:264`).
+Containers 1–3 ride row `1.9` (@Fizz). **`:264` is @Lumen's file and I did not edit
+it** — routed, same as container 4 was.
