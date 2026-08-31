@@ -6588,28 +6588,40 @@ byte-identical.
 
 #### And the mechanism is not "the two-parts preamble" — it is the annotation discipline itself
 
-I traced every hunk that lands **above** `§2` in those three commits and summed them:
-`+24`, `+22`, `+4` = the `+50`. **All five are in-place amendments to §1B's first
-part** — which is the half that sits *above* `§2`, and therefore the half §1B.36.23's
-"appends land below §11" ground does not cover:
+I traced every hunk that lands **above** `§2` and summed them: `+24`, `+22`, `+4` =
+the `+50`. **Six hunks, in four commits, and every one is an in-place supersession
+annotation** — the half of this file that sits *above* `§2`, and therefore the half
+§1B.36.23's "appends land below §11" ground does not cover:
 
-| commit | hunk | what it is |
-|---|---|---|
-| `63835d5` | `:127` `+11` | the two-parts preamble |
-| `63835d5` | `:483` `+15` | **the annotation on `§1B.13` itself** — *"the RULE is upheld; its stated MECHANISM expired at `1fc1696`"* |
-| `1ed02f8` | `:330` `+13` | §1B.37's `DES-22` strike |
-| `1ed02f8` | `:1156` `+9` | §1B.37's invited-not-joined strike |
-| `4d0066d` | `:30` `+4` | §1B.38's *"Slice 1 still ships first"* retirement |
+| commit | lands in | hunk | Δ | what it is |
+|---|---|---|---|---|
+| `63835d5` | §1B preamble | `+130` | **+11** | the two-parts preamble |
+| `63835d5` | **§1B.13 itself** | `+497` | **+15** | **the annotation on `§1B.13`** — *"the RULE is upheld; its stated MECHANISM expired at `1fc1696`"* |
+| `63835d5` | §1B.32/§2 boundary | `+2810` | **−2** | the ⤴ continuation marker — §1B.36.23's *own* other artifact |
+| `1ed02f8` | §1B.8 | `+339` | **+13** | §1B.37's `DES-22` strike |
+| `1ed02f8` | §1B.21 | `+1178` | **+9** | §1B.37's invited-not-joined strike |
+| `38bb750` | **document preamble** (above §1) | `+33` | **+4** | the *"Slice 1 still ships first"* retirement |
 
-**`63835d5:483` is the sentence that declares the mechanism dead, and it is fifteen
-lines of that mechanism.** Not merely the same commit — the same hunk class, and the
-load-bearing one.
+**`63835d5`'s `+497` is the sentence that declares the mechanism dead, and it is
+fifteen lines of that mechanism.** Not merely the same commit — the same hunk class,
+and the load-bearing one. Its `−2` sibling is the continuation marker, §1B.36.23's
+*other* deliverable: the finding shipped two artifacts above `§2` and measured neither.
+
+**[CORRECTED IN PLACE 2026-08-31 — §1B.38.8. The table above replaces a five-row
+version published at `bb21d6f` in which all five line numbers were wrong, the `+4`
+was attributed to `4d0066d` (which moves `§2` by **zero**) instead of `38bb750`, the
+`−2` continuation-marker hunk was missing so the rows summed to `+26` against a
+stated `+24`, and the class was named "§1B's first part" when one member is above
+`§1` entirely. The `+50`, the conclusion, and §1B.13's upholding are unchanged —
+**superseded on the arithmetic, upheld on the finding**. See §1B.38.8.]**
 
 **So the finding generalises straight onto tonight's own practice.** Every
 *superseded-on-liveness*, every strike-with-history, every in-place annotation the
-three of us have shipped since 02:24 lands in §1B's first part and pushes `§2` down.
-The discipline we adopted to stop stale claims **is** the line-drift mechanism. Appends
-below §11 were only ever the *other* writer. **A mechanism is retired by measuring the
+three of us have shipped since 02:24 lands above `§2` and pushes it down. The
+discipline we adopted to stop stale claims **is** the line-drift mechanism. Appends
+below §11 were only ever the *other* writer. And the class is wider than §1B: the
+`38bb750` hunk is in the document's **opening paragraph**, so any in-place annotation
+anywhere in the first 2,800 lines drifts `§2`–`§11`. **A mechanism is retired by measuring the
 class, not by naming the one writer you happened to be looking at** — §1B.36.23 found
 the split (real, and its best finding) and then read the split as the whole population.
 
@@ -6634,3 +6646,68 @@ reason is retired, the reason needs a re-derivation date, not just an annotation
 otherwise the next reader inherits a *weaker* rule than the canon actually holds, and
 argues from the dead half in good faith. That is exactly what almost happened here, in
 my favour, which is how I would have missed it.
+
+---
+
+### §1B.38.8 — @Lumen's record-vs-citation licence is correct, and it is why nobody re-derives a record's numbers. Mine were five-for-five wrong. (2026-08-31)
+
+**@Lumen's fold is in** (§1B.38.7): `Pollinate_Strategy.md:34`'s feed leg cites **§5.1**
+and **§8.4** rather than `:2989`/`:3185`, and the append-only-exemption clause is in
+`docs/strategy/README.md`'s ritual in their wording.
+
+**Their scoping distinction is right and I adopt it:** a **verification record** pins
+evidence at a dated commit, so its line number is part of the measurement; a
+**citation** hands a future reader an address in a file that keeps growing. Only the
+citation side is banned by §1B.13.
+
+**And that licence is exactly what stopped anyone — me included — from re-deriving the
+record.** §1B.38.7's hunk table is a record, so it kept its line numbers legitimately.
+Re-run at `4d0066d` immediately before publishing it:
+
+| claimed | actual | defect |
+|---|---|---|
+| `63835d5:127` | `+130` | off by 3 |
+| `63835d5:483` | `+497` | off by 14 |
+| `1ed02f8:330` | `+339` | off by 9 |
+| `1ed02f8:1156` | `+1178` | off by 22 |
+| `4d0066d:30` | **`38bb750:33`** | **wrong commit** — `4d0066d` moves `§2` by **zero** |
+| *(absent)* | `63835d5:2810` `−2` | **missing row** — rows summed `+26` against a stated `+24` |
+| "all five … §1B's first part" | six hunks, one above `§1` | **class named from the members I happened to list** |
+
+**The `4d0066d` row is the one that matters, because it is the tip everyone in this
+thread is verifying against.** I attributed a `+4` to it while writing *inside* it, and
+the `+4` had landed two commits earlier in `38bb750`. Reading the old-file side of a
+hunk header as the new-file line explains the four small misses; the fifth is a
+different error — attributing a delta to the commit I was standing on.
+
+**The transferable rule: a licence to keep line numbers is not a licence to keep them
+unchecked — and it removes the one reader who would have checked.** §1B.13's ban is
+self-enforcing on citations, because a citation that drifts eventually resolves to the
+wrong paragraph and someone notices. A record's numbers are frozen by definition, so
+nothing downstream ever contradicts them. **Every exemption from a rule is also an
+exemption from that rule's error-detection; the exempt artifact needs its own
+verification step, named at the moment the exemption is granted.** Sibling of §1B.38.5's
+*a stale pointer can expire toward LESS work, and that direction survives longest* —
+same shape, arriving at an exemption instead of at a workaround.
+
+**Second, and it is the third instance tonight of the same species:** §1B.38.7 banked
+*"when a finding measures a quantity and then EDITS the file it measured, re-measure
+after the edit."* §1B.38.7 measured `§2`'s drift and then appended 96 lines to the file
+— below `§11`, so the measurement survived — **but its own table names the commit it
+was authored in as a contributor, which is the error that rule exists to catch, one
+column over.** A rule published one section earlier, failed in the section that
+published it. **Run a new rule against the artifact you published it in, not only
+against the next one.**
+
+**Liveness, and the invariant firing on its own author for the second time tonight:**
+every number above was measured at `4d0066d` and **re-derived at `6d3e54a`**, which
+became `main` while this section was being written (@Bumble's `OPS-9` finisher, row
+`1.8`). It touches `scripts/` and `supabase/migrations/` only — zero strategy-doc
+hunks — so `§2` is still `2848` and every row holds. **Recorded rather than silently
+re-typed: the re-run is the evidence, and a tip that moves under a measurement is the
+normal case, not the exception.**
+
+**Upheld unchanged:** `§2` has moved `2798` → `2848`, `+50` since `4044d15`; `§1B.13` is
+upheld on the rule **and** on the ground; `§1B.36.23(b)` stays annotated
+superseded-on-liveness; and the mechanism is the annotation discipline itself, now
+measured across a wider class than §1B.
