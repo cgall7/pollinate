@@ -243,8 +243,27 @@ check('development profile sets no EXPO_PUBLIC_DEMO_MODE (absent -> false)',
   eas.build?.development?.env?.EXPO_PUBLIC_DEMO_MODE, undefined);
 check('preview profile sets EXPO_PUBLIC_DEMO_MODE "true"',
   eas.build?.preview?.env?.EXPO_PUBLIC_DEMO_MODE, 'true');
+check('testers profile sets EXPO_PUBLIC_DEMO_MODE "false"',
+  eas.build?.testers?.env?.EXPO_PUBLIC_DEMO_MODE, 'false');
 check('production profile sets EXPO_PUBLIC_DEMO_MODE "false"',
   eas.build?.production?.env?.EXPO_PUBLIC_DEMO_MODE, 'false');
+
+// --- OPS-10: a real internal-distribution profile exists, and preview's ---
+// pitch semantics stay pinned rather than becoming the tester build. Two
+// ways this roster can rot separately: `testers` regains a dev/simulator
+// shape (the profile exists but can't ship to a stranger's phone), or
+// `preview` gets flipped to "false" directly (the shortcut this profile
+// exists to close, since preview's own demo-mode assertion above would
+// still pass if someone changed EXPO_PUBLIC_DEMO_MODE without touching
+// distribution/developmentClient/ios.simulator).
+check('testers profile is internal distribution',
+  eas.build?.testers?.distribution, 'internal');
+check('testers profile has no developmentClient',
+  eas.build?.testers?.developmentClient, undefined);
+check('testers profile has no ios.simulator',
+  eas.build?.testers?.ios?.simulator, undefined);
+check('preview profile still sets EXPO_PUBLIC_DEMO_MODE "true" (the pitch profile, not the tester build)',
+  eas.build?.preview?.env?.EXPO_PUBLIC_DEMO_MODE, 'true');
 
 // --- .env.example lists the var --------------------------------------------
 const envExample = await readFile(path.join(ROOT, '.env.example'), 'utf8');
@@ -263,7 +282,13 @@ for (const name of ['DEMO_LOGIN_EMAIL', 'DEMO_LOGIN_PASSWORD']) {
 // ships with the source tree. Absence in EVERY profile, not just production,
 // because `preview` is exactly the profile someone would be tempted to wire
 // this into directly instead of through .env.
-for (const profile of ['development', 'preview', 'production']) {
+//
+// Enumerated off eas.json's own keys, not a literal list (OPS-10, Vector's
+// finding: a hardcoded ['development', 'preview', 'production'] roster is
+// invisible to a profile added later — it would go unchecked while this gate
+// stayed green). Object.keys(eas.build) means the day after a fifth profile
+// is added, this loop covers it with no edit here at all.
+for (const profile of Object.keys(eas.build ?? {})) {
   for (const name of ['EXPO_PUBLIC_DEMO_LOGIN_EMAIL', 'EXPO_PUBLIC_DEMO_LOGIN_PASSWORD']) {
     check(`eas.json's ${profile} profile sets no ${name}`, eas.build?.[profile]?.env?.[name], undefined);
   }
