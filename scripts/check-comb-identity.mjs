@@ -26,6 +26,15 @@
 //   R5  `RotationFold.js` withholds every count-bearing line when
 //       `count == null` or `count <= 0` — the zero-suppression rule
 //       (DES-22 §6 item 3 / DES-31 §1.1), calibrated by mutation
+//   R6  `RotationFold.js`'s name-carrying branch is reachable only by an
+//       explicit `variant === 'member'` AND a present `subjectName` — never
+//       by variant alone. R-38.9 hardening requirement 1 (Lumen): an
+//       absent/misspelled `variant` must fail CLOSED toward the nameless
+//       branch, not open toward the one that can render a real name
+//   R7  `RotationFold.js`'s nameless/subject branch never reads
+//       `countKind` — it renders the size sentence unconditionally, so
+//       `variant: 'subject', countKind: 'writers'` can't reach a
+//       participation claim. R-38.9 hardening requirement 2 (Lumen)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -169,6 +178,65 @@ const foldCode = codeOnly(foldSrc, foldAst);
       'R5 zero-suppression guard',
       `expected both a \`count == null\` check and a \`count <= 0\` check guarding the count line, found null-guard=${hasNullGuard} zero-guard=${hasZeroGuard}`
     );
+  }
+}
+
+// Locate RotationFold's single IfStatement once, shared by R6/R7 — its test
+// is the fail-open/fail-closed guard, its consequent is the nameless branch.
+let rotationIf = null;
+walk(foldAst.program, (n) => {
+  if (n.type === 'IfStatement') rotationIf = n;
+});
+
+// ── R6. fail-closed variant guard: member branch needs an explicit variant
+//       AND a name to carry, never variant alone (R-38.9 hardening req 1) ─
+{
+  if (!rotationIf) {
+    bad('R6 fail-closed variant guard', 'could not find the variant branch in RotationFold — FAILS CLOSED');
+  } else {
+    // Resolve whatever the test negates back to its own declaration, so a
+    // rename (e.g. `isMember` → something else) doesn't dodge this check by
+    // hiding the guard behind an identifier this script stopped reading.
+    let guardExpr = rotationIf.test;
+    if (guardExpr.type === 'UnaryExpression' && guardExpr.operator === '!' && guardExpr.argument.type === 'Identifier') {
+      const guardName = guardExpr.argument.name;
+      walk(foldAst.program, (n) => {
+        if (n.type === 'VariableDeclarator' && n.id?.name === guardName) guardExpr = n.init;
+      });
+    }
+    const guardSrc = foldSrc.slice(guardExpr.start, guardExpr.end);
+    const requiresExplicitMember = /variant\s*===\s*['"]member['"]/.test(guardSrc);
+    const requiresName = /&&/.test(guardSrc) && /subjectName/.test(guardSrc);
+    if (requiresExplicitMember && requiresName) {
+      ok("R6 member branch requires an explicit variant === 'member' AND a present subjectName, not variant alone");
+    } else {
+      bad(
+        'R6 fail-closed variant guard',
+        `guard expression \`${guardSrc}\` doesn't require both an explicit 'member' variant and a present subjectName — a bare \`variant === 'subject'\` check (or its negation) fails open toward the name-carrying branch on any other value`
+      );
+    }
+  }
+}
+
+// ── R7. the nameless/subject branch never reads countKind — no
+//       participation framing is reachable from it (R-38.9 hardening req 2)
+{
+  if (!rotationIf) {
+    bad('R7 subject branch ignores countKind', 'could not find the variant branch in RotationFold — FAILS CLOSED');
+  } else {
+    // `foldCode`, not `foldSrc` — comments are blanked at identical offsets
+    // (same lesson as this file's own header note on prose vs. rendered
+    // strings), because this branch's justification comment names
+    // `countKind` explicitly to explain why it's absent from the code.
+    const branchSrc = foldCode.slice(rotationIf.consequent.start, rotationIf.consequent.end);
+    if (branchSrc.includes('countKind')) {
+      bad(
+        'R7 subject branch ignores countKind',
+        'the nameless/subject branch references `countKind` — it must render the size sentence unconditionally; a caller-supplied countKind must not be able to select a participation claim for this reader (§1B.36.5)'
+      );
+    } else {
+      ok('R7 nameless/subject branch never reads countKind — no participation claim is reachable from it');
+    }
   }
 }
 
