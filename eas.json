@@ -19,6 +19,13 @@
         "EXPO_PUBLIC_DEMO_MODE": "true"
       }
     },
+    "internal": {
+      "distribution": "internal",
+      "channel": "internal",
+      "env": {
+        "EXPO_PUBLIC_DEMO_MODE": "false"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",

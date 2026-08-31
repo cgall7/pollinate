@@ -239,10 +239,13 @@ check('no destructured `const { X } = process.env` in App.js',
 
 // --- eas.json: read the file that owns the per-profile values -------------
 const eas = JSON.parse(await readFile(path.join(ROOT, 'eas.json'), 'utf8'));
+const profiles = Object.keys(eas.build ?? {});
 check('development profile sets no EXPO_PUBLIC_DEMO_MODE (absent -> false)',
   eas.build?.development?.env?.EXPO_PUBLIC_DEMO_MODE, undefined);
 check('preview profile sets EXPO_PUBLIC_DEMO_MODE "true"',
   eas.build?.preview?.env?.EXPO_PUBLIC_DEMO_MODE, 'true');
+check('internal profile sets EXPO_PUBLIC_DEMO_MODE "false"',
+  eas.build?.internal?.env?.EXPO_PUBLIC_DEMO_MODE, 'false');
 check('production profile sets EXPO_PUBLIC_DEMO_MODE "false"',
   eas.build?.production?.env?.EXPO_PUBLIC_DEMO_MODE, 'false');
 
@@ -263,7 +266,12 @@ for (const name of ['DEMO_LOGIN_EMAIL', 'DEMO_LOGIN_PASSWORD']) {
 // ships with the source tree. Absence in EVERY profile, not just production,
 // because `preview` is exactly the profile someone would be tempted to wire
 // this into directly instead of through .env.
-for (const profile of ['development', 'preview', 'production']) {
+//
+// Iterates `profiles` (eas.json's own Object.keys), not a hardcoded literal
+// (Vector, 2026-08-31): a literal roster is invisible to a fifth profile —
+// the credential check would stay green while the new profile shipped
+// unchecked. Every profile that exists gets checked, by construction.
+for (const profile of profiles) {
   for (const name of ['EXPO_PUBLIC_DEMO_LOGIN_EMAIL', 'EXPO_PUBLIC_DEMO_LOGIN_PASSWORD']) {
     check(`eas.json's ${profile} profile sets no ${name}`, eas.build?.[profile]?.env?.[name], undefined);
   }
