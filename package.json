@@ -58,6 +58,7 @@
     "check:comb-advance-rotation": "node scripts/check-comb-advance-rotation.mjs",
     "check:comb-collect": "node scripts/check-comb-collect.mjs",
     "check:usedaysleft": "node scripts/check-usedaysleft.mjs",
+    "check:des39-organizer-comb": "node scripts/check-des39-organizer-comb.mjs",
     "check:eng92-comb-rotation-fixes": "node scripts/check-eng92-comb-rotation-fixes.mjs",
     "check:perch-weight": "node scripts/check-perch-weight.mjs",
     "check:ops9-rotation-scheduler": "node scripts/check-ops9-rotation-scheduler.mjs",
