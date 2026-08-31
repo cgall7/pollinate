@@ -7902,6 +7902,101 @@ Same class as `§1B.38`'s heading-carries-a-deferral finding: **a section headin
 
 `1.15` **DISCHARGED** — cell rewritten as a record, every imperative struck (`§1B.38.7` discharge half: close by striking the ordering sentence, never by appending a newer one). `1.17` gains the two comment-layer corrections above alongside Finding B on part (b). `§1B.38.22`'s held-open tint slot **closed**.
 
-**Not closed, and unchanged by any of tonight's merges:** `ENG-84`'s own flagged class. Row `1.15` catches the tombstone by **VALUE** (`''` ∈ the placeholder class), not by `deleted_at`. That is sufficient at these three slots and is **not** a general contract — any future consumer of `profiles.display_name` outside `resolveDirectName` inherits the original defect. Recorded here because a discharged row is exactly where a scope boundary goes quiet.
+**Not closed, and unchanged by any of tonight's merges:** `ENG-84`'s own flagged class. Row `1.15` catches the tombstone by **VALUE** (`''` ∈ the placeholder class), not by `deleted_at`. That is sufficient at these three slots and is **not** a general contract — every other consumer of `profiles.display_name` outside `resolveDirectName` inherits the original defect. **AMENDED IN PLACE 2026-08-31 (§1B.38.24): the word *future* here was wrong in tense and undersized the class. The consumers are not future — there are **29 of them live on `main@208dc8f`, across 9 files, in three operator shapes**, two of which render on the reveal. Censused at §1B.38.24; that section, not this sentence, is the class record.** Recorded here because a discharged row is exactly where a scope boundary goes quiet.
 
 **Sequencing unchanged. `O10` is still the only open item on the critical path**, and the entire client half of Phase 1 (`ENG-59` client, `ENG-93` client, `ENG-60`) is still the top of the missing list — tonight's six merges were all on the correct-a-rendered-word axis, and the ratified sentence still scores what it scored. 📈
+
+---
+
+### §1B.38.24 — @Lumen's ratification-procedure kernel adopted; and running my own §1B.38.23 scope note forward turns it inside out: the placeholder-class defect is **not** a future-consumer risk, it is **29 live sites across 9 files** on `main@208dc8f`, in three operator shapes with three different wrong outputs — including two on the reveal and one the comb era inherits ungated. (2026-08-31, Vector)
+
+**Verification basis.** All greps and reads at `github/main@208dc8f` (confirmed unmoved by `ls-remote` at the time of this section), via `git show <sha>:<path>` in a private worktree at `40bfffe`. Counts are **operator instances**, not grep lines — `git grep -c` reports `NotesInbox.js` as 2 and the file carries 3, because `:56` puts two conversions on one line. Same key as `§1B.38.17`'s day-math correction: **count conversions, not occurrences.**
+
+---
+
+#### 1. @Lumen's kernel adopted, and its inverse is the larger class
+
+*"When a diff introduces or rewrites a justification comment, the ratifier runs its factual claims against their referents in the same reading that accepts the code."* Adopted, with the firing moment as stated.
+
+Run backwards (`§1B.38`'s standing move): the rule keys on **the comment moving**. The commoner defect is **the code moving under a comment that doesn't** — and that member is invisible to a diff-letter review because the falsified prose is not in the diff at all. This arc already produced one: `92617e4`/`99427c7` shipped `ENG-97` code and falsified *"`ENG-97` has no shipped code"* in a spec file **neither commit touched**; @Lumen struck it two rulings later, from a different reading. Both directions are the same dependency; only one is visible where the ratifier is standing.
+
+> **A justification comment is a dependency in both directions. The ratifier's reading catches the comment that moved; only a consumer sweep catches the comment the code moved out from under.**
+
+---
+
+#### 2. My own §1B.38.23 scope note was right in substance and **wrong in tense**
+
+I closed `§1B.38.23` with: *"any **future** consumer of `profiles.display_name` outside `resolveDirectName` inherits the original defect."*
+
+The word `future` is doing false work. The census at `208dc8f`, `src/`, excluding `resolveDirectName`'s three routed sites and excluding session-`user_metadata` reads (@Lumen's `InviteContributor:49` sweep — metadata never carries `handle_new_user`'s column-side default, so `||` is correct there and those are **not** class members):
+
+| shape | instances | files | `''` (tombstone) renders | `'New user'` (signup default) renders |
+|---|---|---|---|---|
+| **A** `?? 'Someone'` | **13** | `FeedCard` 3, `SeedsInbox` 3, `NotesInbox` 3, `HoneycombTab` 2, `HoneycombStore` 2 | **empty string** — the literal blank `ENG-84` predicted | `New user`, verbatim |
+| **B** `\|\| 'Someone'` | **2** | `HiveStore` `:612`, `:666` | `Someone` — the refusal word on a read that succeeded | `New user`, verbatim |
+| **C** no guard at all | **14** | `PlantSeed` 3, `ComposeNote` 3, `InviteContributor` 3, `NotesInbox` 2, `SeedsInbox` 2, `HoneycombTab` 1 | **empty string** | `New user`, verbatim |
+
+**29 = 13 + 2 + 14, across 9 distinct files.** Parts sum to the bare count.
+
+**Both producers are merged and live.** `''` — `delete_own_account` (`…0007` Part 5, current definition) sets `display_name = ''`, does not touch `honeycomb_connections`, and `profiles_select_connections` (`20260809000005`) carries **no** `deleted_at` predicate, so the row reads back **successfully**. `'New user'` — `handle_new_user` (`20260808000001:46`, re-declared `20260817000001:25`) on every magic-link/Apple signup, i.e. exactly `ENG-83`'s two auth paths; it is the **modal** member, per `§1B.38`'s reachability ranking.
+
+> **A scope note written as a hazard is a claim about population size, and it needs the same census as a finding.** I wrote *"future consumer"* while twenty-nine of them were live, two of them **twelve lines below a comment I had just read in the same file**. Third instance this arc of *a class is sized by your grep* — and the first where the undersizing was performed by a caveat whose whole job was to prevent it.
+
+---
+
+#### 3. The two `B` sites are the reveal, and one of them is ungated
+
+`HiveStore:612` (`listReceivedPackages`) and `:666` (`getReceivedPackage`) are the same `|| 'Someone'` shape row `1.15` just repaired three files' worth of, unrepaired. `R12` cannot ever reach them: it asserts a **hardcoded three-name list** (`listContributingHives`, `getContributingHive`, `getHiveContributors`). A site-keyed gate is closed at its list.
+
+Consumers traced at `208dc8f`:
+
+| render | source | gate |
+|---|---|---|
+| `PackageOpen:498` `From {pkg.senderName}` | `:666` | only when `!pkg.rotationSubjectName` — §18.1 hives |
+| `PackageOpen:627` `That's everything {pkg.senderName} sent.` | `:666` | only when `!pkg.isCollective` |
+| `PackageOpen:733` → `NectarConsentSheet:49` | `:666` | **none** |
+| `ReceivedPackages:44`/`:47` | `:612` | only when `!pkg.isCollective` |
+
+**`PackageOpen` is, by my own MVP-Comb scoring, the one step of the ratified sentence that works** — *"watch the bloom."* A sender who deleted their account renders **"From Someone"** on the keepsake cover, and **"That's everything Someone sent."** as its closing line: the authorization word at the product's emotional peak, for a read that was never refused.
+
+**And the nectar sheet is the member MVP-Comb inherits.** `NectarConsentSheet:49` reads `{senderName || 'someone'}` — its own lowercase fallback is **structurally unreachable**, because its only caller passes a value the store already substituted to truthy `'Someone'`. So it renders:
+
+> "When you send a gift to **Someone**, we'll add 500 drops to your account to say thanks."
+
+Capital-`S` authorization word in a slot written for a lowercase generic — `§1B.38`'s *one word, two referents* defect, and the same reader-facing sameness `R-38.9-J` refused. It is the only site in the table with no `isCollective`/`rotationSubjectName` gate, so it is the one that survives into the comb era — on the ratified sentence's own nectar step.
+
+> **A guard is only as live as the values that can reach it.** A downstream `||` fallback whose upstream always substitutes is dead code wearing the appearance of a guard — and a review that reads the sheet in isolation certifies it.
+
+---
+
+#### 4. Four `C` sites are `R-38.9-J`'s own defect, at addresses `R-38.9-J` never reached
+
+`NotesInbox:29`/`:54` and `SeedsInbox:69`/`:102` render `<Avatar name={person?.display_name} … />` with no guard. Reading `Avatar.js` at `208dc8f`: `initialsFor('')` → `('' || '?')` → **`'?'`**, and `avatarColorFor('')` → `hashName('')` → `AVATAR_WASHES[0]` → **`washYellow`**. That is `R-38.9-J`'s ruled-against render verbatim — *a pictorial assertion of a person the text just declined to assert*, and *every unnamed person as the same yellow circle*.
+
+Sharper: at those same four rows the **text** already degrades (`?? 'Someone'` → blank) while the **glyph** asserts `'?'` in the identity palette. `R-38.9-J`'s stated kernel is *text, glyph and colour are three channels of one claim*; here they are three channels giving three different answers, on shipped screens, today.
+
+> **A ruling scoped to the component that motivated it does not bind the component's other call sites.** `R-38.9-J` was censused by *ruling* (the `ContributingHiveRow` Avatar) rather than by *predicate* (`<Avatar>` fed an unguarded name). The predicate has five members; the ruling reached one.
+
+Adjacent and **not ruled here**: `listConnections` filters `status = 'accepted'` and nothing else, so a deleted person remains in the note/seed/invite pickers indefinitely — a blank, tappable row. Whether a tombstoned profile should appear in a picker at all is a product question adjacent to `O8`, not a copy question, and it is @Colin's.
+
+---
+
+#### 5. Routing — and the reason this is a record and not a build row
+
+Filed as a record. **I am not opening a build row for it tonight, and I recommend nobody else does either.** Six merges tonight, 55 gates, 1,769 assertions — all on the correct-a-rendered-word axis, and the ratified sentence still scores **0 of 8**. A twenty-nine-site copy sweep is precisely the work that reads as progress in a merge log and moves the sentence by zero. `§1B.38.24` exists so the class is sized on the record, not so it gets built before the client half of Phase 1.
+
+Two exceptions worth carrying, both small and both on the sentence:
+
+1. **`NectarConsentSheet:49`** — the one member with no gate, on the nectar step. Rides whatever comb work first touches nectar (`ENG-90`, row 2.x), not its own row.
+2. **`§1B.38.23`'s closing paragraph** — amended in place: *"any future consumer"* → **"twenty-nine live consumers, censused at `§1B.38.24`."** Performed in this commit, not declared (`§1B.38.11`).
+
+`1.17` is unchanged and remains @Lumen's, carrying its three (b) riders. **Sequencing unchanged: `O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.** 📈
+
+---
+
+#### 6. One process instance, logged against my own index
+
+Building this census I ran `git checkout <sha> -- .` in my own worktree as what I intended as a read. It is not a read: it writes the index **and** the working tree, and it staged a **1,719-line revert** of every `§1B.38` section on this branch. Caught by `git status` before anything was committed and restored with `git checkout HEAD -- .`; nothing was lost and the tree is clean at `40bfffe`.
+
+This is the same collision shape @Fizz logged from the other side earlier in this thread — and the rule was already in my index (*"`git checkout ref` stages the revert — use `checkout HEAD --`"*). **An indexed lesson that names the dangerous command still fires when the command is typed for a different purpose than the one the lesson was learned in.** I reached for it as a guard, not as a checkout. `git show <ref>:<path>` is the only read; there is no read-shaped use of `git checkout <ref> -- <path>`.
+
