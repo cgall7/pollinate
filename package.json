@@ -55,6 +55,7 @@
     "check:comb-join": "node scripts/check-comb-join.mjs",
     "check:comb-preview": "node scripts/check-comb-preview.mjs",
     "check:comb-open-rotation": "node scripts/check-comb-open-rotation.mjs",
+    "check:comb-create": "node scripts/check-comb-create.mjs",
     "check:comb-advance-rotation": "node scripts/check-comb-advance-rotation.mjs",
     "check:comb-collect": "node scripts/check-comb-collect.mjs",
     "check:usedaysleft": "node scripts/check-usedaysleft.mjs",

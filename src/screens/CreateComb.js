@@ -7,11 +7,20 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
 import { HoneycombStore } from '../services/HoneycombStore';
 import { CombStore } from '../services/CombStore';
+import { useAuth } from '../contexts/AuthContext';
+
+const CADENCES = [
+  { value: '1 month', label: 'One month', detail: 'The rhythm we recommend' },
+  { value: '2 months', label: 'Two months', detail: 'A little more breathing room' },
+  { value: '3 months', label: 'Three months', detail: 'A slower gathering' },
+];
+const isPlaceholderName = (name) => !name || name.trim().toLowerCase() === 'new user';
 
 // DES-29: the organizer can only choose a connection. This is both the
 // readable-name constraint and the month-one contributor guarantee; the
 // organizer never appears as the first subject.
 export const CreateCombScreen = ({ navigation }) => {
+  const { session } = useAuth();
   const [name, setName] = useState('');
   const [connections, setConnections] = useState([]);
   const [subject, setSubject] = useState(null);
@@ -19,6 +28,10 @@ export const CreateCombScreen = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [createdCombId, setCreatedCombId] = useState(null);
+  const [cadence, setCadence] = useState('1 month');
+  const initialOrganizerName = session?.user?.user_metadata?.display_name ?? '';
+  const [organizerName, setOrganizerName] = useState(initialOrganizerName);
+  const needsOrganizerName = isPlaceholderName(initialOrganizerName);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -37,11 +50,12 @@ export const CreateCombScreen = ({ navigation }) => {
     setError('');
     try {
       let result;
+      if (needsOrganizerName) await CombStore.saveOrganizerName(organizerName);
       if (createdCombId) {
         result = await CombStore.openFirstRotation({ combId: createdCombId, subjectProfileId: subject.id });
       } else {
         try {
-          result = await CombStore.createComb({ name, subjectProfileId: subject.id });
+          result = await CombStore.createComb({ name, subjectProfileId: subject.id, cadence });
         } catch (err) {
           // The comb row is durable before the mint. Keep its id when the
           // RPC is the failed half so Retry never creates a second comb.
@@ -54,7 +68,7 @@ export const CreateCombScreen = ({ navigation }) => {
       navigation.replace('HiveDetail', { hiveId });
     } catch (err) {
       console.warn('CreateCombScreen: create failed', err);
-      setError(createdCombId ? "We couldn't open the first month. Try again." : "We couldn't start this comb. Try again.");
+      setError(err?.combId || createdCombId ? "We couldn't open the first month. Try again." : "We couldn't start this comb. Try again.");
     } finally {
       setSaving(false);
     }
@@ -70,6 +84,9 @@ export const CreateCombScreen = ({ navigation }) => {
         <Text style={styles.eyebrow}>START A COMB</Text>
         <Text style={styles.title}>Who are you gathering around?</Text>
         <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="Name this comb" placeholderTextColor={theme.colors.inkFaint} maxLength={100} />
+        {needsOrganizerName && <><Text style={styles.label}>What should your people call you?</Text><TextInput value={organizerName} onChangeText={setOrganizerName} style={styles.input} placeholder="Your name" placeholderTextColor={theme.colors.inkFaint} maxLength={100} /></>}
+        <Text style={styles.label}>How long is each month?</Text>
+        {CADENCES.map((option) => <PressableScale key={option.value} onPress={() => setCadence(option.value)} style={[styles.person, cadence === option.value && styles.personSelected]}><View><Text style={styles.personName}>{option.label}</Text><Text style={styles.help}>{option.detail}</Text></View><Text style={styles.check}>{cadence === option.value ? '✓' : ''}</Text></PressableScale>)}
         <Text style={styles.label}>Who is this first month for?</Text>
         <Text style={styles.help}>Choose a connection. You’ll write for them together this month.</Text>
       </>}
@@ -83,7 +100,7 @@ export const CreateCombScreen = ({ navigation }) => {
     />
     <View style={styles.footer}>
       {!!error && <Text style={styles.error}>{error}</Text>}
-      <PrimaryButton onPress={create} loading={saving} disabled={!name.trim() || !subject || loading}>Start this comb</PrimaryButton>
+      <PrimaryButton onPress={create} loading={saving} disabled={!name.trim() || !subject || loading || (needsOrganizerName && !organizerName.trim())}>{needsOrganizerName ? `Create the comb as ${organizerName.trim() || 'you'}` : 'Start this comb'}</PrimaryButton>
     </View>
   </View>;
 };

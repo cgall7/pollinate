@@ -15,6 +15,16 @@ const requireUserId = async (client) => {
 // mint to open month one.  No client clock: comb_open_rotation derives the
 // first boundary from the cadence stored on the comb.
 export const CombStore = {
+  async saveOrganizerName(name) {
+    const client = requireSupabase();
+    const ownerId = await requireUserId(client);
+    const displayName = name.trim();
+    if (!displayName) throw new Error('Your name is needed before creating a comb');
+    const { error } = await client.from('profiles').update({ display_name: displayName }).eq('id', ownerId);
+    if (error) throw error;
+    const { error: authError } = await client.auth.updateUser({ data: { display_name: displayName } });
+    if (authError) throw authError;
+  },
   async openFirstRotation({ combId, subjectProfileId }) {
     const client = requireSupabase();
     const { data: rotationId, error: mintError } = await client.rpc('comb_open_rotation', {
