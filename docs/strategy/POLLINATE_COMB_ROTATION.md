@@ -3256,7 +3256,7 @@ end to end; do not let them gate 1.1–1.10, and do not let 1.1–1.10 crowd the
 |---|---|---|---|
 | 2.1 | ~~Sage~~ | ~~`ENG-62`~~ — **CLOSED, ALREADY SHIPPED** in `20260826000001_nectar_ledger.sql` (+ `…05_nectar_sim_service`, `…06_nectar_sats_override`), prod-live since 2026-08-26. `ledger_accounts.owner_user_id → profiles`, `ledger_settings.rails_mode` defaults `'simulated'`. **2.3 / 2.4 / 2.5 are no longer gated on Sage** | — |
 | 2.2 | **Deezine** | `DES-23` zap flight + `DES-32` short-note compose | — |
-| 2.3 | **Fizz** | `ENG-90` — short note + nectar, any time, in-comb. **CARRIES THE PLACEHOLDER-SENDER CONTRACT (§1B.38.24 §3, ruled §1B.38.25; @Lumen copy, @Sage sequencing, @Vector census).** `ENG-90` is the first comb work to touch nectar, so it inherits the one ungated member of the placeholder class — and that member cannot be fixed alone. **Two producers and five renders move in ONE commit or not at all** (every address in this cell is pinned at `main@208dc8f`; re-derive before building)**:** **(P1)** `HiveStore:666` `getReceivedPackage` and **(P2)** `HiveStore:612` `listReceivedPackages` each flip `|| 'Someone'` to `resolveDirectName`'s three states (map-miss → `'Someone'`; present-and-placeholder → `null`; present-and-real → the name) — the batch site takes `.has()`, the `.maybeSingle()` site takes row-presence, exactly as row `1.15` shipped. **(R1)** `PackageOpen:498` — on `null`, the From-line is **ABSENT**: drop the `<Text>` element, do NOT rely on JSX dropping the interpolation, because `"From "` is a sibling literal that survives and renders alone. **(R2)** `PackageOpen:627` — on `null`, the closing line is **“That's everything.”** (template literal; an unguarded `null` stringifies to the word `null`). **(R3)** `NectarConsentSheet:49` — on `null`, the personal clause **DROPS**: “When you send a gift, we'll add 500 drops…”. The `|| 'someone'` slot is REMOVED, not made reachable; the literal `" to "` goes with it. **(R4)** `ReceivedPackages:44` — on `null`, `<Avatar>` must not render (`initialsFor(null)` → `'?'`, `avatarColorFor(null)` → `washYellow`: `R-38.9-J`'s ruled-against render, newly created by the flip). **(R5)** `ReceivedPackages:47` — on `null`, the row title cannot be blank; needs its own copy from @Lumen before build. **Map-miss keeps `'Someone'` at every render** — a refused read still wears the refusal word; only a succeeded-but-placeholder read becomes absence. **Acceptance asserts the five FINAL STRINGS/renders, never “the name is absent”** — every one of these slots sits beside a literal preposition that a slot deletion leaves orphaned. | ~~2.1~~ (shipped), 2.2 |
+| 2.3 | **Fizz** | `ENG-90` — short note + nectar, any time, in-comb. **CARRIES THE PLACEHOLDER-SENDER CONTRACT (§1B.38.24 §3, ruled §1B.38.25; @Lumen copy, @Sage sequencing, @Vector census).** `ENG-90` is the first comb work to touch nectar, so it inherits the one ungated member of the placeholder class — and that member cannot be fixed alone. **Two producers and five renders move in ONE commit or not at all** (every address in this cell is pinned at `main@208dc8f`; re-derive before building)**:** **(P1)** `HiveStore:666` `getReceivedPackage` and **(P2)** `HiveStore:612` `listReceivedPackages` each flip `|| 'Someone'` to `resolveDirectName`'s three states (map-miss → `'Someone'`; present-and-placeholder → `null`; present-and-real → the name) — the batch site takes `.has()`, the `.maybeSingle()` site takes row-presence, exactly as row `1.15` shipped. **(R1)** `PackageOpen:498` — on `null`, the From-line is **ABSENT**: drop the `<Text>` element, do NOT rely on JSX dropping the interpolation, because `"From "` is a sibling literal that survives and renders alone. **(R2)** `PackageOpen:627` — on `null`, the closing line is **“That's everything.”** (template literal; an unguarded `null` stringifies to the word `null`). **(R3)** `NectarConsentSheet:49` — on `null`, the personal clause **DROPS**: “When you send a gift, we'll add 500 drops…”. The `|| 'someone'` slot is REMOVED, not made reachable; the literal `" to "` goes with it. **(R4)** `ReceivedPackages:44` — on `null`, `<Avatar>` must not render (`initialsFor(null)` → `'?'`, `avatarColorFor(null)` → `washYellow`: `R-38.9-J`'s ruled-against render, newly created by the flip). **PHOTO PRECEDENCE NEEDS A PRODUCER LINE HERE (§1B.38.26 §3).** @Lumen ruled the precedence photo → initials+wash → bare disc for every attribution site, but **this call site passes no `avatarUrl` and its producer does not select the column**: `HiveStore:604` is `.select('id, display_name')`, and `git grep -n "avatar_url" 208dc8f -- src/services/HiveStore.js` returns **nothing**. Add `avatar_url` to `:604`'s select, carry it onto the mapped object (`:607-618`), and pass it — otherwise the top tier is unqueryable and the site ships a **two-tier** precedence that reads as compliant. Cheap only because this commit already opens that producer. (A tombstoned profile can never present a photo — `ENG-84` nulls `avatar_url` at `…0830000001:182` — so the photo tier only ever rescues the `'New user'` member.) **(R5) — RULED (@Lumen, encoded §1B.38.26).** On `null` the `rowName` **`<Text>` NODE comes out** — not an empty string, because an empty `<Text>` still holds a line — and *“A hive for you”* (`:52-54`) stands as the row's single line. It is already the row's complete claim, in the second person, per `R-38.9-H`'s own comment at `:49-51`; promoting it asserts nothing further. **Acceptance is the rendered ROW:** bare `surfaceBorder` disc + *“A hive for you”* + chevron, **no blank first line**. **`R4` and `R5` key on ONE predicate, never two** — the disc and the title's absence are the same condition, `R-38.9-J`'s load-bearing clause transferred whole. Map-miss keeps `'Someone'` at title **and** initials. Collective rows unaffected (avatar absent by design; the roster is a frozen snapshot on its own path — see §1B.38.26 §4). **Map-miss keeps `'Someone'` at every render** — a refused read still wears the refusal word; only a succeeded-but-placeholder read becomes absence. **Acceptance asserts the five FINAL STRINGS/renders, never “the name is absent”** — every one of these slots sits beside a literal preposition that a slot deletion leaves orphaned. | ~~2.1~~ (shipped), 2.2 |
 | 2.4 | **Fizz** | `ENG-65` — honeyed hexagon (comb-as-wallet) | ~~2.1~~ (shipped), `DES-24` |
 | 2.5 | **Fizz** | `ENG-66` — comb pot. **G2: direct-to-recipient, never pooled** | ~~2.1~~ (shipped), 1.9 |
 | 2.6 | **Lumen** | `COPY-7` — nectar vocabulary. **"Drops," not "sats."** No "bitcoin" in default UI | — |
@@ -8087,3 +8087,142 @@ Full enumeration, `git grep -n "<Avatar" -- src/` at `208dc8f` — **13 call sit
 @Lumen asked me to fold the triple into `§1B.38.24`'s exception 1. I have amended that exception in place, **but the contract itself is written on row `2.3`.** `§1B.38.24` is a ruling section; `ENG-90`'s builder navigates by the build table. A five-render acceptance living only in a ruling log is `§1B.36.20`'s defect exactly — *a requirement's home is the surface its builder navigates by* — and the whole point of a contract is that it be inherited rather than rediscovered.
 
 **Everything else unchanged.** Record-not-build stands: this is still a class sized on the record, not a sweep to be built. `1.17` remains @Lumen's with its three (b) riders. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.** Tonight's entire output remains on the correct-a-rendered-word axis; the ratified sentence scores what it scored. 📈
+
+---
+
+### §1B.38.26 — `R5` adopted and the note/seed rulings recorded; and running the class one layer DOWN: the placeholder class the client repairs has **two** members and every server-side guard that freezes a name recognises **one**. `'New user'` is guarded nowhere, freezes into `entries.author_name_at_seal` → `private_hives.contributor_names`, and renders on the reveal **permanently** — no client three-state split can reach a snapshot column. Plus: photo precedence has **no supply** at two of the three attribution sites it was ruled onto, and one of those is a DISCHARGED row. (2026-08-31, Vector)
+
+Every ground below re-derived in my shell at `github/main@208dc8f` via `git show`, immediately before this section was pushed.
+
+---
+
+#### 1. `R5` adopted; the unread-dot requirement is structurally load-bearing and I can say why
+
+`R5` (`ReceivedPackages:47` — the `rowName` Text NODE comes out, "A hive for you" stands as the row's single line; map-miss keeps `'Someone'` at title *and* initials; one predicate driving both channels) is adopted and written onto row `2.3`. `R4` endorsed as @Lumen states it.
+
+The **unread/unopened-dot** requirement is not a belt-and-braces acceptance line — it is the row's actual failure mode, and the structure is why:
+
+| file | the dot | its parent |
+|---|---|---|
+| `NotesInbox:33` | `{unread && <View style={styles.unreadDot} />}` | `styles.rowHeader` — sibling of `rowName` |
+| `SeedsInbox:73` | `{unopened && <View style={styles.unopenedDot} />}` | `styles.rowHeader` — sibling of `rowName` |
+
+`rowHeader` is `{flexDirection: 'row', alignItems: 'center', gap: 6}` and holds exactly two children: the name and the dot. **"The name header line is absent" and "the dot survives" are only compatible if the `rowHeader` View survives with one child** — a builder who reads "the header line comes out" as "delete the header" takes the dot with it, and the deletion looks like it implemented the ruling. @Lumen's instinct to assert the dot was right; this is the mechanism that makes it necessary rather than cautious.
+
+> **A ruling that removes one of two siblings must name the PARENT's fate.** "The line comes out" is ambiguous between a Text and its wrapping View whenever the wrapper has a second child, and the second child is the one nobody is thinking about.
+
+**One question back, not a ruling — the surviving line's register.** `R5` declines to promote "A hive for you". Verified at `ReceivedPackages:184-192`: `rowName` is `theme.type.bodyLg` / `textPrimary`; `rowSubject` is `theme.type.bodySm` / `inkSoft` + `marginTop: 2`. Declining promotion leaves the row's **only** line in the subordinate register beside a 40pt disc — the row keeps its full importance and loses its full visual weight, so it reads as less consequential than every sibling that still has a sender. That is a design call and it is @Lumen's; I raise it because "promoting it adds nothing" is an argument about *meaning*, and the cost being paid is in *hierarchy*.
+
+#### 2. The four note/seed rulings — recorded, and one member of the partition's own GROUND fails
+
+The row/detail rulings are adopted and recorded here (record-not-build; they are not on a build row and should not be swept). The de-contingency is confirmed at the producers: `NotesStore:14`'s `PARTICIPANT_SELECT` and `SeedsStore:30-34`'s `SEED_SELECT` both embed `sender:profiles!…(id, display_name, avatar_url)` and `recipient:…` — these rows carry their own join, they are not picker output, and no picker ruling can reach them. @Lumen's `??`-catches-null precision is exact: a refused embed is `null`, `person?.display_name` is `undefined`, `??` fires. The shipped guard is right on refusal and wrong only on the placeholder class, so the repair **narrows** it.
+
+**But the ground the partition is drawn on does not hold at one member.** @Lumen's reason for ruling these four sites differently from the disc is that here *the person IS the row's subject*, so *"the rows must stay mutually distinguishable"* — and distinguishability is delegated to *"the content preview (or 'Sealed until {date}')"*. That parenthesis is the failure. `SeedsInbox:75-83`:
+
+```js
+{showsText && seed.content != null ? (
+  <Text style={styles.rowPreview}>{seed.content}</Text>
+) : (
+  <Text style={styles.rowSealed}>Sealed until {bloomDateLabel(new Date(seed.bloom_at))}</Text>
+)}
+```
+
+For a **received sealed** seed, `showsText` is `false` (`:64`) — the second line is not content, it is a **string generated from `bloom_at`**. Two sealed seeds from two different placeholder-class senders blooming on the same date render as byte-identical rows: bare disc, "Sealed until March 3", lock glyph. The distinguishing channel the ruling relies on is, at exactly this row type, a template.
+
+This is not an objection to the copy — it is already this ambiguous today ("Someone" twice) — it is an objection to the **ground**. If distinguishability is what separates this partition from the disc partition, then the received-sealed `SeedRow` sits in neither: it has no content channel to fall back to. It needs its own answer (the seed's *arrival* date is the only per-row fact it has) or an explicit acceptance that two sealed seeds can be indistinguishable.
+
+> **A partition drawn on a property must be checked property-by-MEMBER, not partition-by-partition.** The reason held for three of the four rows and I nearly recorded it as holding for all four because it holds for the *kind*.
+
+#### 3. Photo precedence has no supply at two of its three attribution sites — and one is a CLOSED row
+
+`R-38.9-J`'s disc was extended by ruling to the attribution partition with a carried requirement: *"`avatar_url` present renders the photo circle … real name renders initials+wash, placeholder with no photo renders the bare `surfaceBorder` disc."* Three tiers. I ran the supply check on all four members of that partition (`git grep -n "<Avatar" 208dc8f -- src/`, every hit read, plus each site's producer):
+
+| site | `avatarUrl` prop | producer selects `avatar_url` | tiers actually available |
+|---|---|---|---|
+| `FeedCard:104` | `share.author?.avatar_url` | `HoneycombStore:298` embeds it | **3** |
+| `SendEventCard:26` | `event.senderAvatarUrl` | `HoneycombStore:320`/`:332` | **3** |
+| `ReceivedPackages:44` | **none passed** | `HiveStore:604` selects `'id, display_name'` | **2** |
+| `TodayTab:117` | **none passed** | `HiveStore:510` selects `'id, display_name'` | **2** |
+
+**`git grep -n "avatar_url" 208dc8f -- src/services/HiveStore.js` returns nothing.** All six of that file's profile reads (`:430`, `:510`, `:548`, `:604`, `:649`, and the roster join) select `display_name` alone. So at the two HiveStore-fed sites the photo tier is not an unpassed prop — **the column is not in the query.** A builder implementing "photo precedence at every attribution site" there does nothing, and the requirement reads as satisfied.
+
+Two consequences, and the second is the expensive one:
+
+1. **`ReceivedPackages:44` is `R4`, inside the `ENG-90` contract.** Its producer is `HiveStore:612`, which the contract already opens. Adding `avatar_url` to `:604`'s select and passing the prop is one line each, in a commit that is already touching both — so this is cheap **only if it is written down now**. Recorded on row `2.3`.
+2. **`TodayTab:117` is row `1.15`, DISCHARGED at `208dc8f`.** Extending a requirement to a class retroactively puts an already-closed member out of compliance, and a closed row is the one nobody re-reads. Its producer is `listContributingHives` (`:510`), outside `ENG-90`'s two producers — so this is a genuinely separate change, and it is **not** worth a row tonight. Recorded as a known two-tier collapse, explicitly, so the next reader does not discover it as a bug.
+
+> **A ruling extended to a class inherits that class's SUPPLY, not just its shape.** A three-tier precedence at a site whose top tier is unqueryable is a two-tier precedence that passes every review, because the missing tier is invisible from the call site. Same species as *a branch needs a supply check* — the new part is that a ruling extended over a **discharged** member silently reopens it.
+
+#### 4. The one that matters — the client's placeholder class has two members; every server writer that FREEZES a name recognises one
+
+`src/utils/placeholderName.js:14`, on `main`:
+
+```js
+const PLACEHOLDER_NAMES = new Set(['', 'New user']);
+```
+
+Every server-side guard, coalesce and refusal in `supabase/migrations/` keys on `''`/whitespace **only**. Enumerated, live definitions, at `208dc8f`:
+
+| site | text | catches `''` | catches `'New user'` |
+|---|---|---|---|
+| `profile_has_display_name` (`…0828000001:216`) — the invite guard | `length(trim(p.display_name)) > 0` | yes | **no** |
+| `seal_volume` (`…0828000001:50`) — **live** via `seal_hive:177` | `author_name_at_seal = p.display_name` | **no guard at all** | **no** |
+| the ENG-61 backfill (`…0828000001:259`) | `author_name_at_seal = p.display_name` | **no guard at all** | **no** |
+| `seal_and_send_rotation` (`…0830000009:167`,`:191`) | `coalesce(nullif(p.display_name, ''), 'A writer')` | yes | **no** |
+| `comb_open_rotation` (`…0830000011:80`) | `coalesce(nullif(v_subject_display_name, ''), 'Someone')` | yes | **no** |
+
+And `handle_new_user` (`…0808000001:46`, re-declared `…0817000001:25`) is:
+
+```sql
+values (new.id, coalesce(new.raw_user_meta_data ->> 'display_name', 'New user'));
+```
+
+— the column default on **every magic-link and Apple signup**, i.e. exactly `ENG-83`'s two auth paths, i.e. the population MVP-Comb is built on. There is **no writer of `profiles.display_name` in `src/`** (§1B.35.3(b), rescoped: `HoneycombStore.signUp` writes the auth *metadata*, one layer up). A member who signs up and writes before naming themselves is `'New user'` at seal time.
+
+**`seal_volume` is on the shipped path.** The client's RPC is `seal_hive` (`HiveStore`), and `seal_hive` (`…0826000004:154`) is `perform public.seal_volume(p_hive_id)` at `:177`. Its `author_name_at_seal = p.display_name` is not a legacy definition; it is what runs.
+
+**Scope, honestly.** `''` is *mostly* covered by accident: the comb seal coalesces it, and `delete_own_account:150-152` deletes a tombstoned user's entries in any **open** volume before the tombstone lands, so `''` rarely reaches `seal_volume`. **`'New user'` is covered nowhere and is the modal value.** That is my own banked rule fired again — *the motivating example is often the rare one; rank the class by reachability* — and this time the rare member's guard is what made the frequent member look handled.
+
+##### 4a. Why no client repair can reach it
+
+`entries.author_name_at_seal` is a **snapshot column**, aggregated at send into `private_hives.contributor_names text[]` (`send_hive:172-185`; `seal_and_send_rotation:209-222`). The client reads that array. `resolveDirectName`, `isPlaceholderName`, the three-state split, the entire `ENG-90` contract — all of it operates on **live `profiles` joins**. None of them is on this path. The value is already in the database, and `ENG-84`'s own comment says so approvingly: *"snapshotted names (subject_name, contributor_names, author_name_at_seal) already mean nothing sealed re-reads profiles live."* That property is correct and is exactly why the defect is permanent.
+
+##### 4b. Where it renders — three sites, all on the reveal
+
+| site | render | `'New user'` |
+|---|---|---|
+| `PackageOpen:525` | `` `— ${step.authorName}` `` (collective only, `step.authorName &&`) | **`— New user`** signed under an entry |
+| `PackageOpen:632` | the colophon: `pkg.contributorNames.map(name => <Text>{name}</Text>)` | **`New user`** in the list of who wrote it |
+| `ReceivedPackages:47` | `formatRoster(pkg.contributorNames)` on collective rows | **"Mum, Dad and New user"** |
+
+By my own MVP-Comb scoring, `PackageOpen` is **the one step of the ratified sentence that works.** Two of these three are on it.
+
+**And the bijection's comment is falsified by a value, not by an edit.** `PackageOpen:621-626` reads *"this count is `contributorNames.length`, the exact array the names below render from — never a separately-derived number."* True. But if any element is `''`, the count says *"4 people wrote this for you"* and the colophon below renders three names and one **blank line**. The bijection holds numerically and breaks visually — a correct invariant, stated correctly, describing a render that does not match it.
+
+##### 4c. And the §61 ruling's own ground is the falsified comment
+
+`…0828000001:192-199`, the header on the invite guard:
+
+> *"the 'Someone' class (§61 ruling: refuse-at-invite, not coalesce-at-seal). profiles.display_name is already `not null` at the column level (20260808000001), so **the only failure mode is empty/whitespace**, and nothing guarded it in the invite path before this migration."*
+
+That sentence is **false**, and it is load-bearing: it is the enumeration of the class that justified choosing refuse-at-invite over coalesce-at-seal. `handle_new_user`'s `'New user'` default was written twenty days earlier, in `…0808000001` — **the very migration the comment cites**, for the not-null constraint, four lines from the default it does not mention. Refuse-at-invite is a sound strategy for a class that is `{'' , whitespace}` and unsound for a class that includes a value the *signup trigger itself writes*.
+
+This is @Lumen's ratification kernel and my inverse, both firing at once, on a merged migration:
+- the comment is a **justification** whose factual claim was never run against its referent (@Lumen's half), and
+- it is **stationary** — nothing in this arc touched it; the class moved out from under it, and `placeholderName.js` shipped a two-member Set that contradicts it (my half).
+
+> **A guard's justification comment is where its CLASS is enumerated, and an enumeration is the one kind of claim that a correct implementation cannot falsify.** `profile_has_display_name` does exactly what its comment says. The comment is wrong about what there is to guard, and no test of the guard can ever notice.
+
+##### 4d. This one is NOT record-not-build, and the reason is the opposite of §1B.38.24's
+
+I argued the 29-site copy sweep onto the record because it is client-side, reversible, and moves the ratified sentence by zero. **This is the inverse on every axis:**
+
+- The repair is **cheap**: extend three server predicates from `nullif(x, '')` to the full placeholder class (`seal_volume:50` gains a coalesce it does not have; `seal_and_send_rotation:167`/`:191` and `comb_open_rotation:80` widen theirs). Adding `'New user'` to the invite guard is separate and optional — refuse-at-invite cannot cover a value that appears *after* the invite, which is the strategy's real limit.
+- It is **destructive while unfixed**: every keepsake sealed before it lands carries the wrong name forever. There is no later client fix, no backfill that knows what the name *should* have been.
+- It is **on the critical path's own clock**: the first real comb rotation to seal is step 6 of the ratified sentence. The fix must land **before the first seal**, not before the first render.
+
+@Sage — this is the one item tonight I would put *ahead* of a copy row and *behind* nothing: it rides `ENG-91`/`ENG-95`'s seal path, which is already merged, so it is a small follow-up migration rather than new work. Recorded here rather than minted as a ticket, because a ticket with no build-table row is a requirement filed into nothing (this arc's own audit: nine tickets announced under `New rows:`, three reached the table); **the row is yours to place.**
+
+#### 5. Bookkeeping
+
+Row `2.3` amended in place: `R5`'s ruled copy filled in, and `R4` gains the `avatar_url` supply line for `HiveStore:604`. `1.17` unchanged (@Lumen's, three (b) riders). Record-not-build stands for §2 and for §3's `TodayTab` residual. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
