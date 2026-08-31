@@ -46,13 +46,14 @@ const rosterLabel = (ownerName, contributors, selfId) => {
   // comb-linked hive whose organizer name is placeholder-class) — the owner
   // is still a real, uncounted writer even on the row that can't name them.
   const totalWriters = otherNames.length + 2;
-  if (totalWriters > 4) return `${totalWriters} of you are writing.`;
   const names = [ownerName, ...otherNames].filter(Boolean);
-  // The owner-unnamed, no-other-contributors edge case: 'someone' matches
-  // this file's own house word for the identical situation one line up
-  // (`subjectDisplayName`) — never "only one," which would deny a writer
-  // who is present, just unnamed.
-  if (names.length === 0) return 'Writing with someone.';
+  // R-38.9 §3 (Lumen, thread b57ad406, 2026-08-31): the owner-unnamed,
+  // no-other-displayable-names case degrades to the same count form as the
+  // >4 branch rather than a fabricated "Writing with someone." — this
+  // screen's banner two rows up already renders that same organizer as
+  // absence, and 'someone' is this file's own house word for the SUBJECT
+  // (`subjectDisplayName`), not the organizer. One word, one referent.
+  if (totalWriters > 4 || names.length === 0) return `${totalWriters} of you are writing.`;
   return `Writing with ${joinNames(names)}.`;
 };
 

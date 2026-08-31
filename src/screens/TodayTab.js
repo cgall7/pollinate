@@ -17,6 +17,7 @@ import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { Avatar } from '../components/Avatar';
+import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
@@ -88,9 +89,28 @@ const GREETING_ANCHOR = 'greeting';
 // comb-linked hive whose organizer name is placeholder-class — HiveStore
 // answers "no from-clause to show," not "Someone," so this line omits
 // rather than renders a name it doesn't have.
+//
+// R-38.9-J (Lumen, same thread): text, glyph, and color are three channels
+// of one claim — an absence ruling that binds only the text still leaves
+// `Avatar`'s circle asserting a specific (and, worse, always-the-same,
+// since `avatarColorFor(null)` hashes to the same wash every time) person
+// beside text that just declined to name one. When `ownerName` is null the
+// row renders no person at all: same 40pt disc geometry so rows stay
+// aligned down the shelf, but tinted from the hive's own cover theme
+// instead of a name hash, no glyph. Degrades from *who* to *which hive* —
+// a fact this row actually holds.
 const ContributingHiveRow = ({ hive, onPress }) => (
   <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
-    <Avatar name={hive.ownerName} size={40} />
+    {hive.ownerName ? (
+      <Avatar name={hive.ownerName} size={40} />
+    ) : (
+      <View
+        style={[
+          styles.contributingRowAvatarPlaceholder,
+          { backgroundColor: hiveCoverTheme(hive.coverTheme).base },
+        ]}
+      />
+    )}
     <View style={styles.contributingRowText}>
       <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
       {hive.ownerName ? (
@@ -632,6 +652,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     ...theme.shadows.card,
+  },
+  // No border: `theme.colors.glassRim` is a lone specular ring with its
+  // own exact-set gate (check-glass-definition E7) — whether it reads
+  // depends on what it frames, and that's its own ruling to make, not
+  // this row's to borrow. The disc's geometry, not a rim, is what needs
+  // to match Avatar's footprint here.
+  contributingRowAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   contributingRowText: {
     flex: 1,

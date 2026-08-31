@@ -35,9 +35,9 @@
 //   R8  `HiveStore.listContributingHives` and `.getContributingHive` both
 //       resolve `ownerName` by `combOwnerNames.has(id)` first — a
 //       comb-linked hive's answer, `null` or a real name, is final — falling
-//       to the direct `profiles` join then `'Someone'` only when the hive is
-//       NOT comb-linked at all (Finding A, thread b57ad406, 2026-08-31: a
-//       placeholder-class comb name must never fall through to 'Someone')
+//       to `resolveDirectName` (R12) only when the hive is NOT comb-linked
+//       at all (Finding A, thread b57ad406, 2026-08-31: a placeholder-class
+//       comb name must never fall through to 'Someone')
 //   R9  `resolveCombOwnerNames` nulls out a placeholder-class resolved name
 //       (`isPlaceholderName(name) ? null : name`) rather than passing it
 //       through — the source of R8's "final answer, not a fallback rung"
@@ -45,9 +45,31 @@
 //       only when `hive.ownerName` is truthy — omitted, not "From null",
 //       when a comb organizer's name is placeholder-class
 //   R11 `ContributingHive.js`'s banner omits ", from {ownerName}" under the
-//       same condition, and `rosterLabel` never renders a literal "with ."
-//       or drops a real writer from its numeric count when the owner's name
-//       is absent
+//       same condition, and `rosterLabel` never drops a real writer from
+//       its numeric count when the owner's name is absent, and its
+//       zero-displayable-name case degrades to the same numeric form as
+//       its >4 case (R-38.9 §3, Lumen 2026-08-31) rather than a fabricated
+//       "Writing with someone." — this screen's own house word for
+//       'someone' names the SUBJECT, not the organizer
+//   R12 Row 1.15 (residuals 1+2, ruled thread b57ad406, 2026-08-31):
+//       `resolveDirectName` in `HiveStore.js` gives the direct `profiles`
+//       join the same three states as `resolveCombOwnerNames` — a map-miss
+//       (the read was refused or the row absent) answers 'Someone'; a
+//       read-succeeded placeholder-class name answers `null`; a real name
+//       passes through — and both `listContributingHives`/
+//       `getContributingHive`'s direct-join term AND `getHiveContributors`
+//       route through it, closing the divergence Finding A's fix left on
+//       the branch with a shipped producer
+//   R13 `HiveDetail.js`'s `rosterLabel` filters `null` names out of its
+//       display list but still counts every contributor (including an
+//       unnamed one) toward its numeric "N of you are writing" branch —
+//       never renders a literal "with null." and never drops a real,
+//       unnamed writer from the count
+//   R14 `TodayTab.js`'s `ContributingHiveRow` never renders `<Avatar>` on a
+//       null `ownerName` — R-38.9-J: the row degrades to a plain,
+//       cover-theme-tinted disc (same 40pt geometry, no glyph) instead of
+//       `avatarColorFor(null)`'s single always-the-same wash asserting an
+//       unknown person the text just declined to name
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,6 +84,7 @@ const CONTRIBUTING = path.join(SRC, 'screens/ContributingHive.js');
 const RECEIVED = path.join(SRC, 'screens/ReceivedPackages.js');
 const HIVE_STORE = path.join(SRC, 'services/HiveStore.js');
 const TODAY_TAB = path.join(SRC, 'screens/TodayTab.js');
+const HIVE_DETAIL = path.join(SRC, 'screens/HiveDetail.js');
 
 let pass = 0;
 const failures = [];
@@ -94,17 +117,20 @@ const contributingSrc = fs.readFileSync(CONTRIBUTING, 'utf8');
 const receivedSrc = fs.readFileSync(RECEIVED, 'utf8');
 const hiveStoreSrc = fs.readFileSync(HIVE_STORE, 'utf8');
 const todayTabSrc = fs.readFileSync(TODAY_TAB, 'utf8');
+const hiveDetailSrc = fs.readFileSync(HIVE_DETAIL, 'utf8');
 
 const foldAst = parseJs(foldSrc);
 const composeAst = parseJs(composeSrc);
 const contributingAst = parseJs(contributingSrc);
 const hiveStoreAst = parseJs(hiveStoreSrc);
 const todayTabAst = parseJs(todayTabSrc);
+const hiveDetailAst = parseJs(hiveDetailSrc);
 const foldCode = codeOnly(foldSrc, foldAst);
 const composeCode = codeOnly(composeSrc, composeAst);
 const contributingCode = codeOnly(contributingSrc, contributingAst);
 const hiveStoreCode = codeOnly(hiveStoreSrc, hiveStoreAst);
 const todayTabCode = codeOnly(todayTabSrc, todayTabAst);
+const hiveDetailCode = codeOnly(hiveDetailSrc, hiveDetailAst);
 
 // ── R1/R2. the pure classifier, tested directly, and its source guarded ──
 {
@@ -215,14 +241,17 @@ const todayTabCode = codeOnly(todayTabSrc, todayTabAst);
     const mapKeyEsc = mapKey.replace('.', '\\.');
     // `.has()`, not `||` — a comb-linked hive whose resolved name is `null`
     // must NOT fall through to the direct join or 'Someone' (Finding A).
+    // The else arm routes through `resolveDirectName` (R12), not a raw
+    // `.get(...) || 'Someone'` — a truthy-|| fallthrough there is exactly
+    // the divergence Vector's residual 1 found.
     const hasGuard = new RegExp(
-      `combOwnerNames\\.has\\(${mapKeyEsc}\\)\\s*\\?\\s*combOwnerNames\\.get\\(${mapKeyEsc}\\)\\s*:\\s*[^,]+\\|\\|\\s*['"]Someone['"]`
+      `combOwnerNames\\.has\\(${mapKeyEsc}\\)\\s*\\?\\s*combOwnerNames\\.get\\(${mapKeyEsc}\\)\\s*:\\s*resolveDirectName\\(`
     ).test(body);
-    const noTruthyFallthrough = !new RegExp(`combOwnerNames\\.get\\(${mapKeyEsc}\\)\\s*\\|\\|`).test(body);
+    const noTruthyFallthrough = !new RegExp(`combOwnerNames\\.get\\(${mapKeyEsc}\\)\\s*\\|\\|`).test(body) && !/\|\|\s*['"]Someone['"]/.test(body);
     if (hasGuard && noTruthyFallthrough) {
-      ok(`R8 ${fnName} resolves ownerName via combOwnerNames.has() — comb-linked answer is final, direct-join/'Someone' only when not comb-linked`);
+      ok(`R8 ${fnName} resolves ownerName via combOwnerNames.has() — comb-linked answer is final, resolveDirectName only when not comb-linked`);
     } else {
-      problems.push(`${fnName}: .has()-guarded chain found=${hasGuard}, no truthy-|| fallthrough=${noTruthyFallthrough}`);
+      problems.push(`${fnName}: .has()-guarded resolveDirectName chain found=${hasGuard}, no truthy-|| fallthrough=${noTruthyFallthrough}`);
     }
   }
   if (problems.length) bad('R8 HiveStore owner-name resolution', problems.join(' | '));
@@ -273,15 +302,104 @@ const todayTabCode = codeOnly(todayTabSrc, todayTabAst);
   // never from the filtered display list — a null ownerName must not
   // shrink the "N of you are writing" count by one.
   const countsFromTotal = /otherNames\.length \+ 2/.test(rosterBody) && /totalWriters > 4/.test(rosterBody);
-  const namesFallback = /names\.length === 0/.test(rosterBody) && /'Writing with someone\.'/.test(rosterBody);
+  // R-38.9 §3 (Lumen, 2026-08-31): the zero-displayable-names case must
+  // degrade to the SAME numeric branch as >4, not a fabricated sentence —
+  // one condition, one return, no separate 'Writing with someone.' string.
+  const unionCondition = /totalWriters > 4 \|\| names\.length === 0/.test(rosterBody);
+  const noFabricatedString = !/Writing with someone/.test(rosterBody);
   const filtersAbsent = /\[ownerName, \.\.\.otherNames\]\.filter\(Boolean\)/.test(rosterBody);
 
-  if (bannerGuarded && countsFromTotal && namesFallback && filtersAbsent) {
-    ok('R11 ContributingHive omits the from-clause when absent; rosterLabel counts from total writers and never renders an empty roster');
+  if (bannerGuarded && countsFromTotal && unionCondition && noFabricatedString && filtersAbsent) {
+    ok('R11 ContributingHive omits the from-clause when absent; rosterLabel counts from total writers and degrades a zero-name roster to the numeric form, not a fabricated sentence');
   } else {
     bad(
       'R11 ContributingHive owner-attribution guard',
-      `banner guarded=${bannerGuarded}, roster found=${!!rosterFnNode}, counts from total=${countsFromTotal}, empty-names fallback=${namesFallback}, filters absent name=${filtersAbsent}`
+      `banner guarded=${bannerGuarded}, roster found=${!!rosterFnNode}, counts from total=${countsFromTotal}, union condition=${unionCondition}, no fabricated string=${noFabricatedString}, filters absent name=${filtersAbsent}`
+    );
+  }
+}
+
+// ── R12. resolveDirectName — the direct-join term's own three states,
+//        and both listContributingHives/getContributingHive AND
+//        getHiveContributors route through it (Row 1.15 residuals 1+2) ──
+{
+  const { isPlaceholderName } = await import(`${HELPER}?t=${Date.now()}`);
+  let fnNode = null;
+  walk(hiveStoreAst.program, (n) => {
+    if (fnNode) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'resolveDirectName') fnNode = n;
+  });
+  if (!fnNode) {
+    bad('R12 resolveDirectName', 'could not locate the function — FAILS CLOSED');
+  } else {
+    const body = hiveStoreCode.slice(fnNode.start, fnNode.end);
+    const mapMissIsSomeone = /!names\.has\(id\)\)\s*return\s*['"]Someone['"]/.test(body);
+    const placeholderIsNull = /isPlaceholderName\(name\)\s*\?\s*null\s*:\s*name/.test(body);
+    const listSiteRoutes = /ownerName:\s*combOwnerNames\.has\(h\.id\)\s*\?\s*combOwnerNames\.get\(h\.id\)\s*:\s*resolveDirectName\(ownerNames,\s*h\.owner_id\)/.test(
+      hiveStoreCode
+    );
+    const singleSiteRoutes = /ownerName:\s*combOwnerNames\.has\(hive\.id\)\s*\?\s*combOwnerNames\.get\(hive\.id\)\s*:\s*resolveDirectName\(ownerNames,\s*hive\.owner_id\)/.test(
+      hiveStoreCode
+    );
+    const contributorsSiteRoutes = /name:\s*resolveDirectName\(names,\s*r\.profile_id\)/.test(hiveStoreCode);
+    if (mapMissIsSomeone && placeholderIsNull && listSiteRoutes && singleSiteRoutes && contributorsSiteRoutes) {
+      ok('R12 resolveDirectName gives the direct-join term the same three states as resolveCombOwnerNames, and all three call sites (listContributingHives, getContributingHive, getHiveContributors) route through it');
+    } else {
+      bad(
+        'R12 resolveDirectName',
+        `map-miss→'Someone'=${mapMissIsSomeone}, placeholder→null=${placeholderIsNull}, listContributingHives routes=${listSiteRoutes}, getContributingHive routes=${singleSiteRoutes}, getHiveContributors routes=${contributorsSiteRoutes}`
+      );
+    }
+  }
+  // Behavioral cross-check on the classifier the function is built from,
+  // since a source-level regex can't see the runtime branch it takes.
+  if (isPlaceholderName('New user') !== true || isPlaceholderName('Sarah') !== false) {
+    bad('R12 resolveDirectName classifier cross-check', 'isPlaceholderName disagreed with its own R1 cases — FAILS CLOSED');
+  }
+}
+
+// ── R13. HiveDetail rosterLabel — filters null names for display, never
+//        drops an unnamed contributor from the numeric count ────────────
+{
+  let rosterFnNode = null;
+  walk(hiveDetailAst.program, (n) => {
+    if (rosterFnNode) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'rosterLabel') rosterFnNode = n;
+  });
+  const rosterBody = rosterFnNode ? hiveDetailCode.slice(rosterFnNode.start, rosterFnNode.end) : '';
+  const filtersDisplay = /\.map\(\(c\) => c\.name\)\.filter\(Boolean\)/.test(rosterBody);
+  // The numeric branch's "+1" reads off `contributors.length` (the real
+  // headcount), not `names.length` (the filtered display list) — an
+  // unnamed contributor still counts.
+  const countsFromContributors = /contributors\.length \+ 1/.test(rosterBody);
+  const displayGatedOnRealTotal = /contributors\.length <= 3 && names\.length > 0/.test(rosterBody);
+  if (rosterFnNode && filtersDisplay && countsFromContributors && displayGatedOnRealTotal) {
+    ok('R13 HiveDetail rosterLabel filters placeholder/null names from its display list but counts every contributor toward the numeric form');
+  } else {
+    bad(
+      'R13 HiveDetail rosterLabel',
+      `function found=${!!rosterFnNode}, filters display=${filtersDisplay}, counts from contributors.length=${countsFromContributors}, display gated on real total=${displayGatedOnRealTotal}`
+    );
+  }
+}
+
+// ── R14. TodayTab's ContributingHiveRow — no <Avatar> on a null
+//        ownerName, a plain cover-theme disc instead (R-38.9-J) ─────────
+{
+  let rowFnNode = null;
+  walk(todayTabAst.program, (n) => {
+    if (rowFnNode) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'ContributingHiveRow') rowFnNode = n;
+  });
+  const rowBody = rowFnNode ? todayTabCode.slice(rowFnNode.start, rowFnNode.end) : '';
+  const avatarGatedOnOwnerName = /hive\.ownerName\s*\?\s*\(\s*<Avatar name=\{hive\.ownerName\} size=\{40\} \/>/.test(rowBody);
+  const placeholderUsesCoverTheme = /hiveCoverTheme\(hive\.coverTheme\)\.base/.test(rowBody);
+  if (rowFnNode && avatarGatedOnOwnerName && placeholderUsesCoverTheme) {
+    ok('R14 TodayTab ContributingHiveRow renders <Avatar> only when hive.ownerName is truthy; a null owner gets a plain cover-theme-tinted disc instead');
+  } else {
+    bad(
+      'R14 TodayTab Avatar guard',
+      `row found=${!!rowFnNode}, avatar gated on ownerName=${avatarGatedOnOwnerName}, placeholder uses cover theme=${placeholderUsesCoverTheme}`
     );
   }
 }

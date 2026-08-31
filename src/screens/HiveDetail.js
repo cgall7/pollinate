@@ -38,10 +38,17 @@ const joinNames = (names) => {
 // whole writing group, not just the invited half of it. DES-21/OPEN-3
 // reserves the roster's final visual treatment (avatar cluster vs. names)
 // for Deezine — this is a reasonable default, not a ruling.
+// Row 1.15 (thread b57ad406, 2026-08-31): `getHiveContributors` can now
+// answer a placeholder-class name as `null` (Row 1.15's `resolveDirectName`
+// in HiveStore.js) rather than falling through to a printable-but-wrong
+// string — so `names` below is the DISPLAYABLE subset, while the numeric
+// branches below still gate on `contributors.length`, the real headcount,
+// so an unnamed writer is never dropped from the count the way they're
+// dropped from the sentence.
 const rosterLabel = (contributors) => {
   if (contributors.length === 0) return "You're the only one writing so far.";
-  const names = contributors.map((c) => c.name);
-  if (names.length <= 3) return `Writing with ${joinNames(names)}.`;
+  const names = contributors.map((c) => c.name).filter(Boolean);
+  if (contributors.length <= 3 && names.length > 0) return `Writing with ${joinNames(names)}.`;
   return `${contributors.length + 1} of you are writing.`;
 };
 

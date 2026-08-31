@@ -156,6 +156,22 @@ const resolveCombOwnerNames = async (client, hives) => {
   return ownerNameByHiveId;
 };
 
+// Row 1.15 residuals 1+2 (§1B.38.20/.21, ruled thread b57ad406): the direct
+// `profiles` join's own three states, mirroring `resolveCombOwnerNames`
+// above so a placeholder-class name renders the same absence on both the
+// comb-linked and direct-join branches instead of diverging on provenance
+// the reader can't see. `names` is keyed by every id the batch join was
+// ASKED for, not every id it ANSWERED — a missing key is the row RLS or a
+// deleted profile dropped silently (the same shape `listReceivedPackages`
+// already documents), so it stays the permission word; a present key whose
+// value is placeholder-class is a row the read reached with nothing to
+// show, so it goes absent instead.
+const resolveDirectName = (names, id) => {
+  if (!names.has(id)) return 'Someone';
+  const name = names.get(id);
+  return isPlaceholderName(name) ? null : name;
+};
+
 export const HiveStore = {
   // The complete creation act against today's schema (§30.9.3): a hive IS
   // its subject's name plus its owner, plus (as of 20260817000002) the
@@ -414,7 +430,7 @@ export const HiveStore = {
     const { data: profiles } = await client.from('profiles').select('id, display_name').in('id', profileIds);
     const names = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
 
-    return rows.map((r) => ({ profileId: r.profile_id, name: names.get(r.profile_id) || 'Someone' }));
+    return rows.map((r) => ({ profileId: r.profile_id, name: resolveDirectName(names, r.profile_id) }));
   },
 
   // Every profile_id that has ever occupied a roster row on this hive,
@@ -504,7 +520,7 @@ export const HiveStore = {
       subjectName: h.subject_name,
       coverTheme: h.cover_theme,
       sealedAt: h.sealed_at,
-      ownerName: combOwnerNames.has(h.id) ? combOwnerNames.get(h.id) : ownerNames.get(h.owner_id) || 'Someone',
+      ownerName: combOwnerNames.has(h.id) ? combOwnerNames.get(h.id) : resolveDirectName(ownerNames, h.owner_id),
     }));
   },
 
@@ -532,6 +548,11 @@ export const HiveStore = {
       .select('display_name')
       .eq('id', hive.owner_id)
       .maybeSingle();
+    // Row 1.15: `.maybeSingle()` returning null IS the map-miss state
+    // (`resolveDirectName`'s `!names.has(id)`) — no row reached, the
+    // permission word stands. A returned row goes through the same
+    // placeholder split as every other direct-join site.
+    const ownerNames = owner ? new Map([[hive.owner_id, owner.display_name]]) : new Map();
     // ENG-97/Finding A: same `.has()` resolution as listContributingHives.
     const combOwnerNames = await resolveCombOwnerNames(client, [hive]);
 
@@ -540,7 +561,7 @@ export const HiveStore = {
       subjectName: hive.subject_name,
       coverTheme: hive.cover_theme,
       sealedAt: hive.sealed_at,
-      ownerName: combOwnerNames.has(hive.id) ? combOwnerNames.get(hive.id) : owner?.display_name || 'Someone',
+      ownerName: combOwnerNames.has(hive.id) ? combOwnerNames.get(hive.id) : resolveDirectName(ownerNames, hive.owner_id),
     };
   },
 
