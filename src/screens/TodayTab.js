@@ -17,7 +17,6 @@ import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { Avatar } from '../components/Avatar';
-import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
@@ -90,26 +89,34 @@ const GREETING_ANCHOR = 'greeting';
 // answers "no from-clause to show," not "Someone," so this line omits
 // rather than renders a name it doesn't have.
 //
-// R-38.9-J (Lumen, same thread): text, glyph, and color are three channels
-// of one claim — an absence ruling that binds only the text still leaves
-// `Avatar`'s circle asserting a specific (and, worse, always-the-same,
-// since `avatarColorFor(null)` hashes to the same wash every time) person
-// beside text that just declined to name one. When `ownerName` is null the
-// row renders no person at all: same 40pt disc geometry so rows stay
-// aligned down the shelf, but tinted from the hive's own cover theme
-// instead of a name hash, no glyph. Degrades from *who* to *which hive* —
-// a fact this row actually holds.
+// R-38.9-J (Lumen, thread b57ad406, ruled §1B.38.22/final): text, glyph, and
+// color are three channels of one claim — an absence ruling that binds only
+// the text still leaves `Avatar`'s circle asserting a specific (and, worse,
+// always-the-same, since `avatarColorFor(null)` hashes to the same wash
+// every time) person beside text that just declined to name one. When
+// `ownerName` is null the row renders no person at all: same 40pt disc
+// geometry so rows stay aligned down the shelf, filled with
+// `theme.colors.surfaceBorder` — the same "slot whose content is not
+// available" token `Avatar.js`'s own `styles.image` already uses behind an
+// unloaded photo, extending an existing mechanism rather than adding one.
+// A cover-theme tint was proposed and REFUSED (Vector, §1B.38.22 §1):
+// `washPeach`/`washSky` are the only two of the four cover bases in
+// `AVATAR_WASHES`, and `washPeach`'s own token text reserves it for avatar
+// identity swatches only; the other two are cream-on-white and read as
+// invisible against this row's white `surface` ground, which the cover
+// palette was never calibrated to sit on as a figure. The semantic drops
+// rather than re-homes: the hive fact is already carried one channel over
+// by `subjectName` in the same row, and TodayTab renders cover theme
+// nowhere else, so a theme-tinted disc would debut that channel only on
+// the unnamed-owner row — the absence row would become the loudest row on
+// the shelf. No ring: `glassRim` is white-on-white here, and a
+// `surfaceBorder` ring on a `surfaceBorder` fill is doubling.
 const ContributingHiveRow = ({ hive, onPress }) => (
   <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
     {hive.ownerName ? (
       <Avatar name={hive.ownerName} size={40} />
     ) : (
-      <View
-        style={[
-          styles.contributingRowAvatarPlaceholder,
-          { backgroundColor: hiveCoverTheme(hive.coverTheme).base },
-        ]}
-      />
+      <View style={styles.ownerAbsentDisc} />
     )}
     <View style={styles.contributingRowText}>
       <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
@@ -653,15 +660,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     ...theme.shadows.card,
   },
-  // No border: `theme.colors.glassRim` is a lone specular ring with its
-  // own exact-set gate (check-glass-definition E7) — whether it reads
-  // depends on what it frames, and that's its own ruling to make, not
-  // this row's to borrow. The disc's geometry, not a rim, is what needs
-  // to match Avatar's footprint here.
-  contributingRowAvatarPlaceholder: {
+  // R-38.9-J (Lumen, final): a plain disc where `Avatar` would otherwise
+  // sit, same footprint so shelf rows stay aligned. `surfaceBorder` is the
+  // "content not available" precedent `Avatar.js` already sets for its own
+  // unloaded-photo fill. No ring — `glassRim` is white-on-white here, and a
+  // `surfaceBorder` ring on a `surfaceBorder` fill is doubling.
+  ownerAbsentDisc: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: theme.colors.surfaceBorder,
   },
   contributingRowText: {
     flex: 1,

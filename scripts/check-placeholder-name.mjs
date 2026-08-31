@@ -66,10 +66,14 @@
 //       never renders a literal "with null." and never drops a real,
 //       unnamed writer from the count
 //   R14 `TodayTab.js`'s `ContributingHiveRow` never renders `<Avatar>` on a
-//       null `ownerName` — R-38.9-J: the row degrades to a plain,
-//       cover-theme-tinted disc (same 40pt geometry, no glyph) instead of
+//       null `ownerName` — R-38.9-J (final, Lumen §1B.38.22): the row
+//       degrades to a plain disc filled with `theme.colors.surfaceBorder`
+//       (same 40pt geometry, no glyph, no ring) instead of
 //       `avatarColorFor(null)`'s single always-the-same wash asserting an
-//       unknown person the text just declined to name
+//       unknown person the text just declined to name — a cover-theme tint
+//       was proposed and refused (Vector, §1B.38.22 §1: two of the four
+//       cover bases aren't identity-safe tokens, and the palette carries no
+//       contrast guarantee as a figure on this row's white ground)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -393,13 +397,32 @@ const hiveDetailCode = codeOnly(hiveDetailSrc, hiveDetailAst);
   });
   const rowBody = rowFnNode ? todayTabCode.slice(rowFnNode.start, rowFnNode.end) : '';
   const avatarGatedOnOwnerName = /hive\.ownerName\s*\?\s*\(\s*<Avatar name=\{hive\.ownerName\} size=\{40\} \/>/.test(rowBody);
-  const placeholderUsesCoverTheme = /hiveCoverTheme\(hive\.coverTheme\)\.base/.test(rowBody);
-  if (rowFnNode && avatarGatedOnOwnerName && placeholderUsesCoverTheme) {
-    ok('R14 TodayTab ContributingHiveRow renders <Avatar> only when hive.ownerName is truthy; a null owner gets a plain cover-theme-tinted disc instead');
+  const placeholderUsesSurfaceBorderDisc = /<View style=\{styles\.ownerAbsentDisc\} \/>/.test(rowBody);
+  const noCoverThemeOnPlaceholder = !/hiveCoverTheme/.test(rowBody);
+  if (rowFnNode && avatarGatedOnOwnerName && placeholderUsesSurfaceBorderDisc && noCoverThemeOnPlaceholder) {
+    ok('R14 TodayTab ContributingHiveRow renders <Avatar> only when hive.ownerName is truthy; a null owner gets a plain surfaceBorder-filled disc instead, never a cover-theme tint');
   } else {
     bad(
       'R14 TodayTab Avatar guard',
-      `row found=${!!rowFnNode}, avatar gated on ownerName=${avatarGatedOnOwnerName}, placeholder uses cover theme=${placeholderUsesCoverTheme}`
+      `row found=${!!rowFnNode}, avatar gated on ownerName=${avatarGatedOnOwnerName}, placeholder uses surfaceBorder disc=${placeholderUsesSurfaceBorderDisc}, no cover-theme leak=${noCoverThemeOnPlaceholder}`
+    );
+  }
+}
+
+// ── R15. ownerAbsentDisc — surfaceBorder fill, no border/ring (Lumen final
+//        R-38.9-J: a surfaceBorder ring on a surfaceBorder fill is
+//        doubling) ──────────────────────────────────────────────────────
+{
+  const styleMatch = todayTabCode.match(/ownerAbsentDisc:\s*\{([^}]*)\}/s);
+  const styleBody = styleMatch ? styleMatch[1] : '';
+  const fillsSurfaceBorder = /backgroundColor:\s*theme\.colors\.surfaceBorder/.test(styleBody);
+  const noBorder = !/borderWidth|borderColor/.test(styleBody);
+  if (styleMatch && fillsSurfaceBorder && noBorder) {
+    ok('R15 ownerAbsentDisc fills theme.colors.surfaceBorder with no border/ring');
+  } else {
+    bad(
+      'R15 ownerAbsentDisc shape',
+      `style found=${!!styleMatch}, fills surfaceBorder=${fillsSurfaceBorder}, no border=${noBorder}`
     );
   }
 }
