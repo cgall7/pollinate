@@ -3256,7 +3256,7 @@ end to end; do not let them gate 1.1–1.10, and do not let 1.1–1.10 crowd the
 | 2.5 | **Fizz** | `ENG-66` — comb pot. **G2: direct-to-recipient, never pooled** | ~~2.1~~ (shipped), 1.9 |
 | 2.6 | **Lumen** | `COPY-7` — nectar vocabulary. **"Drops," not "sats."** No "bitcoin" in default UI | — |
 | 2.7 | **Fizz** | `ENG-89` + `ENG-78` — **instrument C1–C5. In the MVP** (`O6` closed). Must ship in the same binary as the features it measures | 0.1, 1.9, 2.3 |
-| 2.8 | **Bumble** | `OPS-10` — **EAS internal distribution** for the seeded combs (`O7` closed; **not** TestFlight, which stays MVP2) | — |
+| 2.8 | **Bumble** | `OPS-10` — **EAS internal distribution** for the seeded combs (`O7` closed; **not** TestFlight, which stays MVP2). **BLOCKER ADDED §1B.38.5 — `eas.json` has exactly THREE profiles and none is a strangers build:** `development` (internal, but `developmentClient` + simulator), `preview` (internal, but `"EXPO_PUBLIC_DEMO_MODE": "true"` — it IS the pitch/kiosk profile), `production` (demo false, but store-bound + `autoIncrement`). `demoMode.js:20` derives `DEMO_MODE` from that env; `:46` sets `DEMO_CONTENT = __DEV__ || DEMO_MODE`, and a store-bound build has `__DEV__` false — so **`DEMO_CONTENT` is true**, and four demo affordances render on a stranger's phone (Onboarding's `FlowToggle` and demo-skip link, `CoreRitual`'s "Load demo data" writing fake rows into a real account, `HoneycombTab`'s seven fabricated people). **Needs a FOURTH profile — `distribution: internal`, `EXPO_PUBLIC_DEMO_MODE` absent or `"false"`, no dev-client, no simulator — and NOT a flipped `preview`: `scripts/check-demo-mode-env.mjs:244-245` asserts `preview` is exactly `"true"`, so flipping it turns a green gate red and the pitch profile is pinned deliberately.** **MERGE-TIME REQUIREMENT:** `check-demo-mode-env.mjs:266` loops the hardcoded roster `['development','preview','production']` — a fourth profile is invisible to the demo-login-value check and the gate stays green. Add it to the roster in the same PR, and assert the roster equals `Object.keys(eas.build)` rather than a literal. **ACCEPTANCE INSTRUMENT:** `GUIDES/POLLINATE_TESTFLIGHT_ACCEPTANCE.md`'s walk survives as INVENTORY (its authority died with `Strategy` §11), but **its steps 1–7 exercise the daily loop, not the comb loop** — a build passing it proves nothing about the eight-step sentence. Add comb steps before using it to accept `OPS-10`. Two of its pointers are stale toward LESS work: the "check the source by hand" deferral is met (`cec96cc` is on `main`), and "none of the fifteen gates sees this class" is false (`check-demo-content-callsites.mjs`, `check-demo-mode-env.mjs`) | — |
 
 **Phase 3 — Measure. Operations, not build — this happens *with* the shipped MVP.**
 
@@ -6380,3 +6380,117 @@ so the row stays true.
 `:112`, `:131`, `:172`, `:174`) · container 4 = **11** (@Lumen's 3 + 7 + `:264`).
 Containers 1–3 ride row `1.9` (@Fizz). **`:264` is @Lumen's file and I did not edit
 it** — routed, same as container 4 was.
+
+---
+
+### §1B.38.5 — the fourth token run forward on `COPY-13`'s retirements: the **acceptance-row register lives in a different TREE than the canon**, and `OPS-10` has no build profile that can pass its own checklist (2026-08-31)
+
+**Method note first, because it is the reason this was found.** §1B.38.4 established
+that the register the fourth token reaches is **acceptance rows, constraints blocks
+and `✅`/`❌` permission lists**. Run that forward as a search rather than a repair:
+
+```
+$ git grep -lE "^\s*[-*]\s*\[[ xX]\]|^\s*[-*]\s*(✅|❌)" github/main -- docs/strategy/
+   (no output — ZERO)
+$ git grep -lE "…" github/main
+   (no output — ZERO, repo-wide)
+$ grep -rlE "…" GUIDES/ PLANS/ RESEARCH/
+   18 files
+```
+
+**The canon has no acceptance-row register at all. Every one lives in the
+workspace.** So `COPY-13`'s sweep — scoped to `docs/strategy/` — could not have seen
+this class no matter which tokens it used. **A census's file list is a container,
+2026-08-31's own lesson, one TREE over instead of one file over.**
+
+#### `GUIDES/POLLINATE_TESTFLIGHT_ACCEPTANCE.md` — frame retired, `status: active`, zero annotation
+
+Its own subtitle is **"(DS 11.1 artifact)"**. `DS` §11 was retired **the same night, by
+this document's own edit** — `Pollinate_Strategy.md:467-474`: *"Retired as a launch
+gate 2026-08-31 … the checklist below no longer gates any release."* The workspace
+twin of that checklist was never told. It matches none of the repricing, sequencing,
+`testflight|demo mode` or measurement-frame censuses **because none of them looked in
+`GUIDES/`.**
+
+**Disposition is INVENTORY, not dead** (@Lumen's three-state taxonomy, applied):
+step 1 of the ratified sentence is *"a stranger can install"*, `OPS-10` still needs a
+strangers build, and the file's own closing line is right — *the walk is the only
+end-to-end instrument until a device farm exists*. What dies is (a) the **authority**
+— passing authorizes nothing, per `Strategy` §11's retirement — and (b) the **Slice-1
+loop probes**: the walk's steps 1–7 exercise journal → Today → Hive doors, i.e. *"the
+daily loop, the thing Slice 1 exists to validate."* **An MVP-Comb build can pass this
+checklist end to end and prove nothing about the eight-step sentence.** The walk needs
+comb steps or it is an instrument pointed at a retired release.
+
+#### The live defect it already catches, which nobody has run: `OPS-10` has no profile, and the obvious fix is refused by a green gate
+
+Pre-flight row 2 requires **`DEMO_CONTENT` false for the tester profile**, and the
+same row states the rule: *"A pitch/kiosk build is a **separate profile**, never the
+tester profile."* On `main@4d0066d` there are **exactly three** profiles in
+`eas.json`, and none of them is a strangers build:
+
+| profile | distribution | `EXPO_PUBLIC_DEMO_MODE` | why it cannot be `OPS-10`'s |
+|---|---|---|---|
+| `development` | internal | **unset** (⇒ false) | `developmentClient: true` + `ios.simulator: true` |
+| `preview` | internal | **`"true"`** | it IS the pitch/kiosk profile |
+| `production` | *(store)* | `"false"` | store-bound + `autoIncrement`; not internal |
+
+`src/constants/demoMode.js:20` derives `DEMO_MODE` from that env and `:46` sets
+`DEMO_CONTENT = __DEV__ || DEMO_MODE`; a store-bound build has `__DEV__` false, so on
+`preview` **`DEMO_CONTENT` is true** and four demo affordances render on a stranger's
+phone — `Onboarding`'s `FlowToggle` and demo-skip link, `CoreRitual`'s *"Load demo
+data"* (which writes fabricated rows into the real account just created), and
+`HoneycombTab`'s seven fabricated people.
+
+**And the shortcut is closed, correctly, by a gate.** `scripts/check-demo-mode-env.mjs:244-245`
+**asserts** `preview` sets `EXPO_PUBLIC_DEMO_MODE` to exactly `"true"`. Flipping
+`preview` to false to make it a tester profile turns that gate **red**, and a builder
+reading a red gate on a one-token change reverts rather than re-reads. **The gate is
+right — `preview`'s pitch semantics are pinned deliberately — and the profile roster
+is simply one entry short.** `OPS-10` needs a **fourth** profile: `distribution:
+internal`, `EXPO_PUBLIC_DEMO_MODE` absent or `"false"`, no `developmentClient`, no
+simulator.
+
+**Merge-time requirement that rides it, and it is the roster shape again:**
+`check-demo-mode-env.mjs:266` loops over the hardcoded list
+`['development', 'preview', 'production']` for the never-ship-a-demo-login-value
+check. A fourth profile is **invisible** to that loop — the gate stays green while the
+new profile goes unchecked. **Add the profile to the roster in the same PR**, and
+assert the roster equals `Object.keys(eas.build)` rather than a literal, or the next
+profile repeats this exactly (2026-08-30's *a cardinality assertion over a matched
+subset proves nothing unless you also assert matched == total*, in list form).
+
+Row `3.1` (@Colin, seed three real combs) depends on `OPS-10` shipping, so this sits
+on the path to the combs `C1`–`C5` are read from. Amended onto row `2.8` this commit.
+
+#### Two stale pointers inside it — and they expire in the OPPOSITE direction
+
+Every stale-deferral instance tonight made a reader do something **wrong**. These two
+make a reader do something **unnecessary**:
+
+1. Pre-flight row 2: *"until the release-readiness gate derives `DEMO_MODE` from a
+   build-profile env var (absent ⇒ false), **check the source by hand**"*, citing
+   branch `fizz/demo-content-flag @ cec96cc`. **Met.** `git merge-base --is-ancestor
+   cec96cc github/main` → true; `demoMode.js:20` is env-derived on `main`.
+2. Closing section: *"`git grep -l DEMO_MODE -- scripts/` is empty on `github/main`
+   today; **none of the fifteen gates sees this class**."* **False.** Two gates exist:
+   `scripts/check-demo-content-callsites.mjs` and `scripts/check-demo-mode-env.mjs`.
+
+**Banked: a stale pointer can expire toward LESS work as well as more, and that
+direction survives longest — because doing the work by hand still passes.** A reader
+following either instruction gets a correct result and never learns the automation
+landed, so the pointer is never contradicted by an outcome. **When re-deriving a
+deferral's premise, check both directions: has the blocker cleared, and has the
+WORKAROUND been superseded?**
+
+#### Scoped negatives, since I checked them
+
+- `Pollinate_Strategy.md:34` (the Slice-1 Build-Slices bullet, still naming *"TestFlight
+  / internal testing"* and the feed) sits **inside a block quote whose header already
+  supersedes it as a release plan** (`:26-31`). Its sibling Slice-2 bullet carries an
+  inline amendment and it does not — an asymmetry of the *cell-scoped annotation*
+  species — but the block supersession reaches it. **Flagged to @Lumen as a judgement
+  call, not asserted as a defect.**
+- The other 17 workspace files carrying acceptance rows were **not** swept here. This
+  section's claim is scoped to `POLLINATE_TESTFLIGHT_ACCEPTANCE.md`, which is the one
+  whose *title* names a retired path.
