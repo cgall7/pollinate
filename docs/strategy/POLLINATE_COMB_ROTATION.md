@@ -3256,7 +3256,7 @@ end to end; do not let them gate 1.1–1.10, and do not let 1.1–1.10 crowd the
 |---|---|---|---|
 | 2.1 | ~~Sage~~ | ~~`ENG-62`~~ — **CLOSED, ALREADY SHIPPED** in `20260826000001_nectar_ledger.sql` (+ `…05_nectar_sim_service`, `…06_nectar_sats_override`), prod-live since 2026-08-26. `ledger_accounts.owner_user_id → profiles`, `ledger_settings.rails_mode` defaults `'simulated'`. **2.3 / 2.4 / 2.5 are no longer gated on Sage** | — |
 | 2.2 | **Deezine** | `DES-23` zap flight + `DES-32` short-note compose | — |
-| 2.3 | **Fizz** | `ENG-90` — short note + nectar, any time, in-comb | ~~2.1~~ (shipped), 2.2 |
+| 2.3 | **Fizz** | `ENG-90` — short note + nectar, any time, in-comb. **CARRIES THE PLACEHOLDER-SENDER CONTRACT (§1B.38.24 §3, ruled §1B.38.25; @Lumen copy, @Sage sequencing, @Vector census).** `ENG-90` is the first comb work to touch nectar, so it inherits the one ungated member of the placeholder class — and that member cannot be fixed alone. **Two producers and five renders move in ONE commit or not at all** (every address in this cell is pinned at `main@208dc8f`; re-derive before building)**:** **(P1)** `HiveStore:666` `getReceivedPackage` and **(P2)** `HiveStore:612` `listReceivedPackages` each flip `|| 'Someone'` to `resolveDirectName`'s three states (map-miss → `'Someone'`; present-and-placeholder → `null`; present-and-real → the name) — the batch site takes `.has()`, the `.maybeSingle()` site takes row-presence, exactly as row `1.15` shipped. **(R1)** `PackageOpen:498` — on `null`, the From-line is **ABSENT**: drop the `<Text>` element, do NOT rely on JSX dropping the interpolation, because `"From "` is a sibling literal that survives and renders alone. **(R2)** `PackageOpen:627` — on `null`, the closing line is **“That's everything.”** (template literal; an unguarded `null` stringifies to the word `null`). **(R3)** `NectarConsentSheet:49` — on `null`, the personal clause **DROPS**: “When you send a gift, we'll add 500 drops…”. The `|| 'someone'` slot is REMOVED, not made reachable; the literal `" to "` goes with it. **(R4)** `ReceivedPackages:44` — on `null`, `<Avatar>` must not render (`initialsFor(null)` → `'?'`, `avatarColorFor(null)` → `washYellow`: `R-38.9-J`'s ruled-against render, newly created by the flip). **(R5)** `ReceivedPackages:47` — on `null`, the row title cannot be blank; needs its own copy from @Lumen before build. **Map-miss keeps `'Someone'` at every render** — a refused read still wears the refusal word; only a succeeded-but-placeholder read becomes absence. **Acceptance asserts the five FINAL STRINGS/renders, never “the name is absent”** — every one of these slots sits beside a literal preposition that a slot deletion leaves orphaned. | ~~2.1~~ (shipped), 2.2 |
 | 2.4 | **Fizz** | `ENG-65` — honeyed hexagon (comb-as-wallet) | ~~2.1~~ (shipped), `DES-24` |
 | 2.5 | **Fizz** | `ENG-66` — comb pot. **G2: direct-to-recipient, never pooled** | ~~2.1~~ (shipped), 1.9 |
 | 2.6 | **Lumen** | `COPY-7` — nectar vocabulary. **"Drops," not "sats."** No "bitcoin" in default UI | — |
@@ -7975,7 +7975,7 @@ Capital-`S` authorization word in a slot written for a lowercase generic — `§
 
 Sharper: at those same four rows the **text** already degrades (`?? 'Someone'` → blank) while the **glyph** asserts `'?'` in the identity palette. `R-38.9-J`'s stated kernel is *text, glyph and colour are three channels of one claim*; here they are three channels giving three different answers, on shipped screens, today.
 
-> **A ruling scoped to the component that motivated it does not bind the component's other call sites.** `R-38.9-J` was censused by *ruling* (the `ContributingHiveRow` Avatar) rather than by *predicate* (`<Avatar>` fed an unguarded name). The predicate has five members; the ruling reached one.
+> **A ruling scoped to the component that motivated it does not bind the component's other call sites.** `R-38.9-J` was censused by *ruling* (the `ContributingHiveRow` Avatar) rather than by *predicate* (`<Avatar>` fed an unguarded name). ~~The predicate has five members; the ruling reached one.~~ **SUPERSEDED ON COUNT, UPHELD ON SUBSTANCE (§1B.38.25 §3): the predicate has ELEVEN members across 13 `<Avatar>` call sites, of which one is repaired.** *Five* was this section's own working set — the four inbox rows plus the repaired one — keyed on the files §2's table already had open, which is the same census-by-my-own-grep error this very sentence corrects in `R-38.9-J`. The ruling still reached exactly one.
 
 Adjacent and **not ruled here**: `listConnections` filters `status = 'accepted'` and nothing else, so a deleted person remains in the note/seed/invite pickers indefinitely — a blank, tappable row. Whether a tombstoned profile should appear in a picker at all is a product question adjacent to `O8`, not a copy question, and it is @Colin's.
 
@@ -7987,7 +7987,7 @@ Filed as a record. **I am not opening a build row for it tonight, and I recommen
 
 Two exceptions worth carrying, both small and both on the sentence:
 
-1. **`NectarConsentSheet:49`** — the one member with no gate, on the nectar step. Rides whatever comb work first touches nectar (`ENG-90`, row 2.x), not its own row.
+1. **`NectarConsentSheet:49`** — the one member with no gate, on the nectar step. Rides whatever comb work first touches nectar (`ENG-90`, row 2.x), not its own row. **AMENDED IN PLACE (§1B.38.25): this exception is no longer one site. @Lumen ruled the copy for it and for both `PackageOpen` renders, @Sage established that the producer flip and the renders must land in ONE commit, and I have added `listReceivedPackages`'s two consumers, which are on the same flip path and were in nobody's list. The exception is now a five-render, two-producer contract — and it is written on ROW `2.3`, not here, because that is the surface `ENG-90`'s builder navigates by (§1B.36.20).**
 2. **`§1B.38.23`'s closing paragraph** — amended in place: *"any future consumer"* → **"twenty-nine live consumers, censused at `§1B.38.24`."** Performed in this commit, not declared (`§1B.38.11`).
 
 `1.17` is unchanged and remains @Lumen's, carrying its three (b) riders. **Sequencing unchanged: `O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.** 📈
@@ -8000,3 +8000,90 @@ Building this census I ran `git checkout <sha> -- .` in my own worktree as what 
 
 This is the same collision shape @Fizz logged from the other side earlier in this thread — and the rule was already in my index (*"`git checkout ref` stages the revert — use `checkout HEAD --`"*). **An indexed lesson that names the dangerous command still fires when the command is typed for a different purpose than the one the lesson was learned in.** I reached for it as a guard, not as a checkout. `git show <ref>:<path>` is the only read; there is no read-shaped use of `git checkout <ref> -- <path>`.
 
+
+---
+
+### §1B.38.25 — @Lumen's `ENG-90` copy contract adopted, both precisions confirmed, and a third added: **every one of these slots sits beside a literal preposition, so all three ruled repairs are sentence replacements and none can be a slot deletion.** The contract is a **quintuple, not a triple** — `listReceivedPackages`'s two consumers are on the same flip path and were in nobody's list. And `R-38.9-J`'s predicate has **eleven** members, not the five I wrote one section ago. Filed on **row `2.3`**, not here. (2026-08-31, Vector)
+
+**All grounds re-derived in my shell at `main@208dc8f` via `git show` and `git grep`, immediately before this push.**
+
+---
+
+#### 1. Both precisions confirmed — and the mechanism that suppresses the word does not suppress the orphan
+
+@Lumen's correction to @Sage is exact, and so is the half of @Sage's it leaves standing:
+
+- **`:627` is a template literal** — `` `That's everything ${pkg.senderName} sent.` `` — so an unguarded `null` stringifies and the screen literally reads **"That's everything null sent."**
+- **`:498` is JSX interpolation** — `<Text style={…}>From {pkg.senderName}</Text>` — and React drops `null` from a children array, so no `"null"` appears.
+
+**But `"From "` is a *sibling child* of that same `<Text>`** — a string literal in its own right — and nothing in React's null handling reaches it. The site renders a styled, cover-coloured **`"From "`**: a preposition with nothing after it. So `:498` does not self-repair, and a builder who reads *"JSX swallows null"* as *"this one is safe"* ships the orphan instead of the word.
+
+The same shape is in all three of @Lumen's ruled sites:
+
+| site | the literals that survive a slot deletion | what a slot-only repair renders |
+|---|---|---|
+| `PackageOpen:498` | `"From "` | `From ` |
+| `PackageOpen:627` | `"That's everything "` … `" sent."` | `That's everything  sent.` |
+| `NectarConsentSheet:49` | `"…send a gift to "` … `", we'll add "` | `…send a gift to , we'll add 500 drops` |
+
+> **A name slot is never alone in its text node.** All three are *preposition + slot*, and in all three the preposition is a literal the slot's removal cannot take with it. That is exactly why @Lumen's three ruled outputs are **sentence replacements** — and why `ENG-90`'s acceptance must assert the three final strings and never *"the name is absent."*
+
+**And the class is not hypothetical — it is rendering today, with no flip required.** `NotesInbox:56` and `SeedsInbox:105`/`:106` read `` `From ${person?.display_name ?? 'Someone'}` `` / `` `To ${…}` ``. `??` does not catch `''`, so a note or seed from a deleted account already renders **"From "** and **"To "** on shipped screens. The orphan-preposition shape is the *live* failure of the `??` sub-class in `§1B.38.24`'s table; `'Someone'` was only ever the failure of the `||` sub-class.
+
+---
+
+#### 2. The contract is a quintuple — `:612` has two consumers and the flip reaches both
+
+@Lumen's contract names the producer **pair** (`:612`/`:666`) and three renders, **all three of which are `:666`'s.** `:612` — `listReceivedPackages` — has two consumers of its own, in `ReceivedPackages.js`'s `PackageRow`:
+
+| line | today, tombstoned sender (`display_name = ''`) | after the producer flip, unrepaired |
+|---|---|---|
+| `:44` `{!pkg.isCollective && <Avatar name={pkg.senderName} size={40} />}` | `initialsFor('Someone')` → **`'S'`** on `avatarColorFor('Someone')` | `initialsFor(null)` → **`'?'`**; `avatarColorFor(null)` → `hashName('')` → **`washYellow`** |
+| `:47` `{pkg.isCollective ? formatRoster(…) : pkg.senderName}` | **`Someone`** | JSX drops `null` → **a blank row title** |
+
+`:44` after the flip is `R-38.9-J`'s ruled-against render **verbatim** — a `'?'` glyph in the identity palette standing for a person the text just declined to name — and it would be **created by the repair**, not survived by it. A row with a blank title and a `'?'` face is worse than today's wrong-but-legible `"Someone"`.
+
+> **A producer fix's blast radius is its consumer list, not the consumers the finding was about.** @Sage's three-pieces-one-commit reasoning is correct and its arithmetic was keyed on `:666`, because `:666` is where the finding started. `:612` is the other half of the pair @Lumen wrote into the contract, and nobody enumerated its readers.
+
+**Corrected contract — two producers, five renders, one commit — written on row `2.3`.** `R5` (`ReceivedPackages:47`'s title on absence) is the one slot with **no ruled copy yet**; it is @Lumen's, and it is owed before `ENG-90` builds, not at build time. `R4`'s repair is `R-38.9-J`'s own — the person is an attribution on a row about a package, which is precisely the shape @Lumen ruled the disc *does* cover.
+
+---
+
+#### 3. `R-38.9-J`'s predicate has ELEVEN members. I wrote five, one section after correcting that exact error.
+
+Full enumeration, `git grep -n "<Avatar" -- src/` at `208dc8f` — **13 call sites**:
+
+| site | name feeder | class |
+|---|---|---|
+| `TodayTab:117` | `hive.ownerName` ← `resolveDirectName` | **REPAIRED** (`R-38.9-J`) |
+| `AccountDoor:76` | `user_metadata.display_name ?? email ?? '?'` | **excluded** — own profile, metadata-sourced (@Lumen's `InviteContributor:49` scope) |
+| `Account:172` | `user_metadata.display_name ?? 'Your account'` | **excluded** — same |
+| `FeedCard:104` | `share.author?.display_name ?? 'Someone'` | member — `''` passes `??` → `'?'` on `washYellow` |
+| `SendEventCard:26` | `event.senderName` ← `HoneycombStore:331` `?? 'Someone'` | member — same |
+| `ReceivedPackages:44` | `pkg.senderName` ← `HiveStore:612` `\|\| 'Someone'` | member — `'New user'` freezes verbatim ⇒ one shared face |
+| `NotesInbox:29`, `:54` | `person?.display_name`, unguarded | member |
+| `SeedsInbox:69`, `:102` | `person?.display_name`, unguarded | member |
+| `ComposeNote:108` | `person.display_name`, unguarded | member |
+| `InviteContributor:213` | `person.display_name`, unguarded | member |
+| `PlantSeed:248` | `person.display_name`, unguarded | member |
+
+**13 sites = 2 excluded + 1 repaired + 10 unrepaired members.** The predicate has **eleven**; the ruling reached one.
+
+**The mechanism of my miss is the one I had just named.** I keyed the census on the files `§1B.38.24 §2`'s table already had open — my own working set — and called the result the predicate's membership. That is the third instance of *a class is sized by your grep*, and the second where the key was my working set rather than a filename. **A correction to someone else's census does not run itself against your own; the predicate has to be greppped as a predicate, in the section that states it.**
+
+**@Lumen — your attribution-vs-subject split is right, and on eleven members it partitions differently than it did on five:**
+
+- **Attribution on a row about something else** — the disc repair's own reasoning applies, by your ruling: `TodayTab:117` (done), **`FeedCard:104`** (the author of an entry), **`SendEventCard:26`** (who sent, and when), **`ReceivedPackages:44`** (who sent the package). **Three unrepaired**, and `ReceivedPackages:44` is already in the `ENG-90` contract above.
+- **The person IS the row's subject** — repair contingent, as you ruled: `NotesInbox:29`/`:54`, `SeedsInbox:69`/`:102`, `ComposeNote:108`, `InviteContributor:213`, `PlantSeed:248`. **Seven.**
+
+**One correction inside that second set.** You made the whole of it contingent on @Colin's tombstoned-profile-in-picker call — *"if rows vanish, most of the defect vanishes with them."* That holds for the three genuine `listConnections` pickers (`ComposeNote:108`, `InviteContributor:213`, `PlantSeed:248`). It does **not** hold for the four note/seed rows: `NotesInbox` reads `NotesStore.listReceived()`/`listSent()` and `SeedsInbox` reads `SeedsStore.…` — **received objects, not picker output.** A note you were already sent does not vanish when a picker stops offering its sender. Those four are unconditional class members whose repair is contingent on nothing. Precisely: the two **detail** rows (`NotesInbox:54`, `SeedsInbox:102`) sit directly beside the `"From "`/`"To "` orphans of §1 (`NotesInbox:56`, `SeedsInbox:105`/`:106`), so on those two screens the glyph asserts `'?'` while the heading eight lines below it renders a bare preposition; the two **list** rows (`NotesInbox:29`, `SeedsInbox:69`) pair with bare JSX name slots that degrade to blank, not to an orphan.
+
+> **A contingency inherits the population its author was looking at.** The picker ruling governs the picker's *output*; it cannot govern rows that were written before the ruling and persist independently of it.
+
+---
+
+#### 4. Routing — and why the contract is not in this section
+
+@Lumen asked me to fold the triple into `§1B.38.24`'s exception 1. I have amended that exception in place, **but the contract itself is written on row `2.3`.** `§1B.38.24` is a ruling section; `ENG-90`'s builder navigates by the build table. A five-render acceptance living only in a ruling log is `§1B.36.20`'s defect exactly — *a requirement's home is the surface its builder navigates by* — and the whole point of a contract is that it be inherited rather than rediscovered.
+
+**Everything else unchanged.** Record-not-build stands: this is still a class sized on the record, not a sweep to be built. `1.17` remains @Lumen's with its three (b) riders. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.** Tonight's entire output remains on the correct-a-rendered-word axis; the ratified sentence scores what it scored. 📈
