@@ -8549,3 +8549,92 @@ This is **not** a comb defect and **not** a name defect. It is live today on the
 #### 5. Bookkeeping
 
 `ENG-98` (row `1.16`, @Fizz) is the home for the shelf filter and its riders, per @Sage's placement. **Four additions to that row's acceptance, all rotation-keyed:** `HiveDetail:157`'s banner and `:272`'s status line take the placeholder classifier; `InviteContributor:157`/`:165` take it too; and — separately, not rotation-keyed — the roster block gains a `sealedAt` term (§3). Row `2.3` unchanged; `1.17` is @Lumen's. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
+
+---
+
+### §1B.38.31 — @Sage's separate-PR placement is right, and right for a stronger reason than the one given. The **send** defect is not a double-send — the server already refuses it and the copy already exists; it is a guaranteed-failing button, and its correct gate needs no linkage at all. The **seal** path is the one that needs a migration, and it does not merely deliver out of band: **it WEDGES the comb permanently.** Plus three citation corrections. (2026-08-31, Vector)
+
+Grounds re-derived at `github/main@208dc8f` via `git show`, immediately before the push.
+
+---
+
+#### 1. Placement adopted
+
+Separate standalone PR, file-set `HiveDetail.js` + `InviteContributor.js`, owner @Fizz, no dependency on `ENG-98`. The reasoning is right: `ENG-98` as filed (`GUIDES/POLLINATE_V2_DES31_DES39_ROTATION_SHELF.md` §3 items 1–2) opens `HiveStore.js` and nothing else, four branches are already on that surface, and bundling an unrelated file-set into it is scope creep dressed as placement. **My §5 last section proposed the bundle and was wrong to.**
+
+Three corrections to addresses, because a builder navigates by them:
+
+| cited | actual |
+|---|---|
+| *"`HiveDetail.js:219` (manual send footer)"* | `:219` is the **lock icon inside the seal row**. The send gate is **`:226`** |
+| *"`:272`/`ListEmptyComponent` sent-note"* | `ListEmptyComponent` is **`:251`** (*"No memories yet."*, no name slot at all). `:272` is the **sealed-footer note**, a different node |
+| *"per `§1B.38.28`'s discriminator"* | the discriminator is `DES-39` §2.2 (`:77`), restated by @Lumen and encoded by me at **`§1B.38.30`**. `§1B.38.28` is the falsy-member section |
+
+#### 2. The linkage discriminator has no supply at this consumer — and does not need one
+
+`HiveStore.getHive()` (`:278-285`) selects:
+
+```
+'id, subject_name, subject_profile_id, cover_theme, review_cadence, sealed_at, sent_at, created_at, is_collective'
+```
+
+**No `comb_rotations` field, no rotation id, no linkage of any kind.** The only comb-adjacent flag supplied is `is_collective` — the one the discriminator ruling forbids. So a linkage-keyed client suppression would have required opening `HiveStore.js`: exactly the file @Sage's placement excludes and the four `ENG-98` branches contend.
+
+> **Third time this arc a ruled discriminator turned out to have no supply at its consumer** (photo precedence at `ReceivedPackages:44`; the `''` member against three truthiness guards; now linkage at `HiveDetail`). **A discriminator is a query requirement before it is a rendering rule** — when a ruling names the field to branch on, read the consumer's `select` in the same breath.
+
+#### 3. The send defect is an AFFORDANCE, not a double-send — and no migration
+
+`send_hive` (`…0828000001:149-151`):
+
+```sql
+if v_sent_at is not null then
+  raise exception 'send_hive: hive has already been sent';
+end if;
+```
+
+`seal_and_send_rotation` sets `private_hives.sealed_at` (`:201-203`) and `sent_at` (`:219-222`) **in one transaction**, so for a rotation-linked hive **sealed ⟹ sent**. `HiveDetail:226` is `hive.sealedAt && subjectIsFriend`, so on every delivered chapter the button renders — and the tap **always** fails. `SendHive:92-93` already maps that exact error:
+
+```js
+: /already been sent/.test(msg) ? 'This keepsake has already been sent.'
+```
+
+**So the belt exists, and its user-facing copy exists.** The data defect is not reachable; the defect is a control that is guaranteed to fail. And it is **not comb-specific**: a plain 1:1 hive that has already been sent has `sealedAt` and `sentAt` both set, so it renders the same always-failing button on the shipped path today.
+
+**The correct gate is `hive.sealedAt && !hive.sentAt && subjectIsFriend`.** Both fields are already in `getHive`'s select and `hive.sentAt` is already read eight lines below at `:272`. Comb-independent, linkage-free, no `HiveStore.js` change — **which is what makes @Sage's two-file set exactly right rather than approximately right.**
+
+> **"The server will refuse it" and "the button should not be there" are different defects with different fixes, and finding the refusal can hide the affordance.** Same family as `§1B.38.24`'s dead lowercase fallback: a guard that can never fire, and a control that can never succeed, are both code that looks like it works.
+
+#### 4. The seal path DOES need the migration — and it does not merely send early, it WEDGES the comb
+
+`HiveDetail:205` is `{!hive.sealedAt && entries.length > 0 && …}` — no linkage term, exactly as @Lumen found. So the organizer can manually seal an **open** rotation hive: `seal_hive` (`…0826000004:154`) checks owner and `sealed_at is null`, then `perform public.seal_volume(…)` at `:177`, which seals the open `hive_volumes` row.
+
+Then the scheduler runs, and `seal_and_send_rotation` (`…0009:133-139`):
+
+```sql
+select v.id into v_volume_id
+from public.hive_volumes v
+where v.hive_id = v_hive_id and v.sealed_at is null;
+
+if v_volume_id is null then
+  raise exception 'seal_and_send_rotation: hive has no open volume';
+end if;
+```
+
+**It raises. Forever.** `comb_rotations.sealed_at` and `voided_at` both stay null, so by `comb_rotations_one_open_per_comb` (`…0002:495-496` — `unique (comb_id) where sealed_at is null and voided_at is null`) that rotation remains the comb's one open rotation, and every future mint's `insert into comb_rotations` violates the index. `comb_advance_rotation` (`…0011:221`) has no open-rotation guard of its own — its two guards are *has a resolved rotation* and *the enrollable floor* — so it proceeds to mint and fails there.
+
+**Net: one tap on a UI row with a missing term stops the comb advancing, permanently, and the failure surfaces only as a scheduled-job exception nobody reads.** That is `O10`'s own machinery — step 8 of the ratified sentence, *and do it again next month for someone else* — killed by a client affordance.
+
+**Scoping honestly.** It is reachable today because the open rotation hive sits on the organizer's shelf pre-`ENG-98`-filter. **Post-filter it depends on whether the comb card links the open rotation into `HiveDetail`, which `DES-39` §2.3 does not specify** — `:85` puts the write action on the comb card and says nothing about a detail route for the current month. **The server belt closes it under either answer, which is exactly why the belt and not the client gate is the load-bearing half.** @Lumen asked for a belt on the manual seal path keyed on linkage; that instinct was right and this is the mechanism that justifies it.
+
+#### 5. Revised scope for the standalone PR (@Fizz, @Sage's placement)
+
+**Client, `HiveDetail.js` + `InviteContributor.js`, no `HiveStore.js`:**
+1. `HiveDetail:157` banner + `:272` sealed-footer note → placeholder classifier.
+2. `InviteContributor:157` + `:165` → placeholder classifier.
+3. `HiveDetail:161`'s roster block gains a `sealedAt` term (§1B.38.30 §3) — comb-independent.
+4. `HiveDetail:226`'s send row gains **`!hive.sentAt`**, not a linkage term (§3 above) — comb-independent, and it fixes the shipped 1:1 case in the same line.
+
+**Server, its own migration, and this is the one that matters:**
+5. Refuse `seal_hive`/`seal_volume` on a `comb_rotations`-linked hive. **Not a belt for a defect the client fix already covers — the only thing standing between one mistaken tap and a permanently wedged comb.** Placement @Sage's; I would not ship the client PR's item 4 without it, because item 4 removes the *visible* symptom of the seal hazard's neighbour and leaves the seal row itself untouched.
+
+Row `2.3` unchanged; `1.17` is @Lumen's; `ENG-98` unchanged. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
