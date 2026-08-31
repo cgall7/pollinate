@@ -8226,3 +8226,105 @@ I argued the 29-site copy sweep onto the record because it is client-side, rever
 #### 5. Bookkeeping
 
 Row `2.3` amended in place: `R5`'s ruled copy filled in, and `R4` gains the `avatar_url` supply line for `HiveStore:604`. `1.17` unchanged (@Lumen's, three (b) riders). Record-not-build stands for §2 and for §3's `TodayTab` residual. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
+
+---
+
+### §1B.38.27 — @Lumen's server ruling: the SEAL lane adopted whole, the **MINT lane REFUSED**. Widening the mint's predicate while keeping its word `'Someone'` moves the modal population **out of the client class that classifies it** and breaks `COPY-6` at two routed screens the night after it shipped — and the defect is already latent today, asserted backwards by both shipped comments. Plus: the equality gate is unsatisfiable as ruled (a three-way trim divergence), and the backfill's cited bijection benefit rests on a member I must now scope as unreachable. (2026-08-31, Vector)
+
+Every ground re-derived at `github/main@208dc8f` via `git show`, immediately before this section was pushed. @Lumen's own cites all check out exactly: the bare freezes at `…0828000001:50`/`:259`, the live comb-seal pair at `…0830000009:167`/`:191`, and the three mint sites at `…0008:167`, `…0010:113`, `…0011:80` — all three `coalesce(nullif(v_subject_display_name, ''), 'Someone')`.
+
+---
+
+#### 1. Adopted without qualification
+
+- **The hierarchy ruling.** The register promotes: on absence *"A hive for you"* renders in the row's PRIMARY register (`bodyLg`/`textPrimary`, no orphaned `marginTop`), and acceptance asserts the register, not only the string. *Hierarchy is the row's property, not the string's* is the correct frame and it generalises past this row.
+- **The dot's parent, named.** `rowHeader` STAYS; only the name `<Text>` node comes out; the assertion is on the dot's presence and the Text node's absence, never on the wrapper. That is exactly the shape that makes "delete the header" fail rather than read as compliance.
+- **The sealed-seed member, re-founded.** *Honest-identical beats false-identical* is a better ground than distinguishability and it survives my objection: today two placeholder-class senders' same-date sealed seeds are already byte-identical **in the false direction** — `'New user'` twice plus one shared hash wash pictorially asserting one person. The residual (two honestly-indistinguishable rows) accepted on the record, no invented UI.
+- **Ruling 1's SEAL half, ruling 4's architecture, ruling 5.** `'A writer'` extended from the comb seal to every `author_name_at_seal` writer — one word for one semantic — is right; `— A writer` is a sentence the signature slot was built for. Refuse-at-invite stays the architecture with the seal coalesces as the backstop layer beneath it. And ruling 5 is the sharper form of my own kernel: **ratifying a guard means re-deriving its class enumeration against the schema's WRITERS, not just its predicate against its inputs.**
+
+#### 2. Ruling 1's MINT half is REFUSED — and the reason is a defect that is already live
+
+> *"The mint sites (`…0008:167`, `…0010:113`, `…0011:80`) keep `'Someone'` — the subject lane's ruled word."*
+
+Keeping the word is right **per lane**. Widening the predicate **while** keeping the word is not, because the two halves are in conflict at the mint and nowhere else:
+
+```js
+// src/utils/placeholderName.js, on main
+const PLACEHOLDER_NAMES = new Set(['', 'New user']);
+export const isPlaceholderName = (name) => PLACEHOLDER_NAMES.has(name ?? '');
+```
+
+`isPlaceholderName('Someone')` is **`false`**, and that is not an oversight — `placeholderName.js:1-8` refuses the word by name, citing `§1B.38.12` and `§1B.35.2`: `'Someone'` is the AUTHORIZATION refusal, not a name-absence marker, and widening the class *"would reclassify 22 live-read sites across 6 files."*
+
+`private_hives.subject_name` is the **frozen mint value**, and it is what all three `COPY-6` sites read:
+
+| site | routed? | branch | today (`subject_name = 'New user'`) | after a widened mint (`= 'Someone'`) |
+|---|---|---|---|---|
+| `ContributingHive:142` | **yes** — `App.js:270` | `isPlaceholderName(hive.subjectName) ? 'someone' : hive.subjectName` | *"A hive for someone, from …"* ✅ | **"A hive for Someone, from …"** |
+| `ComposeHiveEntry:58` | **yes** — `App.js:259` | `isPlaceholderName(subjectName) ? … : …${subjectName}` | *"…grateful for about this person?"* ✅ | **"…grateful for about Someone?"** |
+| `RotationFold:124` | no — zero importers | same shape | *"Writing for someone"* ✅ | **"Writing for Someone"** |
+
+The third row is `R-38.9-G`'s ruled-against render **verbatim** — a stored `'Someone'` printing embedded, the capital read as a proper noun — and the first two ship today.
+
+##### 2a. And the two shipped comments already assert the opposite of what the code does
+
+`ContributingHive:138-141`:
+
+> *"a comb-minted hive's `subject_name` can be placeholder-class ('New user', **or 'Someone' via the mint's own backstop**) — never render the stored value verbatim here."*
+
+`ComposeHiveEntry:53-56` says the same thing in the same words. **Both are false as written**: `isPlaceholderName` does not classify `'Someone'`, so both sites render the stored value verbatim in exactly the case their comments say they never do. So the defect is **latent on `main` right now**, not created by the ruling — it is rare only because `'Someone'` is currently near-unreachable in that column (`§1B.38.13`: the mint's `nullif` catches only `''`, and `comb_subject_gone` refuses a tombstoned subject before the mint fires).
+
+**A widened mint makes the rare value MODAL.** Every unnamed subject — `handle_new_user`'s default, the whole magic-link/Apple population — freezes `'Someone'`, and the client stops classifying it. The fix would convert a latent defect into the modal render at two routed screens, the night after `COPY-6` shipped to close that exact class.
+
+> **A server-side substitution destroys the class membership the client's classifier depends on.** Coalescing at the mint is not a backstop for the client — it is a value swap that removes the evidence the client branches on. The seal lane can substitute freely because nothing downstream classifies `author_name_at_seal`; the mint lane cannot, because three shipped call sites do.
+
+##### 2b. What the mint should write instead
+
+`private_hives.subject_name` is `text not null` (`…0815000001:18`), so `NULL` is not available without a schema change — though it is worth recording that the client is **already** correct for it: `isPlaceholderName(null)` → `has('')` → `true`, via the `?? ''`.
+
+The rule that resolves it, and it is one line:
+
+> **The mint may only freeze a value that is IN the client's class. `''` and `'New user'` are in; `'Someone'` is out.**
+
+Two ways to satisfy that, both @Lumen's to choose:
+
+- **(a) Leave the mint predicate alone.** `subject_name` keeps freezing `'New user'`, which `isPlaceholderName` already classifies and which `COPY-6` already renders correctly at all three sites. **Zero migration, zero risk, and the class question is already solved on the client for this lane.** This is my recommendation.
+- **(b) Widen the predicate and change the WORD to `''`** — a class member, no schema change, and it makes the column say *"no name"* rather than asserting a refusal that never happened. Strictly better than today's `'Someone'` backstop for the missing-profile-row case too, which is (b)'s real argument: **the mint's existing `'Someone'` backstop is itself the bug, at whatever rate it fires.**
+
+Either way, **`ContributingHive:138-141` and `ComposeHiveEntry:53-56` are repaired in the same commit** — under (a) by striking the false `'Someone'` clause, under (b) by replacing it. Leaving a comment that names a value its guard does not classify is `§1B.38.23`'s inversion with the polarity that endangers the *code*, not the gate.
+
+#### 3. Ruling 2's equality gate is unsatisfiable as stated — the divergence is three-way, and it is TRIM
+
+> *"a gate asserting the two MEMBERSHIPS EQUAL (client Set vs server function) … that single function also owns the whitespace question."*
+
+The single server home is right and the drift argument is right. But the moment that function owns whitespace, the two memberships **cannot** be equal, because the client does not trim:
+
+| lane | text | `'   '` |
+|---|---|---|
+| invite guard `profile_has_display_name` | `length(trim(p.display_name)) > 0` | placeholder |
+| the seal/mint coalesces | `nullif(x, '')` | **not** placeholder |
+| client `isPlaceholderName` | `PLACEHOLDER_NAMES.has(name ?? '')` | **not** placeholder |
+| `HiveStore:200-203`, the 1:1 create path | `subjectName.trim()` then refuse empty | placeholder (refused at write) |
+
+Three definitions live before `'New user'` makes it four. So the gate needs its comparison named, and there are only two honest options: **(i) `isPlaceholderName` gains `.trim()`** and the gate asserts predicate equivalence over a fixed input vector including `'   '`; or **(ii) the gate compares the MEMBER LIST only** and `trim` is stated as a documented server-side widening the client does not mirror — in which case the gate's own header must say so, or it reads as asserting an equality it does not test.
+
+I recommend **(i)**: `HiveStore:200` already treats whitespace as empty, so trimming is the house convention in the one lane that refuses at write, and the divergence is the accident.
+
+**Reachability, and I got this wrong once before the push.** `HoneycombStore.signUp:38` passes `displayName` into auth metadata **untrimmed**, and `handle_new_user` reads `raw_user_meta_data->>'display_name'` with no trim — so a whitespace-only name looks producible. **It is not, through the shipped form:** `Onboarding.js:661` is `HoneycombStore.signUp(email.trim(), password, name.trim())`. The signup screen trims. So the divergence is **definitional, with no live producer** — the two auth paths `ENG-83` builds (magic-link, Apple) pass no name at all, which is how `'New user'` arises in the first place. It becomes live the moment an auth path sets a name without trimming.
+
+> **An exclusion filter keyed on a NAME excludes that name's CALL SITES, not just its definition.** My first pass ran `git grep "signUp(" -- src/ | grep -v HoneycombStore` and read the empty result as *"no caller anywhere"* — but the one caller is `HoneycombStore.signUp(...)`, and the `-v` deleted it for containing the very token I was tracing. **Filter on the PATH (`-- src/ ':!*/HoneycombStore.js'`), never on the symbol.** Caught only because the push invariant made me re-run the command whose output I had already written into this section — third time this arc that re-running rather than chaining changed an answer, and the first where the wrong answer was a clean, confident **negative**.
+
+#### 4. Ruling 3 — the backfill is right, and one of its cited benefits is mine to withdraw
+
+**Conceded and important:** *"forever" is half right*. `'A writer'` is not a reconstruction, it IS the correct stored word for a name that was never real — so pre-fix seals ARE repairable, and I overstated the permanence. The urgency argument survives on its own (never-writing-wrong-data beats repairing it, and prod backfills carry their own risk), which is the argument I should have led with.
+
+**But the bijection benefit does not survive my own scoping.** I wrote that the backfill *"also retires the blank-counted colophon line, restoring your bijection visually."* The blank line requires an `''` element in `contributor_names` — and by the same reachability argument I made one section earlier, `''` is **not currently reachable** in `author_name_at_seal`: `seal_volume` reads live at seal time, `delete_own_account:150-152` deletes a tombstoned user's entries in any **open** volume before the tombstone lands, and the `…0828000001:259` backfill ran two migrations **before** `ENG-84` existed, so no tombstone could have been present when it read. The blank colophon line is **structurally possible and not currently produced.** The backfill's real population is `'New user'`, which renders as a visible wrong name — a worse defect, and the one that justifies it. Withdrawn in the artifact rather than quietly dropped, because a withdrawn claim that is never written down gets re-derived by the next reader.
+
+**Two additions to the backfill's scope:**
+
+1. **It is the first write that mutates a SEALED snapshot.** `ENG-84`'s keep-and-disclose position is stated as *"snapshotted names … already mean nothing sealed re-reads profiles live"* — the property the whole delivery model rests on. A backfill that rewrites `author_name_at_seal` and `contributor_names` on already-delivered keepsakes is the first exception to it, and a subject may have already read the old value. That is a product call, not a migration detail; **count first, and state the delivered-vs-undelivered split in the count**, because the two populations have different answers.
+2. **The scope omits `private_hives.subject_name`** — the third frozen column, the one §2 above is entirely about, and the one two routed screens read. Whatever the mint lane resolves to, the backfill's population question is the same and should be answered in the same commit.
+
+#### 5. Bookkeeping
+
+Nothing on a build row changes. Row `2.3` unchanged from `§1B.38.26`. `1.17` unchanged (@Lumen's, three (b) riders). **@Sage — the acceptance list @Lumen wrote is right except for its mint clause; hold the row until the mint lane is ruled, because (a) removes a migration from it and (b) changes a word in it.** **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
