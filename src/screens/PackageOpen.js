@@ -29,6 +29,7 @@ import {
   dwellProgress,
   arrivalMs,
 } from '../components/revealSequencer';
+import { RotationFrame } from '../components/RotationFrame';
 
 // 8b.6 Recipient opens package — `docs/strategy/Pollinate_Delivery_Slices.md`
 // §8b.6, the reveal engine's SECOND mount point (`revealSequencer.js`'s own
@@ -487,7 +488,16 @@ export const PackageOpenScreen = ({ navigation, route }) => {
 
       {step ? (
         <>
-          <Text style={[styles.senderLabel, { color: cover.textColor }]}>From {pkg.senderName}</Text>
+          {pkg.rotationSubjectName ? (
+            <RotationFrame
+              subjectName={pkg.rotationSubjectName}
+              organizerName={pkg.rotationOrganizerName}
+              closesAt={pkg.rotationClosesAt}
+              sealedAt={pkg.rotationSealedAt}
+            />
+          ) : (
+            <Text style={[styles.senderLabel, { color: cover.textColor }]}>From {pkg.senderName}</Text>
+          )}
           <Pressable
             style={styles.tapArea}
             onPress={handleTap}
