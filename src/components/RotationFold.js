@@ -14,23 +14,29 @@ import { numberInWordsCapped } from '../utils/numberWords';
 // ships on the reveal header under that spec, and DES-31/39 §4 explicitly
 // asks new mounts to match it rather than pick their own scale.
 //
-// ZERO-SUPPRESSION IS THE CALLER'S JOB, NOT THIS COMPONENT'S GUESS. Every
-// count source in play here (`comb_member_count`, `comb_rotation_writer_
-// count`) fails open on refusal by returning 0 (DES-22 §6, DES-31 §1.1) —
-// this component cannot tell "nobody" from "not allowed to know" any better
-// than the caller can, so it treats `count == null` as "withhold the line"
-// and leaves the caller to pass `null` rather than a `0` it doesn't trust.
+// ZERO-SUPPRESSION HERE IS A BACKSTOP, NOT A SUBSTITUTE FOR THE CALLER'S OWN
+// WORK. Every count source in play (`comb_member_count`, `comb_rotation_
+// writer_count`) fails open on refusal by returning 0 (DES-22 §6, DES-31
+// §1.1), and this component treats `count == null` as "withhold the line" —
+// which also happens to catch a `0` the caller trusts. But `R5` pins that
+// disjunction on every branch that renders a count, so a caller that skips
+// the §1B.33 work and passes a fails-open `0` straight through reads here
+// exactly like one that did it correctly. No gate in this file can ever
+// fail because a caller forgot that step — the caller still owns getting
+// `null` vs `0` right; this only backstops the render once it has.
 export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind = 'writers', style }) => {
   const daysLine =
     Number.isFinite(daysLeft) ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : null;
 
-  // R-38.9 hardening requirement 1 (Lumen): the name-carrying branch is now
-  // an opt-IN, not a default. Only an explicit `variant === 'member'` WITH a
-  // `subjectName` to carry reaches it — an absent/misspelled `variant`, or a
-  // `member` request missing its name, falls through to the nameless branch
-  // below instead of rendering "Writing for undefined" or, worse, a real
-  // name to the subject herself.
-  const isMember = variant === 'member' && !!subjectName;
+  // R-38.9 hardening requirement 1 (Lumen), corrected by Vector's
+  // §1B.38.11 row 1: reader classification and name availability are two
+  // separate decisions, not one ANDed boolean. `variant === 'member'`
+  // alone selects the reader — the caller asserts that with certainty — so
+  // an absent/misspelled `variant` still fails closed toward the nameless
+  // branch below. A `subjectName` that comes back empty on a genuine
+  // member is handled just past this branch, as its own refusal (see
+  // below), never by silently reclassifying the reader as the subject.
+  const isMember = variant === 'member';
 
   // R-38.9-E (Lumen): derived above the branch split, not inside it. A
   // fail-closed fallback inherits every CALLER's inputs, not just the one
@@ -73,6 +79,20 @@ export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind 
         {daysLine && <Text style={styles.daysLine}>{daysLine}.</Text>}
       </View>
     );
+  }
+
+  if (!subjectName) {
+    // Vector's §1B.38.11 row 1 (R-38.9-F): `variant === 'member'` is a
+    // reader CLASSIFICATION the caller asserts with certainty; a missing
+    // `subjectName` here is not "no data," it's a REFUSED READ — e.g. a
+    // mid-rotation joiner whose `hive_contributors` row hasn't landed yet,
+    // an O10-gated question, not this component's to answer. Falling
+    // through to the branch above would silently hand this MEMBER the
+    // SUBJECT's own copy — the exact defect this split exists to close.
+    // The real render for this state is Lumen's copy ruling to make
+    // (§1B.38.11 row 3); until it lands, render nothing rather than
+    // fabricate one.
+    return null;
   }
 
   // variant === 'member' with a subjectName present: "Writing for

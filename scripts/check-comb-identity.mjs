@@ -26,11 +26,13 @@
 //   R5  `RotationFold.js` withholds every count-bearing line when
 //       `count == null` or `count <= 0` — the zero-suppression rule
 //       (DES-22 §6 item 3 / DES-31 §1.1), calibrated by mutation
-//   R6  `RotationFold.js`'s name-carrying branch is reachable only by an
-//       explicit `variant === 'member'` AND a present `subjectName` — never
-//       by variant alone. R-38.9 hardening requirement 1 (Lumen): an
-//       absent/misspelled `variant` must fail CLOSED toward the nameless
-//       branch, not open toward the one that can render a real name
+//   R6  `RotationFold.js`'s reader-selection guard is `variant === 'member'`
+//       ALONE — never ANDed with `subjectName`. R-38.9 hardening req 1
+//       (Lumen), corrected by Vector's §1B.38.11 row 1: reader
+//       classification and name availability are two separate decisions;
+//       ANDing them let a refused name read silently reclassify a member
+//       as the subject (see R9). An absent/misspelled `variant` still
+//       fails CLOSED toward the nameless branch
 //   R7  `RotationFold.js`'s nameless/subject branch never reads
 //       `countKind` — it renders the size sentence unconditionally, so
 //       `variant: 'subject', countKind: 'writers'` can't reach a
@@ -41,6 +43,12 @@
 //       `countKind` at its 'writers' default) can't leak the writer count
 //       into the size sentence. R-38.9-E (Lumen), probe-the-fix's-new-
 //       surface on hardening requirement 1
+//   R9  `RotationFold.js`'s member path treats a missing `subjectName` as
+//       its own refusal (returns `null`) — distinct from, and never a
+//       fallthrough into, the nameless/subject branch. R-38.9-F (Vector's
+//       §1B.38.11 row 1 fix): a member whose name read was refused (e.g. a
+//       mid-rotation joiner not yet in `hive_contributors`) must not
+//       silently receive the subject's own copy
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -187,18 +195,20 @@ const foldCode = codeOnly(foldSrc, foldAst);
   }
 }
 
-// Locate RotationFold's single IfStatement once, shared by R6/R7 — its test
-// is the fail-open/fail-closed guard, its consequent is the nameless branch.
-let rotationIf = null;
+// Locate RotationFold's top-level IfStatements in source order, shared by
+// R6/R7/R8/R9 — [0] is the reader-selection guard (nameless branch is its
+// consequent), [1] is the member-path refusal for a missing subjectName.
+const rotationIfs = [];
 walk(foldAst.program, (n) => {
-  if (n.type === 'IfStatement') rotationIf = n;
+  if (n.type === 'IfStatement') rotationIfs.push(n);
 });
+const rotationIf = rotationIfs[0] ?? null;
 
-// ── R6. fail-closed variant guard: member branch needs an explicit variant
-//       AND a name to carry, never variant alone (R-38.9 hardening req 1) ─
+// ── R6. reader-selection guard is variant === 'member' alone — never ANDed
+//       with subjectName (R-38.9 hardening req 1, corrected by Vector) ────
 {
   if (!rotationIf) {
-    bad('R6 fail-closed variant guard', 'could not find the variant branch in RotationFold — FAILS CLOSED');
+    bad('R6 reader-selection guard', 'could not find the reader-selection branch in RotationFold — FAILS CLOSED');
   } else {
     // Resolve whatever the test negates back to its own declaration, so a
     // rename (e.g. `isMember` → something else) doesn't dodge this check by
@@ -211,14 +221,16 @@ walk(foldAst.program, (n) => {
       });
     }
     const guardSrc = foldSrc.slice(guardExpr.start, guardExpr.end);
-    const requiresExplicitMember = /variant\s*===\s*['"]member['"]/.test(guardSrc);
-    const requiresName = /&&/.test(guardSrc) && /subjectName/.test(guardSrc);
-    if (requiresExplicitMember && requiresName) {
-      ok("R6 member branch requires an explicit variant === 'member' AND a present subjectName, not variant alone");
+    const selectsOnVariant = /variant\s*===\s*['"]member['"]/.test(guardSrc);
+    const staysClearOfName = !/subjectName/.test(guardSrc);
+    if (selectsOnVariant && staysClearOfName) {
+      ok("R6 reader-selection guard is variant === 'member' alone — a missing subjectName can't reclassify the reader");
+    } else if (!selectsOnVariant) {
+      bad('R6 reader-selection guard', `guard expression \`${guardSrc}\` doesn't select on variant === 'member' — a misspelled/absent variant could fail open toward the name-carrying path`);
     } else {
       bad(
-        'R6 fail-closed variant guard',
-        `guard expression \`${guardSrc}\` doesn't require both an explicit 'member' variant and a present subjectName — a bare \`variant === 'subject'\` check (or its negation) fails open toward the name-carrying branch on any other value`
+        'R6 reader-selection guard',
+        `guard expression \`${guardSrc}\` still ANDs subjectName into the reader classification — a refused name read on a genuine member would silently fall through to the nameless/subject branch instead of surfacing as its own refusal (R9)`
       );
     }
   }
@@ -290,6 +302,35 @@ walk(foldAst.program, (n) => {
           `\`${countRef}\` feeds the nameless branch's count line but its declaration (\`${declSrc || '<not found>'}\`) doesn't gate on countKind === 'size' with a null alternate, declared outside the branch`
         );
       }
+    }
+  }
+}
+
+// ── R9. member path's missing-subjectName case is its own refusal —
+//       returns null, never falls through to the nameless branch (R-38.9-F)
+{
+  if (rotationIfs.length < 2) {
+    bad('R9 refusal state', `expected 2 top-level branches in RotationFold (reader-selection + refusal), found ${rotationIfs.length} — FAILS CLOSED`);
+  } else {
+    const refusalIf = rotationIfs[1];
+    const testSrc = foldSrc.slice(refusalIf.test.start, refusalIf.test.end);
+    const testsSubjectNameAbsence =
+      /subjectName/.test(testSrc) &&
+      (/^\s*!/.test(testSrc) || /==\s*null/.test(testSrc) || /===\s*null/.test(testSrc) || /==\s*undefined/.test(testSrc));
+    // Calibrated to `null` specifically — that's what's actually built
+    // pending Lumen's copy ruling (§1B.38.11 row 3). A future commit that
+    // lands real copy for this state is expected to touch this row too.
+    let refusalReturnsNull = false;
+    walk(refusalIf.consequent, (n) => {
+      if (n.type === 'ReturnStatement' && n.argument?.type === 'NullLiteral') refusalReturnsNull = true;
+    });
+    if (testsSubjectNameAbsence && refusalReturnsNull) {
+      ok('R9 member path returns null on a missing subjectName — its own refusal, never the nameless branch');
+    } else {
+      bad(
+        'R9 refusal state',
+        `expected a second branch guarding on the ABSENCE of subjectName and returning null — found test \`${testSrc}\` (testsSubjectNameAbsence=${testsSubjectNameAbsence}), refusalReturnsNull=${refusalReturnsNull}`
+      );
     }
   }
 }
