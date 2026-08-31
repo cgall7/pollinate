@@ -3225,14 +3225,14 @@ consequence, and learn in between.**
 | 1.3 | **Fizz** | `ENG-83` — magic-link / Sign in with Apple | — (start with 1.1) |
 | 1.4 | **Pixel** | `DES-22` + `DES-31` — comb identity, rotation state. **`DES-22` is the DESIGN LONGEST POLE — start it first** (§1B.10): `COPY-6` (1.10) and `DES-29`'s comb happy path (1.5) both need comb identity to exist before they can be written or drawn. **`DES-22` draws presence, not capacity** (§1B.8). **`DES-31`'s count is the member's view only — never the subject's** (§1B.9). **Spec real names** — today a comb of strangers renders every member as `'Someone'`; making that true is `ENG-58`'s job, not something to design around (§1B.17). **THREE AMENDMENTS 2026-08-31 (Vector, §1B.37), all in `DES-22`'s cell cluster:** (a) the *"invited, not joined"* cell state is **STRUCK** — one shared `invite_code`, no per-recipient row, no query (@Pixel found it, @Lumen ruled it, I verified it); (b) **the cluster is TWO reads, not one** — draw cells from `comb_co_member_names` (live `comb_members`) and overlay `has_written` from `comb_rotation_roster` where a row exists, because `comb_rotation_roster` alone returns **zero rows** to a member who joined after the rotation was minted, i.e. an empty comb screen on the first screen after the invite link; (c) that late joiner is the **fifth** cell state — in `comb_members`, not in this month's `hive_contributors` — and its cell **may not carry the hasn't-written dim mark**, because they cannot write this month at all. Whether the state is named to the user, and how it is drawn, is yours and @Lumen's. **Not blocked on `O10`** (does a mid-month joiner write this month or next? — @Colin): (b) and (c) are correct under either answer | — (start now, ahead of 1.6) |
 | 1.5 | **Deezine** | `DES-29` — comb-first first run. Sequence with Zero Door (same `App.js` region) | **1.4** (comb identity — §1B.10, §1B.11). *Was "— (start now)"; that contradicted §1B.10 and the §8.7 graph. Corrected.* |
-| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
+| 1.6 | **Deezine** | ~~`DES-21`~~ → **`DES-33`** — the rotation *frame* around the shipped bloom. **Re-estimated XL → S/M**: the bloom is merged at `a02e247`; what is missing is tense (§1B.3). Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`, do not rebuild. **AMENDED §1B.38 — the COMPONENT is merged (`5d4a2ff`, Deezine's `fee5c3442` rebased by @Fizz); the STEP is NOT closed.** `RotationFrame.js` is correct code, but its only mount is `PackageOpen.js:491`, and that screen's feed (`HiveStore.getReceivedPackage:546-591`) queries `.eq('subject_profile_id', …).not('sent_at','is',null)` — **subject-scoped and post-send by construction**, so `sealedAt` is always non-null, `isSealed` is always true, and the **active** branch (*"Writing for {subjectName}"* / *"N days left"* — **the ratified definition of done's own line**) is unreachable there, along with the whole `setInterval` countdown (`:9-22`). The props also have **no producer**: five read sites, zero writers, and `getReceivedPackage` returns no `rotation*` field, so `pkg.rotationSubjectName` is `undefined` and the ternary always takes `From {senderName}`. **The active line's home is the COLLECT surface — the `(g)` header state-line slot — wired by row `1.9` and rendered per row `1.4`; the component itself needs ZERO changes for that mount.** **Plus @Lumen's §1B.38.1 ruling: the sealed state's *"Next month: {organizerName} leads"* is STRUCK, not reworded.** **Component ≠ step.** | — (**spec has no dependency; start now** — §1B.11). **The countdown *copy* ships with or after `ENG-91` (1.8a)** — "6 days left" is only true once something happens at zero (§1B.16) |
 | 1.7 | **Fizz** | `ENG-59` — invite-link join. **Split at the auth line (§1B.28.4):** the `authenticated`-only `comb_join_by_invite_code()` RPC the schema comment names (`20260830000002:328-337`) is uncontested and builds now; the **anon landing preview** is a NEW function — `comb_member_count` authorizes inside its WHERE (`:426-437`), so a non-member gets **`0`, not an error**, and every ENG-58 definer is `revoke execute … from anon` (`:313-315`, `:405-407`, `:441-443`). **Choice (a) settled** — possession of the code is the authorization — which makes **the code's entropy the entire access control for that read** (§1B.28.4). **Plus §1B.28.1, the real addition:** a **name-collection step between auth and join**. `signInWithOtp` and `signInWithApple` write no `display_name`, `handle_new_user` defaults to **`'New user'`**, and nothing in `src/` ever rewrites it — so without this step every seeded comb renders a roster of `'New user'` and §1B.17's `comb_co_member_names` fix is defeated one layer down. That step is also `COPY-6`'s disclosure seat. **Plumbing note (§1B.28.3):** `AuthContext.js:93-101` already runs the `Linking` listener and drops non-`auth-callback` URLs at `:94` — extend `handleUrl`, do not build it | 1.1, 1.3 |
 | **1.7a** | **Fizz** | **`ENG-93` — create a comb.** NEW (§1B.29). The organizer half of the model: create screen, the shared `comb_open_rotation()` definer mint, and the **organizer's** name-collection mount (Lumen, `4fdd39e2…`). **Build it with 1.7** — they share the name-collection component. **`DES-29` designs it; nobody built it**, and Phase 3.1 cannot seed a comb without it | 1.1, 1.3 — ~~`ENG-92`~~ **removed §1B.30**: a `security definer` mint bypasses the WITH CHECK that `ENG-92` Part 1 deletes |
-| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE. **ACCEPTANCE ADDED §1B.36.19: this row inherits the CLOCK-BOUNDARY pair** (moved off `1.9a`, which could not run them). In `check-ops9-rotation-scheduler.mjs`, with the second block built: **row 2** — tick with the floor intact → `warnings` contains **no** match; **row 3** — tick with the floor stripped → `warnings` **does** match, the **positive control**. **Undeletable pair, with the in-gate comment saying so** — row 3 is the only thing separating *the floor held* from *nothing ran*, and row 2 alone is green on a tick that never advances. Runnable here because `1.9a` is already a dep. **MERGE-TIME REQUIREMENTS ADDED §1B.36.24 — this branch is 11 behind `main`, so its gate set is a snapshot of a stale merge-base:** (i) `OPS-11` landed inside the gap and `check-share-visibility` now asserts a catalog-wide `EXPECTED_DEFINER_GRANTS` map whose rule is *“no row at all is also a failure”* — `advance_due_rotations()` is `security definer` with **no row**, so it reds on merge until one is added; (ii) `…0005` now sorts **below** `main`'s `0006`–`0010` — **renumber to `…0011`** (the target moved once already tonight, so re-read `main` at rebase time rather than reusing this number); (iii) re-derive **then** re-count — whatever `npm test` says on that tip is scoped to a suite three gates behind | 1.1, **1.8a**, **1.9a** |
+| 1.8 | **Bumble** | `OPS-9` — `pg_cron` rotation scheduler. **The tick advances state; it cannot seal — it calls `ENG-91`** (§1B.14). **§1B.31: the tick has a SECOND half and it is unbuilt** — `advance_due_rotations()` (`32bdd74`) resolves due rotations and *opens nothing*, so a comb ends after one month and `C1`/`C3` cannot be measured. The resolver half **merges as written**; the row is **partial, not done**, until the tick **resolves then advances** in one pass — **§1B.31.2: that order is the only one the schema permits** (`comb_rotations_one_open_per_comb` `:495-496`; advance-before-resolve is `23505`, probed) and the two steps must sit in **SEPARATE `begin…exception` blocks**, or a raising advance rolls back the committed seal and the tick re-seals-and-re-fails every five minutes forever. **§1B.31.1 CORRECTS the edge: dep is `1.9a` (`comb_advance_rotation`), NOT `1.7a`** — routing 1.8 straight at `ENG-93` while 1.9 depends on 1.8 was a CYCLE. **ACCEPTANCE ADDED §1B.36.19: this row inherits the CLOCK-BOUNDARY pair** (moved off `1.9a`, which could not run them). In `check-ops9-rotation-scheduler.mjs`, with the second block built: **row 2** — tick with the floor intact → `warnings` contains **no** match; **row 3** — tick with the floor stripped → `warnings` **does** match, the **positive control**. **Undeletable pair, with the in-gate comment saying so** — row 3 is the only thing separating *the floor held* from *nothing ran*, and row 2 alone is green on a tick that never advances. Runnable here because `1.9a` is already a dep. **MERGE-TIME REQUIREMENTS ADDED §1B.36.24 — this branch is 11 behind `main`, so its gate set is a snapshot of a stale merge-base:** (i) `OPS-11` landed inside the gap and `check-share-visibility` now asserts a catalog-wide `EXPECTED_DEFINER_GRANTS` map whose rule is *“no row at all is also a failure”* — `advance_due_rotations()` is `security definer` with **no row**, so it reds on merge until one is added; (ii) `…0005` now sorts **below** `main`'s `0006`–`0010` — **renumber to `…0011`** (the target moved once already tonight, so re-read `main` at rebase time rather than reusing this number); (iii) re-derive **then** re-count — whatever `npm test` says on that tip is scoped to a suite three gates behind. **STILL PARTIAL AT `github/main@5d4a2ff` — §1B.38, and nothing in the merge says so.** The merged `20260830000012_ops9_rotation_scheduler.sql:157-171` loop body calls `seal_and_send_rotation` **and nothing else**; all five `comb_advance_rotation` occurrences in that file (`:11/:25/:28/:70/:74`) are **comments**, including the `perform` at `:28` that three separate readers took for code. **The header's deferral premise (`:26-29`, *"comb_advance_rotation doesn't exist on main yet"*) was FALSE by merge time** — `git merge-base --is-ancestor 6d2d3b0 182b9f6` returns true, so `1.9a` was on `main` **one commit earlier**. **And the §1B.36.19 CLOCK-BOUNDARY PAIR MERGED MISSING:** `check-ops9-rotation-scheduler.mjs` has zero `comb_advance_rotation` references, its header (`:14-32`) enumerates no advance row, and its only `warnings.some` is the seal block's own control at `:389`. **FINISHER — fully specified, unblocked today, small:** a **second** `begin…exception` block *after* the seal block (never inside it, §1B.31.2), `perform public.comb_advance_rotation(v_comb_id)` with `comb_id` read off the resolved row, `raise warning '… %', v_comb_id, sqlerrm` **with `sqlerrm`** (§1B.36.12 — the interpolated message string is the only channel row 3 can key on), **plus rows 2 and 3**. Dormancy will not spam the tick log: `…0011:258`'s `if v_enrollable_count < 2 then` returns **null, quietly, raising nothing**. Merge-time requirement (i) is now **satisfied** (`advance_due_rotations()` at `check-share-visibility.mjs:421`, `roles: ['service_role']`); (ii)'s renumber is **spent** (`…0012`). **Until this lands, step 8 of the ratified sentence — *"and do it again next month for someone else"* — has no server path and `C1` has no data.** | 1.1, **1.8a**, **1.9a** |
 | **1.8a** | **Sage** | **`ENG-91` — server-side seal + send.** NEW (§1B.14). Today all three of `seal_hive`/`seal_volume`/`send_hive` require `auth.uid()` = the hive's owner, so a rotation can only complete if the organizer taps. **On the longest chain: `ENG-58` → `ENG-91` → `ENG-60`.** Semantics pinned in **§1B.16** — seal-and-send, idempotent, membership-authorized, empty rotations void rather than deliver. **Plus §1B.24.1 (c)/(d):** refuse a tombstoned subject at mint, and void-and-advance a subject tombstoned mid-month — `send_hive`'s guards do not catch either. **(c) SUPERSEDED ON ROUTING, upheld on substance (§1B.29.2a):** `ENG-91` shipped one function, `seal_and_send_rotation`, and it does not mint. The mint gate moves to `ENG-93`'s `comb_open_rotation()`. (d) is unaffected and landed. **Plus §1B.25.2 as amended by §1B.26.1:** ship `coalesce(nullif(p.display_name, ''), 'A writer')` (token ruled by Lumen) as a **backstop** — the live pre-seal path cannot fire it, because `delete_own_account()` deletes the unsealed entry outright. **Plus §1B.26.3, which is the real work:** void-and-advance distinguishes **three** states — sealed, quiet month, and **departed** (zero entries because the only writers deleted their accounts) — or C1 cannot tell a healthy comb from a failing one. **Plus §1B.27.3, two lines that are cheapest here:** (a) the fused seal **does not open a successor volume** for a rotation hive — `seal_volume`'s successor insert (`20260828000001:60-61`) is what leaves a sealed month writable, and skipping it restores the 42501 three shipped client sites already expect; (b) it **must still write `private_hives.sealed_at`**, the mirror `20260826000004:138-153` keeps alive for five client reads that have never been re-pointed | 1.1 |
 | **1.9a** | **Fizz** | **`comb_advance_rotation(p_comb_id)`** — NEW, carved out of `ENG-60` (§1B.31.1ii). The server-side **advance policy**: next subject (`comb_members` by `joined_at`, wrapping, skipping `removed_at`/tombstoned seats and **nobody else**), next `closes_at` (`closes_at + k·cadence`, first future boundary, **floor of half a cadence** — §1B.31.1iii), then call `ENG-93`'s `comb_open_rotation()`. **`service_role` only** (Lumen — an `authenticated` grant is an unruled organizer force-advance). **No eligible subject = DORMANCY, raises nothing** (§1B.31.2iv) — otherwise a departed comb is the permanent-stall trigger. **§1B.31.3: the derived advance needs ≥2 ENROLLABLE MEMBERS** — `removed_at is null` AND `profiles.deleted_at is null`, **adopted from `ENG-100`'s predicate, never re-implemented** (§1B.36.10; @Lumen's coupling pin, R12 adopt-don't-copy). A floor that counts a different population from the mint it green-lights green-lights a month with zero contributors (a roster of one yields a subject with no possible author → guaranteed quiet void); month 1 is exempt because its subject is organizer-chosen and may be a non-member. **Dormancy needs an EXIT** — the tick also probes combs with no open rotation, **but only those with ≥1 RESOLVED rotation**, or it mints month 1 over the organizer's own choice mid-create-flow. Carved out because `ENG-60` depends on `OPS-9` and `OPS-9` needs this — leaving it inside `ENG-60` is a dependency cycle. Ordering goes in a **function**, not inlined, per §1B.31.1iv. **ACCEPTANCE ADDED §1B.36.20 + §1B.36.21 — read both before building.** (a) **In-body pre-launch dormancy:** *no resolved rotation* returns **quietly**, in this function, not only in the tick's `WHERE` — the derivation is UNDEFINED without a prior rotation (no subject cursor, no base `closes_at`), and this function has two direct callers that are not the tick's `SELECT`. Comment carries the **mechanism** *and* the **hazard** (a `now()` fallback would silently mint month 1 over the organizer's choice, §1B.31.3(i)) — otherwise the silence reads as unfinished. (b) **Its gate is a 2×2 with ONE green cell, all three runnable at this row's landing via a direct `service_role` call, sharing ONE base varying one axis:** **A** (1 enrollable, ≥1 resolved) → no row, no raise; **B** (2, ≥1 resolved) → **a row appears, the shared positive control**; **C** (2, no prior) → no row, no raise. A and C each differ from B on exactly one axis; neither negative substitutes for the other. **PLUS §1B.36.25 — MONTH 1'S BASE, ~4 LINES, AND IT DELETES CLIENT WORK.** `comb_open_rotation`'s `p_closes_at` becomes `default null` and derives `now() + c.cadence` from the comb row the function already selects; an explicit argument is honoured **only when `auth.uid() is null`** (`service_role`, i.e. this function's own advance) and a real session's argument is **ignored, not floored**. Today the parameter is unchecked in the live body (`…0010:66-155`), unconstrained on the column (`…0002:474`), and a past value is not an error but an **immediate void of month 1** (`…0009:129-131`) — the one state `C1` cannot afford to confuse with a quiet month. The client stops computing a timestamp entirely; `DES-29` keeps cadence as a visible choice. Lands here rather than on merged `ENG-93` because **this row already owns every other boundary in the clock** (`closes_at + k·cadence`, the half-cadence floor) and one clock belongs in one ticket. **Gate:** derive-when-omitted (positive) and ignore-an-explicit-past-value as `authenticated` (negative) in ONE fixture, one axis apart | 1.1, **1.7a** |
 | **1.7b** | **Fizz** | **`ENG-100` — the mint's roster hole + empty-snapshot refusal.** NEW (§1B.36.9). **Rides `ENG-94`'s `create or replace` of `comb_open_rotation`; SEPARATE acceptance** — `ENG-94` is titled *subject-gone repoint* and is done when the SUBJECT line is repointed, so the roster requirement dies with it if folded in (§1B.36.9). **Full consolidated acceptance at §1B.36.18 — build from that block, not from the six sections that produced it.** Two lines: (1) the roster snapshot excludes tombstoned CONTRIBUTORS via a general predicate (`not exists … p.deleted_at is not null`), written as the general rule, NOT *"exclude the organizer"*; (2) `get diagnostics` the snapshot's `row_count` and refuse at zero, `using errcode = 'check_violation', constraint = '<name>'` (§1B.36.12/.13/.14). **Month 1 is EXEMPT from §1B.31.3's floor, so the mint is the only place an empty writing roster is observable** — 1.9a's floor does not cover this and cannot. **CLOSED §1B.36.24 — landed on `github/main@52a9733`**, verified independently (50 gates, 0 FAIL, 1,690 assertions, `rev-parse HEAD` confirmed in the same shell). **The near-miss is the part to carry:** the branch was **6 behind `main`** and `…0010`'s `create or replace` of `comb_preview_by_invite_code` was derived from `…0006`'s body, so merging it would have **reverted `ENG-92` Part 6** — reproduced at 18/18 on `main` vs 17/18 on the merge commit. **Standing requirement for every migration on this table: a `create or replace` must be re-derived from the HIGHEST-NUMBERED prior definition at MERGE time, never at authoring time**, and the full suite runs on the merge commit with the per-gate `FAIL` lines read, never `$?` | **1.7a**, and lands in `ENG-94`'s migration |
-| 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
+| 1.9 | **Fizz** | `ENG-60` — the rotation loop: ~~open~~ → notify → collect → seal → reveal. **The `open` half is now row 1.9a**; this row is the client loop. **ACCEPTANCE ADDED §1B.38 — two lines this row now owns that no other row does.** **(1) The COLLECT MOUNT for `RotationFrame`.** Row `1.6` shipped the component into the reveal screen, where its active state cannot fire (subject-scoped, post-send). *"the comb is writing for Sarah — 6 days left"* is a **step of the ratified definition of done**, and it renders only off an **open-rotation** read on the collect surface — that read is this row's. The component takes `subjectName`/`closesAt`/`sealedAt` unchanged; what is missing is the query and the mount. **(2) Ride @Lumen's §1B.38.1 strike:** delete `RotationFrame.js:34-38`'s *"Next month: {organizerName} leads"* block, the `organizerName` prop at `:5`, **and** its pass-through at `PackageOpen.js:494` — a rendered future is licensed only by an existing rotation row, and `getReceivedPackage` carries none. **SCORING CAVEAT: row `1.8` is genuinely partial, so this row can be BUILT and MERGED but cannot be SCORED done against the full sentence** — clause 8 needs the `OPS-9` finisher, which is not this row's to build | 1.1, 1.6, **1.8a**, 1.8, **1.9a** |
 | 1.10 | **Lumen** | `COPY-6` — comb + rotation copy | 1.4 |
 | 1.11 | **Pixel** | `DES-34` — the mascot's sitting motion (Colin `a478c335…`, §1B.5) | — (parallel; **gates nothing**) |
 | 1.12 | **Pixel** | `DES-35` — glass prominence to ≥23% (Colin `a478c335…`, §1B.5). **Material prerequisite merged** — `13cf806` + `cdb07a1` are ancestors of the tip (§1B.7) | — (parallel; **gates nothing**) |
@@ -5999,3 +5999,208 @@ this commit**, per the process invariant — the ruling is not the builder's
 surface. `GUIDES/POLLINATE_V2_DES22_COMB_IDENTITY.md` is @Pixel's file and already
 carries the strike correctly; the two sentences that still need this are §2's
 *"no fifth"* line and §6's fused-single-read framing.
+
+---
+
+### §1B.38 — Two merges landed correct code and closed neither row. `OPS-9`'s deferral premise **expired one commit before its own merge**, and `DES-33` shipped a component whose ruled state **cannot render on its only mount** (2026-08-31)
+
+All of the below verified by me at `github/main@5d4a2ff`, `git rev-parse` confirmed
+in the same shell. Neither merge is wrong as code. Both are wrong as *status*, and
+in this thread three separate statements — @Lumen's *"the critical path's first leg
+is complete"*, @Fizz's *"1.1, 1.6, 1.8a, 1.8, 1.9a all done"*, and my own "first
+leg" framing that seeded both — now say something the rows themselves deny.
+
+#### 1. Row `1.8` (`OPS-9`) is still **partial**, and its stated reason for shipping half was false by merge time
+
+`20260830000012_ops9_rotation_scheduler.sql:157-171` is the entire loop body:
+
+```sql
+loop
+  begin
+    perform public.seal_and_send_rotation(r.id);
+  exception when others then
+    raise warning 'advance_due_rotations: rotation % failed: %', r.id, sqlerrm;
+  end;
+end loop;
+```
+
+There is no `comb_advance_rotation` call. Row `1.8`'s own text still reads *"the row
+is **partial, not done**, until the tick resolves then advances in one pass."*
+Nobody edited it. The row is the only one of the four claims that is right.
+
+**The finding is the deferral's premise.** The migration header at `:26-29`
+justifies the half-merge: *"comb_advance_rotation doesn't exist on main yet —
+calling an unbuilt function would be worse than an honest gap."* That was true at
+Bumble's base. `git merge-base --is-ancestor 6d2d3b0 182b9f6` returns **true** —
+`…0011_eng60_comb_advance_rotation.sql` (row `1.9a`) was on `main` **one commit
+before** `OPS-9` merged. The blocker the deferral was built around was already gone
+when the deferral landed.
+
+**This is §1B.36.13's shape with a different operand.** That rule says a fix which
+*names its class* freezes the class at the author's base commit. Here it is the
+*reason* that froze — a deferral is an argument about the world, and an argument
+written at a base commit has the same expiry as an enumeration written there.
+**Standing rule: a deferral's premise is re-derived at MERGE time, not at authoring
+time.** A stale enumeration ships a partial fix; a stale premise ships a *whole*
+deferral that nothing needed.
+
+`…0011:258` confirms the contract the header depends on, so the finisher is not
+blocked on anything else: `if v_enrollable_count < 2 then` returns **null, quietly,
+raising nothing**. Dormancy will not spam the tick log every five minutes.
+
+**Also missing, and it is mine.** §1B.36.19 moved the CLOCK-BOUNDARY pair onto this
+row — row 2 (floor intact → **no** matching warning) and row 3 (floor stripped →
+warning matches, **the positive control**) — precisely because `1.9a`'s gate could
+not run them. Neither is in `check-ops9-rotation-scheduler.mjs`. The gate header at
+`:14-32` enumerates what it proves and carries no advance row; the only
+`warnings.some` is the seal block's own control at `:389`. **I moved an undeletable
+pair onto a row and the row merged without it** — §1B.36.21's lesson firing in the
+direction I did not check. §1B.36.21 asked what the *source* ticket still proves; it
+did not ask what happens when the *destination* ticket merges before the assertion
+does. **A relocated assertion is only as safe as the destination row's own
+completion, and a row that can merge partially can merge without it.**
+
+Merge-time requirement (i) from §1B.36.24 **is** satisfied — `advance_due_rotations()`
+sits at `check-share-visibility.mjs:421` with `roles: ['service_role']`. (ii)'s
+renumber is spent (`…0012`). Only the second block and its two gate rows remain.
+
+**Consequence, unchanged from §1B.31 and now marked green anyway:** a comb ends
+after one month, `C1` and `C3` cannot be measured, and step 8 of the ratified
+definition of done — *"and do it again next month for someone else"* — has no
+server path.
+
+#### 2. Row `1.6` (`DES-33`) merged a correct component into a screen where its ruled state cannot fire
+
+`RotationFrame.js` is good code and @Sage's rebase-and-PR call was right. Three
+defects, all at the **mount**, none in the component.
+
+**(a) The props have no producer.** Whole tree, five sites, all reads:
+
+```
+$ git grep -n "rotationSubjectName\|rotationClosesAt\|rotationOrganizerName\|rotationSealedAt" github/main -- src/
+src/screens/PackageOpen.js:491,493,494,495,496
+```
+
+`HiveStore.getReceivedPackage` (`:546-591`) returns `id, subjectName, coverTheme,
+sentAt, senderName, isCollective, writerCount, contributorNames, entries` — **no
+`rotation*` field**. So `pkg.rotationSubjectName` is `undefined`, the ternary at
+`PackageOpen.js:491` always takes the `From {senderName}` branch, and
+`RotationFrame` is **unreachable on `main`**. One mount point in the tree; no gate
+references it. This is §1B.36-era "a sweep proves nothing until you check the
+PRODUCER", arriving at a component instead of a scheduler.
+
+**(b) The larger one — even with a producer, the ACTIVE state can never render
+there.** `getReceivedPackage`'s query is
+`.eq('subject_profile_id', subjectId).not('sent_at', 'is', null)` — subject-scoped
+and **post-send by construction**. Any rotation that reaches that screen has already
+been sealed, so `sealedAt` is always non-null, so `isSealed` is always `true`. The
+branch rendering **"Writing for {subjectName}" / "N days left"** — *the exact string
+in Colin's ratified definition of done* — is dead on its only mount, along with the
+whole `setInterval` countdown at `RotationFrame.js:9-22`.
+
+**Row `1.6` closed the component; it did not close the step.** The active line
+belongs on the **collect** surface — the `(g)` header state-line slot — fed by an
+open-rotation read. That is row `1.9` (@Fizz) or row `1.4` (@Pixel), not the reveal
+screen's.
+
+**(c) A copy claim the advance policy contradicts.** The sealed branch renders
+*"Next month: {organizerName} leads."* `comb_advance_rotation` selects the next
+subject as the enrollable member with the next-larger `joined_at`, wrapping to the
+earliest (`…0011:292-315`). **The organizer is next only by coincidence of join
+order.** For most rotations that sentence is false. It is also unratified copy —
+`COPY-6` is row `1.10`, @Lumen's. **(c) IS SUPERSEDED ON ROUTING AND STRENGTHENED ON
+SUBSTANCE BY §1B.38.1: @Lumen rules the sentence STRUCK, not reworded** — the defect
+is not the noun, it is that the surface has no source for any noun, and a copy ticket
+cannot fix a sourcing defect. Read §1B.38.1, not this paragraph, before touching the
+sealed branch.
+
+#### 3. What does NOT change
+
+`1.8`'s gap does not block @Fizz starting `ENG-60`. `notify → collect → seal →
+reveal` is one month; the advance is month two. What changes is the **acceptance**:
+`ENG-60` cannot be scored done against a sentence whose eighth clause has no server
+path, and the *"writing for Sarah — 6 days left"* clause needs a mount `ENG-60` adds,
+not one `1.6` supplied.
+
+#### Scope
+
+Doc-only. **Rows `1.6`, `1.8` and `1.9` amended in this same commit** per the
+§1B.36.26 process invariant — the finder's section is not the builder's surface. The `OPS-9` finisher is @Bumble's and is currently unowned in
+practice — `OPS-8`, `OPS-12` and `LEGAL-2` are all parked on one word from @Colin.
+
+**The transferable rule, third instance tonight:** a merge tells you a diff landed;
+it never tells you a *row* closed. Row `1.8` said "partial" in its own text and
+merged anyway. Row `1.6`'s component merged into a screen its ruled state cannot
+reach. **Score the ratified sentence, not the merge log.**
+
+---
+
+### §1B.38.1 — @Lumen RULES §1B.38(2c): the sealed state renders **no future line** in v1. The strike has **four containers**, and two of them route the replacement copy at a ticket that closed tonight (2026-08-31)
+
+**The ruling (Lumen's, ratified here, effective immediately):** *"Next month:
+{organizerName} leads"* comes **out**, not reworded. Their pin, which I adopt
+verbatim as the reason: **order is a mechanism, not a rendered promise.** A client
+sentence naming next month's writer either reimplements `comb_advance_rotation`'s
+ordering (the R12 adopt-don't-copy violation, §1B.36.10) or promises a schedule the
+tick may change — skips, dormancy, revival. **No softened form survives either
+horn:** *"the comb writes again next month"* is false for a comb that goes dormant
+(`…0011:258` returns null quietly, by design), and the reveal screen's read cannot
+know which. **A rendered future is licensed only by an existing rotation row**, and
+`getReceivedPackage` carries none. When `ENG-60`'s read path lands, `DES-31`'s fold
+may render next month's subject **from the minted row** — adopting the record, never
+the ordering.
+
+This supersedes my §1B.38(2c) framing, which called the sentence *false for most
+rotations* and routed the fix to `COPY-6`. Lumen's is the stronger claim and the
+correct one: the defect is not the noun, it is that **the surface has no source for
+any noun**. A copy ticket cannot fix a sourcing defect — that is §1B.21's own shape
+(*a rendered state names its query*) arriving at a sentence about the future instead
+of a count.
+
+#### The strike's containers — four, not one
+
+Lumen scoped it as *"a strike of the `organizerName` block (`RotationFrame.js:34-37`),
+one small diff."* The block is `:34-38` (the closing `)}` is `:38`), and the sentence
+lives in **four** places, verified at `github/main@5d4a2ff` plus the workspace:
+
+| # | Container | Sites | Disposition |
+|---|---|---|---|
+| 1 | `src/components/RotationFrame.js` | `:34-38` block, **`:5` prop** | strike both — a struck block leaves an unused prop that reads as pending |
+| 2 | `src/screens/PackageOpen.js` | `:494` `organizerName={pkg.rotationOrganizerName}` | strike — the prop's only pass-through |
+| 3 | `MOCKUPS_DES33.md` (**in-repo**, merged `5d4a2ff`) | `:60`, `:74`, `:131` | annotate struck; `:74` reads *"placeholder pending `COPY-13`"* |
+| 4 | `GUIDES/POLLINATE_DES33_ROTATION_FRAME_SPEC.md` (workspace, @Deezine's) | `:130`, `:148`, `:231` | annotate struck; `:148` reads *"Copy is Lumen's via `COPY-13` when this row is built"* |
+
+**Containers 3 and 4 are the finding.** Both flag the line as a *placeholder awaiting
+`COPY-13`*. **`COPY-13` closed tonight** — @Lumen ratified `728eba2`, merged as
+`1ab8e81`, and it produced no such copy because the ruling that arrived is a
+**strike**. So both specs now route a live-looking TODO at a **closed ticket**, and
+the next person to open either one inherits *"this sentence is coming"* when the
+ruling is *"this sentence is gone."* **A strike annotated only in the code leaves
+every spec that specified the code arguing for its return** — same family as
+§1B.36.15 (a rename at a layer boundary breaks the grep that finds the consumer),
+one layer up: here the boundary is **code → spec**, and the grep that finds it is on
+the rendered STRING, not the symbol.
+
+**Standing rule: strike the SENTENCE in every container that specifies it, and when
+a container defers to a ticket, check that ticket is still open.** A deferral
+pointing at a closed ticket is indistinguishable from a deferral pointing at a live
+one — §1B.38's own premise-expiry finding, arriving in prose instead of a migration
+header, on the same night.
+
+#### Scope
+
+Containers 1 and 2 ride **row `1.9`** (@Fizz, amended this commit — the strike is a
+few lines inside a screen he is already editing). Container 3 is in-repo and rides
+the same diff. **Container 4 is @Deezine's workspace file and is NOT mine to edit** —
+flagged to them and to @Lumen; if `DES-33` is re-opened for the collect mount, that
+spec is what the builder reads first.
+
+#### What Lumen also owns, correctly, and I did not catch
+
+Their §1 self-correction is the sharper of the two: every `comb_advance_rotation` in
+`…0012` is a **comment**, including the `perform` at `:28`, and **three of us read a
+grep hit inside a comment as code on one file in one night** — mine included, in the
+`…0012` sweep that produced §1B.38. My §1B.38 reached the right verdict by reading
+the **loop body** (`:157-171`) rather than the grep, which is luck about method, not
+method. **Banked: a grep hit satisfies a reader exactly as well as code until someone
+checks the container** — and `grep -n '^\s*--'` is the whole check.
