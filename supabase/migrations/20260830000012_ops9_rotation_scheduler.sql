@@ -3,11 +3,17 @@
 -- (ENG-58, combs/comb_rotations schema) and 1.8a (ENG-91,
 -- seal_and_send_rotation) -- both merged, github/main@8864a12.
 --
--- RESOLVER HALF ONLY -- Vector's §1B.31/§1B.31.1 (thread f2c15b7d,
+-- FINISHED (Bumble, thread b57ad406, 2026-08-30): the second block below
+-- now calls comb_advance_rotation(r.comb_id). Vector's finding still
+-- stands as the reason it was needed -- the row was genuinely PARTIAL on
+-- main at 5d4a2ff, and the header below is left as the record of why,
+-- not edited into a retroactive "always worked this way."
+--
+-- RESOLVER HALF, ORIGINALLY -- Vector's §1B.31/§1B.31.1 (thread f2c15b7d,
 -- 2026-08-30, committed 1ff0644 then e319f3e on
 -- vector/comb-rotation-strategy): advance_due_rotations() below ends a
--- rotation that has closed; it does not open the comb's next one. Row 1.8
--- is PARTIAL, not done, until the tick also calls the new row 1.9a --
+-- rotation that has closed; it did not open the comb's next one. Row 1.8
+-- was PARTIAL, not done, until the tick also called row 1.9a --
 -- comb_advance_rotation(p_comb_id), Fizz's policy wrapper carved out of
 -- ENG-60: computes the next subject (comb_members by joined_at, wrapping,
 -- skipping removed_at/tombstoned seats and skipping NOBODY else -- a
@@ -154,20 +160,42 @@ set search_path = public, pg_temp
 as $$
 declare
   r record;
+  v_sealed boolean;
 begin
   for r in
-    select id
+    select id, comb_id
     from public.comb_rotations
     where closes_at <= now()
       and sealed_at is null
       and voided_at is null
     order by closes_at
   loop
+    v_sealed := false;
     begin
       perform public.seal_and_send_rotation(r.id);
+      v_sealed := true;
     exception when others then
       raise warning 'advance_due_rotations: rotation % failed: %', r.id, sqlerrm;
     end;
+
+    -- Second, INDEPENDENT subtransaction -- never merged with the seal block
+    -- above. Per §1B.31.2 (thread f2c15b7d, commit 806a33c): a `begin ...
+    -- exception ... end` in PL/pgSQL is a subtransaction, so a raising
+    -- advance inside the SAME block as the seal would roll the seal back --
+    -- sealed_at/sent_at go back to null, the warning is swallowed, and the
+    -- next sweep re-picks the rotation and fails the same way forever. Only
+    -- attempted after a successful seal ("after each successful
+    -- resolution" per this file's own header) -- a rotation whose seal
+    -- itself failed is still open, so calling the advance on it would just
+    -- re-raise the "one open per comb" constraint (23505) as a second,
+    -- redundant warning for the same underlying failure.
+    if v_sealed then
+      begin
+        perform public.comb_advance_rotation(r.comb_id);
+      exception when others then
+        raise warning 'advance_due_rotations: advance for comb % failed: %', r.comb_id, sqlerrm;
+      end;
+    end if;
   end loop;
 end;
 $$;
