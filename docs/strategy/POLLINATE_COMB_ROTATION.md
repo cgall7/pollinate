@@ -30,7 +30,11 @@ part), §17.5.2 (the $39.99 annual-only line), §17.5.3 (the install table),
 durability promise (§17.4), the metering principle (§17.5.2a), the
 money-transmitter guardrails (§5.6 G1–G5), the navigation ruling
 (`POLLINATE_V2_NAVIGATION.md` — **no Wallet tab**, reconfirmed 2026-08-30), or
-19a-before-19b phasing. Slice 1 still ships first.
+19a-before-19b phasing. ~~Slice 1 still ships first.~~ **Retired 2026-08-30,
+same day: §9 retires the "Slice 1 ships first, *then* the comb work"
+sequencing and `O5` closed it — there is ONE release, MVP-Comb (§1A). This
+sentence was left standing when §9 was written; it is the most-read paragraph
+in this document, so it is annotated here rather than only there.**
 
 ---
 
@@ -3332,8 +3336,9 @@ Recorded so no one over-reads this ruling:
   into MVP-Comb (§1A). *Amended 2026-08-30:* the earlier "Slice 1 ships first,
   **then** the comb work" sequencing is retired — shipping a demo of the product
   before the thing that is now the product does not make sense. **There is one
-  release: MVP-Comb.** See open ruling **O5** if a separate earlier demo build
-  is still wanted.
+  release: MVP-Comb.** ~~See open ruling **O5** if a separate earlier demo
+  build is still wanted.~~ **`O5` is CLOSED (`a11aa144…`, §10) — one release;
+  this pointer described it as open and is corrected 2026-08-30.**
 - **§0's positioning amendment** — gratitude is the mechanic, not the category.
 - **The metering principle** (§17.5.2a) — meter the artifact, never the practice,
   never the graph. §3.1 complies: the paid line prices **breadth and size**, and

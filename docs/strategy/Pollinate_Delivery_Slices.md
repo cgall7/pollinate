@@ -3,7 +3,7 @@
 **What changed:** Instead of a single Phase 1 MVP, we're slicing the work into two delivery milestones:
 
 1. **Slice 1: Demo Mode** — Full product works end-to-end for friends & family testing. No paywall. Every feature is free. No money — no payments, no tips (~~wallet is a shell~~ — superseded 2026-08-26: there is no Wallet tab at all; three-tab bar, see `POLLINATE_V2_NAVIGATION.md`). Distributed via TestFlight / internal track. Goal: validate the core loop with real users.
-2. **Slice 2: Public Launch** — After testing validates the loop, ship to App Store / Play Store with the V2 revenue model (`POLLINATE_V2_SPEC.md` §17.5, ruled 2026-08-24): unlimited hives and entries free forever, first delivery free forever, "Pollinate Plus" at $39.99/year (annual only) buying every delivery after the first. The Cash-App-via-iMessage gifting plan is cancelled (V2 §5.7); the money layer is nectar zaps (V2 §5). *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+2. **Slice 2: Public Launch** — After testing validates the loop, ship to App Store / Play Store with the V2 revenue model (`POLLINATE_V2_SPEC.md` §17.5, ruled 2026-08-24): unlimited hives and entries free forever, first delivery free forever, "Pollinate Plus" at $39.99/year (annual only) buying every delivery after the first. The Cash-App-via-iMessage gifting plan is cancelled (V2 §5.7); the money layer is nectar zaps (V2 §5). *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 
 > ### **Amendment, 2026-08-30 (Colin, #Strategy, event `cf648e7f…`): MVP-Comb supersedes the MVP1/MVP2 split below for scope purposes.**
 >
@@ -355,7 +355,7 @@
 
 > **Monetization model (re-ruled 2026-08-24 — V2 §17.5 governs; the PRD-v3.1 model that stood here is superseded):**
 >
-> - ~~**Freemium subscription, metered at delivery.** "Pollinate Plus" at **$39.99/year, annual only**.~~ **Superseded 2026-08-30: the paid line is a comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free (`POLLINATE_COMB_ROTATION.md` §4.1). Open ruling O1: whether individual Plus survives alongside it.
+> - ~~**Freemium subscription, metered at delivery.** "Pollinate Plus" at **$39.99/year, annual only**.~~ **Superseded 2026-08-30: the paid line is the per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — price deliberately unruled until `C1` and `C5` return (`POLLINATE_COMB_ROTATION.md` §3/§4, `O4`). `O1` is closed: individual Plus does not survive as a separate line.
 > - **Free tier:** Unlimited hives and entries forever; first delivery free forever; export free forever (V2 §17.4); receive unlimited. Sealing unconditional on every tier. Cadence, friends and seeds ungated everywhere (V2 §17.5.2a — delivery is the only meter; seeds abuse-rate-limited, not priced).
 > - **Paid tier (Pollinate Plus):** Every delivery after the first. Second-order lines (gifted subscription, family/comb plan, legacy tier) are Slice 3 — V2 §17.5.4.
 > - **Nectar zaps (replaces Cash App gifting, V2 §5.7):** self-custodial, 100% to receiver, free on every tier, never revenue. Pollinate is NOT a money transmitter (V2 §5.6).
@@ -442,7 +442,7 @@
 | Timeline      | 3–4 weeks build, then public launch                                       |
 | Critical path | 15.4 (iMessage/share integration), 12.1 (Subscription engine), 12.5 (Feature gating) |
 | Distribution  | App Store + Play Store (public)                                           |
-| Monetization  | Freemium per V2 §17.5: writing free forever, first delivery free forever, Pollinate Plus $39.99/yr (annual only) for later deliveries. Nectar zaps replace Cash App gifting (V2 §5.7; not a money transmitter, V2 §5.6). | *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+| Monetization  | Freemium per V2 §17.5: writing free forever, first delivery free forever, Pollinate Plus $39.99/yr (annual only) for later deliveries. Nectar zaps replace Cash App gifting (V2 §5.7; not a money transmitter, V2 §5.6). | *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 | Success gate  | The reveal→signup rate (V2 §17.5.3 — `ENG-78` instruments it first); free→paid conversion target 4% |
 
 
