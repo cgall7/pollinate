@@ -31,8 +31,7 @@ check(
 
 check(
   'chapters are sealed rotations only, never voided rows',
-  /\.filter\(\(row\) => row\.sealed_at != null\)/.test(hiveStore) &&
-    !/\.filter\(\(row\) => row\.sealed_at != null \|\| row\.voided_at != null\)/.test(hiveStore)
+  /\.filter\(\(row\) => row\.sealed_at != null && row\.voided_at == null\)/.test(hiveStore)
 );
 
 check(
@@ -99,12 +98,28 @@ check('package exposes the DES-39 check script', /"check:des39-organizer-comb": 
 
 const placeholderValues = new Set(['', 'New user', null, undefined]);
 const fixtureChapterSubjectName = (name) => (placeholderValues.has(name ?? '') ? 'someone' : name);
+const fixtureChapterRows = [
+  { id: 'sealed-delivered', sealed_at: '2026-08-31T12:00:00Z', voided_at: null },
+  { id: 'sealed-voided', sealed_at: '2026-08-31T12:00:00Z', voided_at: '2026-08-31T12:00:00Z' },
+  { id: 'open', sealed_at: null, voided_at: null },
+];
+const fixtureChapterIds = fixtureChapterRows
+  .filter((row) => row.sealed_at != null && row.voided_at == null)
+  .map((row) => row.id);
 
 check(
   'chapter placeholder fixtures render generic subject copy',
   fixtureChapterSubjectName('') === 'someone' &&
     fixtureChapterSubjectName('New user') === 'someone' &&
     fixtureChapterSubjectName('Maya') === 'Maya'
+);
+
+check(
+  'chapter terminal fixtures include delivered only',
+  fixtureChapterIds.length === 1 &&
+    fixtureChapterIds[0] === 'sealed-delivered' &&
+    !fixtureChapterIds.includes('sealed-voided') &&
+    !fixtureChapterIds.includes('open')
 );
 
 let failed = 0;
