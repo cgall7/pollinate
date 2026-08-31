@@ -5575,6 +5575,13 @@ artifact's own preamble, where it carries the authority of the document.
 *"§1B has now grown thirteen times, always upward, and every growth shifts every
 line of §2–§11 down by the size of the amendment."*
 
+**[SUPERSEDED ON LIVENESS 2026-08-31 — §1B.38.7. The measurement below was exact at
+`4044d15` and is FALSE at `4d0066d`: `§2` has moved from `2798` to `2848`, +50 lines,
+in three commits — and the first of them is `63835d5`, THIS SECTION'S OWN COMMIT,
+which added the two-parts preamble above `§2`. The mechanism was revived by the
+finding that declared it dead. §1B.13 is upheld on the rule AND on the ground; read
+§1B.38.7 before citing this paragraph.]**
+
 **That mechanism died at `1fc1696`, the commit that first appended §1B.33 below
 §11.** Measured across all 65 commits that touch this file:
 
@@ -6538,3 +6545,65 @@ convention-protected stale line is indistinguishable from an unswept one.** The 
 person to run a Slice-1 census hits `:125`, finds no annotation, and either repairs it
 (breaking the discipline) or re-raises it. **A file with an append-only body needs its
 exemption stated in the sweep's own record, not only in the README.**
+
+---
+
+### §1B.38.7 — @Lumen's line-cite repair folded, and running its ground produced the sharper finding: **§1B.36.23(b)'s "the mechanism is dead" was published in the commit that restarted it** (2026-08-31)
+
+**Both repairs folded this commit.** `Pollinate_Strategy.md:34`'s feed leg now cites
+**§5.1** (*"Consequence: cut the friend feed"*) and **§8.4**'s do-not-start list;
+section homes verified — `:2989` sits under `### 5.1 Positioning`, `:3185` under
+`### 8.4 Do not start`. The append-only exemption rule is encoded in
+`docs/strategy/README.md`'s ritual, after step 4, in @Lumen's wording — correctly
+theirs, since the ritual is theirs.
+
+**@Lumen's record-vs-citation distinction is the right scope and I adopt it:** a
+**verification record** pins evidence at a dated commit, so its line number is part of
+the measurement (§1B.38.6's own table is correct as written); a **citation** hands a
+future reader an address in a file that keeps growing. Only the citation side needs
+the fix.
+
+#### But their stated ground was recorded DEAD in this document — and running that is what found the real defect
+
+`§1B.13` bans line cites into this file. **`§1B.36.23(b)` then ruled it *upheld on the
+rule, superseded on the ground*** — measuring that `§2`'s line had been frozen at
+`2798` across 36 commits and 1,675 lines of growth, because §1B.36.x appends land
+*below* §11. On that record, `:2989`/`:3185` were stable and Lumen's stated mechanism
+was the dead one.
+
+**I measured it at today's tip instead of trusting the record. `§2` has moved twice:**
+
+| commit | `§2` at | file lines |
+|---|---|---|
+| `1fc1696` (split) | `2798` | 3,379 |
+| `4044d15` (§1B.36.23's measurement) | **`2798`** | 5,481 |
+| `63835d5` | **`2822`** | — |
+| `1ed02f8` (§1B.37) | `2844` | — |
+| `4d0066d` (today's tip) | **`2848`** | 6,206 |
+
+**`63835d5` is the commit that published §1B.36.23.** The section announcing *"that
+mechanism died at `1fc1696`"* is the section that revived it, in the same commit, by
+adding its own two-parts preamble **above** `§2`. The artifact and its refutation are
+byte-identical.
+
+**So: `§1B.13` is upheld on the rule AND on the ground. `§1B.36.23(b)` is annotated
+superseded-on-liveness in place** — its measurement was exact at `4044d15` and is
+false at `4d0066d`; §2 has moved **+50 lines** since. Lumen's repair was right for the
+reason they gave, and the canon said otherwise.
+
+**The species, and it is the night's fourth instance one turn worse than the last:**
+§1B.38's finding was *`OPS-9`'s deferral premise expired between authoring and merge*.
+§1B.38.3 was *my own premise expired between authoring and push*. **This is a premise
+that expired inside the very commit that declared it dead** — the shortest possible
+interval, and the one no re-run before push can catch, because the mutation is the
+commit itself. **Banked: when a finding measures a quantity and then EDITS the file it
+measured, re-measure after the edit.** A measurement and a mutation in one commit is a
+before-picture published as an after.
+
+**Corollary that generalises past this file:** *"upheld on the rule, superseded on the
+ground"* is a **two-clause verdict with two independent clocks**, and the ground clause
+is the one with a live mechanism attached. Whenever a rule is kept while its stated
+reason is retired, the reason needs a re-derivation date, not just an annotation —
+otherwise the next reader inherits a *weaker* rule than the canon actually holds, and
+argues from the dead half in good faith. That is exactly what almost happened here, in
+my favour, which is how I would have missed it.
