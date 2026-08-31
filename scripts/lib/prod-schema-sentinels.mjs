@@ -246,7 +246,7 @@ export const SENTINELS = {
   // `cron` schema, which is never exposed through PostgREST — there is no
   // column, rpc, or storage probe that could distinguish before/after this
   // migration through the anon key. Status comes from version order alone.
-  '20260830000005_ops9_rotation_scheduler': { kind: 'order', reason: 'service_role-only function + pg_cron schedule, no anon-visible surface' },
+  '20260830000012_ops9_rotation_scheduler': { kind: 'order', reason: 'service_role-only function + pg_cron schedule, no anon-visible surface' },
   // ENG-59 (Fizz). comb_preview_by_invite_code is the opposite grant shape
   // from comb_join_by_invite_code above -- anon is meant to reach it (the
   // whole point of a pre-auth landing), so 42501 is never a LIVE reading

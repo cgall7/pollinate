@@ -1,5 +1,5 @@
 // Gate for OPS-9's rotation-sweep function
-// (supabase/migrations/20260830000005_ops9_rotation_scheduler.sql).
+// (supabase/migrations/20260830000012_ops9_rotation_scheduler.sql).
 //
 //   npm run check:ops9-rotation-scheduler
 //
