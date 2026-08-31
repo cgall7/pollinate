@@ -71,6 +71,12 @@ const SUBJECT2 = '77777777-7777-7777-7777-777777777777';
 const CONTRIBUTOR2 = '88888888-8888-8888-8888-888888888888';
 const SUBJECT_BROKEN = '99999999-9999-9999-9999-999999999998';
 const CONTRIBUTOR_BROKEN = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const OWNER3 = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+const SUBJECT3 = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+const CONTRIBUTOR3 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+const OWNER4 = 'ffffffff-ffff-ffff-ffff-fffffffffffe';
+const SUBJECT4 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const CONTRIBUTOR4 = 'cbcbcbcb-cbcb-cbcb-cbcb-cbcbcbcbcbcb';
 
 let pass = 0;
 const failures = [];
@@ -169,7 +175,8 @@ async function main() {
     }
 
     await client.query(
-      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12), ($13, $14), ($15, $16)',
+      'insert into auth.users (id, raw_user_meta_data) values ' +
+        Array.from({ length: 14 }, (_, i) => `($${2 * i + 1}, $${2 * i + 2})`).join(', '),
       [
         OWNER, JSON.stringify({ display_name: 'Owner' }),
         SUBJECT, JSON.stringify({ display_name: 'Subject' }),
@@ -179,6 +186,12 @@ async function main() {
         CONTRIBUTOR2, JSON.stringify({ display_name: 'Contributor Two' }),
         SUBJECT_BROKEN, JSON.stringify({ display_name: 'Subject Broken' }),
         CONTRIBUTOR_BROKEN, JSON.stringify({ display_name: 'Contributor Broken' }),
+        OWNER3, JSON.stringify({ display_name: 'Owner Three' }),
+        SUBJECT3, JSON.stringify({ display_name: 'Subject Three' }),
+        CONTRIBUTOR3, JSON.stringify({ display_name: 'Contributor Three' }),
+        OWNER4, JSON.stringify({ display_name: 'Owner Four' }),
+        SUBJECT4, JSON.stringify({ display_name: 'Subject Four' }),
+        CONTRIBUTOR4, JSON.stringify({ display_name: 'Contributor Four' }),
       ]
     );
 
@@ -398,7 +411,126 @@ async function main() {
     }
 
     // ---------------------------------------------------------------
-    // 6. Grant boundary: not callable as authenticated or anon.
+    // 6/7. §1B.36.19's clock-boundary pair, moved onto this row's own
+    // acceptance because it could not run at 1.9a's landing --
+    // advance_due_rotations() didn't call comb_advance_rotation yet.
+    // UNDELETABLE PAIR: row 7 (floor stripped) is the only thing that
+    // distinguishes "the floor held" from "nothing happened" -- row 6
+    // alone is green on a tick that never advances at all, or on a
+    // notice hook that was never attached.
+    //
+    // What "floor stripped" can and can't mean here, spelled out because
+    // it isn't obvious from the ticket text: ENG-100's empty-roster
+    // check_violation cannot be reached through a GENUINE call to
+    // comb_advance_rotation today. Its own >=2-enrollable guard draws the
+    // next subject from the exact same predicate the mint's roster
+    // snapshot excludes that subject FROM (adopt-don't-copy, §1B.36.10)
+    // -- so roster size is always enrollable_count - 1 >= 1 whenever the
+    // guard lets the mint proceed. That coupling is correct and is what
+    // this pair is really protecting: if a future migration ever edits
+    // one predicate without the other, the floor becomes reachable again
+    // and this row is what would need to catch it -- but there is no
+    // real DATA STATE to construct against the CURRENT, correctly-coupled
+    // code. So row 7 proves the narrower, still-real claim: the TICK
+    // converts a raise from inside comb_advance_rotation's call chain
+    // into a warning carrying sqlerrm, rather than swallowing it --
+    // by temporarily replacing comb_advance_rotation with a stub that
+    // raises ENG-100's exact exception, running the real tick against
+    // it, then restoring the genuine function from its own
+    // pg_get_functiondef() capture. Same "reach an otherwise-unreachable
+    // branch by direct manipulation" idiom section 5 above already uses
+    // on hive_volumes, one call-boundary further in.
+    const floorIntact = await mintRotation({ owner: OWNER3, subject: SUBJECT3, contributors: [CONTRIBUTOR3] });
+    warnings.length = 0;
+    await asService(() => client.query('select public.advance_due_rotations()'));
+    {
+      const surfaced = warnings.some((w) => /no enrollable contributors/.test(w));
+      if (!surfaced) {
+        ok('clock boundary: floor intact -- a healthy advance raises no floor-violation warning');
+      } else {
+        bad('clock boundary: floor intact -- a healthy advance raises no floor-violation warning', JSON.stringify(warnings));
+      }
+    }
+    {
+      // A tick that silently did nothing would also pass the assertion
+      // above for the wrong reason (§1B.36.11's own point about the
+      // no-warning row) -- confirm the comb actually gained a second,
+      // open rotation.
+      const { rows } = await client.query(
+        'select count(*)::int as n from public.comb_rotations where comb_id = $1',
+        [floorIntact.combId]
+      );
+      if (rows[0].n === 2) {
+        ok('clock boundary: floor intact -- the advance actually minted a second rotation, not a silent no-op');
+      } else {
+        bad(
+          'clock boundary: floor intact -- the advance actually minted a second rotation, not a silent no-op',
+          `rotations for comb: ${rows[0].n}`
+        );
+      }
+    }
+
+    const { rows: defRows } = await asPostgres(() =>
+      client.query("select pg_get_functiondef('public.comb_advance_rotation(uuid)'::regprocedure) as def")
+    );
+    const realCombAdvanceRotationDef = defRows[0].def;
+    await asPostgres(() =>
+      client.query(`
+        create or replace function public.comb_advance_rotation(p_comb_id uuid)
+        returns uuid
+        language plpgsql
+        security definer
+        set search_path = public, pg_temp
+        as $stub$
+        begin
+          raise exception 'comb_open_rotation: no enrollable contributors for this rotation'
+            using errcode = 'check_violation', constraint = 'comb_open_rotation_enrollable_floor';
+        end;
+        $stub$;
+      `)
+    );
+    try {
+      const floorStripped = await mintRotation({ owner: OWNER4, subject: SUBJECT4, contributors: [CONTRIBUTOR4] });
+      const floorStrippedVolume = await volumeIdFor(floorStripped.hiveId);
+      await asUser(CONTRIBUTOR4, () =>
+        client.query(
+          "insert into public.entries (user_id, hive_id, volume_id, content, entry_date) values ($1, $2, $3, 'For Subject Four', current_date)",
+          [CONTRIBUTOR4, floorStripped.hiveId, floorStrippedVolume]
+        )
+      );
+      warnings.length = 0;
+      await asService(() => client.query('select public.advance_due_rotations()'));
+      {
+        const surfaced = warnings.some(
+          (w) => /advance_due_rotations: advance for comb/.test(w) && /no enrollable contributors/.test(w)
+        );
+        if (surfaced) {
+          ok('clock boundary: floor stripped -- the tick surfaces it as a WARNING with sqlerrm (the positive control)');
+        } else {
+          bad(
+            'clock boundary: floor stripped -- the tick surfaces it as a WARNING with sqlerrm (the positive control)',
+            `captured notices: ${JSON.stringify(warnings)}`
+          );
+        }
+      }
+      {
+        // The stub raised AFTER seal_and_send_rotation already committed
+        // -- the seal must survive regardless, proving the two
+        // begin/exception blocks are separate subtransactions (§1B.31.2),
+        // not just separately worded.
+        const r = await rotationState(floorStripped.rotationId);
+        if (r.sealed_at && r.sent_at && !r.voided_at) {
+          ok('clock boundary: floor stripped -- the seal still committed even though the advance raised');
+        } else {
+          bad('clock boundary: floor stripped -- the seal still committed even though the advance raised', JSON.stringify(r));
+        }
+      }
+    } finally {
+      await asPostgres(() => client.query(realCombAdvanceRotationDef));
+    }
+
+    // ---------------------------------------------------------------
+    // 8. Grant boundary: not callable as authenticated or anon.
     try {
       await asUser(OWNER, () => client.query('select public.advance_due_rotations()'));
       bad('grant boundary: authenticated cannot call advance_due_rotations', 'call succeeded');
