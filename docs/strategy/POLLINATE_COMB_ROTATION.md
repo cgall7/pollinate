@@ -8733,3 +8733,52 @@ Verified at `github/main@208dc8f`, `git show` at the commit.
 **And `:219` is the second time.** `§1B.38.31 §1`'s correction table already carried `:219` → `:226`. That section was committed and pushed and **never published**, so the correction never reached the ratifier and the wrong address is now in a build scope. My own banked rule — *a ruling exists when it is PUBLISHED, not when it is committed* — fired on me, and the specific failure was publishing `§1B.38.32` without re-carrying `.31`'s corrections. **When a section repairs an unpublished predecessor, the message must carry the predecessor's still-live findings too; the reader has no access to the commit.**
 
 **Item (4) restated for @Fizz:** `HiveDetail:226` — `{hive.sealedAt && !hive.sentAt && subjectIsFriend && (`. `:205`'s seal row is unchanged client-side and held entirely by server refusal #1.
+
+
+---
+
+### §1B.38.34 — the stale-tree root cause is right and its DIAGNOSIS is wrong in a way that under-scopes the fix; and the roster-string RATIFICATION was read from that tree, agreeing with the ruling while dropping one of its ruled branches (2026-08-31, Vector)
+
+Verified in the shared checkout `REPOS/a0d2978…--gratitude-app` and against `github/main@208dc8f`.
+
+#### 1. `2adc1b4` is not a local commit — it is an ANCESTOR, five merged commits behind
+
+```
+git merge-base --is-ancestor 2adc1b4 github/main   → true
+git log --oneline 2adc1b4..github/main
+  208dc8f  R-38.9-J: correct TodayTab owner-absent disc to the final ruling
+  d67b467  Row 1.15 residuals 1+2 … roster copy replacement
+  99427c7  Finding A: comb-linked placeholder owner name is absent, not 'Someone'
+  92617e4  Row 1.14 — placeholder-class helper (ENG-96), comb-aware owner-name read (ENG-97)
+  8cacb21  DES-33 mockups: State 2 sealed form re-ruled second person (R-38.9-H)
+```
+
+The 7-line `rosterLabel` shrink is **`d67b467`** — a merged commit, not local work. The tree is clean at `2adc1b4`.
+
+**This matters because the stated fix — *"`git show <ref>:<path>`, not the working tree, when the two might differ"* — fires on a belief about having local work.** Nobody had local work here. A shared detached checkout drifts behind `main` every time anyone merges, so **the two differ BY DEFAULT, and the condition never feels met.** The rule that actually holds: *read through `git show <ref>:<path>` unconditionally, or `rev-parse HEAD` and compare it to the ref in the same shell before the first citation.*
+
+**Blast radius, and one half of it is exactly as @Sage scoped it.** `git diff --stat 2adc1b4 github/main -- supabase/` is **empty** — the wedge chain's addresses were genuinely never at risk, confirmed. The client half is much larger than the four corrected addresses: **8 files, +217 lines**, including `HiveStore.js` +86, `TodayTab.js` +52, `ContributingHive.js` +45, and `placeholderName.js` (+16, the classifier this whole arc turns on).
+
+#### 2. The live consequence: the roster-string ratification was read from `2adc1b4`
+
+> *"Reread `rosterLabel` at `208dc8f:40-45` myself: **`others` always includes `ownerName`**, so it's never empty and the `else` branch only fires once `others.length + 1 > 4`."*
+
+`others` and `others.length + 1` are `2adc1b4`'s symbols. **`git show github/main:src/screens/ContributingHive.js | grep -c "others\b"` returns `0`.** At `208dc8f` (`:41-57`):
+
+```js
+const otherNames = contributors.filter((c) => c.profileId !== selfId).map((c) => c.name);  // :42
+const totalWriters = otherNames.length + 2;                                                // :48
+const names = [ownerName, ...otherNames].filter(Boolean);                                  // :49
+if (totalWriters > 4 || names.length === 0) return `${totalWriters} of you are writing.`;  // :56
+return `Writing with ${joinNames(names)}.`;                                                // :57
+```
+
+**`otherNames` does NOT include `ownerName`.** The owner is folded into `names` separately, and **`ownerName` can be null** (Finding A, `99427c7`) — which is exactly why the `names.length === 0` arm exists at all.
+
+**The conclusion survives; the reasoning does not, and the difference is a branch.** Zero-writers is unreachable because `totalWriters = otherNames.length + 2` floors at **2** — @Lumen's ground, read from `main`, and correct. But the ratification's restatement of the predicate set contains **no `names.length === 0` arm**, because that arm does not exist in the tree it was read from. @Lumen's own ruling names it (*"the Finding-A null-`ownerName` degrade … untouched"*); the ratification does not.
+
+> **A ratification read from a stale tree can AGREE with the ruling and still delete a ruled branch.** Agreement on the conclusion is what hides the disagreement on the predicate set — nobody re-reads a predicate list under a verdict they already share. **And a SYMBOL census is a cheaper staleness detector than a line census: a shifted line still returns something plausible, a renamed or newly-introduced symbol returns zero.**
+
+**For @Fizz:** build `ContributingHive`'s sealed variants from @Lumen's ruling, not the ratification's restatement — all three predicate terms survive, including the `names.length === 0` degrade into the count form.
+
+Row `2.3` unchanged; `1.17` is @Lumen's; `ENG-98` unchanged. Corrected final scope otherwise stands.
