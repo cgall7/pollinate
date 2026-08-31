@@ -22,7 +22,16 @@ const app = read('App.js');
 const today = read('src/screens/TodayTab.js');
 const contributing = read('src/screens/ContributingHive.js');
 const rotationFrame = read('src/components/RotationFrame.js');
+const packageOpen = read('src/screens/PackageOpen.js');
 const useDaysLeft = read('src/components/useDaysLeft.js');
+const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+const rotationFrameCode = stripComments(rotationFrame);
+const walkSrc = (dir) =>
+  fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+    const rel = path.join(dir, entry.name);
+    if (entry.isDirectory()) return walkSrc(rel);
+    return /\.(js|jsx|ts|tsx)$/.test(entry.name) ? [rel] : [];
+  });
 
 if (!exists('src/screens/CombCollect.js') && !/CombCollect/.test(app)) {
   ok('C1 no standalone CombCollect screen or navigator route');
@@ -71,19 +80,39 @@ if (/navigation\.navigate\('ComposeHiveEntry', \{ hiveId, subjectName: hive\.sub
   bad('C7 compose CTA', 'expected existing ContributingHive CTA to route with the same hiveId');
 }
 
+const rotationFrameHasNoProps = /export const RotationFrame = \(\) =>/.test(rotationFrameCode);
+const rotationFrameHasSealedConstant = /Written for you/.test(rotationFrameCode);
+const rotationFrameStruckActiveCopy = !/Writing for|You received|subjectName|closesAt|sealedAt|useDaysLeft/.test(rotationFrameCode);
+const packageOpenNoPropCall = /<RotationFrame \/>/.test(packageOpen) && !/<RotationFrame[\s\S]*?(subjectName|closesAt|sealedAt)=/.test(packageOpen);
+
+if (rotationFrameHasNoProps && rotationFrameHasSealedConstant && rotationFrameStruckActiveCopy && packageOpenNoPropCall) {
+  ok('C8 RotationFrame is sealed-only and PackageOpen calls it with no props');
+} else {
+  bad(
+    'C8 RotationFrame strike',
+    `no-props=${rotationFrameHasNoProps}, sealed constant=${rotationFrameHasSealedConstant}, active/prop tokens absent=${rotationFrameStruckActiveCopy}, PackageOpen call=${packageOpenNoPropCall}`
+  );
+}
+
+const srcMath = walkSrc('src')
+  .map((rel) => [rel, read(rel)])
+  .filter(([rel]) => rel !== 'src/components/useDaysLeft.js')
+  .filter(([, body]) => /closesAt[\s\S]{0,200}(Math\.ceil|1000 \* 60 \* 60 \* 24)|(Math\.ceil|1000 \* 60 \* 60 \* 24)[\s\S]{0,200}closesAt/.test(body));
+
 if (
   /export const daysUntil/.test(useDaysLeft) &&
   /export const useDaysLeft/.test(useDaysLeft) &&
   /useDaysLeft/.test(today) &&
   /useDaysLeft/.test(contributing) &&
-  /useDaysLeft/.test(rotationFrame) &&
-  !/Math\.ceil/.test(rotationFrame) &&
-  !/Math\.ceil/.test(today) &&
-  !/Math\.ceil/.test(contributing)
+  !/useDaysLeft/.test(rotationFrame) &&
+  srcMath.length === 0
 ) {
-  ok('C8 days-left math uses the shared hook only');
+  ok('C9 days-left math uses the shared hook only across production src/');
 } else {
-  bad('C8 single-clock invariant', 'expected shared useDaysLeft and no local Math.ceil day math in touched renderers');
+  bad(
+    'C9 single-clock invariant',
+    `useDaysLeft exports=${/export const daysUntil/.test(useDaysLeft) && /export const useDaysLeft/.test(useDaysLeft)}, Today uses hook=${/useDaysLeft/.test(today)}, ContributingHive uses hook=${/useDaysLeft/.test(contributing)}, RotationFrame avoids hook=${!/useDaysLeft/.test(rotationFrame)}, local src day math=${srcMath.map(([rel]) => rel).join(', ') || 'none'}`
+  );
 }
 
 console.log(`\ncheck-comb-collect: ${pass} passed, ${failures.length} failed`);
