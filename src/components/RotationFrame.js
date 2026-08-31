@@ -10,7 +10,8 @@ export const RotationFrame = ({ subjectName, organizerName, closesAt, sealedAt }
 
     const updateDays = () => {
       const now = Date.now();
-      const msRemaining = closesAt - now;
+      const closesAtMs = typeof closesAt === 'string' ? new Date(closesAt).getTime() : closesAt;
+      const msRemaining = closesAtMs - now;
       const days = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
       setDaysRemaining(Math.max(0, days));
     };
