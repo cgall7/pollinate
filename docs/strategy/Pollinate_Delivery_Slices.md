@@ -583,8 +583,10 @@ Slice 1 → store transition, not in Slice 2:**
   Store **5.1.1(v)** is a hard rejection for any app with account creation.
 - `OPS-8` — **close the analytics contradiction before the privacy policy
   publishes.** `src/constants/legalCopy.js:159,207` currently promises no
-  analytics will ever exist, which permanently forecloses the four conditions
-  the business rests on. V2 §20.2 has the fix: narrow the promise, do not delete it.
+  analytics will ever exist, which permanently forecloses the ~~four~~ **five**
+  conditions the business rests on *(corrected 2026-08-31 — `C1`–`C5`;
+  `POLLINATE_COMB_ROTATION.md` §6 and its own `:92` both say five. Third site
+  in this class today, with Strategy `:412` and `:419`)*. V2 §20.2 has the fix: narrow the promise, do not delete it.
 
 Also still owed and still unbuilt: **digital export** (§17.4's durability
 promise — no `expo-print` / `expo-sharing` in `package.json`). Physical printing
