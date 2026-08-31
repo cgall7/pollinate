@@ -305,4 +305,17 @@ export const SENTINELS = {
   // departed/tombstoned subject to observe, which no anon calibration probe
   // can construct. Same class as `...0009` above.
   '20260830000010_eng94_repoint_subject_gone': { kind: 'order', reason: 'comb_open_rotation and comb_preview_by_invite_code body replace only; grants unchanged for both' },
+  // ENG-60, row 1.9a (Fizz). comb_advance_rotation(uuid) is the same grant
+  // shape as comb_open_rotation above, one step narrower: revoked from
+  // anon in the same migration that creates it, and granted ONLY to
+  // service_role (not authenticated either — see the migration header).
+  // Anon's denial is the only state this function has ever been in, so
+  // 42501 is what "this migration landed" looks like from outside, same
+  // reasoning as ENG-93's row.
+  '20260830000011_eng60_comb_advance_rotation': {
+    kind: 'rpc',
+    fn: 'comb_advance_rotation',
+    args: { p_comb_id: '00000000-0000-0000-0000-000000000000' },
+    expect: '42501',
+  },
 };

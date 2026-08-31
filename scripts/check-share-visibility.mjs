@@ -417,6 +417,7 @@ async function main() {
     ['send_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'hive-send RPC, requires a session' }],
 
     // -- service_role only: internal/cron, no client role needs direct EXECUTE --
+    ['comb_advance_rotation(uuid)', { roles: ['service_role'], why: 'ENG-60 row 1.9a, advance policy wrapper called by the clock (OPS-9) — an authenticated grant would be an unruled organizer force-advance, §1B.31.2' }],
     ['comb_subject_gone(uuid,uuid)', { roles: ['service_role'], why: 'ENG-95 shared predicate, called only from other definers — a definer body bypasses the caller EXECUTE check on what it calls' }],
     ['seal_and_send_rotation(uuid)', { roles: ['service_role'], why: 'ENG-91 cron-only seal-and-send, explicit anon+authenticated revoke' }],
     ['seal_volume(uuid)', { roles: ['service_role'], why: 'cron/service-only volume seal, explicit anon+authenticated revoke' }],
