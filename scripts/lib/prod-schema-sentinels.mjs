@@ -334,4 +334,8 @@ export const SENTINELS = {
     args: { p_comb_id: '00000000-0000-0000-0000-000000000000' },
     expect: '42501',
   },
+  '20260831000001_eng59_join_current_rotation': {
+    kind: 'order',
+    reason: 'authenticated-only SECURITY DEFINER join RPC replacement, no anon-visible surface',
+  },
 };
