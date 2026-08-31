@@ -475,9 +475,18 @@ list itself.
   "community around lifting others up" without touching V2 §0's ban on a public
   gratitude feed.
 - **Unchanged:** three-tab navigation and the top-right account door (the
-  2026-08-26 amendment above), Slice 1 shipping first, 19a before 19b, every
+  2026-08-26 amendment above), ~~Slice 1 shipping first,~~ 19a before 19b, every
   money-transmitter guardrail, and the durability promise (which is still
   *unbuilt* — digital export is owed; printing is now ruled out).
+  *[Amended 2026-08-31 — "Slice 1 shipping first" is struck. It is retired by the
+  **Retired:** bullet in the MVP-scope block below in this same section (`O5`
+  closed, `a11aa144…`; `POLLINATE_COMB_ROTATION.md` §9 — there is one release,
+  MVP-Comb). The two were written the same day, and listing the clause as
+  *unchanged* is the strongest available affirmation of it: a reader who stops at
+  this bullet has been told the ruling considered the sequencing and kept it.
+  Every other item in the bullet stands. Missed by COPY-13's
+  `Slice 1 (still )?ships first` token on inflection alone — "shipping" is not
+  "ships"; a literal token is a container too.]*
 
 ### MVP scope, ruled 2026-08-30 (event `cf648e7f…`)
 
@@ -492,7 +501,11 @@ completion now.** Called **MVP-Comb** to keep it distinct from the narrower
   (the caps are built and left disabled, §8.5). All of 19b/c/d — no real sats.
 - **Retired:** the "Slice 1 ships first, *then* the comb work" sequencing. There
   is one release. Shipping a demo of the product before the thing that is now the
-  product does not make sense. (`O5` if a separate earlier demo build is wanted.)
+  product does not make sense. ~~(`O5` if a separate earlier demo build is
+  wanted.)~~ *[Amended 2026-08-31 — `O5` is **closed** (`a11aa144…`, recorded two
+  bullets below): one release, no separate earlier demo build. Same defect shape
+  as `POLLINATE_COMB_ROTATION.md` §9's own "See open ruling `O5`" pointer,
+  repaired in the same pass.]*
 - **Definition of done:** a stranger installs, arrives through an invite link
   with no password form, joins a comb, sees *"the comb is writing for Sarah — 6
   days left"*, writes, watches Sarah's reveal bloom with every author's entries,

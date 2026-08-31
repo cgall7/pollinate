@@ -8,7 +8,7 @@ correction; tab bar 4 → 3 per `POLLINATE_V2_NAVIGATION.md` and the 2026-08-26
 amendment in `Pollinate_The_Ruling.md`.
 **Date:** 2026-08-24 (adopted 2026-08-25, amended 2026-08-25 and 2026-08-26)
 **Amendments:** §16.5 rewritten 2026-08-25 (Lumen) — filing moved from RPC/move to copy semantics after Pixel's read-path finding; see the section's amendment block. This changes the file's content hash relative to Colin's Amendment 2026-08-25 bytes; commit `384d35e` preserves those verbatim.
-**Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — Slice 1 ships first, unchanged.
+**Supersedes:** the Slice 2 wallet direction in `Pollinate_PRD.md` §5.6, `Pollinate_Strategy.md` §6, and the Slice 2 rows of `Pollinate_Delivery_Slices.md`. Does **not** supersede anything in Slice 1 — ~~Slice 1 ships first, unchanged.~~ *[Amended 2026-08-31 — the final clause is retired: `POLLINATE_COMB_ROTATION.md` §9 (`O5` closed, `a11aa144…`) rules ONE release, MVP-Comb. The supersession scope above (wallet direction, Slice 2 rows) is unchanged; only "Slice 1 ships first, unchanged" is withdrawn.]*
 **Companion:** `POLLINATE_V2_ASSIGNMENTS.md` (issue-by-issue work breakdown).
 
 > **AMENDED 2026-08-30 — the Comb Rotation Ruling (Colin, #Strategy event
@@ -881,7 +881,7 @@ strategic payoff.
 |---|---|
 | **3.1.5(i)** | Self-custodial wallets permitted — **developer must be enrolled as an Organization**, not an Individual. Currently unset (`DEVELOPMENT_TEAM` empty). |
 | **3.2.1(vii)** | Optional P2P gifts are exempt from IAP if 100% goes to the receiver and nothing is unlocked. Zaps must be **purely optional and unlock nothing.** Damus is the precedent. |
-| **3.1.1** | Crypto may **not** unlock features. The paid subscription must use Apple IAP; sats can never buy it. *(Price reference updated 2026-08-30: the subscription is the **comb plan at $5.99/month**, not $39.99/yr — `POLLINATE_COMB_ROTATION.md` §4.1. **The constraint itself is unchanged and binding**, and now also reads: nectar can never buy a comb plan, and a comb plan can never be earned by zapping.)* |
+| **3.1.1** | Crypto may **not** unlock features. The paid subscription must use Apple IAP; sats can never buy it. *(Price reference updated 2026-08-30, re-cut 2026-08-30 after the final model: the subscription is the **per-user subscription**, price deliberately unruled until `C1` and `C5` return — `POLLINATE_COMB_ROTATION.md` §3/§4, `O4`; it is neither $39.99/yr nor the rejected $5.99/mo organizer-paid comb plan (§11). **The constraint itself is unchanged and binding**, and now also reads: nectar can never buy a comb plan, and a comb plan can never be earned by zapping.)* |
 | **3.1.5(v)** | No currency for completing tasks. **"Earn sats for your streak" is banned.** No zap rewards for journaling. |
 | **2.3.1(a)** | No hidden or dormant features. The wallet is created **only on explicit consent**, when the user first chooses to zap — never at signup. |
 | **2.3 / 2.3.5** | Metadata must reflect the core experience. Stay in **Lifestyle**; the wallet is genuinely secondary. Precedent: Fountain (podcasts + Lightning) sits in Entertainment, not Finance. |

@@ -4,7 +4,7 @@
 **Date:** August 2026  
 **Domain:** pollinateapp.xyz  
 
-> **Changelog 2.2 — 2026-08-30, ruled by Colin (#Strategy thread `e8cec2c0…`, ruling event `0effa81d…`; prior same-thread ruling `482eee85…` bars physical printing).** **The comb rotation is now the hero.** A comb — a closed, invite-joined group capped at 20 — collectively fills one hive for one member at a time, seals it on their occasion, blooms it, and rotates. Private hives become the **personal mode**, not a deprecated one. The paid line is a **comb plan at $5.99/month**, bought by the organizer; membership, writing and receiving stay free forever. `POLLINATE_COMB_ROTATION.md` governs; **§4's pricing rows and §9's Key Results below are superseded** and annotated in place. §1, §2, §3, §5 and §7 remain accurate about *what gets written* — the change is who writes it with you, and what we sell. Rationale in brief: the old model's retention rested on unmeasured willpower, its network effect was a referral loop, and its delivery meter could not fire inside twelve months of a cohort's install.
+> **Changelog 2.2 — 2026-08-30, ruled by Colin (#Strategy thread `e8cec2c0…`, ruling event `0effa81d…`; prior same-thread ruling `482eee85…` bars physical printing).** **The comb rotation is now the hero.** A comb — a closed, invite-joined group capped at 20 — collectively fills one hive for one member at a time, seals it on their occasion, blooms it, and rotates. Private hives become the **personal mode**, not a deprecated one. The paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`); receiving stays free forever, and so does writing in one comb. *(Re-cut 2026-08-30 later the same day: this entry first recorded the $5.99/month organizer-paid comb plan from ruling `0effa81d…`; the final model at `d662661b…` rejected it — §11.)* `POLLINATE_COMB_ROTATION.md` governs; **§4's pricing rows and §9's Key Results below are superseded** and annotated in place. §1, §2, §3, §5 and §7 remain accurate about *what gets written* — the change is who writes it with you, and what we sell. Rationale in brief: the old model's retention rested on unmeasured willpower, its network effect was a referral loop, and its delivery meter could not fire inside twelve months of a cohort's install.
 
 > **Changelog 2.1 — 2026-08-17, ratified by Colin (CEO action items thread).** Positioning re-researched from zero at Colin's request. Killed sentence: *"It's a journal that becomes social."* — it led with the container, not the gift. The hero sentence is now **"gratitude you compile for someone, until it's ready to give,"** and the hero is the Private Hive arc *ending in the reveal*. Delivery reframed as a spectrum (in-app → link → keepsake); a hive is valuable at zero deliveries. "Public hive" naming rejected — the two modes are **Private Hive** and **the Hive**. Slice 1 ships the full arc minus the reply (8b.8 → Slice 1.1). §1 and §2 amended in place below.
 
@@ -20,7 +20,7 @@ We sit at the intersection of three proven markets — gratitude apps ($1.3B), s
 
 **Delivery is a spectrum, not a gate (added 2.1).** A Private Hive must be worth keeping even if its person can never install the app — a young child, a grandparent, someone you've lost. The hive is a letter drawer, not an outbox: it is valuable at zero deliveries, because the compiling itself is the practice. Delivery paths, in order of arrival: **(1) send in-app** (Slice 1) — the full bloom; **(2) send as a link** (post-Slice 1) — a beautiful web-read moment that doubles as the viral loop, since the recipient's first experience of Pollinate is the strongest thing we make; **(3) keep, or export as a keepsake** (later) — for the person who will never install anything. The moat is accumulated *time*, not features — no competitor can copy a year of someone's entries.
 
-**Business model (superseded again 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §4 governs: the paid line is a comb plan at $5.99/month, organizer-paid, up to 20 members, first rotation free; the delivery meter is retired as the primary mechanism, and whether individual Plus survives is open ruling O1. The 2026-08-24 text is kept below as the record of that reasoning.):** Freemium, metered at **delivery**. The free tier is unlimited hives and unlimited entries, forever, plus the **first delivery free, forever** — writing is the moat and is never metered (this reverses the 2026-08-19 "1 hive, lifetime" ruling that stood here, which put the paywall at the `private_hives` insert path). **Pollinate Plus** ($39.99/year, annual only — the monthly plan is retired, not repriced) buys every delivery after the first. Export is free on every tier forever (V2 §17.4 — the durability guarantee). The old friend/seed/review-cadence tier splits are **removed** (ruled 2026-08-25, V2 §17.5.2a — "meter the artifact, never the practice, never the graph"): review cadence ungated, friends uncapped, seeds uncounted (abuse is a ~5/week rate limit, not a price). Delivery is the only meter. The money layer is nectar zaps (V2 §5): self-custodial, 100% to the receiver, never revenue — the Cash-App-links-via-iMessage plan is cancelled (V2 §5.7). We are not a money transmitter (V2 §5.6).
+**Business model (superseded again 2026-08-30 — `POLLINATE_COMB_ROTATION.md` §3/§4 governs: the paid line is the per-user subscription — more than one comb to write in, more than 5 members in a comb you run, up to 20 — price deliberately unruled until `C1` and `C5` return (`O4`); the delivery meter is retired as the primary mechanism, and individual Plus does not survive as a separate line — `O1` is closed, free for everything except the comb. The 2026-08-24 text is kept below as the record of that reasoning.):** Freemium, metered at **delivery**. The free tier is unlimited hives and unlimited entries, forever, plus the **first delivery free, forever** — writing is the moat and is never metered (this reverses the 2026-08-19 "1 hive, lifetime" ruling that stood here, which put the paywall at the `private_hives` insert path). **Pollinate Plus** ($39.99/year, annual only — the monthly plan is retired, not repriced) buys every delivery after the first. Export is free on every tier forever (V2 §17.4 — the durability guarantee). The old friend/seed/review-cadence tier splits are **removed** (ruled 2026-08-25, V2 §17.5.2a — "meter the artifact, never the practice, never the graph"): review cadence ungated, friends uncapped, seeds uncounted (abuse is a ~5/week rate limit, not a price). Delivery is the only meter. The money layer is nectar zaps (V2 §5): self-custodial, 100% to the receiver, never revenue — the Cash-App-links-via-iMessage plan is cancelled (V2 §5.7). We are not a money transmitter (V2 §5.6).
 
 > **MVP scope, ruled 2026-08-30 (`cf648e7f…`):** the Slice ladder below is
 > superseded as a *release plan*. **MVP-Comb = Phases 0, 1 and 2 of
@@ -32,7 +32,7 @@ We sit at the intersection of three proven markets — gratitude apps ($1.3B), s
 
 > **Build Slices:**
 > - **Slice 1 (Demo Mode):** Journal + private hives + social seeds + honeycomb + feed. No money. TestFlight / internal testing. Validates the core emotional and social loop.
-> - **Slice 2 (Public Launch):** Freemium paywall per V2 §17.5 ($39.99/yr annual-only, metered at delivery) + nectar zaps (V2 §5; Cash App gifting cancelled, V2 §5.7). App Store / Play Store launch. *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is a **comb plan at $5.99/month**, organizer-paid, up to 20 members, first rotation free. Whether individual Plus survives is open ruling O1.)*
+> - **Slice 2 (Public Launch):** Freemium paywall per V2 §17.5 ($39.99/yr annual-only, metered at delivery) + nectar zaps (V2 §5; Cash App gifting cancelled, V2 §5.7). App Store / Play Store launch. *(Repriced 2026-08-30 — `POLLINATE_COMB_ROTATION.md`: the paid line is the **per-user subscription** — more than one comb to write in, more than 5 members in a comb you run, up to 20 — **price deliberately unruled until `C1` and `C5` return** (`O4`). Individual Plus does not survive as a separate line; `O1` is closed — free for everything except the comb.)*
 > - **Slice 3+:** Transaction fee research (MDK / Lightning) IF legally viable. Requires formal legal counsel. Not committed.
 
 > **App Tab Bar:** Today (journal + private hives) | Hive (social) | Garden (recap, wrapped, history)
@@ -403,22 +403,37 @@ This captures the full core loop: writing gratitude + packaging/sharing/delaying
 | Free-to-paid conversion rate | Freemium business viability |
 | Monthly Active Users (MAU) | Top-line growth |
 | 30-day retention | Product stickiness |
-| Entries shared to Hive feed | Social engagement |
+| ~~Entries shared to Hive feed~~ | *Dead 2026-08-31 — the friend feed is cut (2026-08-30 ruling); not a supporting metric, there is no surface* |
 
 > **North Star superseded 2026-08-30.** WAHA is replaced by **rotation
 > participation** — the share of an active comb who write for that month's
 > subject. It is condition **C1** in `POLLINATE_COMB_ROTATION.md` §6 and it is
 > the single number that decides the business. The supporting-metric table above
-> stays useful; the four conditions C1–C4 outrank all of it.
+> stays useful; ~~the four conditions C1–C4~~ the conditions of §6 outrank all of it.
+>
+> *[Amended 2026-08-31 — two corrections to this annotation, neither touching its
+> conclusion. (1) **There are FIVE conditions, `C1`–`C5`** —
+> `POLLINATE_COMB_ROTATION.md` §6 is titled "The five conditions that decide this."
+> The omitted one is `C5` (note + nectar frequency), and it is not a minor member:
+> `C1` **and** `C5` are the pair the open price ruling `O4` is gated on (§4), so an
+> enumeration stopping at `C4` drops half the gate on the price. (2) **"Stays
+> useful" does not reach the last row** — "Entries shared to Hive feed" measures a
+> surface the same 2026-08-30 ruling **cut** (`Pollinate_The_Ruling.md`: the Hive
+> tab is comb-first, no photo feed anywhere). That row is dead, not supporting.
+> Same shape as `Pollinate_Strategy.md` §11 and `Pollinate_PRD.md` §8, repaired the
+> same day: a blanket survives-as-inventory clause has to be checked row by row.]*
 
 ### Key Results (12-Month Targets)
 
 > **SUPERSEDED 2026-08-30.** These targets are denominated in individuals and a
 > free→paid conversion that no longer exists in this shape. The replacement is
-> four falsifiable conditions with thresholds, not a quarterly ladder:
+> ~~four~~ **five** falsifiable conditions with thresholds, not a quarterly ladder:
 > **C1** rotation participation ≥60% sustained 3 months; **C2** reveal→install
 > ≥25%; **C3** comb survival ≥50% at month 6; **C4** organizer willingness to
-> pay. **None are measurable today** — there is no analytics SDK in the build.
+> pay; **C5** note + nectar frequency — short notes per active member per week,
+> baseline to establish *(added 2026-08-31: omitted when this annotation was
+> written; `C5` is half the gate on the price, `O4`/§4, and gates all 19b work)*.
+> **None are measurable today** — there is no analytics SDK in the build.
 > Seed three real combs, instrument, and the answer arrives in eight weeks
 > (`POLLINATE_COMB_ROTATION.md` §6).
 
@@ -449,21 +464,44 @@ This captures the full core loop: writing gratitude + packaging/sharing/delaying
 
 ## 11. Go/No-Go Criteria for MVP Launch
 
-Before shipping Slice 1 (Demo Mode) to TestFlight / internal testers:
+~~Before shipping Slice 1 (Demo Mode) to TestFlight / internal testers:~~
+
+*[Retired as a launch gate 2026-08-31 (wording @Lumen, encoded @Vector) —
+`POLLINATE_COMB_ROTATION.md` §1A/§9: there is ONE release, MVP-Comb; its go/no-go is
+the ratified definition-of-done sentence (`a11aa144…` — stranger → invite link, no
+password → join → "writing for Sarah — 6 days left" → write → reveal blooms → nectar
+note → again next month for someone else), and the distribution path is EAS internal
+via `OPS-10` (`O7` closed — TestFlight is MVP2). The checklist below no longer gates
+any release: its items survive as a quality inventory for surfaces that still ship
+(journaling, private hives, seeds, notifications — §1A: nothing in flight is
+cancelled), but passing them authorizes nothing and failing one blocks nothing; §1A's
+sentence does both jobs now. **Two rows are the exception and are struck in place
+below** — the feed rows. `Pollinate_The_Ruling.md` (2026-08-30) cut the friend feed
+outright ("the weakest asset in the app… the Hive tab is comb-first"), so those two
+items describe a surface the same ruling deleted; the survives-as-inventory clause
+does not reach them. Every other row stands as inventory.]*
 
 - [ ] A user can sign up and add a friend in under 2 minutes
 - [ ] A user can write a daily gratitude journal entry
-- [ ] A user can share an entry to the Hive feed
+- ~~[ ] A user can share an entry to the Hive feed~~ *(Retired 2026-08-31 — the friend feed is **cut**, `Pollinate_The_Ruling.md` 2026-08-30 ruling; the Hive tab is comb-first. Not inventory: there is no surface left to test.)*
 - [ ] A user can create a Private Hive, write entries for someone, and see all their entries
 - [ ] A user can seal a Private Hive with no recipient (the grandmother/child/lost-someone case — must complete with no connection required)
 - [ ] A user can send a sealed hive to a connected friend
 - [ ] A "trip down memory lane" review prompt fires correctly at the user's configured cadence (cadence is ungated on every tier — V2 §17.5.2a)
 - [ ] A user can plant a seed (time-capsule message) with a future bloom date
 - [ ] Seed bloom notifications fire correctly and on time
-- [ ] The Honeycomb feed shows real activity from the user's Hive
+- ~~[ ] The Honeycomb feed shows real activity from the user's Hive~~ *(Retired 2026-08-31 — same ruling: the friend feed is cut and no photo feed exists anywhere. Not inventory.)*
 - [ ] Hexagon UI renders with correct visual states
 - [ ] At least 2 seeded groups have been tested end-to-end (real users, real gratitude, real hives)
 - ~~[ ] Wallet tab is present as a shell (Cash App links come in Slice 2)~~ *(Superseded 2026-08-26 — the launch checklist now asserts the opposite: three tabs, no Wallet shell. `POLLINATE_V2_NAVIGATION.md`.)*
-- [ ] Push notifications work for all key events (seed bloom, package received, review prompt, hive entry shared)
+- [ ] Push notifications work for all key events (seed bloom, package received, review prompt, ~~hive entry shared~~ *(this one event only — the sharing surface is cut with the friend feed, 2026-08-31; the other three stand)*)
 
-**If any of the above fail, we don't ship.** The core loop — writing gratitude, keeping Private Hives, packaging and sharing, planting seeds — must work end-to-end.
+~~**If any of the above fail, we don't ship.**~~ The core loop — writing gratitude,
+keeping Private Hives, packaging and sharing, planting seeds — must work end-to-end.
+
+*[Amended 2026-08-31 — the ship-gate sentence is struck for the same reason as the
+header, and struck **separately** because it is a second mechanism: a header-scoped
+annotation retires the *precondition* and leaves the *veto* standing, and the veto is
+the half with teeth. (Same shape as `POLLINATE_V2_ASSIGNMENTS.md` §2, repaired the
+same day.) The core-loop sentence after it is unretired and still true — it describes
+product quality, not a release gate.]*
