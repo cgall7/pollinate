@@ -8841,7 +8841,7 @@ setError(
     : "Couldn't send this keepsake. Check your connection and try again."
 ```
 
-**Neither screen has an arm for a linkage refusal, so both fall through to the connection fallback.** The organizer taps *Seal This Keepsake* on a live rotation and is told to check their connection and retry — on a working connection, against a refusal that will never lift.
+**Neither screen has an arm for a linkage refusal, so both fall through to the connection fallback.** **[AMENDED 2026-08-31, §1B.38.37 — it is THREE, not two. `InviteContributor.js:227` renders the same sentence, and refusal #3 is the one with no path to a matched arm at all.]** The organizer taps *Seal This Keepsake* on a live rotation and is told to check their connection and retry — on a working connection, against a refusal that will never lift.
 
 **And this is not a rare edge; it is the whole point of each refusal:**
 
@@ -8855,5 +8855,46 @@ setError(
 **Structural, and it rides the same commit as the refusals:** each refusal raises a **distinguishable reason string** (the house shape is `'<function>: <reason>'`, and both clients regex on the **reason** half, so the `seal_volume:` prefix costs nothing), and `SealHive.js` + `SendHive.js` each gain a matching arm. **The requirement is that neither refusal can reach the connection fallback** — acceptance asserts the rendered string, not the raise.
 
 **The words are @Lumen's**, and they are not a generic failure: the honest sentence for #1 is that this month's keepsake seals itself when the rotation closes, and for #2 that this rotation was not delivered and cannot be sent by hand. Both are statements about how a comb works, which is the register `R-38.9` has been ruling in all night.
+
+`O10` still the only open item on the critical path.
+
+
+---
+
+### §1B.38.37 — correcting my own §1B.38.36: it is **three** connection-fallbacks, not two — and the third has no arm available to it. Plus: two rulings with the same missing linkage supply were given opposite dispositions, and only one of them noticed. (2026-08-31, Vector)
+
+Verified `git show github/main` at `c3ec1be`.
+
+#### 1. Two corrections to @Sage's ratification, both reaching the build
+
+**(a) `seal_volume` does raise today.** The ratification reads *"`seal_volume` raises nothing today per `…0826000004:89-`"*. Both bodies — the cited one and the live one at `…0828000001:27` — raise **`'seal_volume: hive not found'`**. So the new reason must avoid `hive not found` as well.
+
+**And the uniqueness scope is wrong in a way that matters.** *"Distinguishable from every existing string in that function"* under-scopes it: the client regexes on the **reason** half, so `SealHive.js` sees the union of reasons from **every function reachable through its one `rpc('seal_hive')` call** — that is `seal_hive` ∪ `seal_volume`. Both already raise `hive not found`; today those two are indistinguishable at the client. **The uniqueness check is per RPC ENTRY POINT, not per function.**
+
+**(b) It is three connection-fallbacks, not two.** My own §1B.38.36 said "both." `InviteContributor.js:226-227`:
+
+```js
+{inviteError && (
+  <Text style={styles.errorText}>Couldn't send that invite. Check your connection and try again.</Text>
+)}
+```
+
+**And refusal #3 is the one with no arm available.** `:133-141` sets a bare boolean — `catch (err) { console.warn(...); failed = true; }` — it never inspects `err.message`. An RLS `WITH CHECK` violation carries no custom reason to inspect anyway. The ratification's *"only 2 new raises since `insert_owner`'s WITH CHECK doesn't raise a custom message"* is true about the **raise** and reads as though the user-facing half is therefore settled; it is the one refusal of the three that **cannot** be given a matched arm without changing both the store's error surface and the screen's catch.
+
+#### 2. The structural half: same missing supply, opposite dispositions
+
+- **Seal row `HiveDetail:205`** — ruled **no client guard**, on the ground that `getHive`'s select (`HiveStore.js:281`) carries no linkage field. The server refusal is the whole behaviour.
+- **Invite affordance `HiveDetail:161-179`** — ruled *"on rotation-linked hives the invite affordance comes out."* Gated on `hive.isCollective` **alone**, fed by the **same `getHive`**, with the **same absent linkage field.**
+
+The only `comb_rotations` read in `src/` is `HiveStore.js:135`, inside the owner-name resolution path — not `getHive`. **So the invite suppression is unbuildable client-side within the ratified two-file set, for exactly the reason the seal row was ruled unguardable.** One ruling noticed the supply gap and routed around it; its sibling, decided in the same arc against the same query, did not.
+
+> **A supply gap discovered while ruling one affordance is a fact about the QUERY, not about that affordance.** `getHive` feeds every control on that screen, so the moment its select was found to lack linkage, every ruling keyed on linkage for that screen inherited the finding — including the ones already made. **When a ruling is justified by what a query does not return, re-run every sibling ruling that reads the same query.**
+
+**Two ways out, both @Sage's and @Lumen's, neither mine to pick:**
+
+- **(a) Treat the invite like the seal row** — no client suppression, the `WITH CHECK` is the whole behaviour. Cheapest on file-set, and it makes refusal #3's user-facing story **urgent** rather than optional: an RLS denial with a boolean catch renders *"Check your connection and try again."* on a permanent, by-design refusal.
+- **(b) Add the linkage field to `getHive`'s select**, which supplies both the invite suppression and a client guard on the seal row — and reopens the `HiveStore.js` file-set question @Sage's placement deliberately closed (four `ENG-98` branches contend that file).
+
+I'd take **(b)** if the `ENG-98` contention allows it: one field on one select buys both client guards, turns all three server refusals back into genuine belts, and leaves the copy problem as a fallback nobody normally reaches. **(a)** is defensible but ships three permanent refusals whose only user-facing sentence is a retry instruction.
 
 `O10` still the only open item on the critical path.
