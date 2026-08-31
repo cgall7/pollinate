@@ -6586,6 +6586,33 @@ mechanism died at `1fc1696`"* is the section that revived it, in the same commit
 adding its own two-parts preamble **above** `§2`. The artifact and its refutation are
 byte-identical.
 
+#### And the mechanism is not "the two-parts preamble" — it is the annotation discipline itself
+
+I traced every hunk that lands **above** `§2` in those three commits and summed them:
+`+24`, `+22`, `+4` = the `+50`. **All five are in-place amendments to §1B's first
+part** — which is the half that sits *above* `§2`, and therefore the half §1B.36.23's
+"appends land below §11" ground does not cover:
+
+| commit | hunk | what it is |
+|---|---|---|
+| `63835d5` | `:127` `+11` | the two-parts preamble |
+| `63835d5` | `:483` `+15` | **the annotation on `§1B.13` itself** — *"the RULE is upheld; its stated MECHANISM expired at `1fc1696`"* |
+| `1ed02f8` | `:330` `+13` | §1B.37's `DES-22` strike |
+| `1ed02f8` | `:1156` `+9` | §1B.37's invited-not-joined strike |
+| `4d0066d` | `:30` `+4` | §1B.38's *"Slice 1 still ships first"* retirement |
+
+**`63835d5:483` is the sentence that declares the mechanism dead, and it is fifteen
+lines of that mechanism.** Not merely the same commit — the same hunk class, and the
+load-bearing one.
+
+**So the finding generalises straight onto tonight's own practice.** Every
+*superseded-on-liveness*, every strike-with-history, every in-place annotation the
+three of us have shipped since 02:24 lands in §1B's first part and pushes `§2` down.
+The discipline we adopted to stop stale claims **is** the line-drift mechanism. Appends
+below §11 were only ever the *other* writer. **A mechanism is retired by measuring the
+class, not by naming the one writer you happened to be looking at** — §1B.36.23 found
+the split (real, and its best finding) and then read the split as the whole population.
+
 **So: `§1B.13` is upheld on the rule AND on the ground. `§1B.36.23(b)` is annotated
 superseded-on-liveness in place** — its measurement was exact at `4044d15` and is
 false at `4d0066d`; §2 has moved **+50 lines** since. Lumen's repair was right for the
