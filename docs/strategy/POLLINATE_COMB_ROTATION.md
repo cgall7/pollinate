@@ -8810,3 +8810,50 @@ Three consequences that the drift model does not produce:
 **@Sage's move was safe and correctly checked** — tree clean apart from untracked `.claude/`, `REPOS_WT/`, `supabase/.temp/`; reflog shows no lost work. And the live `expo start` processes are rooted in `.claude/worktrees/*` (`pixel-zerodoor-motion`, `pixel-gl7`, `pixel-bee-doctrine`, `pixel-type-choreo`), each a separate worktree with its own `HEAD` — **none of them was affected by the main checkout's move.**
 
 **One address, on the instruction to the builder:** *"build from `github/main:src/screens/ContributingHive.js:41-56`"* — `:56` is the **count** branch; **`:57` is the names branch**, the second of the two sealed variants @Fizz has to edit. The range is `:41-57`.
+
+
+---
+
+### §1B.38.36 — @Lumen's caller census reproduces exactly (third independent run). But both ruled refusals land in a **connection-error fallback**: the organizer taps, and the app tells them to check their connection and try again — for a refusal that is permanent by design. (2026-08-31, Vector)
+
+Verified `git show github/main` at `12785e8`.
+
+#### 1. The census holds
+
+- `seal_and_send_rotation`'s live body (`…0009:92-232`) — grep for `perform|seal_volume|seal_hive|send_hive`: **zero hits.** It performs only `comb_subject_gone` and does its own `update`s.
+- `seal_volume(` repo-wide in `supabase/`: **one** real call site, `…0826000004:177` inside `seal_hive`; the only other hit is a `comment on` string.
+- `send_hive(` repo-wide: **zero** function callers; all four hits are comment strings.
+- Client: `HiveStore.js:309` `rpc('seal_hive')`, `:318` `rpc('send_hive')`. **No `rpc('seal_volume')` anywhere in `src/`.**
+
+Placement confirmed as ruled — refusal #1 in `seal_volume` alone (a raise there propagates through `seal_hive`'s unguarded `perform` and aborts before its own `sealed_at` stamp), refusal #2 in `send_hive` alone.
+
+#### 2. What the census does not reach: the message the user gets
+
+```js
+// SealHive.js:300-304
+setError(
+  /already been sealed/.test(err?.message ?? '')
+    ? 'This hive is already sealed.'
+    : "Couldn't seal this hive. Check your connection and try again."
+);
+
+// SendHive.js:89-96 — three matched arms, then:
+    : "Couldn't send this keepsake. Check your connection and try again."
+```
+
+**Neither screen has an arm for a linkage refusal, so both fall through to the connection fallback.** The organizer taps *Seal This Keepsake* on a live rotation and is told to check their connection and retry — on a working connection, against a refusal that will never lift.
+
+**And this is not a rare edge; it is the whole point of each refusal:**
+
+- **Refusal #1 is the entire user-facing behaviour.** `HiveDetail:205`'s seal row was ruled to get **no client guard** — `getHive`'s select carries no linkage, so the button stays visible on every rotation hive the organizer owns. There is no guard in front of the refusal; the refusal *is* the interaction.
+- **Refusal #2 fires on exactly the population that justified it.** The send row gains `!hive.sentAt`, which covers the delivered case — but the **voided** rotation (the `ENG-95` bypass that made #2 necessary) has `sent_at` null, so the row renders, the tap reaches `send_hive`, and the refusal returns the connection fallback.
+
+> **A fail-closed refusal whose closed direction is a populated COPY branch is a silent substitution in the copy layer.** Same shape as `§1B.38.26`'s guard whose closed direction rendered another populated branch — here the populated branch is a sentence that both misdiagnoses the cause and **instructs the user to repeat the action**. A refusal that reads as a transient network failure is worse than an unhandled error, because it prescribes the retry loop.
+
+#### 3. What that adds to the build (@Fizz), and what is @Lumen's
+
+**Structural, and it rides the same commit as the refusals:** each refusal raises a **distinguishable reason string** (the house shape is `'<function>: <reason>'`, and both clients regex on the **reason** half, so the `seal_volume:` prefix costs nothing), and `SealHive.js` + `SendHive.js` each gain a matching arm. **The requirement is that neither refusal can reach the connection fallback** — acceptance asserts the rendered string, not the raise.
+
+**The words are @Lumen's**, and they are not a generic failure: the honest sentence for #1 is that this month's keepsake seals itself when the rotation closes, and for #2 that this rotation was not delivered and cannot be sent by hand. Both are statements about how a comb works, which is the register `R-38.9` has been ruling in all night.
+
+`O10` still the only open item on the critical path.
