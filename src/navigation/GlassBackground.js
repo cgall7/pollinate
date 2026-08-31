@@ -3,6 +3,7 @@ import { View, StyleSheet, Platform, AccessibilityInfo } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { theme } from '../constants/theme';
+import { GlassRim } from '../components/GlassRim';
 
 // GL1 — the top rung. `isLiquidGlassAvailable()` is a runtime capability check
 // (iOS 26 and a binary carrying the native module), so it is read ONCE at module
@@ -55,7 +56,10 @@ export const GlassBackground = ({ radius }) => {
     return <View style={[StyleSheet.absoluteFill, clip, styles.androidFallback]} />;
   }
 
-  // The rim stack, shared by both live rungs so they cannot drift apart.
+  // The rim stack, shared by both live rungs so they cannot drift apart — and
+  // now, since GL7(d′), by the borrower circles as well. It lives in
+  // `components/GlassRim` for that reason: one stack, four consumers, no copy
+  // to drift.
   //
   // GL1 residual (a): the white rim ALONE reads weaker on glass than on blur —
   // the body is already at the top of the luminance scale, so a white line has
@@ -63,27 +67,35 @@ export const GlassBackground = ({ radius }) => {
   // the white something to gleam against. Order is the mechanism: hairline
   // first, white over it, so on a bright ground you read a gleam with a dark
   // edge and on a dark one you read a dark edge with a gleam.
-  const rim = (
-    <>
-      <View
-        style={[StyleSheet.absoluteFill, styles.hairline, { borderRadius: radius }]}
-        pointerEvents="none"
-      />
-      {/* ONE 1pt specular edge — the detail that reads as glass, not chrome.
-          This used to spread `StyleSheet.absoluteFillObject`, which does not
-          exist in react-native 0.86.2 (StyleSheetExports.js exports
-          `absoluteFill` only). Spreading `undefined` is legal and silent, so
-          the rim lost its positioning and painted as a 2pt stub at the top
-          of the bar instead of tracing its edge. */}
-      <View style={[StyleSheet.absoluteFill, styles.rim, { borderRadius: radius }]} pointerEvents="none" />
-    </>
-  );
+  //
+  // (The frames spread `StyleSheet.absoluteFill`, never `absoluteFillObject` —
+  // the latter does not exist in react-native 0.86.2, and spreading `undefined`
+  // is legal and silent, so the rim once lost its positioning and painted as a
+  // 2pt stub at the top of the bar instead of tracing its edge.)
+  const rim = <GlassRim radius={radius} />;
 
   if (LIQUID_GLASS) {
     return (
-      <GlassView glassEffectStyle="regular" style={[StyleSheet.absoluteFill, clip]}>
-        {/* GL2: 0.35 here, 0.55 on the blur rung below. The pair is ruled; the
-            number is not a token that moved. */}
+      // GL7(b′), 2026-08-30 — `regular` -> `clear`, ruled by Lumen on measured
+      // frames. `clear` is the more transparent of UIGlassEffect's two styles,
+      // and the reason to take it is NOT that more gets through: at equal
+      // legibility that is worth 11%, which is why GL7(b) first declined it.
+      // It is that the KERNEL is half the width. Measured on device, 10-90
+      // transition width across a step behind the capsule: 6.085pt on
+      // `regular`, 3.172pt on `clear`, at the same 3.7311:1 glyph floor —
+      // 1.9x, and corroborated by two more instruments (25-75 1.70x, gradient
+      // RMS 2.08x). Colin asked for "defined", and definition is an edge
+      // property that no alpha can reach: edge width came out FLAT in the veil
+      // on both rungs.
+      //
+      // `glassEffectStyle` AND `theme.colors.glassLens` ARE ONE SETTING. The
+      // style decides what the veil has to hold back; the veil is re-solved
+      // against it. Moving either alone re-opens a floor that was solved on
+      // frames, so `check-glass-definition.mjs` C1 pins the pair and fails
+      // with the re-solve named. Same defect class as D1's coincident widths.
+      <GlassView glassEffectStyle="clear" style={[StyleSheet.absoluteFill, clip]}>
+        {/* GL2/GL7(b′): 0.76 here, 0.55 on the blur rung below. The pair is
+            ruled; the number is not a token that moved. */}
         <View style={[StyleSheet.absoluteFill, styles.lensVeil]} />
         {rim}
       </GlassView>
@@ -113,13 +125,5 @@ const styles = StyleSheet.create({
   },
   lensVeil: {
     backgroundColor: theme.colors.glassLens,
-  },
-  hairline: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.glassHairline,
-  },
-  rim: {
-    borderWidth: 1,
-    borderColor: theme.colors.glassRim,
   },
 });

@@ -217,9 +217,26 @@ export const BREATH_RISE_CYCLE_MS = 6500;
 //            rather than as breathing. Measured against the wing, 2.2% is
 //            1.53x the tip's travel and still 0.63pt/s at the hero — an order
 //            of magnitude under the ~5pt/s where a slow move becomes a move.
-// 2.2% ships. It is a tuned number inside a stated interval, not a derived
-// one, and it is the first thing to re-measure on a device.
-export const BREATH_RISE_FRACTION = 0.022;
+// R-PW-2 (Lumen, 2026-08-30, GUIDES/POLLINATE_PERCH_WEIGHT_SPEC.md §3) —
+// 2.2% -> 3.2%. The paragraph above ends "it is the first thing to re-measure
+// on a device," and that is exactly the licence this moves on: Colin ran the
+// measurement and the verdict was "flat." A tuned number inside a stated
+// interval, re-tuned by the follow-up its own note named.
+//
+// 3.2% is 4.224pt peak-to-peak at the 132pt hero and 1.408pt at chrome 44.
+// The clock does NOT move (6.5s, 42/58 split): peak drift-rate at the hero is
+// 0.65pt/s, still an order of magnitude under the ~5pt/s where a slow move
+// stops reading as breathing and starts reading as travel. That ordering is
+// the ruling — RETREAT AXIS IS AMPLITUDE, NEVER THE CLOCK. A faster cycle is
+// panting, and it fails the ceiling's own argument rather than tuning inside
+// it: if 3.2% reads as drift on device, come back toward 2.6%.
+//
+// NOT SHIPPED AT A CEILING. 4.5% is the documented ceiling — the R-series bar
+// is that a token always keeps headroom, and 2.2% shipped AT its own stated
+// ceiling, which is part of why there was nowhere to go when the device
+// verdict came back.
+export const BREATH_RISE_FRACTION = 0.032;
+export const BREATH_RISE_CEILING = 0.045;
 
 // A breath is not a sine. The in-breath is quicker than the out-breath in
 // every animal that has one, and a symmetric curve is the second thing (after
@@ -245,6 +262,74 @@ export const BREATH_RISE_SPLIT = 0.42;
 //
 // Interval bounds, not a period: a fixed 15s flick is a metronome with a long
 // arm. Re-rolled after every flick.
-export const FLICK_INTERVAL_MIN_MS = 11000;
-export const FLICK_INTERVAL_MAX_MS = 23000;
+//
+// R-PW-1 (Lumen, 2026-08-30, PERCH_WEIGHT_SPEC §2) — 11-23s -> 4-9s. The
+// diagnosis was arithmetic, not anatomy: this is the only term with real
+// amplitude (12.01pt at the hero against the continuous terms' ~2pt), it runs
+// 1.85% of the time, and the FIRST one could not fire inside 11s — median wait
+// ~17s. A character is judged in its first five seconds, so on the evidence
+// almost nobody had ever seen the one term that carries it.
+//
+// The anti-metronome argument above survives intact, and that is why this
+// number could move: it argues UNPREDICTABILITY, not RARITY. A re-rolled 4-9s
+// interval is exactly as unlearnable as a re-rolled 11-23s one. First flick
+// now lands within 9s of mount BY CONSTRUCTION (median ~6.5s).
+//
+// No separate first-wait constant, deliberately: a creature that flicks the
+// instant you look at it is performing. 4s of composure first is the
+// character.
+export const FLICK_INTERVAL_MIN_MS = 4000;
+export const FLICK_INTERVAL_MAX_MS = 9000;
 export const FLICK_BEATS = 2;
+
+// --- Weight (R-PW-3) ------------------------------------------------------
+//
+// The fourth term, and the only NEW class: a settle beat. PERCH_WEIGHT_SPEC §4.
+//
+// What the FlightElite fox has that three well-phased loops do not is not more
+// motion — it is WEIGHT. It periodically re-settles onto its own mass. Breath
+// and punctuation were both already here; gravity was not.
+//
+// DOCTRINE STATUS. This is an amendment, not a tuning, and it is made rather
+// than assumed: BEE_DOCTRINE_SPEC.md's Retire-Outright list deletes perch
+// fidget by name and State 2 is "complete freeze at rest pose." The amendment
+// narrows that retirement to UNANCHORED restlessness — translation, hops,
+// preening that changes pose. A settle is defined BY its anchor: it is the one
+// gesture that PROVES the anchor by pressing into it. Zero net translation,
+// symmetric recovery to the same rest point.
+//
+// Re-rolled after each one, same reason as the flick.
+export const SETTLE_INTERVAL_MIN_MS = 20000;
+export const SETTLE_INTERVAL_MAX_MS = 45000;
+
+// The dip, as a fraction of DRAWN height — the same denominator
+// `BREATH_RISE_FRACTION` uses, so the two body terms are comparable without a
+// conversion. 3% is 3.96pt at the 132pt hero, 1.32pt at chrome 44: slightly
+// LARGER than a whole breath's peak-to-peak, because a settle has to read as a
+// distinct event against the breath it interrupts, not as a deeper breath.
+export const SETTLE_DIP_FRACTION = 0.03;
+
+// Down fast, up slow. Dropping onto mass is ease-IN (it accelerates); recovery
+// is the muscle taking the load back, which is slower and eases out. The
+// asymmetry IS the weight — a symmetric dip reads as a bob.
+export const SETTLE_DIP_MS = 240;
+export const SETTLE_RECOVER_MS = 520;
+
+// A small elastic tail on the way back up, as a fraction OF THE DIP (not of
+// the height): 4% of 3% is 0.12% of drawn height, 0.158pt at the hero. Below
+// resolvability on its own, which is correct — an overshoot you can measure is
+// a bounce, and a bounce is a cartoon. It exists to stop the recovery landing
+// dead, not to be seen.
+export const SETTLE_OVERSHOOT_FRACTION = 0.04;
+
+// How the recovery's 520ms splits between the main return (dip -> past rest,
+// to the overshoot peak) and the tail (overshoot -> rest). Tuned inside a
+// stated shape, exactly like `BREATH_RISE_SPLIT`: a damped rebound spends most
+// of its time on the large excursion and decays faster than it rose.
+export const SETTLE_OVERSHOOT_SPLIT = 0.72;
+
+// ONE wing beat at the nadir — the wings absorb the settle. Not `FLICK_BEATS`
+// (which is 2, and is the PUNCTUATION rhythm): a settle is one composed
+// gesture, and a double-flick inside it would read as the punctuation term
+// firing coincidentally rather than as part of the same event.
+export const SETTLE_FLICK_BEATS = 1;

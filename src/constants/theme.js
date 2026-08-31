@@ -232,20 +232,66 @@ const colors = {
   glassVeil: withAlpha(pigment.surface, 0.85), // was `surface + 'D9'` (0.851)
   glassSheer: withAlpha(pigment.surface, 0.55), // was `surface + '8C'` (0.549)
   // GL2, ruled (`GUIDES/POLLINATE_GL2_VEIL_DERIVATION.md`): the NATIVE glass
-  // rung takes 0.35 and the blur rung keeps 0.55. Two materials, two values —
-  // this is a PAIR, not a token that moved. `GlassView` already refracts what
-  // is behind it, so the veil above it only has to keep the surface inside the
-  // Sunbeam palette; at 0.55 it would erase the refraction that is the whole
-  // reason the rung exists. 0.35 is the smallest measured alpha clearing both
-  // bars on every ground in that derivation.
-  glassLens: withAlpha(pigment.surface, 0.35),
+  // rung takes its own alpha and the blur rung keeps 0.55. Two materials, two
+  // values — this is a PAIR, not a token that moved. `GlassView` already
+  // refracts what is behind it, so the veil above it only has to keep the
+  // surface inside the Sunbeam palette; at 0.55 it would erase the refraction
+  // that is the whole reason the rung exists.
+  //
+  // GL7(b′), 2026-08-30 — 0.35 -> 0.76, AND IT MOVES WITH `glassEffectStyle`.
+  // This number is meaningless on its own: it is the veil that holds the
+  // legibility floor under `clear`, and 0.35 was the veil that held it under
+  // `regular`. Read them as one setting (`check-glass-definition.mjs` C1 makes
+  // the pair a gate row, so neither can be retuned alone).
+  //
+  // WHY THE RUNG CHANGED. GL7(b) measured how MUCH of the ground the capsule
+  // passes through and declined `clear` — at equal legibility it is worth 11%.
+  // That measured the wrong property. Colin's word was "defined", which is an
+  // EDGE property, and edge width is a separate axis the veil cannot reach:
+  // 10-90 transition width is 6.085pt on `regular` and 3.172pt on `clear` at
+  // the SAME floor, and it is flat in the veil on both rungs (the alpha moves
+  // amplitude, never the kernel). Full derivation, three instruments and the
+  // disconfirmed amplitude confound: `GUIDES/POLLINATE_GL7_MATERIAL_TRANSMISSION.md`
+  // §3a-§3b.
+  //
+  // WHY 0.76 AND NOT THE 0.765 THE FIT SAID. Swept as real frames at 0.76 /
+  // 0.78 / 0.80 and taken as the smallest MEASURED alpha clearing both GL2
+  // bars — 3:1 for the inactive glyph at the darkest column, and no regression
+  // against the rung being replaced. At 0.76 the glyph's ground measures
+  // rgb(199, 199, 199) on the black bound, which is the shipped `regular`@0.35
+  // ground to the byte, so the floor is 3.7311:1 either way. 0.78 clears with
+  // margin but spends the amplitude gain (1.016x); 0.80 regresses amplitude
+  // below shipped. 0.76 is the only swept rung that improves both axes.
+  glassLens: withAlpha(pigment.surface, 0.76),
   // GL1 residual (a), ruled: the 1pt white rim reads WEAKER on glass than on
   // blur, because the glass body sits at 254-255 lum and white has no headroom
   // left to brighten into. Raising the rim's alpha is a dead end — the fix is a
   // hairline of ink UNDER the white, so the edge is defined by the dark line and
-  // the white reads as the specular gleam on top of it. 10%, the middle of the
-  // spec's 8-12% interval, to be re-measured on a device.
-  glassHairline: withAlpha(pigment.ink, 0.1),
+  // the white reads as the specular gleam on top of it.
+  //
+  // GL7(a), 2026-08-30 — 0.10 -> 0.18. The 10% was "the middle of the spec's
+  // 8-12% interval, to be re-measured on a device"; it was never derived, and
+  // its interval was guessed before anyone computed what the rim above it does
+  // to it. `glassRim` is `surface`@0.65, so an ink hairline on a COINCIDENT
+  // frame is attenuated to its transmission through that rim — a factor of
+  // 1 - 0.65 = 0.35. At 0.10 the composite carries 0.035 of ink: the hairline
+  // spends two-thirds of itself on the layer above it, and the white rim ALONE
+  // is ΔE00 0.1287 from the body (an order of magnitude under JND), so the
+  // hairline is not an enhancement here — it is the entire edge.
+  //
+  // 0.18 lands ΔE00 3.0125/2.9407 on the derivation's carriers, mid-band of the
+  // blur rung's own measured rim (2.88/1.67/3.19), which is what keeps the two
+  // rungs reading as one material. Re-measured for GL7(d) on all four hive
+  // cover grounds — the covers the borrower circles sit on — and it holds
+  // there too: 2.8658/2.8704/2.9902/2.9292, within 0.15 of the derivation's
+  // figure, so this is one token and not a per-ground tuning.
+  //
+  // Derivation: GUIDES/POLLINATE_GL1_HAIRLINE_DERIVATION.md §3-§4. The
+  // alternative (widen the hairline to 2pt so 1pt shows inboard at full
+  // strength, ΔE00 4.99) was declined there: it doubles the chrome edge's
+  // visual weight on the one rung the material is meant to be lightest on.
+  // Move the quantity that is under-specified, not the one that was ruled.
+  glassHairline: withAlpha(pigment.ink, 0.18),
 
   // --- Accent alphas ---
   // Marigold as an EDGE, not a fill — §4's "yellow never fills it" still holds.

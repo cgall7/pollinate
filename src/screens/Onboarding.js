@@ -11,6 +11,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { theme } from '../constants/theme';
 import { PressableScale } from '../components/PressableScale';
 import { BackButton } from '../components/BackButton';
@@ -535,6 +537,14 @@ const WhoStep = ({ step, subjectName, onChangeSubjectName, onNext, onDecline }) 
 // --- TodayTab has no catch around its awaits, so a signed-out Main spins
 // --- forever (Pixel, thread 19e90cf8). "Keep it" one screen back is the
 // --- persistence promise; this step has to be the one that makes it true. ---
+// ENG-83 — 'magiclink' is the third leg of what used to be a signup/signin
+// toggle. It exists because a stranger arriving through a comb invite link
+// (ENG-59) has never set a password and must never be asked to invent one
+// on the spot — that's the whole point of the ticket. `startAt === 'invite'`
+// (OnboardingFlow below) is how a future invite-link entry point seeds
+// this mode as the default; nothing in THIS repo produces that value yet
+// (ENG-59 is someone else's ticket), but the mode has to exist and has to
+// render no password field before that caller can rely on it.
 const AccountStep = ({
   step,
   name,
@@ -552,9 +562,27 @@ const AccountStep = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [confirmSent, setConfirmSent] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [hiveFailed, setHiveFailed] = useState(false);
+  // iOS-only by construction, not by omission: `isAvailableAsync()` is never
+  // even called off iOS, so `appleAvailable` stays at its `false` initial
+  // value on Android/web with no native module touched. Apple requires
+  // offering Sign in with Apple wherever another third-party sign-in
+  // appears — magic-link email is not that, but Apple sign-in is also the
+  // fastest no-password path there is, so it is offered everywhere this
+  // screen renders on iOS, not gated to the invite/magic-link entry alone.
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
   const isSignUp = mode === 'signup';
-  const canSubmit = email.trim() && password.length >= 6 && (!isSignUp || name.trim()) && !busy;
+  const isMagicLink = mode === 'magiclink';
+  const canSubmit = isMagicLink
+    ? email.trim().includes('@') && !busy
+    : email.trim() && password.length >= 6 && (!isSignUp || name.trim()) && !busy;
 
   // Both authenticated exits run through here, so the buffered writes and
   // their outcome are handled in exactly one place.
@@ -581,12 +609,55 @@ const AccountStep = ({
     await completeAfterAuth();
   };
 
+  // ENG-83's Apple leg. The nonce is generated HERE, raw, and passed to Apple
+  // only after hashing — Apple gets proof the request came from this
+  // specific attempt (it can't be replayed with a captured token), and
+  // GoTrue gets the raw value back from us separately so it can verify the
+  // hash embedded in Apple's identity token actually matches this session's
+  // own nonce rather than trusting the token's claims unchecked.
+  const handleAppleSignIn = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const rawNonce = Crypto.randomUUID();
+      const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+      if (!credential.identityToken) throw new Error('Apple returned no identity token');
+      await HoneycombStore.signInWithApple(credential.identityToken, rawNonce);
+      await completeAfterAuth();
+    } catch (err) {
+      // The user backing out of the system sheet is not a failure state —
+      // matches the code expo-apple-authentication documents for a
+      // cancelled request. Silent return, same treatment a cancelled iOS
+      // system dialog gets everywhere else in this app.
+      if (err.code === 'ERR_REQUEST_CANCELED') return;
+      console.warn('Onboarding Apple sign-in failed', err);
+      setError('Apple sign-in failed — try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setBusy(true);
     setError(null);
     try {
-      if (isSignUp) {
+      if (isMagicLink) {
+        // No session yet — same shape as the sign-up confirm-email exit
+        // below, and for the same reason (C6): the session only exists
+        // after the user follows the emailed link, which AuthContext's
+        // Linking listener turns into a session in whatever process is
+        // running when they tap it.
+        await HoneycombStore.signInWithOtp(email.trim());
+        setMagicLinkSent(true);
+      } else if (isSignUp) {
         const result = await HoneycombStore.signUp(email.trim(), password, name.trim());
         if (result.session) {
           await completeAfterAuth();
@@ -679,16 +750,75 @@ const AccountStep = ({
     );
   }
 
+  // ENG-83's no-password exit. Same shape as `confirmSent` above and for the
+  // same reason (C6): no session exists yet, "Continue" is a manual escape
+  // hatch, and the real completion is the `session && step === STEP_ACCOUNT`
+  // effect in OnboardingFlow firing once AuthContext turns the tapped link
+  // into a session.
+  if (magicLinkSent) {
+    return (
+      <StepShell step={step} stage="account" wash={theme.colors.washYellow} showMap={false}>
+        <View style={styles.centerFill}>
+          <Text style={styles.h1Center}>Check your email</Text>
+          <Text style={styles.bodyLgCenter}>
+            We sent a sign-in link to {email.trim()}. Tap it on this device to finish — no password needed.
+          </Text>
+        </View>
+        <PrimaryButton onPress={onNext}>Continue</PrimaryButton>
+      </StepShell>
+    );
+  }
+
+  const heading = isMagicLink ? "We'll email you a link." : isSignUp ? 'Keep it.' : 'Welcome back';
+  const subtitle = isMagicLink
+    ? "No password to invent — tap the link we send and you're in."
+    : isSignUp
+      ? 'Make an account so your entries follow you — and so your hive can see the ones you choose to share.'
+      : 'Sign in to pick up where you left off.';
+  const submitLabel = isMagicLink
+    ? (busy ? 'Sending link…' : 'Email me a sign-in link')
+    : isSignUp
+      ? (busy ? 'Creating account…' : 'Create account')
+      : (busy ? 'Signing in…' : 'Sign in');
+
+  // Every OTHER path back to the password form, or away from it, in one
+  // list — this is what keeps "email me a link" discoverable from the
+  // password screens (task's "real alternative, not a replacement") while
+  // also giving the no-password screen its own way back for someone who'd
+  // rather set a password.
+  const switchLinks = isMagicLink
+    ? [
+        { label: 'Have a password already? Sign in', mode: 'signin' },
+        { label: 'Prefer to set a password? Create an account', mode: 'signup' },
+      ]
+    : isSignUp
+      ? [
+          { label: 'Already have an account? Sign in', mode: 'signin' },
+          { label: 'Skip the password — email me a link instead', mode: 'magiclink' },
+        ]
+      : [
+          { label: 'New here? Create an account', mode: 'signup' },
+          { label: 'Skip the password — email me a link instead', mode: 'magiclink' },
+        ];
+
   return (
     <StepShell step={step} stage="account" wash={theme.colors.washYellow} showMap={false}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.fillBetween}>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={styles.h1}>{isSignUp ? 'Keep it.' : 'Welcome back'}</Text>
-          <Text style={styles.bodySm}>
-            {isSignUp
-              ? 'Make an account so your entries follow you — and so your hive can see the ones you choose to share.'
-              : 'Sign in to pick up where you left off.'}
-          </Text>
+          <Text style={styles.h1}>{heading}</Text>
+          <Text style={styles.bodySm}>{subtitle}</Text>
+          {appleAvailable && (
+            <>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={theme.borderRadius.medium}
+                style={styles.appleButton}
+                onPress={handleAppleSignIn}
+              />
+              <Text style={styles.orDivider}>or</Text>
+            </>
+          )}
           <View style={styles.inputCard}>
             {isSignUp && (
               <TextInput
@@ -715,19 +845,27 @@ const AccountStep = ({
               returnKeyType="next"
               editable={!busy}
             />
-            <View style={styles.inputDivider} />
-            <TextInput
-              style={styles.nameInput}
-              placeholder="Password (6+ characters)"
-              placeholderTextColor={theme.colors.inkSoft}
-              value={password}
-              onChangeText={onChangePassword}
-              secureTextEntry
-              returnKeyType="done"
-              editable={!busy}
-            />
+            {/* No password field in magic-link mode — not hidden, absent.
+                This is the property ENG-59's invite-link entry point exists
+                to rely on: a stranger who has never set a password is never
+                shown a control that asks for one. */}
+            {mode !== 'magiclink' && (
+              <>
+                <View style={styles.inputDivider} />
+                <TextInput
+                  style={styles.nameInput}
+                  placeholder="Password (6+ characters)"
+                  placeholderTextColor={theme.colors.inkSoft}
+                  value={password}
+                  onChangeText={onChangePassword}
+                  secureTextEntry
+                  returnKeyType="done"
+                  editable={!busy}
+                />
+              </>
+            )}
           </View>
-          {isSignUp && (
+          {(isSignUp || isMagicLink) && (
             // No consent checkbox yet. The copy in legalCopy.js is now a real
             // draft, but four values in it are still unfilled, so it renders
             // "[the publisher of this app]" and is not publishable — and
@@ -750,14 +888,16 @@ const AccountStep = ({
             </Text>
           )}
           {error && <Text style={styles.signUpError}>{error}</Text>}
-          <PressableScale onPress={() => setMode(isSignUp ? 'signin' : 'signup')} haptic={null}>
-            <Text style={styles.switchModeText}>
-              {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
-            </Text>
-          </PressableScale>
+          <View style={styles.switchLinksGroup}>
+            {switchLinks.map((link) => (
+              <PressableScale key={link.mode} onPress={() => setMode(link.mode)} haptic={null}>
+                <Text style={styles.switchModeText}>{link.label}</Text>
+              </PressableScale>
+            ))}
+          </View>
         </ScrollView>
         <PrimaryButton onPress={handleSubmit} disabled={!canSubmit} style={styles.floatingButton}>
-          {busy ? (isSignUp ? 'Creating account…' : 'Signing in…') : isSignUp ? 'Create account' : 'Sign in'}
+          {submitLabel}
         </PrimaryButton>
       </KeyboardAvoidingView>
     </StepShell>
@@ -776,9 +916,18 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
   // signup" / "Sign in") and the auth deep links land directly on the
   // account beat, and doing that in the initialiser means the Landing never
   // renders for a frame first.
-  const jumpToAccount = startAt === 'signup' || startAt === 'signin';
+  //
+  // ENG-83 — `startAt === 'invite'` is the value ENG-59's comb invite-link
+  // entry point is expected to pass (that screen doesn't exist in this repo
+  // yet; nothing produces this value today). It seeds AccountStep straight
+  // into 'magiclink', which is the ONLY of the three modes that never
+  // renders a password field — the property a stranger with no password to
+  // give absolutely cannot be routed past.
+  const jumpToAccount = startAt === 'signup' || startAt === 'signin' || startAt === 'invite';
   const [step, setStep] = useState(jumpToAccount ? STEP_ACCOUNT : STEP_LANDING);
-  const [accountMode, setAccountMode] = useState(startAt === 'signin' ? 'signin' : 'signup');
+  const [accountMode, setAccountMode] = useState(
+    startAt === 'invite' ? 'magiclink' : startAt === 'signin' ? 'signin' : 'signup'
+  );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1025,6 +1174,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     ...theme.shadows.card,
   },
+  // ENG-83 — the native Sign in with Apple button. Fixed 50pt height is
+  // Apple's own minimum for the system button (HIG); shorter clips its
+  // label on some locales.
+  appleButton: {
+    height: 50,
+    marginTop: 20,
+  },
+  orDivider: {
+    ...theme.type.bodySm,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+    marginVertical: 10,
+  },
   nameInput: {
     fontFamily: theme.fonts.body,
     fontSize: 19,
@@ -1059,6 +1221,10 @@ const styles = StyleSheet.create({
     // as signInLink below. Was 2.3482:1 on washYellow.
     color: theme.colors.inkSoft,
     textAlign: 'center',
+  },
+  // Up to two switchModeText links stack here now (ENG-83) instead of one.
+  switchLinksGroup: {
+    gap: 8,
   },
   entryInput: {
     fontFamily: theme.fonts.body,

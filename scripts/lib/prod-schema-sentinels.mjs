@@ -194,4 +194,115 @@ export const SENTINELS = {
     args: { p_entry_id: '00000000-0000-0000-0000-000000000000' },
     expect: 'success',
   },
+  // Column probe, not an rpc probe on delete_own_account() itself — that
+  // function is destructive (deletes the caller's auth.users row) and this
+  // suite must never invoke it against prod, permission-denied or not.
+  // deleted_at is the anon-visible surface this migration actually adds:
+  // GET .../profiles?select=deleted_at answers 42703 before this migration,
+  // and 200 (empty array under RLS, since anon matches no profiles row —
+  // policies require auth.uid()) after it — same undefined-column-fires-
+  // before-RLS shape 20260813000006's row already relies on.
+  '20260830000001_eng84_account_deletion': { kind: 'column', table: 'profiles', column: 'deleted_at' },
+  // ENG-58 (Sage). Filename renumbered 20260830000001 -> 20260830000002 to
+  // avoid the prefix collision with ENG-84 (merged first, same day) — this
+  // key matches the renamed file. Same `kind: 'column'` shape as every
+  // other table-creation row in this file (20260808000001, 20260813000001/2,
+  // 20260815000001) rather than an `rpc` probe: this migration's every new
+  // function explicitly revokes anon (comb_member_count, comb_co_member_names,
+  // comb_rotation_roster, is_comb_member all `revoke execute ... from
+  // anon`), so an rpc probe would read 42501 both for "function does not
+  // exist yet" in one code path (PGRST202, already MISSING before this) and
+  // "function exists, anon denied" after — the exact ambiguity `expect`
+  // exists to resolve, avoided here by probing a table column instead,
+  // where 200-or-42501 both prove existence regardless of anon's grant (see
+  // the `kind: 'column'` comment above).
+  '20260830000002_comb_rotation_schema': { kind: 'column', table: 'combs', column: 'id' },
+  // ENG-91 (Sage). Same reasoning as 20260830000002's row, one column over:
+  // seal_and_send_rotation() is the only new function here and it's granted
+  // to service_role alone (not even `authenticated`), so an rpc probe would
+  // read 42501 for "doesn't exist yet" and "exists, anon/authenticated
+  // denied" alike — the exact ambiguity a column probe sidesteps.
+  // voided_reason is the one new column this migration adds to the
+  // already-RLS'd comb_rotations table (20260830000002): GET
+  // .../comb_rotations?select=voided_reason answers 42703 before this
+  // migration, 200-or-42501 after, regardless of anon's grant on the table.
+  '20260830000003_eng91_seal_and_send_rotation': { kind: 'column', table: 'comb_rotations', column: 'voided_reason' },
+  // ENG-59 (Fizz). comb_join_by_invite_code adds no new column — same shape
+  // as seal_hive/seal_volume above: a SECURITY DEFINER function revoked from
+  // anon in the same migration that creates it, so 42501 is what "this
+  // migration landed" looks like from outside (an rpc probe against a
+  // service_role-only function like ENG-91's would be ambiguous between
+  // "doesn't exist" and "exists, denied" — not the case here, since anon's
+  // denial is the only state this function has ever been in).
+  '20260830000004_eng59_comb_join_by_invite': {
+    kind: 'rpc',
+    fn: 'comb_join_by_invite_code',
+    args: { p_invite_code: 'calibration-invalid-code' },
+    expect: '42501',
+  },
+  // ENG-59 (Fizz). comb_preview_by_invite_code is the opposite grant shape
+  // from comb_join_by_invite_code above -- anon is meant to reach it (the
+  // whole point of a pre-auth landing), so 42501 is never a LIVE reading
+  // here. 'exists' would be ambiguous the other direction (a PGRST202-only
+  // check can't tell "created, still revoked from anon" apart from "granted
+  // to anon"), so this probes for the full round trip: an invalid code is a
+  // legitimate call this function is built to answer with 200 and zero
+  // rows, not an error -- exactly what 'success' distinguishes from
+  // "function exists but anon still can't call it."
+  '20260830000006_comb_preview_by_invite_code': {
+    kind: 'rpc',
+    fn: 'comb_preview_by_invite_code',
+    args: { p_invite_code: 'calibration-invalid-code' },
+    expect: 'success',
+  },
+  // ENG-93 (Fizz, row 1.7a). comb_open_rotation is the same grant shape as
+  // comb_join_by_invite_code above: revoked from anon in the same migration
+  // that creates it (granted only to authenticated and service_role), so
+  // 42501 is what "this migration landed" looks like from outside — anon's
+  // denial is the only state this function has ever been in, regardless of
+  // whether the calibration args below would also fail their own checks
+  // (nonexistent comb, tombstone check, etc.) once past the grant.
+  '20260830000008_eng93_comb_open_rotation': {
+    kind: 'rpc',
+    fn: 'comb_open_rotation',
+    args: {
+      p_comb_id: '00000000-0000-0000-0000-000000000000',
+      p_subject_profile_id: '00000000-0000-0000-0000-000000000000',
+      p_closes_at: '2026-01-01T00:00:00Z',
+    },
+    expect: '42501',
+  },
+  // ENG-95 (Sage). comb_subject_gone(uuid, uuid) is revoked from public,
+  // anon, AND authenticated -- unlike every 'rpc' entry above, there is no
+  // role this function is ever meant to answer for directly (every caller
+  // is itself SECURITY DEFINER and reaches it through owner privilege, not
+  // a grant), so there is no anon/authenticated probe that would read
+  // differently before and after this migration. seal_and_send_rotation's
+  // own grants (service_role only) are unchanged by this migration's
+  // create-or-replace. No anon-visible surface, same class as
+  // nectar_sats_override above.
+  '20260830000009_eng95_seal_nonmember_subject': { kind: 'order', reason: 'new SECURITY DEFINER helper revoked from every client role; seal_and_send_rotation body replace only, grants unchanged' },
+  // ENG-92 (Sage). No new table/column and no anon-visible surface: one
+  // ALTER POLICY (comb_rotations_insert_owner, still authenticated-only
+  // insert), one new trigger (private_hives, no new column), and every new
+  // or replaced function here is anon-revoked (comb_rotation_writer_count
+  // explicitly; comb_member_count/comb_co_member_names/delete_own_account
+  // were already anon-revoked by the migrations that first created them
+  // and this one only replaces their bodies, not their grants) — same
+  // reasoning as 20260830000002/3's rows, one migration over.
+  '20260830000007_eng92_comb_rotation_fixes': {
+    kind: 'order',
+    reason: 'policy alter + trigger + definer functions, all anon-revoked; no anon-visible surface',
+  },
+  // ENG-94 (Fizz). Repoints comb_open_rotation and comb_preview_by_invite_code
+  // onto the shared comb_subject_gone predicate (ENG-95) — body replace only
+  // for both functions, no grant changes (comb_open_rotation stays revoked
+  // from anon per `...0008`'s sentinel above; comb_preview_by_invite_code
+  // stays anon-callable per `...0006`'s). The externally-visible probe shape
+  // for both functions is identical before and after this migration — the
+  // only behavior change (the departure arm folding into the mint refusal
+  // and into has_active_month) requires a live open rotation with a
+  // departed/tombstoned subject to observe, which no anon calibration probe
+  // can construct. Same class as `...0009` above.
+  '20260830000010_eng94_repoint_subject_gone': { kind: 'order', reason: 'comb_open_rotation and comb_preview_by_invite_code body replace only; grants unchanged for both' },
 };

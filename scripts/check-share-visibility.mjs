@@ -328,15 +328,108 @@ async function main() {
   //   schema PostgREST does not expose, which would close the oracle for
   //   authenticated AND anon at once without touching the inlining fix.
   //
-  // A fourth function landing in this set without its own argument in this
+  //   comb_preview_by_invite_code(text) — anon-callable BY DESIGN, not an
+  //   inlining leak like the three above: this is DES-37's pre-auth invite
+  //   landing, and the whole point is that a stranger holding a link (no
+  //   session at all) can resolve headline/subject/count before signing in.
+  //   The oracle-shape argument the other three entries make ("once EXECUTE
+  //   exists, any caller can enumerate/probe") does not transfer cleanly
+  //   here because the input space isn't small-integer-enumerable: the
+  //   function's sole authorization input is invite_code, a 32-hex-char
+  //   gen_random_uuid() value (122 random bits, ENG-58 migration :150) — the
+  //   same entropy floor ENG-59's join RPC relies on for the identical
+  //   argument. An invalid or guessed code returns the same zero-row shape
+  //   as a revoked one would (Lumen's boundary note, thread b57ad406,
+  //   2026-08-30 16:15:36; enforced by check-comb-preview.mjs #3/#4), so
+  //   there is no distinguishing signal to extract even at scale. The
+  //   function's body also never references entries (check-comb-preview.mjs
+  //   #6, grepped directly) — membership count and names only, nothing
+  //   write-status-shaped for an unauthenticated caller to learn.
+  //
+  // A fifth function landing in this set without its own argument in this
   // comment is exactly the failure mode a blanket accept would produce —
-  // this list is a name check, not a count check, and stays exactly three
-  // until someone adds a paragraph above to go with a fourth.
-  const ALLOWED_ANON_DEFINERS = new Set([
-    'is_hive_contributor(uuid)',
-    'is_volume_open(uuid)',
-    'owns_entry(uuid)',
+  // this list is a name check, not a count check, and stays exactly four
+  // until someone adds a paragraph above to go with a fifth.
+  //
+  // OPS-11 (Vector, thread b57ad406, 2026-08-30): the four paragraphs above
+  // are the anon half of a bigger question. `authenticated` has no catalog
+  // assertion anywhere — where it's covered at all it's covered per
+  // function, in that function's own gate — and a one-directional "anon
+  // can't exceed this set" check catches a widened grant but not a LOST
+  // one; a security argument built on a revoke (like the four above) needs
+  // an assertion that fails if the revoke silently disappears. Measured on
+  // this same catalog (20260813000005's header): every future SECURITY
+  // DEFINER function is born with EXECUTE already granted to
+  // anon/authenticated/service_role via Supabase's own platform-level
+  // `alter default privileges`, which runs outside this repo's migrations —
+  // so a function that never got an explicit revoke is not "ungranted",
+  // it's silently open, and the only way to know is to ask the catalog.
+  //
+  // EXPECTED_DEFINER_GRANTS below generalizes ALLOWED_ANON_DEFINERS to all
+  // three client-facing roles, asserted `==` (not just "not more than") in
+  // both directions, for every SECURITY DEFINER function in `public` — not
+  // just the ones a migration happened to touch. Two failure classes this
+  // catches that the anon-only check could not: (1) `extra` — a role can
+  // execute a function nothing here expects, whether from a genuinely new
+  // grant or a lost revoke on an old one; (2) `missing` — an expected grant
+  // (e.g. one of the four anon exceptions above) silently regressed, which
+  // for `is_hive_contributor`/`is_volume_open`/`owns_entry` would resurrect
+  // the exact inlining 500 those three migrations closed. A function with
+  // no row at all is also a failure — a new definer ships un-reviewed
+  // otherwise, which is the condition this whole gate exists to end.
+  //
+  // A TRIGGER function's grant is inert — Postgres refuses `select
+  // fn()`/`rpc/fn` on it directly ("trigger functions can only be called as
+  // triggers") regardless of what the catalog says — but its row still
+  // names the true grant state rather than being left out, because a
+  // silent row is exactly how `entries_mark_shared` and `handle_new_user`
+  // (authenticated-open via the un-revoked default privilege, no explicit
+  // grant statement, no comment) diverged unnoticed from the three sibling
+  // trigger functions that got an explicit — if redundant — grant written
+  // down (Vector's own measurement: "written by pattern, not per-function
+  // decision"). Being inert is why this is not a leak; it is still a fact
+  // the map has to state, not infer.
+  //
+  // `why` is one line, the standard the four anon paragraphs above already
+  // set: enough to tell a reviewer this was decided, not defaulted into.
+  const EXPECTED_DEFINER_GRANTS = new Map([
+    // -- anon-callable by name: the four exceptions argued in full above --
+    ['comb_preview_by_invite_code(text)', { roles: ['anon', 'authenticated', 'service_role'], why: 'DES-37 pre-auth invite landing — anon-callable by design, argued above' }],
+    ['is_hive_contributor(uuid)', { roles: ['anon', 'authenticated', 'service_role'], why: 'inlining-leak fix, named exception above' }],
+    ['is_volume_open(uuid)', { roles: ['anon', 'authenticated', 'service_role'], why: 'inlining-leak fix, named exception above' }],
+    ['owns_entry(uuid)', { roles: ['anon', 'authenticated', 'service_role'], why: 'inlining-leak fix, named exception above' }],
+
+    // -- ordinary logged-in RPCs / RPC helpers: anon revoked, authenticated needs a session --
+    ['comb_co_member_names(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster-name RPC, requires a session' }],
+    ['comb_join_by_invite_code(text)', { roles: ['authenticated', 'service_role'], why: 'ENG-59 post-auth join, requires a session' }],
+    ['comb_member_count(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster-count RPC, requires a session' }],
+    ['comb_open_rotation(uuid,uuid,timestamp with time zone)', { roles: ['authenticated', 'service_role'], why: 'ENG-93 organizer mint (authenticated) + advance_due_rotations cron (service_role)' }],
+    ['comb_rotation_roster(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster RPC, requires a session' }],
+    ['comb_rotation_writer_count(uuid)', { roles: ['authenticated', 'service_role'], why: 'ENG-92 Part 2, C1 denominator RPC, requires a session (see §1B.23.2\'s caveat: only accurate for a subject who is a comb member)' }],
+    ['consent_to_nectar()', { roles: ['authenticated', 'service_role'], why: 'nectar consent RPC, requires a session' }],
+    ['delete_own_account()', { roles: ['authenticated', 'service_role'], why: 'ENG-84 self-service deletion, requires a session' }],
+    ['find_connectable_profile(text)', { roles: ['authenticated', 'service_role'], why: 'account-lookup RPC; anon revoked 20260813000005 (account-existence oracle)' }],
+    ['is_comb_member(uuid)', { roles: ['authenticated', 'service_role'], why: 'membership-check RPC helper, requires a session' }],
+    ['plant_seed(uuid,text,timestamp with time zone)', { roles: ['authenticated', 'service_role'], why: 'seed-planting RPC, requires a session' }],
+    ['profile_has_display_name(uuid)', { roles: ['authenticated', 'service_role'], why: 'invite-time display-name guard RPC helper, requires a session' }],
+    ['record_zap(uuid,nectar_zap_target_kind,uuid,bigint)', { roles: ['authenticated', 'service_role'], why: 'nectar zap RPC, requires a session' }],
+    ['seal_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'legacy (pre-volumes) hive-seal RPC, requires a session' }],
+    ['send_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'hive-send RPC, requires a session' }],
+
+    // -- service_role only: internal/cron, no client role needs direct EXECUTE --
+    ['comb_subject_gone(uuid,uuid)', { roles: ['service_role'], why: 'ENG-95 shared predicate, called only from other definers — a definer body bypasses the caller EXECUTE check on what it calls' }],
+    ['seal_and_send_rotation(uuid)', { roles: ['service_role'], why: 'ENG-91 cron-only seal-and-send, explicit anon+authenticated revoke' }],
+    ['seal_volume(uuid)', { roles: ['service_role'], why: 'cron/service-only volume seal, explicit anon+authenticated revoke' }],
+
+    // -- trigger functions: grant is inert, row still states the true grant --
+    ['combs_create_owner_membership()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
+    ['comb_members_departure_closes_writing_seat()', { roles: ['authenticated', 'service_role'], why: 'ENG-99 trigger, inert; explicit (redundant) authenticated grant, documented' }],
+    ['entries_mark_shared()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
+    ['entries_resolve_volume_id()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
+    ['handle_new_user()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
+    ['private_hives_create_volume_one()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
   ]);
+  const CHECKED_ROLES = ['anon', 'authenticated', 'service_role'];
   const definers = (
     await client.query(`
       select p.oid::regprocedure::text as sig
@@ -346,32 +439,58 @@ async function main() {
       order by 1
     `)
   ).rows.map((r) => r.sig);
-  const anonCanRun = [];
-  for (const sig of definers) {
-    const { rows } = await client.query('select has_function_privilege($1, $2, $3) as e', [
-      'anon',
-      sig,
-      'execute',
-    ]);
-    if (rows[0].e) anonCanRun.push(sig);
-  }
-  const unexpected = anonCanRun.filter((sig) => !ALLOWED_ANON_DEFINERS.has(sig));
   if (definers.length === 0) {
     bad(
-      '`anon` cannot execute any SECURITY DEFINER function beyond the named exceptions',
+      'every SECURITY DEFINER function in `public` has a reviewed, catalog-matching execute-grant set',
       'found no SECURITY DEFINER functions at all — the query is wrong, or the schema changed shape'
     );
-  } else if (unexpected.length === 0) {
-    ok(
-      `\`anon\` cannot execute any of the ${definers.length} SECURITY DEFINER functions in \`public\`` +
-        (anonCanRun.length ? `, except the ${anonCanRun.length} named exception(s): ${anonCanRun.join(', ')}` : '')
-    );
   } else {
-    bad(
-      '`anon` cannot execute any SECURITY DEFINER function beyond the named exceptions',
-      `signed-out callers can run: ${unexpected.join(', ')} — if this is deliberate, argue its safety in the ` +
-        'comment above ALLOWED_ANON_DEFINERS and add it there by name; do not widen the check to accept it implicitly'
-    );
+    const mismatches = [];
+    for (const sig of definers) {
+      const expected = EXPECTED_DEFINER_GRANTS.get(sig);
+      const actual = [];
+      for (const role of CHECKED_ROLES) {
+        const { rows } = await client.query('select has_function_privilege($1, $2, $3) as e', [role, sig, 'execute']);
+        if (rows[0].e) actual.push(role);
+      }
+      if (!expected) {
+        mismatches.push(
+          `${sig}: no row in EXPECTED_DEFINER_GRANTS (currently executable by: ${actual.join(', ') || 'no one'}) — ` +
+            'a new SECURITY DEFINER function needs a reviewed grant-set row, argued the way the rows above are, before this gate can pass'
+        );
+        continue;
+      }
+      const expectedSet = new Set(expected.roles);
+      const actualSet = new Set(actual);
+      const extra = actual.filter((r) => !expectedSet.has(r));
+      const missing = expected.roles.filter((r) => !actualSet.has(r));
+      if (extra.length || missing.length) {
+        mismatches.push(
+          `${sig}: expected {${expected.roles.join(', ')}}, catalog shows {${actual.join(', ') || 'none'}}` +
+            (extra.length ? ` — unexpected EXECUTE for ${extra.join(', ')} (widened grant or lost revoke)` : '') +
+            (missing.length ? ` — missing expected EXECUTE for ${missing.join(', ')} (lost grant)` : '')
+        );
+      }
+    }
+    for (const sig of EXPECTED_DEFINER_GRANTS.keys()) {
+      if (!definers.includes(sig)) {
+        mismatches.push(
+          `${sig}: named in EXPECTED_DEFINER_GRANTS but no longer exists in the catalog — stale row, remove it ` +
+            '(a renamed/dropped function keeping its old signature here hides the new signature having no row at all)'
+        );
+      }
+    }
+    if (mismatches.length === 0) {
+      ok(
+        `all ${definers.length} SECURITY DEFINER functions in \`public\` carry exactly their reviewed execute-grant ` +
+          `set across ${CHECKED_ROLES.join('/')}`
+      );
+    } else {
+      bad(
+        'every SECURITY DEFINER function in `public` has a reviewed, catalog-matching execute-grant set',
+        mismatches.join('; ')
+      );
+    }
   }
 
   // --- Fixtures --------------------------------------------------------------

@@ -25,6 +25,17 @@ export const supabase = isSupabaseConfigured
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
+        // ENG-83 — magic-link sign-in. PKCE (not the 'implicit' default) is
+        // what puts the callback's token in a `?code=` query param instead
+        // of a `#access_token=` URL fragment: React Native has no browser
+        // location bar to read a fragment from, so `src/services/
+        // authLinking.js` and `HoneycombStore.completeSessionFromUrl` are
+        // written against the `code` shape. `detectSessionInUrl` stays
+        // false either way — that flag is GoTrue's own browser-only
+        // auto-parse, meaningless with no DOM `window.location`, and RN's
+        // deep-link event is what feeds the callback URL to this client
+        // instead (AuthContext.js).
+        flowType: 'pkce',
       },
     })
   : null;
