@@ -8898,3 +8898,55 @@ The only `comb_rotations` read in `src/` is `HiveStore.js:135`, inside the owner
 I'd take **(b)** if the `ENG-98` contention allows it: one field on one select buys both client guards, turns all three server refusals back into genuine belts, and leaves the copy problem as a fallback nobody normally reaches. **(a)** is defensible but ships three permanent refusals whose only user-facing sentence is a retry instruction.
 
 `O10` still the only open item on the critical path.
+
+
+---
+
+### §1B.38.38 — (b) adopted. But the scope line tells @Fizz to mirror a join that does not exist: `listHives` has **no** comb filter — that is `ENG-98` item 1, unbuilt, and the pattern it points at (`:135`) is a different function. Plus two addresses carried forward from the corrected tree. (2026-08-31, Vector)
+
+Verified `git show github/main` at `4a0bb57`.
+
+#### 1. `listHives` has nothing to mirror
+
+```js
+// HiveStore.js:228 — async listHives()
+.from('private_hives')
+.select('id, subject_name, cover_theme, review_cadence, sealed_at, created_at')
+.eq('owner_id', ownerId)
+```
+
+**Six plain columns. No `comb_rotations`, no left join, no `is null` filter.** The scope line's *"same left-join-`is null` shape `listHives` already uses at `HiveStore.js:135`"* has two errors that compound: `listHives` **starts at `:228`**, so `:135` is not inside it; and `:135` is `resolveCombOwnerNames` (`:131-137`), which is a **separate `comb_rotations` query keyed by `hive_id`** —
+
+```js
+const { data: rotations } = await client
+  .from('comb_rotations')
+  .select('hive_id, comb_id')
+  .in('hive_id', hiveIds);
+```
+
+— not a PostgREST embed at all.
+
+**The left-join-`is null` embed is `ENG-98` item 1's FILED shape, not a built one.** `GUIDES/POLLINATE_V2_DES31_DES39_ROTATION_SHELF.md:126` — *"`listHives` gains a comb-exclusion filter — left-join `comb_rotations` on `hive_id`, keep only `is null` rows"* — with my own build note at `:79` explaining the PostgREST expression. **So the instruction routes @Fizz at the unbuilt ticket this PR is repeatedly ruled independent of**, and a builder who opens `listHives` to copy the pattern finds nothing there.
+
+> **§1B.38.29's finding, arriving as an instruction.** *"`listHives` carries no comb filter"* was the discovery that opened the organizer lane; three hours later it is quoted as an existing pattern to imitate. **A negative finding and a positive instruction can name the same line — when a scope line says "mirror what X already does," open X.**
+
+#### 2. What @Fizz can actually copy
+
+`getHive` is a **single-hive** read, so it needs no embed:
+
+- **Cheapest** — one `comb_rotations` select keyed on the hive, `resolveCombOwnerNames:134-137`'s shape with `.eq('hive_id', hiveId)` instead of `.in(...)`. One extra round trip, zero PostgREST subtlety, and `comb_rotations_select` (`…0002:498-503`) already grants the organizer the read via `combs.owner_id = auth.uid()`.
+- **Or** the `!left` embed from `ENG-98`'s build note, if the same expression is wanted in both places later.
+
+#### 3. Two addresses carried forward, and the mechanism is new
+
+*"seal row (`:198`)"* → **`:205`**. *"invite block (`:154`)"* → **`:161`**. Both **−7**, the `d67b467` `rosterLabel` shrink.
+
+**But this is not another stale-tree read.** The shared checkout is still at `208dc8f` and its reflog is unchanged since `05:05:56` — `HiveDetail.js` is byte-identical to `main` there, so reading the working tree would have given `:205`/`:161`. These are numbers **carried from the earlier messages**, written before the instrument was fixed.
+
+> **A corrected instrument does not retroactively correct the numbers already in your notes.** Exactly `§1B.38.21`'s finding — *announcing a change of instrument does not re-derive figures already in the draft* — one arc later and from the other direction. **Fixing the read fixes the next number, never the last one; re-derive the ones you are about to re-use.**
+
+#### 4. File overlap, stated so it is a known cost
+
+This PR now edits `getHive`; `ENG-98` items 1–2 edit `listHives` and add the organizer read — **same file**. *"No `ENG-98` dependency"* holds for **ordering** (neither blocks the other) and not for **file-set**: whichever lands second rebases inside `HiveStore.js`. Small, and better named than discovered at rebase.
+
+`O10` still the only open item on the critical path.
