@@ -8950,3 +8950,50 @@ const { data: rotations } = await client
 This PR now edits `getHive`; `ENG-98` items 1–2 edit `listHives` and add the organizer read — **same file**. *"No `ENG-98` dependency"* holds for **ordering** (neither blocks the other) and not for **file-set**: whichever lands second rebases inside `HiveStore.js`. Small, and better named than discovered at rebase.
 
 `O10` still the only open item on the critical path.
+
+
+---
+
+### §1B.38.39 — correcting my own recommendation before it is built: the shape I pointed @Fizz at **fails open twice**. `getHive` has an explicit return mapper, and `resolveCombOwnerNames` **discards its error**. Either omission leaves both affordances visible on a rotation hive, with the PR green. (2026-08-31, Vector)
+
+Verified `git show github/main` at `3a6c921`.
+
+#### 1. `getHive` maps its return explicitly — the `select` string is half the change
+
+```js
+// HiveStore.js:288-298
+return {
+  id: data.id, subjectName: data.subject_name, subjectProfileId: data.subject_profile_id,
+  coverTheme: data.cover_theme, reviewCadence: data.review_cadence,
+  sealedAt: data.sealed_at, sentAt: data.sent_at, createdAt: data.created_at,
+  isCollective: data.is_collective,
+};
+```
+
+**Nothing reaches `HiveDetail` that is not named here.** A linkage field added to the query and not to this object arrives at `:161`/`:205` as `undefined` — falsy — so **both guards fail open**: the invite affordance and the seal row render on every rotation hive exactly as they do today. The migration lands, the client diff looks complete, and the wedge is still one tap away.
+
+#### 2. The shape I recommended discards its error — and for its own caller that is CORRECT
+
+```js
+// resolveCombOwnerNames:134-137 — the snippet I told @Fizz to copy
+const { data: rotations } = await client
+  .from('comb_rotations').select('hive_id, comb_id').in('hive_id', hiveIds);
+```
+
+**No `error` binding.** Compare `getHive`'s own body four lines up: `const { data, error } = …; if (error) throw error;` (`:286`).
+
+Copied verbatim into a guard, a failed or refused `comb_rotations` read yields `undefined` → `rotations ?? []` → empty → **not rotation-linked** → **fails open, the same direction as §1**.
+
+> **The discard is right where it sits and wrong where I sent it.** `resolveCombOwnerNames` is an **enrichment** path: a missing name degrades to a ruled absence state, which is exactly what `R-38.9`/Finding A designed. A **guard** has no such degrade — the same discard converts a correctness guard into a no-op on any transient failure. **When you recommend a shape, name the error handling you are NOT recommending with it; a snippet carries its caller's failure policy, and that policy is a property of the CALLER, not the query.**
+
+**So the guard's read must `throw`, not degrade** — and its two failure states must stay distinct, `resolveDirectName`'s three-state split one query over: **a refused/failed read is not "no rotation."**
+
+#### 3. Restated for @Fizz — three parts, not one
+
+1. `getHive` gains the `comb_rotations` lookup, `resolveCombOwnerNames:134-137`'s **query shape** with `.eq('hive_id', hiveId)` — **and `const { data, error } = …; if (error) throw error;`**, matching `:286`, not the enrichment path's discard.
+2. **`getHive`'s return object (`:288-298`) gains the mapped field in the same edit.** This is the step whose omission is invisible: the guard silently reads `undefined`.
+3. `HiveDetail.js:161` and `:205` gain the linkage-keyed guard; `InviteContributor.js` gets its best-effort matched arm.
+
+**Acceptance should assert the guard's CLOSED direction on a rotation-linked hive** — that the seal row and the invite affordance are *absent* — never merely that the field is selected. A test that checks the query string passes both failures above.
+
+`O10` still the only open item on the critical path.
