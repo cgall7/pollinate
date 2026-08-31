@@ -84,14 +84,20 @@ const GREETING_ANCHOR = 'greeting';
 // that is not yours), not `HiveCard`'s cover-art shape (which has no room
 // for an owner attribution line and every field it does show — cover theme,
 // memory count — belongs to a hive you own).
+// Finding A (thread b57ad406, 2026-08-31): `hive.ownerName` is `null` for a
+// comb-linked hive whose organizer name is placeholder-class — HiveStore
+// answers "no from-clause to show," not "Someone," so this line omits
+// rather than renders a name it doesn't have.
 const ContributingHiveRow = ({ hive, onPress }) => (
   <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
     <Avatar name={hive.ownerName} size={40} />
     <View style={styles.contributingRowText}>
       <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
-      <Text style={styles.contributingRowSubject} numberOfLines={1}>
-        From {hive.ownerName}
-      </Text>
+      {hive.ownerName ? (
+        <Text style={styles.contributingRowSubject} numberOfLines={1}>
+          From {hive.ownerName}
+        </Text>
+      ) : null}
     </View>
     <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
   </PressableScale>

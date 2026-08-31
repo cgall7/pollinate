@@ -33,11 +33,21 @@
 //   R7  each of the four render sites (R3-R6's three, minus R6 which takes
 //       no name) imports `isPlaceholderName` from '../utils/placeholderName'
 //   R8  `HiveStore.listContributingHives` and `.getContributingHive` both
-//       resolve `ownerName` through the same three-step chain, in order:
-//       the comb-aware read (`combOwnerNames`), then the direct `profiles`
-//       join, then the honest-refusal fallback `'Someone'` — comb-aware
-//       first, because a comb writer usually has no honeycomb connection
-//       to the organizer and the direct join returns nothing for them
+//       resolve `ownerName` by `combOwnerNames.has(id)` first — a
+//       comb-linked hive's answer, `null` or a real name, is final — falling
+//       to the direct `profiles` join then `'Someone'` only when the hive is
+//       NOT comb-linked at all (Finding A, thread b57ad406, 2026-08-31: a
+//       placeholder-class comb name must never fall through to 'Someone')
+//   R9  `resolveCombOwnerNames` nulls out a placeholder-class resolved name
+//       (`isPlaceholderName(name) ? null : name`) rather than passing it
+//       through — the source of R8's "final answer, not a fallback rung"
+//   R10 `TodayTab.js`'s contributing-hive row renders "From {ownerName}"
+//       only when `hive.ownerName` is truthy — omitted, not "From null",
+//       when a comb organizer's name is placeholder-class
+//   R11 `ContributingHive.js`'s banner omits ", from {ownerName}" under the
+//       same condition, and `rosterLabel` never renders a literal "with ."
+//       or drops a real writer from its numeric count when the owner's name
+//       is absent
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,6 +61,7 @@ const COMPOSE = path.join(SRC, 'screens/ComposeHiveEntry.js');
 const CONTRIBUTING = path.join(SRC, 'screens/ContributingHive.js');
 const RECEIVED = path.join(SRC, 'screens/ReceivedPackages.js');
 const HIVE_STORE = path.join(SRC, 'services/HiveStore.js');
+const TODAY_TAB = path.join(SRC, 'screens/TodayTab.js');
 
 let pass = 0;
 const failures = [];
@@ -82,15 +93,18 @@ const composeSrc = fs.readFileSync(COMPOSE, 'utf8');
 const contributingSrc = fs.readFileSync(CONTRIBUTING, 'utf8');
 const receivedSrc = fs.readFileSync(RECEIVED, 'utf8');
 const hiveStoreSrc = fs.readFileSync(HIVE_STORE, 'utf8');
+const todayTabSrc = fs.readFileSync(TODAY_TAB, 'utf8');
 
 const foldAst = parseJs(foldSrc);
 const composeAst = parseJs(composeSrc);
 const contributingAst = parseJs(contributingSrc);
 const hiveStoreAst = parseJs(hiveStoreSrc);
+const todayTabAst = parseJs(todayTabSrc);
 const foldCode = codeOnly(foldSrc, foldAst);
 const composeCode = codeOnly(composeSrc, composeAst);
 const contributingCode = codeOnly(contributingSrc, contributingAst);
 const hiveStoreCode = codeOnly(hiveStoreSrc, hiveStoreAst);
+const todayTabCode = codeOnly(todayTabSrc, todayTabAst);
 
 // ── R1/R2. the pure classifier, tested directly, and its source guarded ──
 {
@@ -183,8 +197,8 @@ const hiveStoreCode = codeOnly(hiveStoreSrc, hiveStoreAst);
   }
 }
 
-// ── R8. HiveStore owner-name resolution order — comb-aware, then direct
-//       join, then honest refusal (ENG-97) ──────────────────────────────
+// ── R8. HiveStore owner-name resolution — comb-linked answer is FINAL
+//       (Finding A), direct join + 'Someone' only when not comb-linked ──
 {
   const problems = [];
   for (const [fnName, mapKey] of [['listContributingHives', 'h.id'], ['getContributingHive', 'hive.id']]) {
@@ -198,17 +212,78 @@ const hiveStoreCode = codeOnly(hiveStoreSrc, hiveStoreAst);
       continue;
     }
     const body = hiveStoreCode.slice(fnNode.start, fnNode.end);
-    const usesCombOwnerNames = new RegExp(`combOwnerNames\\.get\\(${mapKey.replace('.', '\\.')}\\)`).test(body);
-    const chainOrder = new RegExp(
-      `combOwnerNames\\.get\\(${mapKey.replace('.', '\\.')}\\)\\s*\\|\\|[^|]*\\|\\|\\s*['"]Someone['"]`
+    const mapKeyEsc = mapKey.replace('.', '\\.');
+    // `.has()`, not `||` — a comb-linked hive whose resolved name is `null`
+    // must NOT fall through to the direct join or 'Someone' (Finding A).
+    const hasGuard = new RegExp(
+      `combOwnerNames\\.has\\(${mapKeyEsc}\\)\\s*\\?\\s*combOwnerNames\\.get\\(${mapKeyEsc}\\)\\s*:\\s*[^,]+\\|\\|\\s*['"]Someone['"]`
     ).test(body);
-    if (usesCombOwnerNames && chainOrder) {
-      ok(`R8 ${fnName} resolves ownerName as combOwnerNames → direct join → 'Someone', in that order`);
+    const noTruthyFallthrough = !new RegExp(`combOwnerNames\\.get\\(${mapKeyEsc}\\)\\s*\\|\\|`).test(body);
+    if (hasGuard && noTruthyFallthrough) {
+      ok(`R8 ${fnName} resolves ownerName via combOwnerNames.has() — comb-linked answer is final, direct-join/'Someone' only when not comb-linked`);
     } else {
-      problems.push(`${fnName}: combOwnerNames read found=${usesCombOwnerNames}, three-step || chain in order found=${chainOrder}`);
+      problems.push(`${fnName}: .has()-guarded chain found=${hasGuard}, no truthy-|| fallthrough=${noTruthyFallthrough}`);
     }
   }
-  if (problems.length) bad('R8 HiveStore owner-name resolution order', problems.join(' | '));
+  if (problems.length) bad('R8 HiveStore owner-name resolution', problems.join(' | '));
+}
+
+// ── R9. resolveCombOwnerNames nulls out a placeholder-class name ────────
+{
+  let fnNode = null;
+  walk(hiveStoreAst.program, (n) => {
+    if (fnNode) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'resolveCombOwnerNames') fnNode = n;
+  });
+  const body = fnNode ? hiveStoreCode.slice(fnNode.start, fnNode.end) : '';
+  const nullsPlaceholder = /isPlaceholderName\(name\)\s*\?\s*null\s*:\s*name/.test(body);
+  const importsHelper = /import\s*{\s*isPlaceholderName\s*}\s*from\s*['"]\.\.\/utils\/placeholderName['"]/.test(hiveStoreSrc);
+  if (fnNode && nullsPlaceholder && importsHelper) {
+    ok('R9 resolveCombOwnerNames nulls a placeholder-class resolved name instead of passing it through');
+  } else {
+    bad('R9 resolveCombOwnerNames placeholder guard', `function found=${!!fnNode}, nulls placeholder=${nullsPlaceholder}, imports helper=${importsHelper}`);
+  }
+}
+
+// ── R10. TodayTab's contributing-hive row omits "From X" when absent ────
+{
+  const hasGuardedLine = /hive\.ownerName\s*\?\s*\(\s*<Text[^>]*>\s*From \{hive\.ownerName\}/.test(todayTabCode);
+  if (hasGuardedLine) {
+    ok('R10 TodayTab renders "From {hive.ownerName}" only when hive.ownerName is truthy');
+  } else {
+    bad('R10 TodayTab owner-attribution guard', `guarded line found=${hasGuardedLine}`);
+  }
+}
+
+// ── R11. ContributingHive banner omits ", from X"; rosterLabel never
+//        drops a real writer from its count or renders an empty roster ──
+{
+  const bannerGuarded =
+    /hive\.ownerName\s*\?\s*\(\s*<>A hive for \{subjectDisplayName\}, from \{hive\.ownerName\}<\/>\s*\)\s*:\s*\(\s*<>A hive for \{subjectDisplayName\}<\/>\s*\)/.test(
+      contributingCode
+    );
+
+  let rosterFnNode = null;
+  walk(contributingAst.program, (n) => {
+    if (rosterFnNode) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'rosterLabel') rosterFnNode = n;
+  });
+  const rosterBody = rosterFnNode ? contributingCode.slice(rosterFnNode.start, rosterFnNode.end) : '';
+  // Count from `otherNames.length + 2` (owner + self, unconditional),
+  // never from the filtered display list — a null ownerName must not
+  // shrink the "N of you are writing" count by one.
+  const countsFromTotal = /otherNames\.length \+ 2/.test(rosterBody) && /totalWriters > 4/.test(rosterBody);
+  const namesFallback = /names\.length === 0/.test(rosterBody) && /'Writing with someone\.'/.test(rosterBody);
+  const filtersAbsent = /\[ownerName, \.\.\.otherNames\]\.filter\(Boolean\)/.test(rosterBody);
+
+  if (bannerGuarded && countsFromTotal && namesFallback && filtersAbsent) {
+    ok('R11 ContributingHive omits the from-clause when absent; rosterLabel counts from total writers and never renders an empty roster');
+  } else {
+    bad(
+      'R11 ContributingHive owner-attribution guard',
+      `banner guarded=${bannerGuarded}, roster found=${!!rosterFnNode}, counts from total=${countsFromTotal}, empty-names fallback=${namesFallback}, filters absent name=${filtersAbsent}`
+    );
+  }
 }
 
 console.log(`\ncheck-placeholder-name: ${pass} passed, ${failures.length} failed`);

@@ -39,10 +39,21 @@ const joinNames = (names) => {
 // and the owner is folded in by name instead, since (unlike HiveDetail) the
 // owner never appears in `contributors` here either.
 const rosterLabel = (ownerName, contributors, selfId) => {
-  const others = [ownerName, ...contributors.filter((c) => c.profileId !== selfId).map((c) => c.name)];
-  if (others.length <= 3) return `Writing with ${joinNames(others)}.`;
-  // +1 for the caller themselves, who `others` deliberately excludes above.
-  return `${others.length + 1} of you are writing.`;
+  const otherNames = contributors.filter((c) => c.profileId !== selfId).map((c) => c.name);
+  // +2: the owner plus the caller themselves, neither of whom `otherNames`
+  // counts. Counted here rather than off `names.length` below because
+  // Finding A (thread b57ad406, 2026-08-31) can make `ownerName` null (a
+  // comb-linked hive whose organizer name is placeholder-class) — the owner
+  // is still a real, uncounted writer even on the row that can't name them.
+  const totalWriters = otherNames.length + 2;
+  if (totalWriters > 4) return `${totalWriters} of you are writing.`;
+  const names = [ownerName, ...otherNames].filter(Boolean);
+  // The owner-unnamed, no-other-contributors edge case: 'someone' matches
+  // this file's own house word for the identical situation one line up
+  // (`subjectDisplayName`) — never "only one," which would deny a writer
+  // who is present, just unnamed.
+  if (names.length === 0) return 'Writing with someone.';
+  return `Writing with ${joinNames(names)}.`;
 };
 
 // ENG-61 — a contributor's own writing surface. Mirrors HiveDetail.js's
@@ -138,8 +149,15 @@ export const ContributingHiveScreen = ({ navigation, route }) => {
             R-38.9-H — because its reader IS the subject. This screen's
             reader is a contributor, not the subject, so third person is
             still right; only the placeholder-class guard applies here. */}
+        {/* Finding A (thread b57ad406, 2026-08-31): `hive.ownerName` is null
+            for a comb-linked hive whose organizer name is placeholder-class
+            — omit the from-clause rather than render a name we don't have. */}
         <Text style={[styles.bannerAttribution, { color: cover.textColor }]}>
-          A hive for {subjectDisplayName}, from {hive.ownerName}
+          {hive.ownerName ? (
+            <>A hive for {subjectDisplayName}, from {hive.ownerName}</>
+          ) : (
+            <>A hive for {subjectDisplayName}</>
+          )}
         </Text>
         <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
       </View>

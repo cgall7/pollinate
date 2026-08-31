@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { toISODate } from '../utils/dateRanges';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 // Private Hives — the client half. Until this file, `private_hives` had a
 // full server side (six migrations, live in production) and ZERO readers or
@@ -115,6 +116,18 @@ const resolveRefusalCause = (own, seat) => {
 // §18.1 hive has no `comb_rotations` row and keeps the direct join below —
 // there is no better source for that case, and `'Someone'` there is the
 // honest answer to a real authorization refusal, not a name bug.
+//
+// Finding A (thread b57ad406, 2026-08-31): a comb-linked hive's organizer
+// name is either this read's answer or ABSENT — it never falls through to
+// the direct join or `'Someone'`, both of which answer a different question
+// (a non-comb hive's authorization state). A placeholder-class name
+// (`isPlaceholderName` — e.g. an unrepaired `handle_new_user` default) is
+// answered, not refused, so `'Someone'` there would misrepresent a name gap
+// as an authorization gap. Every hive here that carries a `comb_rotations`
+// row gets an entry in the returned map — `null` when the resolved name is
+// placeholder-class — so callers distinguish "comb-linked, no from-clause to
+// show" from "not comb-linked, ask the direct join" with `.has()`, never
+// truthiness.
 const resolveCombOwnerNames = async (client, hives) => {
   const hiveIds = hives.map((h) => h.id);
   if (hiveIds.length === 0) return new Map();
@@ -138,7 +151,7 @@ const resolveCombOwnerNames = async (client, hives) => {
     const combId = combIdByHiveId.get(h.id);
     if (combId == null) continue;
     const name = memberNamesByCombId.get(combId)?.get(h.owner_id);
-    if (name) ownerNameByHiveId.set(h.id, name);
+    ownerNameByHiveId.set(h.id, isPlaceholderName(name) ? null : name);
   }
   return ownerNameByHiveId;
 };
@@ -480,8 +493,10 @@ export const HiveStore = {
     const ownerIds = [...new Set(hives.map((h) => h.owner_id))];
     const { data: owners } = await client.from('profiles').select('id, display_name').in('id', ownerIds);
     const ownerNames = new Map((owners ?? []).map((p) => [p.id, p.display_name]));
-    // ENG-97: overrides the direct join above for comb-minted hives, where
-    // it is refused rather than merely absent.
+    // ENG-97/Finding A: overrides the direct join above for comb-minted
+    // hives — `.has()`, not `||`, so a placeholder-class comb organizer
+    // name (`null` in the map) stays absent instead of falling through to
+    // the direct join or `'Someone'`.
     const combOwnerNames = await resolveCombOwnerNames(client, hives);
 
     return hives.map((h) => ({
@@ -489,7 +504,7 @@ export const HiveStore = {
       subjectName: h.subject_name,
       coverTheme: h.cover_theme,
       sealedAt: h.sealed_at,
-      ownerName: combOwnerNames.get(h.id) || ownerNames.get(h.owner_id) || 'Someone',
+      ownerName: combOwnerNames.has(h.id) ? combOwnerNames.get(h.id) : ownerNames.get(h.owner_id) || 'Someone',
     }));
   },
 
@@ -517,7 +532,7 @@ export const HiveStore = {
       .select('display_name')
       .eq('id', hive.owner_id)
       .maybeSingle();
-    // ENG-97: overrides the direct join above for a comb-minted hive.
+    // ENG-97/Finding A: same `.has()` resolution as listContributingHives.
     const combOwnerNames = await resolveCombOwnerNames(client, [hive]);
 
     return {
@@ -525,7 +540,7 @@ export const HiveStore = {
       subjectName: hive.subject_name,
       coverTheme: hive.cover_theme,
       sealedAt: hive.sealed_at,
-      ownerName: combOwnerNames.get(hive.id) || owner?.display_name || 'Someone',
+      ownerName: combOwnerNames.has(hive.id) ? combOwnerNames.get(hive.id) : owner?.display_name || 'Someone',
     };
   },
 
