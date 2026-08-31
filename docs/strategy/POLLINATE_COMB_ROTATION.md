@@ -8592,7 +8592,7 @@ if v_sent_at is not null then
 end if;
 ```
 
-`seal_and_send_rotation` sets `private_hives.sealed_at` (`:201-203`) and `sent_at` (`:219-222`) **in one transaction**, so for a rotation-linked hive **sealed ⟹ sent**. `HiveDetail:226` is `hive.sealedAt && subjectIsFriend`, so on every delivered chapter the button renders — and the tap **always** fails. `SendHive:92-93` already maps that exact error:
+`seal_and_send_rotation` sets `private_hives.sealed_at` (`:201-203`) and `sent_at` (`:219-222`) **in one transaction**, so for a rotation-linked hive **sealed ⟹ sent**. **[AMENDED 2026-08-31, §1B.38.32 §1 — SUPERSEDED ON SCOPE. True of the DELIVER path only. The VOID path (`…0009:164-187`) stamps `sealed_at` and never `sent_at`, so on a voided rotation the send row renders AND `send_hive` SUCCEEDS. `!hive.sentAt` does not reach that case; @Lumen's linkage term does. The always-failing-button finding below is upheld and remains comb-independent.]** `HiveDetail:226` is `hive.sealedAt && subjectIsFriend`, so on every delivered chapter the button renders — and the tap **always** fails. `SendHive:92-93` already maps that exact error:
 
 ```js
 : /already been sent/.test(msg) ? 'This keepsake has already been sent.'
@@ -8620,7 +8620,7 @@ if v_volume_id is null then
 end if;
 ```
 
-**It raises. Forever.** `comb_rotations.sealed_at` and `voided_at` both stay null, so by `comb_rotations_one_open_per_comb` (`…0002:495-496` — `unique (comb_id) where sealed_at is null and voided_at is null`) that rotation remains the comb's one open rotation, and every future mint's `insert into comb_rotations` violates the index. `comb_advance_rotation` (`…0011:221`) has no open-rotation guard of its own — its two guards are *has a resolved rotation* and *the enrollable floor* — so it proceeds to mint and fails there.
+**It raises. Forever.** **[AMENDED 2026-08-31, §1B.38.32 §2 — SUPERSEDED ON MECHANISM, UPHELD ON CONCLUSION. This raise cannot fire: `seal_volume` (`…0828000001:60-61`) OPENS A SUCCESSOR VOLUME, so `v_volume_id` is non-null. The raise is `private_hives_sealed_at_immutable` one branch later. The comb still wedges permanently — see §1B.38.32 §2 for the corrected chain.]** `comb_rotations.sealed_at` and `voided_at` both stay null, so by `comb_rotations_one_open_per_comb` (`…0002:495-496` — `unique (comb_id) where sealed_at is null and voided_at is null`) that rotation remains the comb's one open rotation, and every future mint's `insert into comb_rotations` violates the index. `comb_advance_rotation` (`…0011:221`) has no open-rotation guard of its own — its two guards are *has a resolved rotation* and *the enrollable floor* — so it proceeds to mint and fails there.
 
 **Net: one tap on a UI row with a missing term stops the comb advancing, permanently, and the failure surfaces only as a scheduled-job exception nobody reads.** That is `O10`'s own machinery — step 8 of the ratified sentence, *and do it again next month for someone else* — killed by a client affordance.
 
@@ -8636,5 +8636,77 @@ end if;
 
 **Server, its own migration, and this is the one that matters:**
 5. Refuse `seal_hive`/`seal_volume` on a `comb_rotations`-linked hive. **Not a belt for a defect the client fix already covers — the only thing standing between one mistaken tap and a permanently wedged comb.** Placement @Sage's; I would not ship the client PR's item 4 without it, because item 4 removes the *visible* symptom of the seal hazard's neighbour and leaves the seal row itself untouched.
+
+Row `2.3` unchanged; `1.17` is @Lumen's; `ENG-98` unchanged. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
+
+
+---
+
+### §1B.38.32 — in-place repair of §1B.38.31, both halves. The send belt @Lumen asked for is NEEDED and my §3 narrowed it wrongly; and the wedge fires through the immutability trigger, not the volume guard — because `seal_volume` opens a successor. Plus: ENG-91 FLAGGED this hazard and declared it unreachable on a premise that was already false. (2026-08-31, Vector)
+
+Re-derived at `github/main@208dc8f` against the **live** bodies — `seal_and_send_rotation` is `…0009:92` (`create or replace`), not `…0003:94`; `seal_volume` is `…0828000001:27`, not `…0826000004:89`.
+
+---
+
+#### 1. §1B.38.31 §3 is superseded on scope: on a VOIDED rotation the manual send SUCCEEDS
+
+I wrote *"for a rotation-linked hive **sealed ⟹ sent**"* and concluded the send row is only ever a guaranteed-failing button, fixable with `!hive.sentAt` and no linkage. That is true of the **deliver** path and false of the **void** path.
+
+`…0009:164-187`, the void branch, stamps `hive_volumes.sealed_at`, `private_hives.sealed_at`, and `comb_rotations.voided_at` — and **never `private_hives.sent_at`.** So for a voided rotation:
+
+- `HiveDetail:111` fetches `subjectIsFriend` exactly when `sealedAt && subjectProfileId && !sentAt` — **all three true**.
+- `:226` (`hive.sealedAt && subjectIsFriend`) renders the send row whenever organizer and subject are an accepted `honeycomb_connections` pair.
+- `send_hive` (`…0828000001:142-165`) checks owner ✓, sealed ✓, `sent_at is null` ✓, subject present ✓, accepted connection ✓ — and **delivers.**
+
+The sharpest member is `voided_reason = 'subject_gone'` reached by **departure rather than deletion** (`comb_subject_gone` covers both): the subject's profile is alive, the letters are real and `packaged`, and one tap delivers the keepsake ENG-95 exists to withhold. `'quiet'`/`'departed'` deliver an empty keepsake instead.
+
+**So @Lumen's linkage-keyed suppression of the send row was right, and I overruled it on an incomplete case split.** The corrected client gate is **both** terms — `!hive.sentAt` (comb-independent; still fixes the shipped 1:1 always-failing button, which is upheld) **and** a rotation-resolution term. And per §1B.38.31 §2, `getHive`'s select carries no linkage, so the client cannot express the second term without opening `HiveStore.js` — **which makes the server refusal on `send_hive` load-bearing, not a belt.**
+
+> **A case split over a state machine must enumerate the machine's TERMINAL STATES, not the one the happy path reaches.** `seal_and_send_rotation` has two terminals — delivered and voided — and I derived an invariant (`sealed ⟹ sent`) from the first while quoting a function whose other branch is fourteen lines above it. The refusal I found (`'already been sent'`) is the deliver path's own; the void path leaves every one of `send_hive`'s guards satisfied.
+
+#### 2. §1B.38.31 §4 is superseded on mechanism and upheld on conclusion: `seal_volume` opens a successor
+
+I cited `…0009:137-139`'s `if v_volume_id is null then raise 'hive has no open volume'` as the raise that wedges the comb. **It cannot fire.** `seal_volume`'s live body ends at `…0828000001:60-61` with
+
+```sql
+insert into public.hive_volumes (hive_id, ordinal)
+  values (p_hive_id, v_ordinal + 1);
+```
+
+so a manual `seal_hive` leaves the rotation hive with an **open successor volume**. The corrected chain, every address at the live bodies:
+
+1. Manual `seal_hive` (`…0826000004:154`): seals volume 1 via `seal_volume`, opens volume 2, stamps `private_hives.sealed_at`.
+2. Scheduler tick. `…0009:133-135` finds volume 2 — non-null, so the defensive raise is skipped.
+3. `…0009:145-147` counts `private` entries on volume 2. **Either branch wedges:**
+   - **zero** → `…0009:152-159` resolves `v_void_reason := 'quiet'` (contributors are still active, so `v_departed` is false) → void path.
+   - **non-zero** (a contributor wrote after the manual seal — `entries_resolve_volume_id_trigger` stamps the successor and `is_volume_open()` admits it) → deliver path.
+4. **Both paths execute `update public.private_hives set sealed_at = now()`** (`…0009:177-179` and `:201-203`). `private_hives_sealed_at_immutable` (`20260815000004:14-21`, trigger at `:26`) raises *"sealed_at cannot be changed once set"* — `old.sealed_at` is already stamped by step 1.
+5. `advance_due_rotations` (`…0012:174-179`) catches it, leaves `v_sealed := false`, and `:192`'s `if v_sealed then` **skips `comb_advance_rotation` entirely**.
+6. `comb_rotations.sealed_at`/`voided_at` stay null, so the row is still the comb's one open rotation under `comb_rotations_one_open_per_comb` (`…0002:495-496`), and every subsequent tick repeats identically.
+
+**Conclusion unchanged and now unconditional: one tap wedges the comb permanently, regardless of entry count, visible only as a `raise warning` in a scheduled job.** Step 8 of the ratified definition of done — *and do it again next month for someone else* — dies to a client row with a missing term.
+
+> **Third instance this arc, and the first inside a section written to bank the rule.** I quoted `…0009:136-139` from the *earlier* migration's body (`…0003`) and never read `seal_volume`'s tail, which is the statement the whole chain turns on. **`create or replace` means the address you grep is not the body that runs — resolve a function to its LAST definition before quoting its control flow.**
+
+#### 3. The hazard was already flagged — and the disclosure is what made everyone stop looking
+
+`…0003:283-296`, ENG-91's own header comment:
+
+> *"KNOWN, CURRENTLY UNREACHABLE GAP … `seal_volume()`/`seal_hive()` … still open a successor volume for ANY hive, including a comb rotation's. If a future client ever wires a manual "seal" affordance onto a comb-rotation hive (**today's shipped HiveDetail/ContributingHive screens have no path to one — ENG-59/60's UI doesn't exist yet**), that legacy path would reopen this exact hole … Whoever wires ENG-59/60's client UI should route a comb rotation's "seal early" affordance, if one is ever built, through THIS function … never through `seal_hive()`."*
+
+The mechanism is named exactly right. **The unreachability premise was false when it was written**: `HiveDetail:205` is a shipped manual seal affordance, and it reaches a comb-rotation hive because `listHives`/`getHive` carry no comb filter (§1B.38.29) and the mint sets `owner_id` to the organizer. The comment checked the lane it was thinking about — ENG-59/60's *contributor* UI — and never opened the organizer's shelf. Same lane blindness as §1B.38.29, one file over, three days earlier.
+
+And the prescription compounds it: the requirement is filed into **"whoever wires ENG-59/60's client UI"** — a builder who will never open `HiveDetail.js`, because the affordance is not theirs and already exists. Sibling of *a requirement filed into a function you have not read is filed into nothing*, and of *an impossible assignment reads as pending*.
+
+> **A disclosed-and-scoped hazard is read as a hazard someone owns.** An undisclosed one gets rediscovered by the next census; a disclosed one is skipped by every census, because the comment answers the question the censor was about to ask. **When a comment declares a gap unreachable, re-derive its reachability premise — that premise is a claim about a SCREEN, and screens ship on a different clock than the migration that reasons about them.**
+
+#### 4. Revised server scope — the migration is TWO refusals, not one
+
+Both keyed on `comb_rotations` linkage (`unique (hive_id)`, `…0002:480`), never `is_collective`:
+
+1. **`seal_hive`/`seal_volume` refuse a rotation-linked hive** (§2) — the wedge.
+2. **`send_hive` refuses a rotation-linked hive** (§1) — the ENG-95 bypass, which the client cannot gate because `getHive` supplies no linkage.
+
+Client, unchanged from §1B.38.31 §5 except item 4: `HiveDetail:226` takes `!hive.sentAt` (comb-independent, fixes the shipped 1:1 case) **and** loses the row on rotation-linked hives once linkage has a supply; until then #2 above is the only thing holding it.
 
 Row `2.3` unchanged; `1.17` is @Lumen's; `ENG-98` unchanged. **`O10` is still the only open item on the critical path, and `ENG-59` client / `ENG-93` client / `ENG-60` are still the top of the missing list.**
