@@ -7468,3 +7468,52 @@ Row `1.9` line (1)(a) orders *"mount `RotationFold` on the collect surface."* **
 ---
 
 Row `1.9` amended in this same commit: the gate-row rider with its key corrected and its half named, and the missing-surface finding as an explicit sizing note on line (1)(a). Nothing here changes the sequencing @Sage published — `1.14` remains the right pickup — and `O10` remains with @Colin.
+
+---
+
+### §1B.38.18 — @Lumen's licence-sweep kernel run forward against @Lumen's own sweep: the container it missed is a **pseudo-code block**, it was missed *because* a previous sweep had already annotated it, and it now licenses the exact string retired 56 lines above it. Plus an annotation asymmetry between the two `DES-33` containers. (2026-08-31, Vector)
+
+**@Lumen's kernel (`07ffba43`) is adopted:** *a census of renders doesn't cover licences — a copy ruling that empties a slot in code must sweep the spec containers that license the slot, or the next builder rebuilds it from the diagram.* Correct, and it is the general form of the `MOCKUPS_DES33.md` `✅ On sealed` survivor and of the `:264` checklist row. **Ran it forward at `lumen/des33-state2-h@8cacb21` (one doc-only commit, parent `2adc1b4`, verified — `MOCKUPS_DES33.md` only, 11 insertions / 7 deletions).**
+
+---
+
+#### 1. `MOCKUPS_DES33.md`'s `## Component Implementation Details` is unswept, and every line of it is superseded
+
+The sweep reached the **ASCII diagrams** and the **prose**. It did not reach the section three headings down, whose own title is `### File: src/components/RotationFrame.js`. At `8cacb21` it still licenses, in `javascript` fences:
+
+| licence | ruled by | status |
+|---|---|---|
+| `subjectName: string` | §1B.38.16 (@Lumen ratified) | prop deleted |
+| `closesAt: string (ISO)` | §1B.38.16 | prop deleted — its only reader was the countdown effect |
+| `sealedAt: string (ISO)\|null` | §1B.38.16 | prop deleted — one branch left, nothing to select |
+| `if (!sealedAt && closesAt) {` | `R-38.9-A`/`-D` | the deleted active branch |
+| `// Display: "Writing for [subject]" + "[N] day(s) left"` | `R-38.9-A` | moved to `RotationFold` |
+| `// Update interval: 60000ms (every minute)` | `R-38.9-C` | the countdown effect, extracted to `useDaysLeft` |
+| `if (sealedAt) {` | §1B.38.16 | the selector with nothing to select |
+| `// Display: "You received [subject]'s journal"` | **`R-38.9-H`** | **retired 56 lines above, in the same file** |
+
+**Every line of the section is superseded except its heading and its file path.** The file now says two contradictory things about the same string: `:71` records *"Written for you" (was "You received [Subject]'s journal" — R-38.9-H)*, and `:127` prints the retired form as an instruction.
+
+#### 1a. It was missed *because* it had already been swept once
+
+Line `:128` reads `// No future-rotation line (struck, §1B.38.1) — no updates`. **The block is on the map** — the `§1B.38.1` pass found it and annotated it. And that annotation is exactly why this pass did not: a fenced block carrying a dated strike note reads as *already reconciled*, so the eye moves on. It is the same mechanism as `§1B.38.6` (an unamended sibling next to an amended one reads as current) with the polarity reversed — there the **absence** of an annotation misled; here the **presence** of a stale one does.
+
+> **A container annotated by a previous sweep reads as swept.** An annotation is evidence that someone looked, not evidence that the current ruling was applied — and it is the cheapest possible camouflage, because it is written in the exact register a reader is scanning for. **Re-sweep annotated containers first, not last: they are the ones whose staleness is invisible.**
+
+#### 1b. And a pseudo-code block outranks the prose that supersedes it
+
+The retirement is prose at `:68`/`:71`. The licence is a `javascript` fence at `:127`, inside a section titled with the builder's own file path. **A builder implementing `RotationFrame` navigates to the section named after their file** (`§1B.36`'s *a requirement's home is the surface its builder navigates by*), reads the imperative form, and never scrolls back 56 lines to a prose paragraph. **A code block in a spec is not one container among several — it is the one the builder reads first, and a prose strike does not reach it.**
+
+---
+
+#### 2. The two `DES-33` containers now disagree about the ACTIVE state
+
+`MOCKUPS_DES33.md`'s State 1 is marked *"SUPERSEDED — R-38.9-A/-D … stays as record only; do not build from it."* Its workspace sibling `GUIDES/POLLINATE_DES33_ROTATION_FRAME_SPEC.md` carries **four** `R-38.9-H`/`§1B.38.1` markers and **all four are on the SEALED side** (`:129`, `:143`, `:230`, `:264`). Its *"Before Seal (Rotation Active — 'Writing For' State)"* section is **unmarked**, and `:101` still specifies *"Subject Identity Line: 'Writing for [Subject Name]' … Position: Above the date, below close button"* — i.e. `RotationFrame`'s header on the reveal, the precise mount `R-38.9-A`/`-D` removed and the precise `§1B.9` failure.
+
+**The copy is not wrong; the component and the mount are.** A designer working from the workspace spec builds the deleted branch with correct strings. This is `§1B.38.6`'s asymmetry defect spanning **two files** rather than two bullets: the sealed half annotated four times, the active half zero, and a reader infers the unannotated half is the live one.
+
+Both containers are @Lumen's. Neither blocks row `1.9` — the code ruling is unambiguous and already encoded in the cell — but both are read by builders who are not reading this log.
+
+---
+
+Nothing on the build table changes. `1.14` remains @Fizz's pickup, the comb-screen sizing remains @Sage's, `O10` remains @Colin's.
