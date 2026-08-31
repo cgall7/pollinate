@@ -449,21 +449,44 @@ This captures the full core loop: writing gratitude + packaging/sharing/delaying
 
 ## 11. Go/No-Go Criteria for MVP Launch
 
-Before shipping Slice 1 (Demo Mode) to TestFlight / internal testers:
+~~Before shipping Slice 1 (Demo Mode) to TestFlight / internal testers:~~
+
+*[Retired as a launch gate 2026-08-31 (wording @Lumen, encoded @Vector) —
+`POLLINATE_COMB_ROTATION.md` §1A/§9: there is ONE release, MVP-Comb; its go/no-go is
+the ratified definition-of-done sentence (`a11aa144…` — stranger → invite link, no
+password → join → "writing for Sarah — 6 days left" → write → reveal blooms → nectar
+note → again next month for someone else), and the distribution path is EAS internal
+via `OPS-10` (`O7` closed — TestFlight is MVP2). The checklist below no longer gates
+any release: its items survive as a quality inventory for surfaces that still ship
+(journaling, private hives, seeds, notifications — §1A: nothing in flight is
+cancelled), but passing them authorizes nothing and failing one blocks nothing; §1A's
+sentence does both jobs now. **Two rows are the exception and are struck in place
+below** — the feed rows. `Pollinate_The_Ruling.md` (2026-08-30) cut the friend feed
+outright ("the weakest asset in the app… the Hive tab is comb-first"), so those two
+items describe a surface the same ruling deleted; the survives-as-inventory clause
+does not reach them. Every other row stands as inventory.]*
 
 - [ ] A user can sign up and add a friend in under 2 minutes
 - [ ] A user can write a daily gratitude journal entry
-- [ ] A user can share an entry to the Hive feed
+- ~~[ ] A user can share an entry to the Hive feed~~ *(Retired 2026-08-31 — the friend feed is **cut**, `Pollinate_The_Ruling.md` 2026-08-30 ruling; the Hive tab is comb-first. Not inventory: there is no surface left to test.)*
 - [ ] A user can create a Private Hive, write entries for someone, and see all their entries
 - [ ] A user can seal a Private Hive with no recipient (the grandmother/child/lost-someone case — must complete with no connection required)
 - [ ] A user can send a sealed hive to a connected friend
 - [ ] A "trip down memory lane" review prompt fires correctly at the user's configured cadence (cadence is ungated on every tier — V2 §17.5.2a)
 - [ ] A user can plant a seed (time-capsule message) with a future bloom date
 - [ ] Seed bloom notifications fire correctly and on time
-- [ ] The Honeycomb feed shows real activity from the user's Hive
+- ~~[ ] The Honeycomb feed shows real activity from the user's Hive~~ *(Retired 2026-08-31 — same ruling: the friend feed is cut and no photo feed exists anywhere. Not inventory.)*
 - [ ] Hexagon UI renders with correct visual states
 - [ ] At least 2 seeded groups have been tested end-to-end (real users, real gratitude, real hives)
 - ~~[ ] Wallet tab is present as a shell (Cash App links come in Slice 2)~~ *(Superseded 2026-08-26 — the launch checklist now asserts the opposite: three tabs, no Wallet shell. `POLLINATE_V2_NAVIGATION.md`.)*
-- [ ] Push notifications work for all key events (seed bloom, package received, review prompt, hive entry shared)
+- [ ] Push notifications work for all key events (seed bloom, package received, review prompt, ~~hive entry shared~~ *(this one event only — the sharing surface is cut with the friend feed, 2026-08-31; the other three stand)*)
 
-**If any of the above fail, we don't ship.** The core loop — writing gratitude, keeping Private Hives, packaging and sharing, planting seeds — must work end-to-end.
+~~**If any of the above fail, we don't ship.**~~ The core loop — writing gratitude,
+keeping Private Hives, packaging and sharing, planting seeds — must work end-to-end.
+
+*[Amended 2026-08-31 — the ship-gate sentence is struck for the same reason as the
+header, and struck **separately** because it is a second mechanism: a header-scoped
+annotation retires the *precondition* and leaves the *veto* standing, and the veto is
+the half with teeth. (Same shape as `POLLINATE_V2_ASSIGNMENTS.md` §2, repaired the
+same day.) The core-loop sentence after it is unretired and still true — it describes
+product quality, not a release gate.]*
