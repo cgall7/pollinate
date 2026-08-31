@@ -82,17 +82,28 @@ export const RotationFold = ({ variant, subjectName, daysLeft, count, countKind 
   }
 
   if (!subjectName) {
-    // Vector's §1B.38.11 row 1 (R-38.9-F): `variant === 'member'` is a
-    // reader CLASSIFICATION the caller asserts with certainty; a missing
-    // `subjectName` here is not "no data," it's a REFUSED READ — e.g. a
-    // mid-rotation joiner whose `hive_contributors` row hasn't landed yet,
-    // an O10-gated question, not this component's to answer. Falling
+    // R-38.9-F (Lumen, ruled): `variant === 'member'` is a reader
+    // CLASSIFICATION the caller asserts with certainty; a missing
+    // `subjectName` here is not "no data," it's a REFUSED READ. Falling
     // through to the branch above would silently hand this MEMBER the
     // SUBJECT's own copy — the exact defect this split exists to close.
-    // The real render for this state is Lumen's copy ruling to make
-    // (§1B.38.11 row 3); until it lands, render nothing rather than
-    // fabricate one.
-    return null;
+    //
+    // Two distinct causes land here and this component cannot and does not
+    // try to tell them apart: (1) a mid-rotation joiner whose
+    // `hive_contributors` row hasn't landed yet — legal, pending O10's
+    // still-open this-month/next-month ruling — and (2) a wiring bug that
+    // handed a member mount no name at all. They are indistinguishable AT
+    // THE COMPONENT by design; the record discriminates instead (the
+    // roster row's presence or absence), not this render — same move as
+    // "absence is the record" applied a second time. So the copy below
+    // must be true under either cause: no name claim, no participation
+    // claim, just orientation that the month is already moving.
+    return (
+      <View style={style}>
+        <Text style={styles.subjectLine}>This month is already underway.</Text>
+        {daysLine && <Text style={styles.daysLine}>{daysLine}</Text>}
+      </View>
+    );
   }
 
   // variant === 'member' with a subjectName present: "Writing for

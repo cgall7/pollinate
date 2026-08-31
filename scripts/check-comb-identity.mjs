@@ -44,11 +44,15 @@
 //       into the size sentence. R-38.9-E (Lumen), probe-the-fix's-new-
 //       surface on hardening requirement 1
 //   R9  `RotationFold.js`'s member path treats a missing `subjectName` as
-//       its own refusal (returns `null`) — distinct from, and never a
-//       fallthrough into, the nameless/subject branch. R-38.9-F (Vector's
-//       §1B.38.11 row 1 fix): a member whose name read was refused (e.g. a
+//       its own refusal — distinct from, and never a fallthrough into, the
+//       nameless/subject branch. R-38.9-F (Vector's §1B.38.11 row 1 fix;
+//       copy ruled by Lumen): a member whose name read was refused (e.g. a
 //       mid-rotation joiner not yet in `hive_contributors`) must not
-//       silently receive the subject's own copy
+//       silently receive the subject's own copy. The refusal render is its
+//       own fixed line ("This month is already underway.") plus the
+//       unchanged days fragment — it names no one and claims no count,
+//       since the two causes that land here (a legal pending-O10 joiner vs.
+//       a wiring bug) are indistinguishable at the component by design
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -306,8 +310,9 @@ const rotationIf = rotationIfs[0] ?? null;
   }
 }
 
-// ── R9. member path's missing-subjectName case is its own refusal —
-//       returns null, never falls through to the nameless branch (R-38.9-F)
+// ── R9. member path's missing-subjectName case is its own refusal render —
+//       fixed orientation line + the days fragment, never a name, never a
+//       count, never a fallthrough into the nameless branch (R-38.9-F) ────
 {
   if (rotationIfs.length < 2) {
     bad('R9 refusal state', `expected 2 top-level branches in RotationFold (reader-selection + refusal), found ${rotationIfs.length} — FAILS CLOSED`);
@@ -317,20 +322,31 @@ const rotationIf = rotationIfs[0] ?? null;
     const testsSubjectNameAbsence =
       /subjectName/.test(testSrc) &&
       (/^\s*!/.test(testSrc) || /==\s*null/.test(testSrc) || /===\s*null/.test(testSrc) || /==\s*undefined/.test(testSrc));
-    // Calibrated to `null` specifically — that's what's actually built
-    // pending Lumen's copy ruling (§1B.38.11 row 3). A future commit that
-    // lands real copy for this state is expected to touch this row too.
-    let refusalReturnsNull = false;
-    walk(refusalIf.consequent, (n) => {
-      if (n.type === 'ReturnStatement' && n.argument?.type === 'NullLiteral') refusalReturnsNull = true;
-    });
-    if (testsSubjectNameAbsence && refusalReturnsNull) {
-      ok('R9 member path returns null on a missing subjectName — its own refusal, never the nameless branch');
+
+    // `foldCode`, not `foldSrc` — this branch's own comment explains the
+    // ban on a name/count claim by naming `subjectName`/`count` in prose,
+    // same "grep prose too" lesson as R7's comment-blanked read.
+    const refusalRawSrc = foldSrc.slice(refusalIf.consequent.start, refusalIf.consequent.end);
+    const refusalCodeSrc = foldCode.slice(refusalIf.consequent.start, refusalIf.consequent.end);
+
+    const hasRuledLine = refusalRawSrc.includes('This month is already underway.');
+    const rendersDaysFragment = /daysLine/.test(refusalCodeSrc);
+    // The refusal must not name the subject or claim a count — both are
+    // exactly what this state exists to withhold, per either of its two
+    // indistinguishable causes.
+    const nameLeak = /subjectName/.test(refusalCodeSrc);
+    const countLeak = /\bcount\b|countLine|countKind/.test(refusalCodeSrc);
+
+    if (hasRuledLine && rendersDaysFragment && !nameLeak && !countLeak) {
+      ok('R9 member path renders the ruled refusal line + days fragment on a missing subjectName — no name, no count, never the nameless branch');
     } else {
       bad(
         'R9 refusal state',
-        `expected a second branch guarding on the ABSENCE of subjectName and returning null — found test \`${testSrc}\` (testsSubjectNameAbsence=${testsSubjectNameAbsence}), refusalReturnsNull=${refusalReturnsNull}`
+        `expected the ruled line "This month is already underway." plus the days fragment, no name, no count — found ruledLine=${hasRuledLine} daysFragment=${rendersDaysFragment} nameLeak=${nameLeak} countLeak=${countLeak} (guard test: \`${testSrc}\`, testsSubjectNameAbsence=${testsSubjectNameAbsence})`
       );
+    }
+    if (!testsSubjectNameAbsence) {
+      bad('R9 refusal guard', `expected the refusal branch to guard on the ABSENCE of subjectName — found test \`${testSrc}\``);
     }
   }
 }
