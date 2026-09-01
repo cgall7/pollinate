@@ -22,6 +22,7 @@ import { CreateHiveFlow } from './src/screens/CreateHive';
 import { CreateCombScreen } from './src/screens/CreateComb';
 import { HiveDetailScreen } from './src/screens/HiveDetail';
 import { ComposeHiveEntryScreen } from './src/screens/ComposeHiveEntry';
+import { CombNectarComposeScreen } from './src/screens/CombNectarCompose';
 import { SealHiveScreen } from './src/screens/SealHive';
 import { SendHiveScreen } from './src/screens/SendHive';
 import { InviteContributor } from './src/screens/InviteContributor';
@@ -286,6 +287,7 @@ export default function App() {
             <Stack.Screen name="CreateComb" component={CreateCombScreen} />
             <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
             <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
+            <Stack.Screen name="CombNectarCompose" component={CombNectarComposeScreen} options={{ presentation: 'modal' }} />
             {/* ENG-61 — Multi-Writer Hives' invite half (20260827000001).
                 InviteContributor is a plain push, same reasoning as its
                 hive siblings here: reached from CreateHive right after a

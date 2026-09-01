@@ -214,6 +214,11 @@ export const ContributingHiveScreen = ({ navigation, route }) => {
         </View>
       ) : (
         <View style={styles.footer}>
+          {hive.combRotation && (
+            <PressableScale onPress={() => navigation.navigate('CombNectarCompose', { combId: hive.combRotation.combId })} style={styles.nectarDoor}>
+              <Text style={styles.nectarDoorText}>Send a little thanks</Text>
+            </PressableScale>
+          )}
           <PrimaryButton
             onPress={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
           >
@@ -230,6 +235,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  nectarDoor: { alignItems: 'center', paddingVertical: 12, marginBottom: 8 },
+  nectarDoorText: { ...theme.type.bodySm, color: theme.colors.ink },
   centered: {
     justifyContent: 'center',
     alignItems: 'center',

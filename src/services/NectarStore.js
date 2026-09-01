@@ -98,6 +98,9 @@ export const NectarStore = {
     return data ?? null;
   },
 
+  // ENG-90 is deliberately not a target-kind extension of recordZap.  A
+  // comb note persists its words atomically with the ledger transfer, so it
+  // owns its contract and its idempotency handle.
   async sendCombNectarNote({ sendId, combId, recipientId, note, amountDrops }) {
     const client = requireSupabase();
     const { data, error } = await client.rpc('send_comb_nectar_note', {
@@ -111,6 +114,9 @@ export const NectarStore = {
     return data?.[0] ?? null;
   },
 
+  // Notes are visible only to their sender or recipient under the RPC/table
+  // policy. The compose UI uses this canonical read after a replay mismatch
+  // instead of telling someone that a request definitely did not send.
   async listCombNectarNotes(combId) {
     const client = requireSupabase();
     const { data, error } = await client
