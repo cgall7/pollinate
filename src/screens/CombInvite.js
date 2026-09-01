@@ -90,6 +90,7 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [needsName, setNeedsName] = useState(true);
+  const [joinerProfileState, setJoinerProfileState] = useState('loading');
 
   useEffect(() => {
     if (preview || !inviteCode) return;
@@ -98,12 +99,18 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     CombInviteStore.getJoinerProfile()
-      .then((profile) => setNeedsName(isPlaceholderName(profile?.display_name)))
-      .catch(() => setError("We couldn't read your profile."));
+      .then((profile) => {
+        setNeedsName(isPlaceholderName(profile?.display_name));
+        setJoinerProfileState('succeeded');
+      })
+      .catch(() => {
+        setError("We couldn't read your profile.");
+        setJoinerProfileState('failed');
+      });
   }, []);
 
   const submit = async () => {
-    if ((needsName && !name.trim()) || busy) return;
+    if (joinerProfileState !== 'succeeded' || (needsName && !name.trim()) || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -140,7 +147,11 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
           The writers in this comb can see your name now; {preview?.subjectName ?? 'the recipient'} sees it with your letter when the month is delivered.
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <PrimaryButton onPress={submit} disabled={(needsName && !name.trim()) || busy} loading={busy}>
+        <PrimaryButton
+          onPress={submit}
+          disabled={joinerProfileState !== 'succeeded' || (needsName && !name.trim()) || busy}
+          loading={busy}
+        >
           {needsName && name.trim() ? `Join as ${name.trim()}` : 'Join the comb'}
         </PrimaryButton>
       </View>
