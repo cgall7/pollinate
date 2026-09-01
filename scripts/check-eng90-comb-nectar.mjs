@@ -65,7 +65,26 @@ async function main() {
     await asUser(client, SENDER, () => client.query('select * from public.consent_to_nectar()'));
     await asUser(client, OUTSIDER, () => client.query('select * from public.consent_to_nectar()'));
 
+    await expectFail('signed-out caller refused stably', () => client.query(
+      'select * from public.send_comb_nectar_note($1,$2,$3,$4,$5)', [crypto.randomUUID(), combId, RECIPIENT, 'Thanks', 1]
+    ), /send_comb_nectar_note: not signed in/);
+    await expectFail('missing required IDs refused stably', () => asUser(client, SENDER, () => client.query(
+      'select * from public.send_comb_nectar_note($1,$2,$3,$4,$5)', [null, null, RECIPIENT, 'Thanks', 1]
+    )), /send id and comb are required/);
+    await expectFail('sender consent refused stably', () => asUser(client, RECIPIENT, () => client.query(
+      'select * from public.send_comb_nectar_note($1,$2,$3,$4,$5)', [crypto.randomUUID(), combId, OUTSIDER, 'Thanks', 1]
+    )), /nectar consent required before sending/);
+
     await expectFail('authenticated clients cannot INSERT notes directly', () => asUser(client, SENDER, () => client.query("insert into public.comb_nectar_notes(id,comb_id,transaction_id,sender_id,recipient_id,note_text,amount_drops) values(gen_random_uuid(),$1,gen_random_uuid(),$2,$3,'forged',1)", [combId, SENDER, RECIPIENT])), /permission denied|row-level security/);
+    const directInvalid = async (note) => {
+      const { rows: [{ id }] } = await client.query(
+        "insert into public.ledger_transactions(kind,idempotency_key,memo) values('tip',$1,'constraint probe') returning id",
+        [`eng90-constraint:${crypto.randomUUID()}`],
+      );
+      return client.query('insert into public.comb_nectar_notes(id,comb_id,transaction_id,sender_id,recipient_id,note_text,amount_drops) values(gen_random_uuid(),$1,$2,$3,$4,$5,1)', [combId, id, SENDER, RECIPIENT, note]);
+    };
+    await expectFail('persisted 1–8-word constraint rejects nine words directly', () => directInvalid('one two three four five six seven eight nine'), /comb_nectar_notes_note_words/);
+    await expectFail('persisted 280-character constraint rejects 281 directly', () => directInvalid('x'.repeat(281)), /comb_nectar_notes_note_length/);
     const first = await send(client, SEND_A);
     first.rows.length === 1 ? ok('valid send returns one committed note') : bad('valid send returns one committed note', JSON.stringify(first.rows));
     const countFor = async (id) => (await client.query("select (select count(*)::int from public.comb_nectar_notes where id=$1) notes,(select count(*)::int from public.ledger_transactions where idempotency_key='comb-note:'||$1) txns,(select count(*)::int from public.ledger_postings p join public.ledger_transactions t on t.id=p.transaction_id where t.idempotency_key='comb-note:'||$1) postings", [id])).rows[0];

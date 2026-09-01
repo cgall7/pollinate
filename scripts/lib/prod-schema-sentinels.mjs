@@ -338,4 +338,12 @@ export const SENTINELS = {
     kind: 'order',
     reason: 'authenticated-only SECURITY DEFINER join RPC replacement, no anon-visible surface',
   },
+  // ENG-90 (Fizz). The note ledger is deliberately not anon-readable, but
+  // column resolution precedes the privilege check: 42501 proves the new
+  // table/column exists while preserving its closed client-write surface.
+  '20260901000001_eng90_comb_nectar_note': {
+    kind: 'column',
+    table: 'comb_nectar_notes',
+    column: 'note_text',
+  },
 };
