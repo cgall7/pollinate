@@ -29,13 +29,19 @@ check(/stays sealed until delivery/.test(screen) && /only \{preview\.subjectName
 check(
   screen.includes('isPlaceholderName(profile?.display_name)') &&
     screen.includes('setNeedsName(isPlaceholderName(profile?.display_name))') &&
+    screen.includes('await CombInviteStore.saveNameAndJoin(inviteCode, needsName ? name : undefined);') &&
     store.includes("profiles').update({ display_name: name })") &&
+    store.includes('if (name)') &&
     store.includes('comb_join_by_invite_code'),
   'I7 name persistence is gated on successful placeholder-class read and fused with join'
 );
 check(screen.includes("joinerProfileState !== 'succeeded'") && /setNeedsName/.test(screen), 'I8 profile readiness blocks submit until profile read succeeds');
 check(/\.from\('comb_rotations'\)/.test(store) && /\.is\('sealed_at', null\)/.test(store) && /\.is\('voided_at', null\)/.test(store), 'I9 successful join resolves the open rotation');
-check(/startAt === 'invite'/.test(onboarding) && /waitForSession/.test(onboarding), 'I10 invite auth path suppresses Continue via waitForSession');
+check(
+  /startAt === 'invite'/.test(onboarding) &&
+    (onboarding.match(/!waitForSession \? <PrimaryButton onPress=\{onNext\}>Continue<\/PrimaryButton> : null/g) || []).length >= 1,
+  'I10 invite auth path suppresses Continue via explicit waitForSession-guarded branch'
+);
 check(/navigation\.replace\('Main', \{ screen: 'Today' \}/.test(screen), 'I11 successful join lands on Today, not the obsolete collect route');
 check(!/navigation\.replace\(COMB_COLLECT_ROUTE/.test(screen), 'I12 obsolete collect route is no longer in the invite join path');
 
