@@ -15,6 +15,17 @@ const requireUserId = async (client) => {
 // mint to open month one.  No client clock: comb_open_rotation derives the
 // first boundary from the cadence stored on the comb.
 export const CombStore = {
+  // The roster-name read is the existing, membership-scoped definer helper
+  // from ENG-58.  Do not join `profiles` here: comb membership is not a
+  // friendship and profile RLS intentionally does not widen for it.
+  async listMembers(combId) {
+    const client = requireSupabase();
+    const userId = await requireUserId(client);
+    const { data, error } = await client.rpc('comb_co_member_names', { p_comb_id: combId });
+    if (error) throw error;
+    return (data ?? []).filter((member) => member.profile_id !== userId);
+  },
+
   async saveOrganizerName(name) {
     const client = requireSupabase();
     const ownerId = await requireUserId(client);
