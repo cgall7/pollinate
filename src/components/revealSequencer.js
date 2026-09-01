@@ -130,26 +130,14 @@
 
 // --- the grammar ----------------------------------------------------------
 //
-// PLACEHOLDER. Both fields are Deezine's under the §12.5 ownership split;
-// these values exist so the engine can be built, sampled and gated before the
-// choreography spec lands, and they are NOT a design. Replacing this object
-// is the whole of the hand-off — no engine change should be needed to accept
-// a timing table.
-export const STUB_GRAMMAR = {
-  // THE BLOOM. Deezine's, and R118 hands it back unchanged: the choreography
-  // spec's §2 range is 800-1200ms and 900 is its own worked example. What the
-  // amendment removes from this number is a JOB it could not do — it is the
-  // arrival, it is no longer the pace, and Deezine's range needs no revision
-  // to stop being one.
-  bloomMs: 900,
-  // The Reduce Motion arrival — a crossfade, not a bloom. `DURATIONS
-  // .reducedMotionFade` in `src/constants/motion.js` is 200 today; it is
-  // copied rather than imported for the reason in the header, and the consumer
-  // passes the live one in. (The choreography spec §5 says 400-600 — that is a
-  // number to reconcile with the token the rest of the app already fades at,
-  // and it is Deezine's call which moves. Nothing here depends on which.)
-  // Ruling 3: this shortens the ARRIVAL. It does not appear in `dwellMs`.
-  reducedFadeMs: 200,
+// Final native reveal grammar, per MP-2. The engine stays dependency-free so
+// the pacing gate can keep importing and sampling it directly.
+export const NATIVE_REVEAL_GRAMMAR = {
+  // The arrival bloom. This is not the whole pace: `dwellMs` still adds the
+  // entry's own read floor, so the rail remains the early-tap refusal carrier.
+  bloomMs: 960,
+  // Reduced Motion substitutes only the arrival, not the dwell.
+  reducedFadeMs: 480,
 
   // THE READ RATE, and it is the one number in this table that is NOT a taste
   // decision — which is why it is mine and the bloom is Deezine's. Deezine

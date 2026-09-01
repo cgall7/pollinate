@@ -20,13 +20,13 @@ import { HoneyDrop } from '../components/HoneyDrop';
 import { DROP_MAX_RADIUS } from '../components/nectarFlight';
 import { useNectarGift } from '../components/useNectarGift';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
-import { SPRINGS, useReducedMotion } from '../constants/motion';
+import { useReducedMotion } from '../constants/motion';
 import {
-  STUB_GRAMMAR,
+  NATIVE_REVEAL_GRAMMAR,
   buildRevealSequence,
   startReveal,
   tapReveal,
-  dwellProgress,
+  dwellMs,
   arrivalMs,
 } from '../components/revealSequencer';
 import { RotationFrame } from '../components/RotationFrame';
@@ -64,7 +64,6 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   const [pkg, setPkg] = useState(null);
   const [sequence, setSequence] = useState(null);
   const [revealState, setRevealState] = useState(null);
-  const [railFill, setRailFill] = useState(0);
 
   // DES-28 D3 — the consent bootstrap door (Sage's ruling 2026-08-26).
   // `nectarConsent` must be initialised from `hasNectarConsent(…)` and
@@ -97,9 +96,8 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   // zap instead of recording a second one (utils/uuid's header).
   const attemptId = useRef(null);
 
-  const bloomOpacity = useRef(new Animated.Value(0)).current;
-  const bloomScale = useRef(new Animated.Value(0.85)).current;
-  const dateOpacity = useRef(new Animated.Value(0)).current;
+  const arrivalProgressAnim = useRef(new Animated.Value(0)).current;
+  const dwellProgressAnim = useRef(new Animated.Value(0)).current;
 
   // R-N3's two ends, both REFS and never coordinates. `giftOrigin` follows
   // the control that carries the amount (the panel decides which);
@@ -391,42 +389,30 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     setNectarConsentSheetOpen(false);
   };
 
-  // Same rail as MemoryLane — R118's floor is per-step and per-tap, not
-  // per-screen, so this call site owns the tick for the same reason that
-  // one does (see revealSequencer.js's own comment on why the tick is not
-  // in the engine).
   useEffect(() => {
     if (!sequence || !revealState || revealState.done) return;
-    const id = setInterval(() => {
-      setRailFill(dwellProgress(revealState, Date.now(), sequence, STUB_GRAMMAR));
-    }, 50);
-    return () => clearInterval(id);
-  }, [sequence, revealState]);
-
-  useEffect(() => {
-    if (!sequence || !revealState || revealState.done) return;
-    dateOpacity.setValue(0);
+    const stepDwellMs = dwellMs(NATIVE_REVEAL_GRAMMAR, sequence[revealState.index]);
+    arrivalProgressAnim.setValue(0);
+    dwellProgressAnim.setValue(0);
     if (reduced) {
-      bloomOpacity.setValue(0);
-      bloomScale.setValue(1);
-      Animated.timing(bloomOpacity, {
+      Animated.timing(arrivalProgressAnim, {
         toValue: 1,
-        duration: arrivalMs(STUB_GRAMMAR, true),
+        duration: arrivalMs(NATIVE_REVEAL_GRAMMAR, true),
         easing: Easing.linear,
         useNativeDriver: true,
       }).start();
     } else {
-      bloomOpacity.setValue(0);
-      bloomScale.setValue(0.85);
-      Animated.parallel([
-        Animated.spring(bloomOpacity, { toValue: 1, ...SPRINGS.reveal, useNativeDriver: true }),
-        Animated.spring(bloomScale, { toValue: 1, ...SPRINGS.reveal, useNativeDriver: true }),
-      ]).start();
+      Animated.timing(arrivalProgressAnim, {
+        toValue: 1,
+        duration: arrivalMs(NATIVE_REVEAL_GRAMMAR, false),
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start();
     }
-    Animated.timing(dateOpacity, {
+    Animated.timing(dwellProgressAnim, {
       toValue: 1,
-      duration: 300,
-      easing: Easing.out(Easing.ease),
+      duration: stepDwellMs,
+      easing: Easing.linear,
       useNativeDriver: true,
     }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -434,10 +420,9 @@ export const PackageOpenScreen = ({ navigation, route }) => {
 
   const handleTap = () => {
     if (!sequence || !revealState) return;
-    const next = tapReveal(revealState, Date.now(), sequence, STUB_GRAMMAR);
+    const next = tapReveal(revealState, Date.now(), sequence, NATIVE_REVEAL_GRAMMAR);
     if (next === revealState) return;
     Haptics.selectionAsync();
-    setRailFill(0);
     setRevealState(next);
   };
 
@@ -473,6 +458,34 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   // DES-21 §9 — `connectedAuthorIds === null` (not loaded yet) fails closed
   // to no door, matching the state's own comment.
   const authorReachable = !!(step && connectedAuthorIds && connectedAuthorIds.has(step.authorId));
+  const cardOpacity = reduced
+    ? arrivalProgressAnim
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, 300 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        outputRange: [0, 0.92, 1],
+      });
+  const cardScale = reduced
+    ? 1
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, 300 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        outputRange: [0.965, 1.008, 1],
+      });
+  const cardTranslateY = reduced
+    ? 0
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, 300 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        outputRange: [6, 0, 0],
+      });
+  const dateOpacity = arrivalProgressAnim.interpolate({
+    inputRange: [0, 280 / arrivalMs(NATIVE_REVEAL_GRAMMAR, reduced), 1],
+    outputRange: [0, 1, 1],
+  });
+  const dateTranslateY = reduced
+    ? 0
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, 280 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        outputRange: [3, 0, 0],
+      });
 
   return (
     <View style={[styles.container, { backgroundColor: cover.base }]}>
@@ -504,18 +517,26 @@ export const PackageOpenScreen = ({ navigation, route }) => {
             accessibilityLabel="Tap to continue to the next memory"
           >
             <View style={styles.entryFrame} pointerEvents="box-none">
-              <Animated.Text style={[styles.date, { color: cover.textColor, opacity: dateOpacity }]}>
+              <Animated.Text
+                style={[
+                  styles.date,
+                  { color: cover.textColor, opacity: dateOpacity, transform: [{ translateY: dateTranslateY }] },
+                ]}
+              >
                 {formatRevealDate(step.at)}
               </Animated.Text>
               <Animated.View
-                style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
+                style={[
+                  styles.entryCard,
+                  { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }, { scale: cardScale }] },
+                ]}
               >
                 <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
                   <PaperBlock paper={step.paper} blockRef={entryPaperRef}>
                     <Text style={[styles.entryText, { color: paperInk(step.paper) }]}>{step.text}</Text>
                     {/* DES-21 §4 — a SIGNATURE, not a byline: inside PaperBlock,
                         after the body, trailing-aligned, on the entry's own
-                        `bloomOpacity`/`bloomScale` (no arrival of its own).
+                        arrival progress (no arrival of its own).
                         Condition is per-VOLUME (`pkg.isCollective`), never
                         per-entry (§4's scope note, §14.3's is_collective
                         ruling) — a collective volume signs every entry, a
@@ -591,7 +612,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
 
                           NO CLOCK OF ITS OWN, and none is added: this
                           element is already inside the entry card's
-                          `bloomOpacity`/`bloomScale` view (`:497`), so it
+                          arrival-progress view, so it
                           arrives on the entry's own bloom by position. One
                           more ambient loop is banned (standing rule), which
                           is why "it breathes on the entry's own bloom
@@ -603,7 +624,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                 )}
               </Animated.View>
               <View style={styles.railTrack}>
-                <View style={[styles.railFill, { width: `${Math.round(railFill * 100)}%` }]} />
+                <Animated.View style={[styles.railFill, { transform: [{ scaleX: dwellProgressAnim }] }]} />
               </View>
             </View>
           </Pressable>
@@ -884,9 +905,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   railFill: {
+    width: '100%',
     height: '100%',
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.ink,
+    transformOrigin: 'left center',
   },
   ending: {
     flex: 1,

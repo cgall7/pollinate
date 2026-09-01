@@ -99,9 +99,9 @@ const sortieDurationFor = (hopPx) =>
     easeApproach: easings.dart, easeDescent: easings.settle,
   }).durationMs;
 
-const G = seq.resolveGrammar({ grammar: seq.STUB_GRAMMAR, anchors, sortieDurationFor });
+const G = seq.resolveGrammar({ grammar: seq.NATIVE_REVEAL_GRAMMAR, anchors, sortieDurationFor });
 console.log(`   mean hop ${seq.meanHopPx(anchors).toFixed(1)}px -> sortie ${sortieDurationFor(seq.meanHopPx(anchors)).toFixed(0)}ms ` +
-  `-> solved dwell ${G.perchMs.map(v => Math.round(v)).join('-')}ms for a ${(seq.STUB_GRAMMAR.airborneTarget * 100).toFixed(1)}% target`);
+  `-> solved dwell ${G.perchMs.map(v => Math.round(v)).join('-')}ms for a ${(seq.NATIVE_REVEAL_GRAMMAR.airborneTarget * 100).toFixed(1)}% target`);
 
 const runSession = (seed, forMs, GG = G, AA = anchors) => {
   const rng = seq.makeRng(seed);
@@ -231,7 +231,7 @@ const cy = anchors.reduce((a, p) => a + p.y, 0) / anchors.length;
 // noise wearing the shape of a result.
 for (const spread of [0.4, 0.7, 1.0, 1.4]) {
   const AA = anchors.map((p) => ({ ...p, x: cx + (p.x - cx) * spread, y: cy + (p.y - cy) * spread }));
-  const G2 = seq.resolveGrammar({ grammar: seq.STUB_GRAMMAR, anchors: AA, sortieDurationFor });
+  const G2 = seq.resolveGrammar({ grammar: seq.NATIVE_REVEAL_GRAMMAR, anchors: AA, sortieDurationFor });
   let tot = 0, air = 0;
   for (let s = 0; s < 24; s += 1) {
     const bs = runSession(0x5EED + s * 7919, 60000, G2, AA);

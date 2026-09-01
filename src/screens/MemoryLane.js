@@ -12,7 +12,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { SPRINGS, useReducedMotion } from '../constants/motion';
 import {
-  STUB_GRAMMAR,
+  NATIVE_REVEAL_GRAMMAR,
   buildRevealSequence,
   startReveal,
   tapReveal,
@@ -104,7 +104,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (!sequence || !revealState || revealState.done) return;
     const id = setInterval(() => {
-      setRailFill(dwellProgress(revealState, Date.now(), sequence, STUB_GRAMMAR));
+      setRailFill(dwellProgress(revealState, Date.now(), sequence, NATIVE_REVEAL_GRAMMAR));
     }, RAIL_TICK_MS);
     return () => clearInterval(id);
   }, [sequence, revealState]);
@@ -120,7 +120,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
       bloomScale.setValue(1);
       Animated.timing(bloomOpacity, {
         toValue: 1,
-        duration: arrivalMs(STUB_GRAMMAR, true),
+        duration: arrivalMs(NATIVE_REVEAL_GRAMMAR, true),
         easing: Easing.linear,
         useNativeDriver: true,
       }).start();
@@ -143,7 +143,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
 
   const handleTap = () => {
     if (!sequence || !revealState) return;
-    const next = tapReveal(revealState, Date.now(), sequence, STUB_GRAMMAR);
+    const next = tapReveal(revealState, Date.now(), sequence, NATIVE_REVEAL_GRAMMAR);
     // Ruling 2: an early tap comes back referentially identical — nothing
     // to do, and nothing queued for when the floor does pass.
     if (next === revealState) return;

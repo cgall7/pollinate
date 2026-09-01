@@ -42,6 +42,7 @@ import { contrastRatio, over, parseColor, calibrate } from './lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE = path.join(ROOT, 'src/components/revealSequencer.js');
+const PACKAGE_OPEN_MODULE = path.join(ROOT, 'src/screens/PackageOpen.js');
 const SEED_MODULE = path.join(ROOT, 'src/utils/demoSeed.js');
 const PROMPTS_MODULE = path.join(ROOT, 'src/constants/prompts.js');
 const THEME_MODULE = path.join(ROOT, 'src/constants/theme.js');
@@ -68,6 +69,14 @@ const pend = (label, detail) => {
 };
 
 const parseJs = (src) => parse(src, { sourceType: 'module', plugins: ['jsx'] });
+const parseJsWithComments = (src) => parse(src, { sourceType: 'module', plugins: ['jsx'], attachComment: true });
+const uncommented = (src, ast) => {
+  const chars = src.split('');
+  for (const c of ast.comments ?? []) {
+    for (let i = c.start; i < c.end; i += 1) chars[i] = ' ';
+  }
+  return chars.join('');
+};
 const walk = (node, visit) => {
   if (!node || typeof node !== 'object') return;
   if (Array.isArray(node)) {
@@ -121,7 +130,7 @@ console.log('\nA. the module is sampleable at all');
 
 const seq = await import(`data:text/javascript;base64,${Buffer.from(moduleSource).toString('base64')}`);
 const {
-  STUB_GRAMMAR: G,
+  NATIVE_REVEAL_GRAMMAR: G,
   buildRevealSequence,
   startReveal,
   readMs,
@@ -132,6 +141,9 @@ const {
   arrivalProgress,
   tapReveal,
 } = seq;
+
+const packageOpenSource = await readFile(PACKAGE_OPEN_MODULE, 'utf8');
+const packageOpenAst = parseJsWithComments(packageOpenSource);
 
 // A step, as `buildRevealSequence` would produce it. Built through the real
 // builder rather than hand-written, so a change to the step shape reaches
@@ -144,6 +156,19 @@ const stepOf = (words) =>
 // ===========================================================================
 console.log('\nB. the floor, swept over its whole domain');
 // ===========================================================================
+
+// 0. MP-2 closes the placeholder grammar. The exact timing is now a contract
+//    because the PackageOpen arrival and the pacing floor both derive from it.
+{
+  if (G && G.bloomMs === 960 && G.reducedFadeMs === 480) {
+    ok('native reveal grammar is final: bloomMs 960ms and Reduced Motion arrival 480ms');
+  } else {
+    bad(
+      'native reveal grammar is final: bloomMs 960ms and Reduced Motion arrival 480ms',
+      `got bloomMs=${G && G.bloomMs}, reducedFadeMs=${G && G.reducedFadeMs}`,
+    );
+  }
+}
 
 // 1. Monotone in length. Catches the two ways a per-step floor degrades back
 //    into a constant: a literal, and a latch that saturates early.
@@ -536,6 +561,92 @@ console.log('\nD. the rail, and what this gate cannot reach');
     bad(
       'dwellProgress runs 0 -> 1 over the floor and reaches 1 exactly when canAdvance flips',
       `at 0: ${at0}, at floor: ${atFloor}, ${mismatches.length} offsets where the rail and the gate disagree.`,
+    );
+  }
+}
+
+// 14b. MP-2: PackageOpen may not reintroduce the 50ms React-state rail loop.
+//      The rail is a single Animated.Value over dwellMs, painted as a transform
+//      so it can move every frame without rerendering React.
+{
+  const setIntervalCalls = [];
+  const railStateHits = [];
+  const dwellAnim = [];
+  walk(packageOpenAst.program, (n) => {
+    if (n.type === 'CallExpression' && n.callee?.name === 'setInterval') setIntervalCalls.push(n.start);
+    if (n.type === 'VariableDeclarator' && /railFill|setRailFill/.test(n.id?.name ?? '')) railStateHits.push(n.id.name);
+    if (n.type === 'CallExpression' && /setRailFill/.test(n.callee?.name ?? '')) railStateHits.push(n.callee.name);
+    if (
+      n.type === 'CallExpression' &&
+      n.callee?.object?.name === 'Animated' &&
+      n.callee?.property?.name === 'timing'
+    ) {
+      const text = packageOpenSource.slice(n.start, n.end);
+      if (/dwellProgressAnim/.test(text) && /duration:\s*stepDwellMs/.test(text) && /Easing\.linear/.test(text)) {
+        dwellAnim.push(n.start);
+      }
+    }
+  });
+  if (setIntervalCalls.length === 0 && railStateHits.length === 0 && dwellAnim.length === 1) {
+    ok('PackageOpen rail uses one linear Animated dwell driver and no setInterval/state-width loop');
+  } else {
+    bad(
+      'PackageOpen rail uses one linear Animated dwell driver and no setInterval/state-width loop',
+      `setInterval calls=${setIntervalCalls.length}, rail state identifiers=${railStateHits.length}, ` +
+        `linear dwell timings=${dwellAnim.length}`,
+    );
+  }
+}
+
+// 14c. MP-2: PackageOpen arrival is one master timing value; the old spring
+//      path and separate date clock must stay gone.
+{
+  const springs = [];
+  const arrivalTimings = [];
+  const dateTimingCalls = [];
+  walk(packageOpenAst.program, (n) => {
+    if (
+      n.type === 'CallExpression' &&
+      n.callee?.object?.name === 'Animated' &&
+      n.callee?.property?.name === 'spring'
+    ) {
+      springs.push(n.start);
+    }
+    if (
+      n.type === 'CallExpression' &&
+      n.callee?.object?.name === 'Animated' &&
+      n.callee?.property?.name === 'timing'
+    ) {
+      const text = packageOpenSource.slice(n.start, n.end);
+      if (/arrivalProgressAnim/.test(text)) arrivalTimings.push(n.start);
+      if (/dateOpacity|dateTranslateY/.test(text)) dateTimingCalls.push(n.start);
+    }
+  });
+  if (springs.length === 0 && arrivalTimings.length === 2 && dateTimingCalls.length === 0) {
+    ok('PackageOpen arrival has no spring and date reads the same master arrival progress');
+  } else {
+    bad(
+      'PackageOpen arrival has no spring and date reads the same master arrival progress',
+      `springs=${springs.length}, arrival timings=${arrivalTimings.length}, date timing calls=${dateTimingCalls.length}`,
+    );
+  }
+}
+
+// 14d. MP-2: no production reveal importer may still ask for a STUB grammar.
+{
+  const files = await jsFiles(SRC);
+  const offenders = [];
+  for (const f of files) {
+    const src = await readFile(f, 'utf8');
+    const ast = parseJsWithComments(src);
+    if (/\bSTUB_[A-Z0-9_]*GRAMMAR\b/.test(uncommented(src, ast))) offenders.push(path.relative(ROOT, f));
+  }
+  if (offenders.length === 0) {
+    ok('no production reveal importer references a STUB grammar symbol');
+  } else {
+    bad(
+      'no production reveal importer references a STUB grammar symbol',
+      `found ${offenders.join(', ')}`,
     );
   }
 }
