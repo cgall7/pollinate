@@ -33,6 +33,34 @@
 // mutation loop cannot revert an uncommitted edit of your own.
 export const MUTATIONS = [
   {
+    row: 'D1b',
+    why: 'travel goes back to out(cubic), which launches from rest at peak velocity instead of zero endpoint velocity',
+    file: 'src/constants/motion.js',
+    from: '  travel: Easing.inOut(Easing.cubic),',
+    to: '  travel: Easing.out(Easing.cubic),',
+  },
+  {
+    row: 'D5b',
+    why: 'failure recovery adds a duplicate count at return start while leaving the correct origin count in place',
+    file: 'src/components/useNectarGift.js',
+    from: '          const returnHomeDone = new Promise((resolveReturnHome) => {\n            const reverseTravel = () => {',
+    to: '          const returnHomeDone = new Promise((resolveReturnHome) => {\n            countTo(settled.current);\n            const reverseTravel = () => {',
+  },
+  {
+    row: 'D5c',
+    why: 'Reduce Motion waits for the network before starting the optimistic count, making the gesture visually inert on a slow RPC',
+    file: 'src/components/useNectarGift.js',
+    from: '        const optimisticCountDone = countTo(optimistic);',
+    to: '',
+  },
+  {
+    row: 'D5b',
+    why: 'a known-at-contact failure skips the optimistic count before returning',
+    file: 'src/components/useNectarGift.js',
+    from: '          const countDone = countTo(optimistic);\n          if (commitResult && !commitResult.ok) {',
+    to: '          if (commitResult && !commitResult.ok) {',
+  },
+  {
     row: 'E1',
     why: 'a door that stops being a door — one call site loses the shared containerStyle, so the population is one and the branch pairing is gone',
     file: 'src/screens/PackageOpen.js',
@@ -331,6 +359,7 @@ import {
   NECTAR_STARTER_GRANT_DROPS,
   nectarArrivalDrops,
 } from '../src/constants/nectar.js';
+import { nectarGiftLifecycleTrace } from '../src/components/nectarGiftLifecycle.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -371,7 +400,13 @@ const nectarMs = (key) => {
   if (!m) throw new Error(`check-nectar-exchange: NECTAR.${key} not found — a beat this gate measures has been renamed or removed`);
   return Number(m[1]);
 };
-const NECTAR = { gather: nectarMs('gather'), travel: nectarMs('travel'), settle: nectarMs('settle') };
+const NECTAR = {
+  gather: nectarMs('gather'),
+  travel: nectarMs('travel'),
+  absorbRise: nectarMs('absorbRise'),
+  absorbFall: nectarMs('absorbFall'),
+  settle: nectarMs('settle'),
+};
 
 const HIVE_THEMES_SRC = await read('src/constants/hiveThemes.js');
 const COVERS = [...HIVE_THEMES_SRC.matchAll(/base:\s*theme\.colors\.(\w+),\s*\n\s*textColor:\s*theme\.colors\.(\w+)/g)]
@@ -769,6 +804,44 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     bad('D1', `haptic in settle=${hapticInSettle}, haptic in a promise handler=${hapticInPromiseThen}, RM haptic=${rmHaptic} — §6 row 4 wants the call site inside absorption and nowhere else`);
   }
 
+  // MP-3: the travel profile starts and ends at rest. This samples the exact
+  // expression motion.js exports, with a tiny local Easing shim, rather than
+  // a hand-copied cubic that could keep passing after the app's curve changed.
+  const nectarEasingBlock = /export const NECTAR_EASING = \{[\s\S]*?\n\};/.exec(MOTION_SRC)?.[0] ?? '';
+  const travelExpr = /travel:\s*([^,\n]+),/.exec(nectarEasingBlock)?.[1] ?? '';
+  const EasingShim = {
+    cubic: (t) => t * t * t,
+    out: (fn) => (t) => 1 - fn(1 - t),
+    inOut: (fn) => (t) => (t < 0.5 ? fn(t * 2) / 2 : 1 - fn((1 - t) * 2) / 2),
+  };
+  let easeTravel = null;
+  try {
+    easeTravel = Function('Easing', `return (${travelExpr});`)(EasingShim);
+  } catch {
+    easeTravel = null;
+  }
+  const speeds = [];
+  const dt = 1 / 1000;
+  if (typeof easeTravel === 'function') {
+    for (let i = 0; i < 1000; i += 1) speeds.push((easeTravel((i + 1) * dt) - easeTravel(i * dt)) / dt);
+  }
+  const endpointEpsilon = 0.00001;
+  const endpointsRest = speeds[0] < 0.00001 && speeds[speeds.length - 1] < 0.00001;
+  const positiveInside = speeds.slice(1, -1).every((v) => v > 0);
+  let peaks = 0;
+  for (let i = 1; i < speeds.length - 1; i += 1) {
+    if (speeds[i] >= speeds[i - 1] && speeds[i] >= speeds[i + 1] && speeds[i] > 2.9) peaks += 1;
+  }
+  if (travelExpr === 'Easing.inOut(Easing.cubic)' && endpointsRest && positiveInside && peaks === 1) {
+    ok('D1b travel samples NECTAR_EASING.travel itself: endpoint velocity is zero at t=0/t=1, positive inside, and has one central peak at the cubic join');
+  } else {
+    bad(
+      'D1b',
+      `travelExpr="${travelExpr}", sampled=${typeof easeTravel === 'function'}, endpointsRest=${endpointsRest}, ` +
+        `positiveInside=${positiveInside}, peakSamples=${peaks}, epsilon=${endpointEpsilon}`,
+    );
+  }
+
   // ROW 5, MADE STRUCTURAL. "The numeral returns to its prior value exactly —
   // no drift from the count-down/count-up pair" is only checkable if the two
   // are NOT a pair: every count is a tween to an ABSOLUTE target, so
@@ -828,6 +901,145 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     ok(`D5 the beat's instants are composed from NECTAR rather than typed — contact = gather + travel = ${NECTAR.gather + NECTAR.travel}ms, matching R-N3's own Depart boundary, and rest follows from it. Retuning a duration moves the beat instead of stranding it`);
   } else {
     bad('D5', `contact is "${contact.trim()}" and rest is "${rest.trim()}" (contact resolves to ${NECTAR.gather + NECTAR.travel}ms) — a beat boundary spelled as a literal is a number that outlives its own duration`);
+  }
+
+  // MP-3: failure timing is contact-owned, and the returned send() promise is
+  // owned by the whole failure lifecycle. A failure known before contact
+  // starts the return immediately; a failure arriving during the stain stops
+  // that stain on the frame the RPC result appears; and the caller cannot
+  // leave its sending state until return-home plus the authoritative count
+  // both complete.
+  const failureTiming =
+    /let commitResult = null;/.test(HOOK) &&
+    /commitResult = \{ ok: false, err \};/.test(HOOK) &&
+    /const countDone = countTo\(optimistic\);\n\s*if \(commitResult && !commitResult\.ok\) \{/.test(HOOK) &&
+    /if \(commitResult && !commitResult\.ok\) \{[\s\S]{0,200}?Promise\.reject\(\{ err: commitResult\.err, collapsed: false, countDone \}\)/.test(HOOK) &&
+    /const failure = settledCommit\.then\(\(res\) => \(res\.ok \? null : res\)\);/.test(HOOK) &&
+    /Promise\.race\(\[stainDone\.then\(\(\) => null\), failure\]\)/.test(HOOK) &&
+    /stainAnimation\?\.stop\(\);/.test(HOOK) &&
+    /Promise\.reject\(\{ err: earlyFailure\.err, collapsed: true, countDone \}\)/.test(HOOK) &&
+    /return Promise\.all\(\[stainDone, countDone\]\);/.test(HOOK) &&
+    /const returnPlan = nectarFailureReturnPlan\(\{ collapsed, nectar: NECTAR \}\);/.test(HOOK) &&
+    /if \(returnPlan\.authoritativeCountAt !== 'origin'\) return;/.test(HOOK) &&
+    /const returnHomeDone = new Promise\(\(resolveReturnHome\) => \{/.test(HOOK) &&
+    /resolveReturnHome\(\);/.test(HOOK) &&
+    /const countHomeDone = countTo\(settled\.current\);/.test(HOOK) &&
+    /return returnHomeDone\.then\(\(\) => \(\{ ok: false, err \}\)\);/.test(HOOK);
+  const normalFailureTrace = [0, 200, 800].map((commitAtMs) =>
+    nectarGiftLifecycleTrace({ reduced: false, commitAtMs, ok: false, nectar: NECTAR })
+  );
+  const normalFailureClocksHold =
+    normalFailureTrace[0].optimisticCountStartMs === normalFailureTrace[0].contactMs &&
+    normalFailureTrace[0].returnStartMs === normalFailureTrace[0].contactMs &&
+    normalFailureTrace[0].firstPositionChangeMs === normalFailureTrace[0].contactMs &&
+    normalFailureTrace[0].authoritativeCountStartMs === normalFailureTrace[0].originMs &&
+    normalFailureTrace[1].returnStartMs === normalFailureTrace[1].contactMs &&
+    normalFailureTrace[2].returnStartMs === 800 &&
+    normalFailureTrace.every((t) => t.resolveMs >= t.authoritativeCountStartMs + NECTAR.settle);
+  const settledCountCalls = [];
+  visit(tree, (n, anc) => {
+    if (
+      n.type !== 'CallExpression' ||
+      n.callee?.type !== 'Identifier' ||
+      n.callee.name !== 'countTo' ||
+      n.arguments?.[0]?.type !== 'MemberExpression' ||
+      n.arguments[0].object?.name !== 'settled' ||
+      n.arguments[0].property?.name !== 'current'
+    ) return;
+
+    const insideReverseTravelCompletion = anc.some((a) => {
+      if (
+        a.type !== 'CallExpression' ||
+        a.callee?.type !== 'MemberExpression' ||
+        a.callee.property?.name !== 'start'
+      ) return false;
+      const timingCall = a.callee.object;
+      return (
+        timingCall?.type === 'CallExpression' &&
+        timingCall.callee?.type === 'MemberExpression' &&
+        timingCall.callee.object?.name === 'Animated' &&
+        timingCall.callee.property?.name === 'timing' &&
+        timingCall.arguments?.[0]?.type === 'Identifier' &&
+        timingCall.arguments[0].name === 'travel'
+      );
+    });
+    settledCountCalls.push({ insideReverseTravelCompletion });
+  });
+  const exactlyOneSettledCountAtOrigin =
+    settledCountCalls.length === 1 &&
+    settledCountCalls[0].insideReverseTravelCompletion;
+  if (failureTiming && normalFailureClocksHold && exactlyOneSettledCountAtOrigin) {
+    ok('D5b normal lifecycle inspects failure at contact, interrupts the stain on an in-stain rejection, starts exactly one authoritative count, starts it at reverse-travel origin, and send() resolves only after return-home plus authoritative count completion');
+  } else {
+    bad(
+      'D5b',
+      `failureTiming=${failureTiming}, settledCountCalls=${JSON.stringify(settledCountCalls)}, traces=${JSON.stringify(normalFailureTrace)}`,
+    );
+  }
+
+  const commitSamples = [0, 200, 800];
+  const lifecycleMatrix = [false, true].flatMap((reduced) =>
+    [true, false].flatMap((okResult) =>
+      commitSamples.map((commitAtMs) => ({
+        reduced,
+        ok: okResult,
+        commitAtMs,
+        trace: nectarGiftLifecycleTrace({ reduced, commitAtMs, ok: okResult, nectar: NECTAR }),
+      }))
+    )
+  );
+  const fullLifecycleMatrixHolds = lifecycleMatrix.every(({ reduced, ok: okResult, commitAtMs, trace }) => {
+    if (reduced && okResult) {
+      return trace.countStartMs === 0 && trace.resolveMs >= commitAtMs && trace.resolveMs >= NECTAR.settle;
+    }
+    if (reduced && !okResult) {
+      return trace.countStartMs === 0 && trace.authoritativeCountStartMs === commitAtMs && trace.resolveMs >= commitAtMs + NECTAR.settle;
+    }
+    if (!reduced && okResult) {
+      return (
+        trace.optimisticCountStartMs === trace.contactMs &&
+        trace.resolveMs >= commitAtMs &&
+        trace.resolveMs >= trace.contactMs + NECTAR.absorbRise + NECTAR.absorbFall &&
+        trace.resolveMs >= trace.contactMs + NECTAR.settle
+      );
+    }
+    return (
+      trace.optimisticCountStartMs === trace.contactMs &&
+      trace.returnStartMs === (commitAtMs <= trace.contactMs ? trace.contactMs : commitAtMs) &&
+      trace.firstPositionChangeMs === trace.returnStartMs &&
+      trace.authoritativeCountStartMs === trace.originMs &&
+      trace.resolveMs >= trace.originMs + NECTAR.gather &&
+      trace.resolveMs >= trace.authoritativeCountStartMs + NECTAR.settle
+    );
+  });
+
+  // MP-3: Reduce Motion still has no travel, but it must keep the gesture's
+  // optimism. The count starts before the network join; success awaits that
+  // visible optimistic count, and failure reverses to the authoritative base
+  // only when the rejection is known.
+  const rmReducedBlock = /if \(reduced\) \{([\s\S]*?)\n      \}/.exec(HOOK)?.[1] ?? '';
+  const rmOptimisticStartsBeforeNetwork =
+    /const optimisticCountDone = countTo\(optimistic\);[\s\S]*?return settledCommit/.test(rmReducedBlock);
+  const rmSuccessAwaitsOptimistic =
+    /if \(res\.ok\) \{[\s\S]*?await optimisticCountDone;/.test(rmReducedBlock);
+  const rmFailureReversesAuthoritative =
+    /\} else \{[\s\S]*?await countTo\(base\);/.test(rmReducedBlock);
+  const countPromiseOwned = /return new Promise\(\(resolve\) => \{[\s\S]*?a\.start\(resolve\);[\s\S]*?\}\);/.test(HOOK);
+  const rmTrace = [0, 200, 800].map((commitAtMs) =>
+    nectarGiftLifecycleTrace({ reduced: true, commitAtMs, ok: true, nectar: NECTAR })
+  );
+  const rmClocksHold = rmTrace.every((t, index) =>
+    t.countStartMs === 0 &&
+    t.resolveMs >= [0, 200, 800][index] &&
+    t.resolveMs >= NECTAR.settle
+  );
+  if (rmOptimisticStartsBeforeNetwork && rmSuccessAwaitsOptimistic && rmFailureReversesAuthoritative && countPromiseOwned && rmClocksHold && fullLifecycleMatrixHolds) {
+    ok('D5c Reduce Motion starts the optimistic count with the gesture, reverses only after a known failure, send() awaits the visible count callback, and the shared lifecycle planner covers the 12-case timing matrix');
+  } else {
+    bad(
+      'D5c',
+      `rmOptimisticStartsBeforeNetwork=${rmOptimisticStartsBeforeNetwork}, rmSuccessAwaitsOptimistic=${rmSuccessAwaitsOptimistic}, rmFailureReversesAuthoritative=${rmFailureReversesAuthoritative}, countPromiseOwned=${countPromiseOwned}, rmClocksHold=${rmClocksHold}, fullLifecycleMatrixHolds=${fullLifecycleMatrixHolds}, matrix=${JSON.stringify(lifecycleMatrix)}`,
+    );
   }
 
   // THE PANEL'S NUMERAL SURVIVES GATHER. This is the one place this build

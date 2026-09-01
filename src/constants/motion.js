@@ -156,10 +156,10 @@ export const NECTAR = {
 };
 
 export const NECTAR_EASING = {
-  // The gesture's own curve. `out(cubic)` decelerating into the paper, and
-  // the drop does not bounce — R-N3 says so outright, which rules out every
-  // spring in this file for the travel.
-  travel: Easing.out(Easing.cubic),
+  // The gesture's own curve. Endpoint velocity is zero at lift-off and
+  // contact, with one interior speed peak. The drop does not bounce — R-N3
+  // says so outright, which rules out every spring in this file for travel.
+  travel: Easing.inOut(Easing.cubic),
   // The spec's own pair, quoted: rise `out(cubic)`, fall `inOut(cubic)`.
   absorbRise: Easing.out(Easing.cubic),
   absorbFall: Easing.inOut(Easing.cubic),
