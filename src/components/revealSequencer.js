@@ -283,6 +283,50 @@ export const dwellMs = (grammar, step) => grammar.bloomMs + readMs(step, grammar
 // what it is about.
 export const arrivalMs = (grammar, reduced) => (reduced ? grammar.reducedFadeMs : grammar.bloomMs);
 
+export const REVEAL_CARD_KEYFRAME_MS = 300;
+export const REVEAL_DATE_ONSET_MS = 280;
+
+const easeOutCubic = (t) => 1 - ((1 - t) ** 3);
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);
+const clamp01 = (n) => Math.max(0, Math.min(1, n));
+
+export const normalRevealMasterProgressAtMs = (elapsedMs, grammar) => {
+  const first = REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs;
+  if (elapsedMs <= 0) return 0;
+  if (elapsedMs < REVEAL_CARD_KEYFRAME_MS) {
+    return first * easeOutCubic(elapsedMs / REVEAL_CARD_KEYFRAME_MS);
+  }
+  if (elapsedMs >= grammar.bloomMs) return 1;
+  const restMs = grammar.bloomMs - REVEAL_CARD_KEYFRAME_MS;
+  const rest = easeInOutCubic((elapsedMs - REVEAL_CARD_KEYFRAME_MS) / restMs);
+  return first + (1 - first) * rest;
+};
+
+export const normalRevealCardOpacityAtMaster = (master, grammar = NATIVE_REVEAL_GRAMMAR) => {
+  const first = REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs;
+  if (master <= 0) return 0;
+  if (master < first) return (master / first) * 0.92;
+  if (master >= 1) return 1;
+  return 0.92 + ((master - first) / (1 - first)) * 0.08;
+};
+
+export const normalRevealCardOpacityAtMs = (elapsedMs, grammar) =>
+  normalRevealCardOpacityAtMaster(normalRevealMasterProgressAtMs(elapsedMs, grammar), grammar);
+
+export const normalRevealCardOpacitySegmentEasing = (fromMs, toMs, grammar) => {
+  const start = normalRevealCardOpacityAtMs(fromMs, grammar);
+  const end = normalRevealCardOpacityAtMs(toMs, grammar);
+  const span = end - start;
+  if (Math.abs(span) < 1e-9) return () => 1;
+  return (t) => clamp01((normalRevealCardOpacityAtMs(fromMs + ((toMs - fromMs) * clamp01(t)), grammar) - start) / span);
+};
+
+export const normalRevealDateMasterBreakpoint = (grammar) =>
+  (REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs) * easeOutCubic(REVEAL_DATE_ONSET_MS / REVEAL_CARD_KEYFRAME_MS);
+
+export const normalRevealDateOpacityBreakpoint = (grammar) =>
+  normalRevealCardOpacityAtMaster(normalRevealDateMasterBreakpoint(grammar), grammar);
+
 export const canAdvance = (state, nowMs, sequence, grammar) =>
   !state.done && nowMs - state.arrivedAtMs >= dwellMs(grammar, sequence[state.index]);
 
@@ -353,7 +397,9 @@ export const dwellProgress = (state, nowMs, sequence, grammar) => {
 export const arrivalProgress = (state, nowMs, grammar, reduced) => {
   const a = arrivalMs(grammar, reduced);
   if (!(a > 0)) return 1;
-  return Math.max(0, Math.min(1, (nowMs - state.arrivedAtMs) / a));
+  const elapsed = nowMs - state.arrivedAtMs;
+  if (reduced) return clamp01(elapsed / a);
+  return clamp01(normalRevealCardOpacityAtMs(elapsed, grammar));
 };
 
 // THE tap. Ruling 2 is the `return state` on both refusal branches: the caller

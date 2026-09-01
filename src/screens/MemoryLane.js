@@ -10,14 +10,20 @@ import { PressableScale } from '../components/PressableScale';
 import { GlassRim } from '../components/GlassRim';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
-import { SPRINGS, useReducedMotion } from '../constants/motion';
+import { useReducedMotion } from '../constants/motion';
 import {
   NATIVE_REVEAL_GRAMMAR,
   buildRevealSequence,
   startReveal,
   tapReveal,
   dwellProgress,
+  arrivalProgress,
+  dwellMs,
   arrivalMs,
+  normalRevealCardOpacityAtMs,
+  normalRevealCardOpacitySegmentEasing,
+  normalRevealDateOpacityBreakpoint,
+  REVEAL_DATE_ONSET_MS,
 } from '../components/revealSequencer';
 
 // 8b.4 Trip Down Memory Lane — the author's own bloom moment
@@ -30,11 +36,6 @@ import {
 // and what an ending is (return to the hive, never a reply prompt — that is
 // package-open's shape, 8b.6, not this one).
 //
-// The tick that drives `dwellProgress` intentionally lives in this call
-// site, not the engine — `check-reveal-pacing.mjs` samples the engine as a
-// pure function of (state, time, tap) precisely so nothing here has to be
-// imported for that gate to run.
-
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -53,8 +54,6 @@ const formatRevealDate = (atMs) => {
   return year === thisYear ? `${month} ${day}` : `${month} ${day}, ${year}`;
 };
 
-const RAIL_TICK_MS = 50;
-
 export const MemoryLaneScreen = ({ navigation, route }) => {
   const { hiveId, subjectName, coverTheme } = route.params;
   const cover = hiveCoverTheme(coverTheme);
@@ -64,11 +63,13 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
   const [error, setError] = useState(false);
   const [sequence, setSequence] = useState(null);
   const [revealState, setRevealState] = useState(null);
-  const [railFill, setRailFill] = useState(0);
-
-  const bloomOpacity = useRef(new Animated.Value(0)).current;
-  const bloomScale = useRef(new Animated.Value(0.85)).current;
-  const dateOpacity = useRef(new Animated.Value(0)).current;
+  const arrivalProgressAnim = useRef(new Animated.Value(0)).current;
+  const dwellProgressAnim = useRef(new Animated.Value(0)).current;
+  const spatialFrozenStepRef = useRef(null);
+  const lastReducedRef = useRef(reduced);
+  const arrivalRenderedRef = useRef(0);
+  const arrivalStepKeyRef = useRef(null);
+  const arrivalGenerationRef = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,50 +97,89 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
     }, [hiveId])
   );
 
-  // Rail progress — the mandatory instrument (R118): while a step is
-  // blooming this is the only thing on screen saying "not yet," so it has
-  // to keep moving even though the tap it is guarding is idle. Resets on
-  // every index change because the effect re-runs against the new
-  // `revealState` identity `tapReveal` hands back.
   useEffect(() => {
-    if (!sequence || !revealState || revealState.done) return;
-    const id = setInterval(() => {
-      setRailFill(dwellProgress(revealState, Date.now(), sequence, NATIVE_REVEAL_GRAMMAR));
-    }, RAIL_TICK_MS);
-    return () => clearInterval(id);
-  }, [sequence, revealState]);
+    if (!sequence || !revealState || revealState.done) return undefined;
+    const now = Date.now();
+    const initial = dwellProgress(revealState, now, sequence, NATIVE_REVEAL_GRAMMAR);
+    const stepDwellMs = dwellMs(NATIVE_REVEAL_GRAMMAR, sequence[revealState.index]);
+    dwellProgressAnim.setValue(initial);
+    const remaining = Math.max(0, stepDwellMs - (now - revealState.arrivedAtMs));
+    const animation = Animated.timing(dwellProgressAnim, {
+      toValue: 1,
+      duration: remaining,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sequence, revealState?.index, revealState?.arrivedAtMs, revealState?.done]);
 
   // Bloom entrance. Ruling 3: Reduce Motion substitutes the arrival with a
   // crossfade and leaves the floor (the rail effect above) untouched — the
   // arrival is the only thing that shortens.
   useEffect(() => {
-    if (!sequence || !revealState || revealState.done) return;
-    dateOpacity.setValue(0);
-    if (reduced) {
-      bloomOpacity.setValue(0);
-      bloomScale.setValue(1);
-      Animated.timing(bloomOpacity, {
+    const sub = arrivalProgressAnim.addListener(({ value }) => {
+      arrivalRenderedRef.current = value;
+    });
+    return () => arrivalProgressAnim.removeListener(sub);
+  }, [arrivalProgressAnim]);
+
+  useEffect(() => {
+    if (!sequence || !revealState || revealState.done) return undefined;
+    const now = Date.now();
+    const elapsed = now - revealState.arrivedAtMs;
+    const sameStep = arrivalStepKeyRef.current === revealState.arrivedAtMs;
+    const toggledIntoReduced = reduced && lastReducedRef.current === false;
+    if (reduced) spatialFrozenStepRef.current = revealState.index;
+    const spatialFrozen = spatialFrozenStepRef.current === revealState.index;
+    const activeReducedRegister = reduced || spatialFrozen;
+    const duration = arrivalMs(NATIVE_REVEAL_GRAMMAR, activeReducedRegister);
+    arrivalStepKeyRef.current = revealState.arrivedAtMs;
+    lastReducedRef.current = reduced;
+    let animation = null;
+    const generation = arrivalGenerationRef.current + 1;
+    arrivalGenerationRef.current = generation;
+    const startFrom = (initial) => {
+      if (arrivalGenerationRef.current !== generation) return;
+      arrivalProgressAnim.setValue(initial);
+      arrivalRenderedRef.current = initial;
+      if (initial >= 1) return;
+      const firstKeyframe = 0.92;
+      const animations = [];
+      if (!activeReducedRegister && initial < firstKeyframe) {
+        animations.push(Animated.timing(arrivalProgressAnim, {
+          toValue: firstKeyframe,
+          duration: Math.max(0, 300 - elapsed),
+          easing: normalRevealCardOpacitySegmentEasing(elapsed, 300, NATIVE_REVEAL_GRAMMAR),
+          useNativeDriver: true,
+        }));
+      }
+      animations.push(Animated.timing(arrivalProgressAnim, {
         toValue: 1,
-        duration: arrivalMs(NATIVE_REVEAL_GRAMMAR, true),
-        easing: Easing.linear,
+        duration: Math.max(0, duration - Math.max(elapsed, activeReducedRegister ? 0 : 300)),
+        easing: activeReducedRegister
+          ? Easing.linear
+          : normalRevealCardOpacitySegmentEasing(Math.max(elapsed, 300), NATIVE_REVEAL_GRAMMAR.bloomMs, NATIVE_REVEAL_GRAMMAR),
         useNativeDriver: true,
-      }).start();
+      }));
+      animation = Animated.sequence(animations);
+      animation.start();
+    };
+    if (sameStep && (toggledIntoReduced || spatialFrozen)) {
+      arrivalProgressAnim.stopAnimation((value) => {
+        arrivalRenderedRef.current = value;
+        startFrom(value);
+      });
     } else {
-      bloomOpacity.setValue(0);
-      bloomScale.setValue(0.85);
-      Animated.parallel([
-        Animated.spring(bloomOpacity, { toValue: 1, ...SPRINGS.reveal, useNativeDriver: true }),
-        Animated.spring(bloomScale, { toValue: 1, ...SPRINGS.reveal, useNativeDriver: true }),
-      ]).start();
+      startFrom(arrivalProgress(revealState, now, NATIVE_REVEAL_GRAMMAR, reduced));
     }
-    Animated.timing(dateOpacity, {
-      toValue: 1,
-      duration: 300,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    return () => {
+      arrivalGenerationRef.current += 1;
+      animation?.stop();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sequence, revealState?.index, revealState?.done, reduced]);
+  }, [sequence, revealState?.index, revealState?.arrivedAtMs, revealState?.done, reduced]);
 
   const handleTap = () => {
     if (!sequence || !revealState) return;
@@ -147,8 +187,15 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
     // Ruling 2: an early tap comes back referentially identical — nothing
     // to do, and nothing queued for when the floor does pass.
     if (next === revealState) return;
+    arrivalProgressAnim.stopAnimation();
+    dwellProgressAnim.stopAnimation();
+    arrivalProgressAnim.setValue(0);
+    dwellProgressAnim.setValue(0);
+    arrivalRenderedRef.current = 0;
+    arrivalStepKeyRef.current = null;
+    arrivalGenerationRef.current += 1;
+    spatialFrozenStepRef.current = null;
     Haptics.selectionAsync();
-    setRailFill(0);
     setRevealState(next);
   };
 
@@ -174,6 +221,36 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
   }
 
   const step = sequence && revealState && !revealState.done ? sequence[revealState.index] : null;
+  const spatialFrozen = reduced || spatialFrozenStepRef.current === revealState?.index;
+  const cardOpacity = arrivalProgressAnim;
+  const cardScale = spatialFrozen
+    ? 1
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, 0.92, 1],
+        outputRange: [0.965, 1.008, 1],
+      });
+  const cardTranslateY = spatialFrozen
+    ? 0
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, 0.92, 1],
+        outputRange: [6, 0, 0],
+      });
+  const dateOpacity = arrivalProgressAnim.interpolate({
+    inputRange: [
+      0,
+      spatialFrozen
+        ? REVEAL_DATE_ONSET_MS / arrivalMs(NATIVE_REVEAL_GRAMMAR, true)
+        : normalRevealDateOpacityBreakpoint(NATIVE_REVEAL_GRAMMAR),
+      1,
+    ],
+    outputRange: [0, 1, 1],
+  });
+  const dateTranslateY = spatialFrozen
+    ? 0
+    : arrivalProgressAnim.interpolate({
+        inputRange: [0, normalRevealDateOpacityBreakpoint(NATIVE_REVEAL_GRAMMAR), 1],
+        outputRange: [3, 0, 0],
+      });
 
   return (
     <View style={[styles.container, { backgroundColor: cover.base }]}>
@@ -194,11 +271,19 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
           accessibilityLabel="Tap to continue to the next memory"
         >
           <View style={styles.entryFrame} pointerEvents="box-none">
-            <Animated.Text style={[styles.date, { color: cover.textColor, opacity: dateOpacity }]}>
+            <Animated.Text
+              style={[
+                styles.date,
+                { color: cover.textColor, opacity: dateOpacity, transform: [{ translateY: dateTranslateY }] },
+              ]}
+            >
               {formatRevealDate(step.at)}
             </Animated.Text>
             <Animated.View
-              style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}
+              style={[
+                styles.entryCard,
+                { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }, { scale: cardScale }] },
+              ]}
             >
               <ScrollView contentContainerStyle={styles.entryScroll} showsVerticalScrollIndicator={false}>
                 <PaperBlock paper={step.paper}>
@@ -207,7 +292,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
               </ScrollView>
             </Animated.View>
             <View style={styles.railTrack}>
-              <View style={[styles.railFill, { width: `${Math.round(railFill * 100)}%` }]} />
+              <Animated.View style={[styles.railFill, { transform: [{ scaleX: dwellProgressAnim }] }]} />
             </View>
           </View>
         </Pressable>
@@ -299,9 +384,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   railFill: {
+    width: '100%',
     height: '100%',
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.ink,
+    transformOrigin: 'left center',
   },
   ending: {
     flex: 1,

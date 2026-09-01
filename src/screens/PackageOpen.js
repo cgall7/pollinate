@@ -28,6 +28,12 @@ import {
   tapReveal,
   dwellMs,
   arrivalMs,
+  dwellProgress,
+  arrivalProgress,
+  normalRevealCardOpacityAtMs,
+  normalRevealCardOpacitySegmentEasing,
+  normalRevealDateOpacityBreakpoint,
+  REVEAL_DATE_ONSET_MS,
 } from '../components/revealSequencer';
 import { RotationFrame } from '../components/RotationFrame';
 
@@ -98,6 +104,11 @@ export const PackageOpenScreen = ({ navigation, route }) => {
 
   const arrivalProgressAnim = useRef(new Animated.Value(0)).current;
   const dwellProgressAnim = useRef(new Animated.Value(0)).current;
+  const spatialFrozenStepRef = useRef(null);
+  const lastReducedRef = useRef(reduced);
+  const arrivalRenderedRef = useRef(0);
+  const arrivalStepKeyRef = useRef(null);
+  const arrivalGenerationRef = useRef(0);
 
   // R-N3's two ends, both REFS and never coordinates. `giftOrigin` follows
   // the control that carries the amount (the panel decides which);
@@ -390,38 +401,98 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   };
 
   useEffect(() => {
-    if (!sequence || !revealState || revealState.done) return;
+    if (!sequence || !revealState || revealState.done) return undefined;
+    const now = Date.now();
+    const initial = dwellProgress(revealState, now, sequence, NATIVE_REVEAL_GRAMMAR);
     const stepDwellMs = dwellMs(NATIVE_REVEAL_GRAMMAR, sequence[revealState.index]);
-    arrivalProgressAnim.setValue(0);
-    dwellProgressAnim.setValue(0);
-    if (reduced) {
-      Animated.timing(arrivalProgressAnim, {
-        toValue: 1,
-        duration: arrivalMs(NATIVE_REVEAL_GRAMMAR, true),
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(arrivalProgressAnim, {
-        toValue: 1,
-        duration: arrivalMs(NATIVE_REVEAL_GRAMMAR, false),
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start();
-    }
-    Animated.timing(dwellProgressAnim, {
+    dwellProgressAnim.setValue(initial);
+    const remaining = Math.max(0, stepDwellMs - (now - revealState.arrivedAtMs));
+    const animation = Animated.timing(dwellProgressAnim, {
       toValue: 1,
-      duration: stepDwellMs,
+      duration: remaining,
       easing: Easing.linear,
       useNativeDriver: true,
-    }).start();
+    });
+    animation.start();
+    return () => animation.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sequence, revealState?.index, revealState?.done, reduced]);
+  }, [sequence, revealState?.index, revealState?.arrivedAtMs, revealState?.done]);
+
+  useEffect(() => {
+    const sub = arrivalProgressAnim.addListener(({ value }) => {
+      arrivalRenderedRef.current = value;
+    });
+    return () => arrivalProgressAnim.removeListener(sub);
+  }, [arrivalProgressAnim]);
+
+  useEffect(() => {
+    if (!sequence || !revealState || revealState.done) return undefined;
+    const now = Date.now();
+    const elapsed = now - revealState.arrivedAtMs;
+    const sameStep = arrivalStepKeyRef.current === revealState.arrivedAtMs;
+    const toggledIntoReduced = reduced && lastReducedRef.current === false;
+    if (reduced) spatialFrozenStepRef.current = revealState.index;
+    const spatialFrozen = spatialFrozenStepRef.current === revealState.index;
+    const activeReducedRegister = reduced || spatialFrozen;
+    const duration = arrivalMs(NATIVE_REVEAL_GRAMMAR, activeReducedRegister);
+    arrivalStepKeyRef.current = revealState.arrivedAtMs;
+    lastReducedRef.current = reduced;
+    let animation = null;
+    const generation = arrivalGenerationRef.current + 1;
+    arrivalGenerationRef.current = generation;
+    const startFrom = (initial) => {
+      if (arrivalGenerationRef.current !== generation) return;
+      arrivalProgressAnim.setValue(initial);
+      arrivalRenderedRef.current = initial;
+      if (initial >= 1) return;
+      const firstKeyframe = 0.92;
+      const animations = [];
+      if (!activeReducedRegister && initial < firstKeyframe) {
+        animations.push(Animated.timing(arrivalProgressAnim, {
+          toValue: firstKeyframe,
+          duration: Math.max(0, 300 - elapsed),
+          easing: normalRevealCardOpacitySegmentEasing(elapsed, 300, NATIVE_REVEAL_GRAMMAR),
+          useNativeDriver: true,
+        }));
+      }
+      animations.push(Animated.timing(arrivalProgressAnim, {
+        toValue: 1,
+        duration: Math.max(0, duration - Math.max(elapsed, activeReducedRegister ? 0 : 300)),
+        easing: activeReducedRegister
+          ? Easing.linear
+          : normalRevealCardOpacitySegmentEasing(Math.max(elapsed, 300), NATIVE_REVEAL_GRAMMAR.bloomMs, NATIVE_REVEAL_GRAMMAR),
+        useNativeDriver: true,
+      }));
+      animation = Animated.sequence(animations);
+      animation.start();
+    };
+    if (sameStep && (toggledIntoReduced || spatialFrozen)) {
+      arrivalProgressAnim.stopAnimation((value) => {
+        arrivalRenderedRef.current = value;
+        startFrom(value);
+      });
+    } else {
+      startFrom(arrivalProgress(revealState, now, NATIVE_REVEAL_GRAMMAR, reduced));
+    }
+    return () => {
+      arrivalGenerationRef.current += 1;
+      animation?.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sequence, revealState?.index, revealState?.arrivedAtMs, revealState?.done, reduced]);
 
   const handleTap = () => {
     if (!sequence || !revealState) return;
     const next = tapReveal(revealState, Date.now(), sequence, NATIVE_REVEAL_GRAMMAR);
     if (next === revealState) return;
+    arrivalProgressAnim.stopAnimation();
+    dwellProgressAnim.stopAnimation();
+    arrivalProgressAnim.setValue(0);
+    dwellProgressAnim.setValue(0);
+    arrivalRenderedRef.current = 0;
+    arrivalStepKeyRef.current = null;
+    arrivalGenerationRef.current += 1;
+    spatialFrozenStepRef.current = null;
     Haptics.selectionAsync();
     setRevealState(next);
   };
@@ -458,32 +529,34 @@ export const PackageOpenScreen = ({ navigation, route }) => {
   // DES-21 §9 — `connectedAuthorIds === null` (not loaded yet) fails closed
   // to no door, matching the state's own comment.
   const authorReachable = !!(step && connectedAuthorIds && connectedAuthorIds.has(step.authorId));
-  const cardOpacity = reduced
-    ? arrivalProgressAnim
-    : arrivalProgressAnim.interpolate({
-        inputRange: [0, 300 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
-        outputRange: [0, 0.92, 1],
-      });
-  const cardScale = reduced
+  const spatialFrozen = reduced || spatialFrozenStepRef.current === revealState?.index;
+  const cardOpacity = arrivalProgressAnim;
+  const cardScale = spatialFrozen
     ? 1
     : arrivalProgressAnim.interpolate({
-        inputRange: [0, 300 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        inputRange: [0, 0.92, 1],
         outputRange: [0.965, 1.008, 1],
       });
-  const cardTranslateY = reduced
+  const cardTranslateY = spatialFrozen
     ? 0
     : arrivalProgressAnim.interpolate({
-        inputRange: [0, 300 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        inputRange: [0, 0.92, 1],
         outputRange: [6, 0, 0],
       });
   const dateOpacity = arrivalProgressAnim.interpolate({
-    inputRange: [0, 280 / arrivalMs(NATIVE_REVEAL_GRAMMAR, reduced), 1],
+    inputRange: [
+      0,
+      spatialFrozen
+        ? REVEAL_DATE_ONSET_MS / arrivalMs(NATIVE_REVEAL_GRAMMAR, true)
+        : normalRevealDateOpacityBreakpoint(NATIVE_REVEAL_GRAMMAR),
+      1,
+    ],
     outputRange: [0, 1, 1],
   });
-  const dateTranslateY = reduced
+  const dateTranslateY = spatialFrozen
     ? 0
     : arrivalProgressAnim.interpolate({
-        inputRange: [0, 280 / NATIVE_REVEAL_GRAMMAR.bloomMs, 1],
+        inputRange: [0, normalRevealDateOpacityBreakpoint(NATIVE_REVEAL_GRAMMAR), 1],
         outputRange: [3, 0, 0],
       });
 
