@@ -79,7 +79,8 @@ check(
   /const chapterCount = comb\.chapters\?\.length \?\? 0/.test(card) &&
     /const chapterCountLabel = chapterCount === 1 \? '1 past month' : `\$\{chapterCount\} past months`/.test(card) &&
     /const chapterSignalLabel = `\$\{expanded \? '▾' : '▸'\} \$\{chapterCountLabel\}`/.test(card) &&
-    /chapterCount > 0 && \(/.test(card) &&
+    /\{chapterCount > 0 && \(\s*<View style=\{styles\.historySignal\}>/.test(card) &&
+    !/\{expanded && chapterCount > 0 && \(\s*<View style=\{styles\.historySignal\}>/.test(card) &&
     /<Text style=\{styles\.metaLine\}>\{chapterSignalLabel\}<\/Text>/.test(card)
 );
 
