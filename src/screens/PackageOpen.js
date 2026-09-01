@@ -489,11 +489,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
       {step ? (
         <>
           {pkg.rotationSubjectName ? (
-            <RotationFrame
-              subjectName={pkg.rotationSubjectName}
-              closesAt={pkg.rotationClosesAt}
-              sealedAt={pkg.rotationSealedAt}
-            />
+            <RotationFrame />
           ) : (
             <Text style={[styles.senderLabel, { color: cover.textColor }]}>From {pkg.senderName}</Text>
           )}

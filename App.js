@@ -19,6 +19,7 @@ import { ComposeNote } from './src/screens/ComposeNote';
 import { PlantSeed } from './src/screens/PlantSeed';
 import { SeedsInbox } from './src/screens/SeedsInbox';
 import { CreateHiveFlow } from './src/screens/CreateHive';
+import { CreateCombScreen } from './src/screens/CreateComb';
 import { HiveDetailScreen } from './src/screens/HiveDetail';
 import { ComposeHiveEntryScreen } from './src/screens/ComposeHiveEntry';
 import { SealHiveScreen } from './src/screens/SealHive';
@@ -282,6 +283,7 @@ export default function App() {
                 same as Lock/Input above: a flow you go deeper into, not a
                 utility sheet, so no `presentation: 'modal'`. */}
             <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
+            <Stack.Screen name="CreateComb" component={CreateCombScreen} />
             <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
             <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
             {/* ENG-61 — Multi-Writer Hives' invite half (20260827000001).

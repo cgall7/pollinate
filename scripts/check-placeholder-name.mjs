@@ -339,10 +339,10 @@ const hiveDetailCode = codeOnly(hiveDetailSrc, hiveDetailAst);
     const body = hiveStoreCode.slice(fnNode.start, fnNode.end);
     const mapMissIsSomeone = /!names\.has\(id\)\)\s*return\s*['"]Someone['"]/.test(body);
     const placeholderIsNull = /isPlaceholderName\(name\)\s*\?\s*null\s*:\s*name/.test(body);
-    const listSiteRoutes = /ownerName:\s*combOwnerNames\.has\(h\.id\)\s*\?\s*combOwnerNames\.get\(h\.id\)\s*:\s*resolveDirectName\(ownerNames,\s*h\.owner_id\)/.test(
+    const listSiteRoutes = /combOwnerNames\.has\(h\.id\)\s*\?\s*combOwnerNames\.get\(h\.id\)\s*:\s*resolveDirectName\(ownerNames,\s*h\.owner_id\)/.test(
       hiveStoreCode
     );
-    const singleSiteRoutes = /ownerName:\s*combOwnerNames\.has\(hive\.id\)\s*\?\s*combOwnerNames\.get\(hive\.id\)\s*:\s*resolveDirectName\(ownerNames,\s*hive\.owner_id\)/.test(
+    const singleSiteRoutes = /combOwnerNames\.has\(hive\.id\)\s*\?\s*combOwnerNames\.get\(hive\.id\)\s*:\s*resolveDirectName\(ownerNames,\s*hive\.owner_id\)/.test(
       hiveStoreCode
     );
     const contributorsSiteRoutes = /name:\s*resolveDirectName\(names,\s*r\.profile_id\)/.test(hiveStoreCode);

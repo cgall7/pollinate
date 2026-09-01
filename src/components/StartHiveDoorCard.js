@@ -7,16 +7,16 @@ import { PressableScale } from './PressableScale';
 // Always-visible entry point into 8b.2's create flow — the sole content of
 // the hives shelf at zero hives, and the trailing card once at least one
 // exists (Today shelf, Design Language §9).
-export const StartHiveDoorCard = ({ onPress }) => (
+export const StartHiveDoorCard = ({ onPress, label = 'Start a hive\nfor someone', accessibilityLabel = 'Start a Private Hive for someone' }) => (
   <PressableScale
     onPress={onPress}
     style={styles.card}
-    accessibilityLabel="Start a Private Hive for someone"
+    accessibilityLabel={accessibilityLabel}
   >
     <View style={styles.iconRing}>
       <Ionicons name="add" size={28} color={theme.colors.ink} />
     </View>
-    <Text style={styles.label}>Start a hive{'\n'}for someone</Text>
+    <Text style={styles.label}>{label}</Text>
   </PressableScale>
 );
 

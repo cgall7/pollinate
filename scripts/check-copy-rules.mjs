@@ -334,8 +334,8 @@ const NOT_COPY_ATTRS = new Set([
   // RN / component API enums and identifiers
   'accessibilityRole', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
   'importantForAccessibility', 'key', 'keyboardShouldPersistTaps', 'keyboardType',
-  'mode', 'name', 'on', 'pointerEvents', 'preset', 'resizeMode', 'returnKeyType',
-  'size', 'stage', 'tint', 'tone', 'variant',
+  'countKind', 'mode', 'name', 'on', 'pointerEvents', 'preset', 'resizeMode',
+  'returnKeyType', 'size', 'stage', 'tint', 'tone', 'variant',
   // SVG geometry and paint
   'cx', 'cy', 'fill', 'fillRule', 'gradientUnits', 'height', 'offset',
   'patternTransform', 'patternUnits', 'preserveAspectRatio', 'r', 'stopOpacity',

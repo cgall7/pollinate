@@ -16,8 +16,11 @@ import { FileToHive } from '../components/FileToHive';
 import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
+import { OrganizerCombCard } from '../components/OrganizerCombCard';
 import { Avatar } from '../components/Avatar';
 import { PressableScale } from '../components/PressableScale';
+import { RotationFold } from '../components/RotationFold';
+import { useDaysLeft } from '../components/useDaysLeft';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 
@@ -111,24 +114,38 @@ const GREETING_ANCHOR = 'greeting';
 // the unnamed-owner row — the absence row would become the loudest row on
 // the shelf. No ring: `glassRim` is white-on-white here, and a
 // `surfaceBorder` ring on a `surfaceBorder` fill is doubling.
-const ContributingHiveRow = ({ hive, onPress }) => (
-  <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
-    {hive.ownerName ? (
-      <Avatar name={hive.ownerName} size={40} />
-    ) : (
-      <View style={styles.ownerAbsentDisc} />
-    )}
-    <View style={styles.contributingRowText}>
-      <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
+const ContributingHiveRow = ({ hive, onPress }) => {
+  const daysLeft = useDaysLeft(hive.combRotation?.closesAt);
+
+  return (
+    <PressableScale onPress={() => onPress(hive)} style={styles.contributingRow}>
       {hive.ownerName ? (
-        <Text style={styles.contributingRowSubject} numberOfLines={1}>
-          From {hive.ownerName}
-        </Text>
-      ) : null}
-    </View>
-    <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
-  </PressableScale>
-);
+        <Avatar name={hive.ownerName} size={40} />
+      ) : (
+        <View style={styles.ownerAbsentDisc} />
+      )}
+      <View style={styles.contributingRowText}>
+        <Text style={styles.contributingRowName}>{hive.subjectName}</Text>
+        {hive.ownerName ? (
+          <Text style={styles.contributingRowSubject} numberOfLines={1}>
+            From {hive.ownerName}
+          </Text>
+        ) : null}
+        {hive.combRotation ? (
+          <RotationFold
+            variant="member"
+            subjectName={hive.subjectName}
+            daysLeft={daysLeft}
+            count={hive.combRotation.writerCount}
+            countKind="writers"
+            style={styles.contributingRotationFold}
+          />
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
+    </PressableScale>
+  );
+};
 
 const greeting = (date) => {
   const hour = date.getHours();
@@ -183,6 +200,9 @@ export const TodayTab = ({ navigation }) => {
   }, [perches]);
   const [hives, setHives] = useState([]);
   const [hivesError, setHivesError] = useState(false);
+  const [organizerCombs, setOrganizerCombs] = useState([]);
+  const [organizerCombsError, setOrganizerCombsError] = useState(false);
+  const [expandedCombId, setExpandedCombId] = useState(null);
   // Hives this user writes in but does not own (ENG-61) — a separate list
   // from `hives` above on purpose, same reasoning as that shelf's own
   // comment: a read failure here must not blank the "PRIVATE HIVES" shelf
@@ -247,6 +267,19 @@ export const TodayTab = ({ navigation }) => {
           console.warn('TodayTab: failed to load hives', err);
           setHivesError(true);
           setHives([]);
+        }
+      })();
+      (async () => {
+        try {
+          const list = await HiveStore.listOrganizerCombs();
+          if (cancelled) return;
+          setOrganizerCombsError(false);
+          setOrganizerCombs(list);
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('TodayTab: failed to load organizer combs', err);
+          setOrganizerCombsError(true);
+          setOrganizerCombs([]);
         }
       })();
       // Independent try/catch, not folded into the block above — a failed
@@ -500,6 +533,11 @@ export const TodayTab = ({ navigation }) => {
                 />
               ))}
               <StartHiveDoorCard onPress={() => navigation.getParent()?.navigate('CreateHive')} />
+              <StartHiveDoorCard
+                onPress={() => navigation.getParent()?.navigate('CreateComb')}
+                label={'Start a comb\ntogether'}
+                accessibilityLabel="Start a comb with your connections"
+              />
             </ScrollView>
             {hivesError && (
               <Text style={styles.hiveErrorText}>We couldn't reach your hives right now.</Text>
@@ -508,6 +546,39 @@ export const TodayTab = ({ navigation }) => {
           </PerchAnchor>
         </StaggeredItem>
 
+        {organizerCombs.length > 0 && (
+          <StaggeredItem index={2}>
+            <PerchAnchor id="organizer-comb-shelf" on="left" at={0.5}>
+              <View style={styles.hiveShelf}>
+                <Text style={styles.shelfLabel}>COMBS YOU RUN</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.hiveRow}
+                >
+                  {organizerCombs.map((comb) => (
+                    <OrganizerCombCard
+                      key={comb.id}
+                      comb={comb}
+                      expanded={expandedCombId === comb.id}
+                      onPress={() => setExpandedCombId((current) => (current === comb.id ? null : comb.id))}
+                      onWrite={(rotation) =>
+                        navigation.getParent()?.navigate('ComposeHiveEntry', {
+                          hiveId: rotation.hiveId,
+                          subjectName: rotation.subjectName,
+                        })
+                      }
+                    />
+                  ))}
+                </ScrollView>
+                {organizerCombsError && (
+                  <Text style={styles.hiveErrorText}>We couldn't reach your combs right now.</Text>
+                )}
+              </View>
+            </PerchAnchor>
+          </StaggeredItem>
+        )}
+
         {/* "Writing with others" shelf (ENG-61) — only rendered when
             non-empty, same door-less treatment `FileToHive` above gets for
             an empty/failed read: there is no evergreen local action this
@@ -515,7 +586,7 @@ export const TodayTab = ({ navigation }) => {
             "start a hive" door card), so a zero-row state and a failed read
             both simply withhold the shelf rather than asserting either one. */}
         {contributingHives.length > 0 && (
-          <StaggeredItem index={2}>
+          <StaggeredItem index={3}>
             <PerchAnchor id="contributing-hive-shelf" on="left" at={0.5}>
               <View style={styles.hiveShelf}>
                 <Text style={styles.shelfLabel}>WRITING WITH OTHERS</Text>
@@ -682,5 +753,8 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
     marginTop: 2,
+  },
+  contributingRotationFold: {
+    marginTop: 10,
   },
 });
