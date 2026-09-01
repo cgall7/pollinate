@@ -746,7 +746,7 @@ const AccountStep = ({
             sharing to the hive.
           </Text>
         </View>
-        <PrimaryButton onPress={onNext}>Continue</PrimaryButton>
+        {!waitForSession ? <PrimaryButton onPress={onNext}>Continue</PrimaryButton> : null}
       </StepShell>
     );
   }
@@ -765,7 +765,7 @@ const AccountStep = ({
             We sent a sign-in link to {email.trim()}. Tap it on this device to finish — no password needed.
           </Text>
         </View>
-        <PrimaryButton onPress={onNext}>Continue</PrimaryButton>
+        {!waitForSession ? <PrimaryButton onPress={onNext}>Continue</PrimaryButton> : null}
       </StepShell>
     );
   }

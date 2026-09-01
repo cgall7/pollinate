@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CombInviteStore } from '../services/CombInviteStore';
 import { PendingCombInvite } from '../services/pendingCombInvite';
 import { numberInWordsCapped } from '../utils/numberWords';
-import { COMB_COLLECT_ROUTE } from './CombCollect';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 const InviteShell = ({ navigation, children }) => (
   <View style={styles.screen}>
@@ -89,23 +89,27 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [needsName, setNeedsName] = useState(true);
 
   useEffect(() => {
     if (preview || !inviteCode) return;
     CombInviteStore.preview(inviteCode).then(setPreview).catch(() => setError("We couldn't reopen this invitation."));
   }, [inviteCode, preview]);
 
+  useEffect(() => {
+    CombInviteStore.getJoinerProfile()
+      .then((profile) => setNeedsName(isPlaceholderName(profile?.display_name)))
+      .catch(() => setError("We couldn't read your profile."));
+  }, []);
+
   const submit = async () => {
-    if (!name.trim() || busy) return;
+    if ((needsName && !name.trim()) || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const destination = await CombInviteStore.saveNameAndJoin(inviteCode, name);
+      await CombInviteStore.saveNameAndJoin(inviteCode, needsName ? name : undefined);
       await PendingCombInvite.clear();
-      navigation.replace(COMB_COLLECT_ROUTE, {
-        rotationId: destination.rotationId,
-        combId: destination.combId,
-      });
+      navigation.replace('Main', { screen: 'Today' });
     } catch (err) {
       console.warn('Comb invite join failed', err);
       setError("We couldn't join this comb. Check your connection and try again.");
@@ -122,8 +126,7 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
         <Text style={styles.heading}>
           {preview ? `${preview.inviterName} asked you to write for ${preview.subjectName}.` : 'How should the comb know you?'}
         </Text>
-        <Text style={styles.inputLabel}>Your name</Text>
-        <TextInput
+        {needsName ? <><Text style={styles.inputLabel}>Your name</Text><TextInput
           value={name}
           onChangeText={setName}
           placeholder="What's your name?"
@@ -132,13 +135,13 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
           autoCorrect={false}
           style={styles.input}
           accessibilityLabel="Your name"
-        />
+        /></> : null}
         <Text style={styles.secondary}>
           The writers in this comb can see your name now; {preview?.subjectName ?? 'the recipient'} sees it with your letter when the month is delivered.
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <PrimaryButton onPress={submit} disabled={!name.trim() || busy} loading={busy}>
-          {name.trim() ? `Join as ${name.trim()}` : 'Join the comb'}
+        <PrimaryButton onPress={submit} disabled={(needsName && !name.trim()) || busy} loading={busy}>
+          {needsName && name.trim() ? `Join as ${name.trim()}` : 'Join the comb'}
         </PrimaryButton>
       </View>
     </KeyboardAvoidingView>

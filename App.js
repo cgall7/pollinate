@@ -30,7 +30,6 @@ import { ReceivedPackagesScreen } from './src/screens/ReceivedPackages';
 import { PackageOpenScreen } from './src/screens/PackageOpen';
 import { PollinateWrapped } from './src/screens/PollinateWrapped';
 import { CombInviteLandingScreen, CombInviteNameScreen } from './src/screens/CombInvite';
-import { COMB_COLLECT_ROUTE, CombCollectScreen } from './src/screens/CombCollect';
 import { MainTabs } from './src/navigation/MainTabs';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -124,7 +123,6 @@ export default function App() {
     const handleInviteUrl = async (url) => {
       const inviteCode = parseCombInviteUrl(url);
       if (!inviteCode) return;
-      await PendingCombInvite.set(inviteCode);
       const destination = { name: 'CombInvite', params: { inviteCode } };
       if (navigationRef.current?.isReady()) navigationRef.current.navigate(destination.name, destination.params);
       else pendingInviteNavigation.current = destination;
@@ -224,7 +222,7 @@ export default function App() {
                   startAt={props.route.params?.startAt}
                   onDone={async () => {
                     const inviteCode = await PendingCombInvite.get();
-                    if (inviteCode) props.navigation.replace('CombInviteName', { inviteCode });
+                    if (inviteCode) props.navigation.replace('CombInvite', { inviteCode });
                     else props.navigation.replace('Main');
                   }}
                   splashHidden={splashHidden}
@@ -299,7 +297,6 @@ export default function App() {
             <Stack.Screen name="ContributingHive" component={ContributingHiveScreen} />
             <Stack.Screen name="CombInvite" component={CombInviteLandingScreen} />
             <Stack.Screen name="CombInviteName" component={CombInviteNameScreen} />
-            <Stack.Screen name={COMB_COLLECT_ROUTE} component={CombCollectScreen} />
             {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
                 found: the 8b.2-8b.7 arc was live at the data layer with no
                 button anywhere to trigger it). Design Language §5-6, condensed

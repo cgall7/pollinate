@@ -6,6 +6,15 @@ const requireSupabase = () => {
 };
 
 export const CombInviteStore = {
+  async getJoinerProfile() {
+    const client = requireSupabase();
+    const { data: { user }, error } = await client.auth.getUser();
+    if (error) throw error;
+    if (!user) throw new Error('A session is required to join a comb');
+    const { data, error: profileError } = await client.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
+    if (profileError) throw profileError;
+    return data;
+  },
   async preview(inviteCode) {
     const { data, error } = await requireSupabase().rpc('comb_preview_by_invite_code', {
       p_invite_code: inviteCode,
@@ -31,10 +40,11 @@ export const CombInviteStore = {
     if (userError) throw userError;
     if (!user) throw new Error('A session is required to join a comb');
 
-    const name = displayName.trim();
-    if (!name) throw new Error('A display name is required to join a comb');
-    const { error: nameError } = await client.from('profiles').update({ display_name: name }).eq('id', user.id);
-    if (nameError) throw nameError;
+    const name = displayName?.trim();
+    if (name) {
+      const { error: nameError } = await client.from('profiles').update({ display_name: name }).eq('id', user.id);
+      if (nameError) throw nameError;
+    }
 
     const { data: combId, error: joinError } = await client.rpc('comb_join_by_invite_code', {
       p_invite_code: inviteCode,
