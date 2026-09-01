@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { CombStore } from '../services/CombStore';
 import { NectarStore } from '../services/NectarStore';
@@ -147,6 +148,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
           .then(() => { setBalanceRefresh((value) => value + 1); return { ok: true }; }, (err) => ({ ok: false, err }));
       if (!result.ok) throw result.err;
       const message = `Sent ${resolvedAmount} drops to ${recipient ? recipientLabel : 'your comb member'}.`;
+      if (!origin || !destination) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSuccessMessage(message);
       AccessibilityInfo.announceForAccessibility(message);
       // `gift.send` resolves only after Settle, so the departure and the
