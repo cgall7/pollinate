@@ -56,6 +56,17 @@ export const PRESS = {
   slab: 0.98,
 };
 
+export const PRESS_TIMING = {
+  // MP-5: press-in is force being applied, not elastic release. It compresses
+  // quickly and never overshoots into the surface; the spring remains legal
+  // only on release.
+  compress: 90,
+};
+
+export const PRESS_EASING = {
+  compress: Easing.out(Easing.cubic),
+};
+
 export const DURATIONS = {
   // Click/burst treatments — §12.5 Rule 2: must stay sub-200ms so they
   // never queue or feel laggy.
