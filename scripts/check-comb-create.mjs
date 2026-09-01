@@ -12,5 +12,13 @@ const checks = [
   ['success returns to the organizer card on Today', screen.includes("navigation.replace('Main', { screen: 'Today' })")],
 ];
 let failed = 0;
-for (const [label, ok] of checks) { console.log(`${ok ? 'ok' : 'FAIL'} ${label}`); if (!ok) failed += 1; }
+for (const [label, ok] of checks) {
+  if (ok) {
+    console.log(`✓ ${label}`);
+  } else {
+    console.error(`✗ ${label}`);
+    failed += 1;
+  }
+}
+console.log(`${checks.length - failed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
