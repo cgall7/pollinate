@@ -568,6 +568,9 @@ export const TodayTab = ({ navigation }) => {
                           subjectName: rotation.subjectName,
                         })
                       }
+                      onNectar={(comb) =>
+                        navigation.getParent()?.navigate('CombNectarCompose', { combId: comb.id })
+                      }
                     />
                   ))}
                 </ScrollView>

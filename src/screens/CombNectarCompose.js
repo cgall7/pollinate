@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { CombStore } from '../services/CombStore';
 import { NectarStore } from '../services/NectarStore';
@@ -9,8 +8,21 @@ import { randomUUID } from '../utils/uuid';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PressableScale } from '../components/PressableScale';
 import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
+import { NectarGiftLayer } from '../components/NectarGiftLayer';
+import { useNectarGift } from '../components/useNectarGift';
+import { useReducedMotion } from '../constants/motion';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 const wordCount = (note) => note.trim().split(/\s+/u).filter(Boolean).length;
+const memberName = (name) => (isPlaceholderName(name) ? 'someone in this comb' : name);
+
+const measure = (ref) =>
+  new Promise((resolve) => {
+    if (!ref.current || typeof ref.current.measureInWindow !== 'function') return resolve(null);
+    ref.current.measureInWindow((x, y, width, height) =>
+      [x, y, width, height].every(Number.isFinite) ? resolve({ x, y, width, height }) : resolve(null)
+    );
+  });
 
 // DES-32's any-time entry.  This is deliberately the same amount surface as
 // the reveal, but its commit is ENG-90's note RPC -- never a target-kind arm
@@ -33,7 +45,11 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
   const [balanceRefresh, setBalanceRefresh] = useState(0);
   const [balanceChangePending, setBalanceChangePending] = useState(false);
   const sendId = useRef(randomUUID());
+  const giftOrigin = useRef(null);
+  const recipientDestination = useRef(null);
   const nectarConsent = hasNectarConsent(consentRow);
+  const reduced = useReducedMotion();
+  const gift = useNectarGift({ reduced, balanceDrops });
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +87,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
   const noteIsValid = wordCount(note) >= 1 && wordCount(note) <= 8 && note.length <= 280;
   const sendable = Boolean(recipientId) && noteIsValid && isSendableAmount(resolvedAmount, balanceDrops);
   const recipient = members.find((member) => member.profile_id === recipientId);
+  const recipientLabel = recipient ? memberName(recipient.display_name) : 'someone in this comb';
 
   // A retry is the *same* request. Any edit makes a new bound payload and
   // therefore retires the old idempotency key before the next submission.
@@ -112,14 +129,28 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
     setValidationMessage(null);
     setSending(true); setFailed(false);
     try {
-      await NectarStore.sendCombNectarNote({ sendId: sendId.current, combId, recipientId, note: note.trim(), amountDrops: resolvedAmount });
-      setBalanceRefresh((value) => value + 1);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const message = `Sent ${resolvedAmount} drops to ${recipient?.display_name ?? 'your comb member'}.`;
+      const [origin, destination] = await Promise.all([measure(giftOrigin), measure(recipientDestination)]);
+      // The same settled gift beat as the reveal owns the authenticated
+      // commit, balance count and departure. A missing measurement cannot
+      // turn a real gift into a refused one, so it falls back to the commit.
+      const result = origin && destination
+        ? await gift.send({
+          origin,
+          destination,
+          amount: resolvedAmount,
+          commit: () =>
+            NectarStore.sendCombNectarNote({ sendId: sendId.current, combId, recipientId, note: note.trim(), amountDrops: resolvedAmount })
+              .then(() => NectarStore.getBalanceDrops())
+              .then((drops) => setBalanceDrops(drops)),
+        })
+        : await NectarStore.sendCombNectarNote({ sendId: sendId.current, combId, recipientId, note: note.trim(), amountDrops: resolvedAmount })
+          .then(() => { setBalanceRefresh((value) => value + 1); return { ok: true }; }, (err) => ({ ok: false, err }));
+      if (!result.ok) throw result.err;
+      const message = `Sent ${resolvedAmount} drops to ${recipient ? recipientLabel : 'your comb member'}.`;
       setSuccessMessage(message);
       AccessibilityInfo.announceForAccessibility(message);
-      // The sheet closes into the departure beat instead of adding a success
-      // card. The balance is refreshed above before this transition.
+      // `gift.send` resolves only after Settle, so the departure and the
+      // authoritative balance decrease stay visible before closing.
       navigation.goBack();
     } catch (err) {
       console.warn('CombNectarCompose: send failed', err);
@@ -162,12 +193,16 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
     <ScreenHeader eyebrow="" title="A little thanks" right={<PressableScale onPress={() => navigation.goBack()}><Text style={styles.close}>×</Text></PressableScale>} />
     {loading ? <ActivityIndicator color={theme.colors.accent} /> : <>
       <Text style={styles.label}>TO</Text>
-      <View style={styles.members}>{members.map((member) => <PressableScale key={member.profile_id} onPress={() => chooseRecipient(member.profile_id)} style={[styles.member, recipientId === member.profile_id && styles.selected]}><Text style={styles.memberName}>{member.display_name}</Text></PressableScale>)}</View>
-      <Text style={styles.target}>To {recipient?.display_name ?? 'someone in this comb'}</Text>
-      {!nectarConsent ? <View style={styles.consent}><Text style={styles.consentText}>Turn this on from a reveal before sending.</Text></View> : senderInactive ? <PressableScale onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />}
+      <View style={styles.members}>{members.map((member) => <PressableScale key={member.profile_id} innerRef={recipientId === member.profile_id ? recipientDestination : undefined} onPress={() => chooseRecipient(member.profile_id)} style={[styles.member, recipientId === member.profile_id && styles.selected]}><Text style={styles.memberName}>{memberName(member.display_name)}</Text></PressableScale>)}</View>
+      <Text style={styles.target}>To {recipientLabel}</Text>
+      {!nectarConsent && <View style={styles.consent}><Text style={styles.consentText}>Turn this on from a reveal before sending.</Text></View>}
+      {nectarConsent && (
+        senderInactive ? <PressableScale onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
+      )}
       {nectarConsent && <><Text style={styles.words}>{wordCount(note)}/8 words</Text>{validationMessage && <Text style={styles.validation}>{validationMessage}</Text>}</>}
       {successMessage && <Text accessibilityLiveRegion="polite" style={styles.srOnly}>{successMessage}</Text>}
     </>}
+    <NectarGiftLayer gift={gift.gift} travel={gift.travel} dropScale={gift.dropScale} dropOpacity={gift.dropOpacity} bloom={gift.bloom} />
   </View>;
 };
 
