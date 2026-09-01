@@ -97,4 +97,40 @@ export const NectarStore = {
     if (error) throw error;
     return data ?? null;
   },
+
+  async sendCombNectarNote({ sendId, combId, recipientId, note, amountDrops }) {
+    const client = requireSupabase();
+    const { data, error } = await client.rpc('send_comb_nectar_note', {
+      p_send_id: sendId,
+      p_comb_id: combId,
+      p_recipient_id: recipientId,
+      p_note: note,
+      p_amount_drops: amountDrops,
+    });
+    if (error) throw error;
+    return data?.[0] ?? null;
+  },
+
+  async listCombNectarNotes(combId) {
+    const client = requireSupabase();
+    const { data, error } = await client
+      .from('comb_nectar_notes')
+      .select(
+        `
+          id,
+          transaction_id,
+          comb_id,
+          sender_id,
+          recipient_id,
+          note_text,
+          amount_drops,
+          created_at
+        `,
+      )
+      .eq('comb_id', combId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  },
 };

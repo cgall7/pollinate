@@ -31,6 +31,7 @@
     "check:entry-writes": "node scripts/check-entry-writes.mjs",
     "check:legacy-journal": "node scripts/check-legacy-journal.mjs",
     "check:legacy-journal-identity": "node scripts/check-legacy-journal-identity.mjs",
+    "check:eng90-comb-nectar": "node scripts/check-eng90-comb-nectar.mjs",
     "check:bee-attitude": "node scripts/check-bee-attitude.mjs",
     "check:daily-nudge": "node scripts/check-daily-nudge.mjs",
     "check:reveal-pacing": "node scripts/check-reveal-pacing.mjs",
