@@ -17,6 +17,9 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite }) => {
   const rotation = comb.openRotation;
   const daysLeft = useDaysLeft(rotation?.closesAt);
   const inviteUrl = getCombInviteUrl(comb.inviteCode);
+  const chapterCount = comb.chapters?.length ?? 0;
+  const chapterCountLabel = chapterCount === 1 ? '1 past month' : `${chapterCount} past months`;
+  const chapterSignalLabel = `${expanded ? '▾' : '▸'} ${chapterCountLabel}`;
   const shareInvite = () => Share.share({ message: inviteUrl });
   const memberLabel =
     comb.memberCount == null
@@ -51,10 +54,15 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite }) => {
         ) : (
           <Text style={styles.emptyLine}>No open month right now.</Text>
         )}
+        {chapterCount > 0 && (
+          <View style={styles.historySignal}>
+            <Text style={styles.metaLine}>{chapterSignalLabel}</Text>
+          </View>
+        )}
         {expanded && (
           <View style={styles.expandedPanel}>
             {memberLabel && <Text style={styles.metaLine}>{memberLabel}</Text>}
-            {comb.chapters?.length > 0 && (
+            {chapterCount > 0 && (
               <View style={styles.chapterList}>
                 <Text style={styles.metaLabel}>Past chapters</Text>
                 {comb.chapters.map((chapter) => (
@@ -145,6 +153,11 @@ const styles = StyleSheet.create({
   metaLabel: {
     ...theme.type.label,
     color: theme.colors.inkSoft,
+  },
+  historySignal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   chapterList: {
     gap: 4,

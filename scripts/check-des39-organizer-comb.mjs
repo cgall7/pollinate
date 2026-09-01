@@ -75,6 +75,15 @@ check(
 );
 
 check(
+  'collapsed organizer card exposes a visible chapter-count affordance',
+  /const chapterCount = comb\.chapters\?\.length \?\? 0/.test(card) &&
+    /const chapterCountLabel = chapterCount === 1 \? '1 past month' : `\$\{chapterCount\} past months`/.test(card) &&
+    /const chapterSignalLabel = `\$\{expanded \? '▾' : '▸'\} \$\{chapterCountLabel\}`/.test(card) &&
+    /chapterCount > 0 && \(/.test(card) &&
+    /<Text style=\{styles\.metaLine\}>\{chapterSignalLabel\}<\/Text>/.test(card)
+);
+
+check(
   'chapter labels use the shared placeholder classifier for empty and New user names',
   /import\s*{\s*isPlaceholderName\s*}\s*from\s*'\.\.\/utils\/placeholderName'/.test(card) &&
     /export const organizerChapterSubjectName = \(name\) => \(isPlaceholderName\(name\) \? 'someone' : name\)/.test(card) &&
@@ -103,6 +112,10 @@ const fixtureChapterRows = [
   { id: 'sealed-voided', sealed_at: '2026-08-31T12:00:00Z', voided_at: '2026-08-31T12:00:00Z' },
   { id: 'open', sealed_at: null, voided_at: null },
 ];
+const fixtureAffordance = ({ chapters, expanded }) => ({
+  signal: chapters.length > 0 ? `${expanded ? '▾' : '▸'} ${chapters.length} past month${chapters.length === 1 ? '' : 's'}` : null,
+  rows: expanded ? chapters.map((chapter) => `Month ${chapter.ordinal}: ${fixtureChapterSubjectName(chapter.subjectName)}`) : [],
+});
 const fixtureChapterIds = fixtureChapterRows
   .filter((row) => row.sealed_at != null && row.voided_at == null)
   .map((row) => row.id);
@@ -120,6 +133,48 @@ check(
     fixtureChapterIds[0] === 'sealed-delivered' &&
     !fixtureChapterIds.includes('sealed-voided') &&
     !fixtureChapterIds.includes('open')
+);
+
+check(
+  'collapsed chapter affordance fixture is visible for one past month',
+  fixtureAffordance({
+    expanded: false,
+    chapters: [{ id: 'one', ordinal: 1, subjectName: 'Maya' }],
+  }).signal === '▸ 1 past month'
+);
+
+check(
+  'collapsed chapter affordance fixture pluralizes multiple past months',
+  fixtureAffordance({
+    expanded: false,
+    chapters: [
+      { id: 'one', ordinal: 1, subjectName: 'Maya' },
+      { id: 'two', ordinal: 2, subjectName: 'Jonah' },
+    ],
+  }).signal === '▸ 2 past months'
+);
+
+check(
+  'zero chapter fixture renders no history affordance',
+  fixtureAffordance({ expanded: false, chapters: [] }).signal === null
+);
+
+const expandedChapterFixture = fixtureAffordance({
+  expanded: true,
+  chapters: [
+    { id: 'one', ordinal: 1, subjectName: 'Maya' },
+    { id: 'two', ordinal: 2, subjectName: 'New user' },
+    { id: 'three', ordinal: 3, subjectName: 'Jonah' },
+  ],
+});
+
+check(
+  'expanded chapter fixture preserves signal and renders every chapter',
+  expandedChapterFixture.signal === '▾ 3 past months' &&
+    expandedChapterFixture.rows.length === 3 &&
+    expandedChapterFixture.rows.includes('Month 1: Maya') &&
+    expandedChapterFixture.rows.includes('Month 2: someone') &&
+    expandedChapterFixture.rows.includes('Month 3: Jonah')
 );
 
 let failed = 0;
