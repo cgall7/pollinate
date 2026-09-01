@@ -11,11 +11,13 @@ import { PressableScale } from '../components/PressableScale';
 import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
 import { NectarGiftLayer } from '../components/NectarGiftLayer';
 import { useNectarGift } from '../components/useNectarGift';
-import { useReducedMotion } from '../constants/motion';
+import { NECTAR, useReducedMotion } from '../constants/motion';
 import { isPlaceholderName } from '../utils/placeholderName';
+import { NectarConsentSheet } from '../components/NectarConsentSheet';
 
 const wordCount = (note) => note.trim().split(/\s+/u).filter(Boolean).length;
 const memberName = (name) => (isPlaceholderName(name) ? 'someone in this comb' : name);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const measure = (ref) =>
   new Promise((resolve) => {
@@ -45,6 +47,9 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
   const [senderInactive, setSenderInactive] = useState(false);
   const [balanceRefresh, setBalanceRefresh] = useState(0);
   const [balanceChangePending, setBalanceChangePending] = useState(false);
+  const [nectarConsentSheetOpen, setNectarConsentSheetOpen] = useState(false);
+  const [nectarConsentSubmitting, setNectarConsentSubmitting] = useState(false);
+  const [nectarConsentError, setNectarConsentError] = useState(false);
   const sendId = useRef(randomUUID());
   const giftOrigin = useRef(null);
   const recipientDestination = useRef(null);
@@ -89,6 +94,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
   const sendable = Boolean(recipientId) && noteIsValid && isSendableAmount(resolvedAmount, balanceDrops);
   const recipient = members.find((member) => member.profile_id === recipientId);
   const recipientLabel = recipient ? memberName(recipient.display_name) : 'someone in this comb';
+  const recipientIsPlaceholder = recipient ? isPlaceholderName(recipient.display_name) : true;
 
   // A retry is the *same* request. Any edit makes a new bound payload and
   // therefore retires the old idempotency key before the next submission.
@@ -120,6 +126,21 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
     setCustom(value);
   }, [retireAttempt]);
 
+  const handleNectarAffirm = async () => {
+    setNectarConsentSubmitting(true);
+    setNectarConsentError(false);
+    try {
+      const row = await NectarStore.consentToNectar();
+      setConsentRow(row);
+      setNectarConsentSheetOpen(false);
+    } catch (err) {
+      console.warn('CombNectarCompose: consent_to_nectar failed', err);
+      setNectarConsentError(true);
+    } finally {
+      setNectarConsentSubmitting(false);
+    }
+  };
+
   const send = async () => {
     if (sending) return;
     if (!note.trim()) return setValidationMessage('Add a note first.');
@@ -145,10 +166,12 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
               .then((drops) => setBalanceDrops(drops)),
         })
         : await NectarStore.sendCombNectarNote({ sendId: sendId.current, combId, recipientId, note: note.trim(), amountDrops: resolvedAmount })
-          .then(() => { setBalanceRefresh((value) => value + 1); return { ok: true }; }, (err) => ({ ok: false, err }));
+          .then(() => NectarStore.getBalanceDrops())
+          .then((drops) => { setBalanceDrops(drops); return { ok: true }; }, (err) => ({ ok: false, err }));
       if (!result.ok) throw result.err;
-      const message = `Sent ${resolvedAmount} drops to ${recipient ? recipientLabel : 'your comb member'}.`;
+      const message = recipientIsPlaceholder ? `Sent ${resolvedAmount} drops.` : `Sent ${resolvedAmount} drops to ${recipientLabel}.`;
       if (!origin || !destination) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (reduced || !origin || !destination) await wait(NECTAR.settle);
       setSuccessMessage(message);
       AccessibilityInfo.announceForAccessibility(message);
       // `gift.send` resolves only after Settle, so the departure and the
@@ -197,7 +220,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       <Text style={styles.label}>TO</Text>
       <View style={styles.members}>{members.map((member) => <PressableScale key={member.profile_id} innerRef={recipientId === member.profile_id ? recipientDestination : undefined} onPress={() => chooseRecipient(member.profile_id)} style={[styles.member, recipientId === member.profile_id && styles.selected]}><Text style={styles.memberName}>{memberName(member.display_name)}</Text></PressableScale>)}</View>
       <Text style={styles.target}>To {recipientLabel}</Text>
-      {!nectarConsent && <View style={styles.consent}><Text style={styles.consentText}>Turn this on from a reveal before sending.</Text></View>}
+      {!nectarConsent && <PressableScale onPress={() => setNectarConsentSheetOpen(true)} style={styles.consent}><Text style={styles.consentText}>Turn this on before sending.</Text></PressableScale>}
       {nectarConsent && (
         senderInactive ? <PressableScale onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
       )}
@@ -205,6 +228,17 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       {successMessage && <Text accessibilityLiveRegion="polite" style={styles.srOnly}>{successMessage}</Text>}
     </>}
     <NectarGiftLayer gift={gift.gift} travel={gift.travel} dropScale={gift.dropScale} dropOpacity={gift.dropOpacity} bloom={gift.bloom} />
+    <NectarConsentSheet
+      nectarConsentSheetOpen={nectarConsentSheetOpen}
+      senderName={recipientLabel}
+      submitting={nectarConsentSubmitting}
+      error={nectarConsentError}
+      onAffirm={handleNectarAffirm}
+      onDismiss={() => {
+        setNectarConsentError(false);
+        setNectarConsentSheetOpen(false);
+      }}
+    />
   </View>;
 };
 

@@ -198,6 +198,9 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
             if (!res.ok) countTo(base);
             return res;
           })
+          .then((res) => new Promise((resolve) => {
+            setTimeout(() => resolve(res), NECTAR.settle);
+          }))
           .finally(() => {
             inFlight.current = false;
             setGift(null);

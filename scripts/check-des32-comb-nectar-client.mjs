@@ -10,6 +10,7 @@ const baseSources = {
   today: read('src/screens/TodayTab.js'),
   contributing: read('src/screens/ContributingHive.js'),
   store: read('src/services/NectarStore.js'),
+  giftHook: read('src/components/useNectarGift.js'),
   app: read('App.js'),
   packageJson: read('package.json'),
 };
@@ -45,6 +46,25 @@ const hasFlightSuccess = ({ compose }) =>
   /controlsStyle=\{gift\.controlsStyle\}/.test(compose) &&
   /originRef=\{giftOrigin\}/.test(compose) &&
   /<NectarGiftLayer gift=\{gift\.gift\} travel=\{gift\.travel\} dropScale=\{gift\.dropScale\} dropOpacity=\{gift\.dropOpacity\} bloom=\{gift\.bloom\} \/>/.test(compose);
+
+const hasConsentSheet = ({ compose }) =>
+  /import\s*\{\s*NectarConsentSheet\s*\}\s*from\s*'\.\.\/components\/NectarConsentSheet'/.test(compose) &&
+  /const \[nectarConsentSheetOpen, setNectarConsentSheetOpen\] = useState\(false\)/.test(compose) &&
+  /const \[nectarConsentSubmitting, setNectarConsentSubmitting\] = useState\(false\)/.test(compose) &&
+  /const \[nectarConsentError, setNectarConsentError\] = useState\(false\)/.test(compose) &&
+  /const handleNectarAffirm = async \(\) => \{[\s\S]*?const row = await NectarStore\.consentToNectar\(\);[\s\S]*?setConsentRow\(row\);[\s\S]*?setNectarConsentSheetOpen\(false\);/.test(compose) &&
+  /!nectarConsent && <PressableScale onPress=\{\(\) => setNectarConsentSheetOpen\(true\)\}/.test(compose) &&
+  /<NectarConsentSheet[\s\S]*?nectarConsentSheetOpen=\{nectarConsentSheetOpen\}[\s\S]*?senderName=\{recipientLabel\}[\s\S]*?submitting=\{nectarConsentSubmitting\}[\s\S]*?error=\{nectarConsentError\}[\s\S]*?onAffirm=\{handleNectarAffirm\}/.test(compose);
+
+const hasCloseAfterVisibleBalance = ({ compose, giftHook }) =>
+  /: await NectarStore\.sendCombNectarNote\(\{ sendId: sendId\.current, combId, recipientId, note: note\.trim\(\), amountDrops: resolvedAmount \}\)\s*\.then\(\(\) => NectarStore\.getBalanceDrops\(\)\)\s*\.then\(\(drops\) => \{ setBalanceDrops\(drops\); return \{ ok: true \}; \}, \(err\) => \(\{ ok: false, err \}\)\)/.test(compose) &&
+  /if \(reduced \|\| !origin \|\| !destination\) await wait\(NECTAR\.settle\);[\s\S]*?setSuccessMessage\(message\);[\s\S]*?AccessibilityInfo\.announceForAccessibility\(message\);[\s\S]*?navigation\.goBack\(\);/.test(compose) &&
+  /\.then\(\(res\) => new Promise\(\(resolve\) => \{[\s\S]*?setTimeout\(\(\) => resolve\(res\), NECTAR\.settle\);[\s\S]*?\}\)\)/.test(giftHook);
+
+const hasPlaceholderAnnouncement = ({ compose }) =>
+  /const recipientIsPlaceholder = recipient \? isPlaceholderName\(recipient\.display_name\) : true/.test(compose) &&
+  /const message = recipientIsPlaceholder \? `Sent \$\{resolvedAmount\} drops\.` : `Sent \$\{resolvedAmount\} drops to \$\{recipientLabel\}\.`/.test(compose) &&
+  !/Sent \$\{resolvedAmount\} drops to \$\{recipient \? recipientLabel : 'your comb member'\}/.test(compose);
 
 const hasRefusalState = ({ compose }) =>
   /const sendId = useRef\(randomUUID\(\)\)/.test(compose) &&
@@ -98,12 +118,18 @@ check(
 );
 
 check(
-  'measurement-unavailable path still commits, refreshes balance, announces, haptics, and closes',
-  /const result = origin && destination[\s\S]*?: await NectarStore\.sendCombNectarNote/.test(baseSources.compose) &&
-    /setBalanceRefresh\(\(value\) => value \+ 1\)/.test(baseSources.compose) &&
-    /if \(!origin \|\| !destination\) Haptics\.notificationAsync\(Haptics\.NotificationFeedbackType\.Success\)/.test(baseSources.compose) &&
-    /AccessibilityInfo\.announceForAccessibility\(message\)/.test(baseSources.compose) &&
-    /navigation\.goBack\(\)/.test(baseSources.compose)
+  'missing consent opens the existing consent sheet and preserves the draft',
+  hasConsentSheet(baseSources)
+);
+
+check(
+  'fallback and reduced success wait for authoritative visible balance before close',
+  hasCloseAfterVisibleBalance(baseSources)
+);
+
+check(
+  'placeholder-class success announcement is targetless',
+  hasPlaceholderAnnouncement(baseSources)
 );
 
 check(
@@ -176,6 +202,49 @@ assertMutationCaught(
       .replace(/await gift\.send\(\{[\s\S]*?setBalanceDrops\(drops\)\),\s*\}\)/, 'await NectarStore.sendCombNectarNote({ sendId: sendId.current, combId, recipientId, note: note.trim(), amountDrops: resolvedAmount })'),
   }),
   hasFlightSuccess
+);
+
+assertMutationCaught(
+  'mutation: consent-sheet removal is caught',
+  (sources) => ({
+    ...sources,
+    compose: sources.compose
+      .replace("import { NectarConsentSheet } from '../components/NectarConsentSheet';", '')
+      .replace(/<NectarConsentSheet[\s\S]*?\/>\n/, ''),
+  }),
+  hasConsentSheet
+);
+
+assertMutationCaught(
+  'mutation: fallback early-close is caught',
+  (sources) => ({
+    ...sources,
+    compose: sources.compose
+      .replace(".then(() => NectarStore.getBalanceDrops())\n          .then((drops) => { setBalanceDrops(drops); return { ok: true }; }, (err) => ({ ok: false, err }))", ".then(() => { setBalanceRefresh((value) => value + 1); return { ok: true }; }, (err) => ({ ok: false, err }))")
+      .replace('if (reduced || !origin || !destination) await wait(NECTAR.settle);', ''),
+  }),
+  hasCloseAfterVisibleBalance
+);
+
+assertMutationCaught(
+  'mutation: reduced-motion early-close is caught',
+  (sources) => ({
+    ...sources,
+    giftHook: sources.giftHook.replace(/\s*\.then\(\(res\) => new Promise\(\(resolve\) => \{[\s\S]*?setTimeout\(\(\) => resolve\(res\), NECTAR\.settle\);[\s\S]*?\}\)\)/, ''),
+  }),
+  hasCloseAfterVisibleBalance
+);
+
+assertMutationCaught(
+  'mutation: placeholder-target announcement is caught',
+  (sources) => ({
+    ...sources,
+    compose: sources.compose.replace(
+      'const message = recipientIsPlaceholder ? `Sent ${resolvedAmount} drops.` : `Sent ${resolvedAmount} drops to ${recipientLabel}.`;',
+      "const message = `Sent ${resolvedAmount} drops to ${recipient ? recipientLabel : 'your comb member'}.`;"
+    ),
+  }),
+  hasPlaceholderAnnouncement
 );
 
 let failed = 0;

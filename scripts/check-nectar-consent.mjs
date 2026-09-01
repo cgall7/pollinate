@@ -438,10 +438,14 @@ check(
   []
 );
 check(
-  `B9 the consent sheet's open state (\`${NECTAR_CONSENT_SHEET_GUARD}\`) has at most one door`,
+  `B9 the consent sheet's open state (\`${NECTAR_CONSENT_SHEET_GUARD}\`) is rooted only in declared bootstrap hosts`,
   (() => {
     const doors = roots.filter((b) => b.name === NECTAR_CONSENT_SHEET_GUARD);
-    return doors.length <= 1 ? [] : doors.map((b) => b.at);
+    const allowed = new Set(['src/screens/PackageOpen.js', 'src/screens/CombNectarCompose.js']);
+    const actual = new Set(doors.map((b) => b.rel));
+    const unexpected = doors.filter((b) => !allowed.has(b.rel)).map((b) => b.at);
+    const missing = [...allowed].filter((rel) => !actual.has(rel)).map((rel) => `${rel}: missing consent-sheet root`);
+    return [...unexpected, ...missing];
   })(),
   []
 );
