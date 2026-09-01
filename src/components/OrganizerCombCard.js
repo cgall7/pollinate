@@ -13,7 +13,7 @@ const ROTATION_WRITER_COUNT_KIND = 'writers';
 
 export const organizerChapterSubjectName = (name) => (isPlaceholderName(name) ? 'someone' : name);
 
-export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite }) => {
+export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar }) => {
   const rotation = comb.openRotation;
   const daysLeft = useDaysLeft(rotation?.closesAt);
   const inviteUrl = getCombInviteUrl(comb.inviteCode);
@@ -76,6 +76,16 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite }) => {
               <Ionicons name="link" size={16} color={theme.colors.ink} />
               <Text style={styles.actionText}>Share invite link</Text>
             </PressableScale>
+            {rotation && (
+              <PressableScale
+                onPress={() => onNectar?.(comb)}
+                style={styles.actionRow}
+                accessibilityLabel={`Send a little thanks in ${comb.name}`}
+              >
+                <Ionicons name="water" size={16} color={theme.colors.ink} />
+                <Text style={styles.actionText}>Send a little thanks</Text>
+              </PressableScale>
+            )}
             {rotation?.canWrite && (
               <PressableScale
                 onPress={() => onWrite?.(rotation)}
