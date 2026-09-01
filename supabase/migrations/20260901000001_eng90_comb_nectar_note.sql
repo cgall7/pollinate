@@ -16,7 +16,12 @@ create table public.comb_nectar_notes (
   amount_drops bigint not null check (amount_drops between 1 and 1000),
   created_at timestamptz not null default now(),
 
-  constraint comb_nectar_notes_no_self_send check (sender_id <> recipient_id)
+  constraint comb_nectar_notes_no_self_send check (sender_id <> recipient_id),
+  constraint comb_nectar_notes_note_length check (char_length(note_text) between 1 and 280),
+  constraint comb_nectar_notes_note_words check (
+    array_length(regexp_split_to_array(btrim(note_text), '\s+'), 1) between 1 and 8
+    and note_text = btrim(note_text)
+  )
 );
 
 create index comb_nectar_notes_sender_idx on public.comb_nectar_notes (sender_id, created_at);
@@ -25,8 +30,11 @@ create index comb_nectar_notes_comb_idx on public.comb_nectar_notes (comb_id, cr
 
 alter table public.comb_nectar_notes enable row level security;
 revoke all on public.comb_nectar_notes from anon, authenticated;
-grant insert on public.comb_nectar_notes to authenticated;
 grant select on public.comb_nectar_notes to authenticated;
+
+create trigger comb_nectar_notes_immutable
+  before update or delete on public.comb_nectar_notes
+  for each row execute function public.ledger_forbid_mutation();
 
 create policy "comb_nectar_notes_select_sender_or_recipient"
   on public.comb_nectar_notes for select
@@ -38,7 +46,8 @@ create or replace function public._nectar_send_tip(
   p_recipient_id uuid,
   p_amount_drops bigint,
   p_idempotency_key_prefix text,
-  p_memo text
+  p_memo text,
+  p_error_prefix text
 )
 returns uuid
 language plpgsql
@@ -46,20 +55,20 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_micro bigint;
+  v_sats bigint;
   v_avail_sender uuid;
   v_avail_recipient uuid;
   v_balance bigint;
   v_txn uuid;
 begin
   if p_amount_drops is null or p_amount_drops < 1 or p_amount_drops > 1000 then
-    raise exception 'send_comb_nectar_note: amount must be between 1 and 1000 drops';
+    raise exception '%: amount must be between 1 and 1000 drops', p_error_prefix;
   end if;
 
   perform public.ledger_ensure_user_accounts(p_sender_id);
   perform public.ledger_ensure_user_accounts(p_recipient_id);
 
-  v_micro := p_amount_drops * public.nectar_drop_microusd();
+  v_sats := p_amount_drops; -- 1 drop = 1 sat, exact
 
   select a.id into v_avail_sender
     from public.ledger_accounts a
@@ -74,13 +83,13 @@ begin
     order by b.account_id
       for update;
 
-  select b.balance_microusd into v_balance
+  select b.balance_sats into v_balance
     from public.ledger_account_balances b
    where b.account_id = v_avail_sender;
 
-  if -v_balance < v_micro then
-    raise exception 'send_comb_nectar_note: insufficient nectar (% drops available, % needed)',
-      (-v_balance) / public.nectar_drop_microusd(), p_amount_drops;
+  if -v_balance < v_sats then
+    raise exception '%: insufficient nectar (% drops available, % needed)',
+      p_error_prefix, -v_balance, p_amount_drops;
   end if;
 
   insert into public.ledger_transactions (kind, idempotency_key, memo)
@@ -91,9 +100,9 @@ begin
     public.ledger_postings_balanced,
     public.ledger_postings_no_overdraft
     immediate;
-  insert into public.ledger_postings (transaction_id, account_id, amount_microusd)
-  values (v_txn, v_avail_sender, v_micro),
-         (v_txn, v_avail_recipient, -v_micro);
+  insert into public.ledger_postings (transaction_id, account_id, amount_sats)
+  values (v_txn, v_avail_sender, v_sats),
+         (v_txn, v_avail_recipient, -v_sats);
   set constraints
     public.ledger_postings_balanced,
     public.ledger_postings_no_overdraft
@@ -103,11 +112,11 @@ begin
 end;
 $$;
 
-comment on function public._nectar_send_tip(uuid, uuid, bigint, text, text) is
+comment on function public._nectar_send_tip(uuid, uuid, bigint, text, text, text) is
   'Internal sender->recipient tip transfer helper for ENG-90 and record_zap.';
 
-revoke all on function public._nectar_send_tip(uuid, uuid, bigint, text, text) from public;
-revoke execute on function public._nectar_send_tip(uuid, uuid, bigint, text, text) from anon, authenticated;
+revoke all on function public._nectar_send_tip(uuid, uuid, bigint, text, text, text) from public;
+revoke execute on function public._nectar_send_tip(uuid, uuid, bigint, text, text, text) from anon, authenticated;
 
 create or replace function public.record_zap(
   p_zap_id uuid,
@@ -213,7 +222,8 @@ begin
     v_recipient,
     p_amount_drops,
     'zap:' || p_zap_id,
-    'nectar zap'
+    'nectar zap',
+    'record_zap'
   );
 
   insert into public.nectar_zaps
@@ -242,8 +252,6 @@ declare
   v_sent_at timestamptz;
   v_txn uuid;
   v_existing record;
-  v_sender_active uuid;
-  v_recipient_active uuid;
   v_note text;
 begin
   if v_uid is null then
@@ -252,6 +260,27 @@ begin
   if p_send_id is null or p_comb_id is null then
     raise exception 'send_comb_nectar_note: send id and comb are required';
   end if;
+  v_note := btrim(p_note);
+
+  -- Replay binds the complete payload before any mutable eligibility or
+  -- new-send validation. A lost response remains replayable even after a
+  -- member leaves, consent is revoked, or the recipient is tombstoned.
+  select cn.id, cn.comb_id, cn.sender_id, cn.recipient_id, cn.note_text, cn.amount_drops, cn.transaction_id, cn.created_at
+    into v_existing
+    from public.comb_nectar_notes cn
+   where cn.id = p_send_id;
+  if found then
+    if v_existing.sender_id = v_uid
+       and v_existing.comb_id = p_comb_id
+       and v_existing.recipient_id is not distinct from p_recipient_id
+       and v_existing.note_text is not distinct from v_note
+       and v_existing.amount_drops is not distinct from p_amount_drops then
+      return query select p_send_id, v_existing.transaction_id, v_existing.created_at;
+      return;
+    end if;
+    raise exception 'send_comb_nectar_note: send % already recorded with different parameters', p_send_id;
+  end if;
+
   if p_amount_drops is null or p_amount_drops < 1 or p_amount_drops > 1000 then
     raise exception 'send_comb_nectar_note: amount must be between 1 and 1000 drops';
   end if;
@@ -262,7 +291,6 @@ begin
     raise exception 'send_comb_nectar_note: cannot send to yourself';
   end if;
 
-  v_note := btrim(p_note);
   if v_note is null or v_note = '' then
     raise exception 'send_comb_nectar_note: note must contain between 1 and 8 words';
   end if;
@@ -296,42 +324,41 @@ begin
     raise exception 'send_comb_nectar_note: recipient not eligible';
   end if;
 
-  select cn.id, cn.comb_id, cn.sender_id, cn.recipient_id, cn.note_text, cn.amount_drops, cn.transaction_id, cn.created_at
-    into v_existing
-    from public.comb_nectar_notes cn
-   where cn.id = p_send_id;
-  if found then
-    if v_existing.sender_id = v_uid
-       and v_existing.comb_id = p_comb_id
-       and v_existing.recipient_id = p_recipient_id
-       and v_existing.note_text = v_note
-       and v_existing.amount_drops = p_amount_drops then
-      return query
-        select
-          p_send_id,
-          v_existing.transaction_id,
-          v_existing.created_at;
-      return;
-    end if;
-    raise exception 'send_comb_nectar_note: send % already recorded with different parameters', p_send_id;
-  end if;
-
   if not exists (select 1 from public.nectar_consents nc where nc.user_id = v_uid) then
     raise exception 'send_comb_nectar_note: nectar consent required before sending';
   end if;
 
-  v_txn := public._nectar_send_tip(
-    v_uid,
-    p_recipient_id,
-    p_amount_drops,
-    'comb-note:' || p_send_id,
-    'comb nectar note'
-  );
+  begin
+    v_txn := public._nectar_send_tip(
+      v_uid,
+      p_recipient_id,
+      p_amount_drops,
+      'comb-note:' || p_send_id,
+      'comb nectar note',
+      'send_comb_nectar_note'
+    );
 
-  insert into public.comb_nectar_notes
-    (id, comb_id, transaction_id, sender_id, recipient_id, note_text, amount_drops)
-  values (p_send_id, p_comb_id, v_txn, v_uid, p_recipient_id, v_note, p_amount_drops)
-  returning created_at into v_sent_at;
+    insert into public.comb_nectar_notes
+      (id, comb_id, transaction_id, sender_id, recipient_id, note_text, amount_drops)
+    values (p_send_id, p_comb_id, v_txn, v_uid, p_recipient_id, v_note, p_amount_drops)
+    returning created_at into v_sent_at;
+  exception when unique_violation then
+    select cn.comb_id, cn.sender_id, cn.recipient_id, cn.note_text,
+           cn.amount_drops, cn.transaction_id, cn.created_at
+      into v_existing
+      from public.comb_nectar_notes cn
+     where cn.id = p_send_id;
+    if found
+       and v_existing.sender_id = v_uid
+       and v_existing.comb_id = p_comb_id
+       and v_existing.recipient_id is not distinct from p_recipient_id
+       and v_existing.note_text is not distinct from v_note
+       and v_existing.amount_drops is not distinct from p_amount_drops then
+      return query select p_send_id, v_existing.transaction_id, v_existing.created_at;
+      return;
+    end if;
+    raise exception 'send_comb_nectar_note: send % already recorded with different parameters', p_send_id;
+  end;
 
   return query select p_send_id, v_txn, v_sent_at;
 end;
@@ -344,7 +371,4 @@ revoke all on function public.send_comb_nectar_note(uuid, uuid, uuid, text, bigi
 revoke execute on function public.send_comb_nectar_note(uuid, uuid, uuid, text, bigint) from anon;
 grant execute on function public.send_comb_nectar_note(uuid, uuid, uuid, text, bigint) to authenticated;
 
-create policy "comb_nectar_notes_service_writer"
-  on public.comb_nectar_notes for insert
-  with check (sender_id = auth.uid())
-  to authenticated;
+notify pgrst, 'reload schema';
