@@ -1,35 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Four BeeTransition role trajectories">
   <rect width="1200" height="720" fill="#FFFDF7"/>
   <text x="72" y="78" fill="#322819" font-family="Arial, sans-serif" font-size="38" font-weight="700">BeeTransition — four distinct causes</text>
-  <text x="72" y="113" fill="#746B5A" font-family="Arial, sans-serif" font-size="19">Quadratic tracks in local screen coordinates. Gold points guide the curve; they are not stops.</text>
+  <text x="72" y="113" fill="#746B5A" font-family="Arial, sans-serif" font-size="19">Quadratic tracks in local screen coordinates. Solid starts, rings end; gold controls guide, never stop.</text>
   <g font-family="Arial, sans-serif">
     <g transform="translate(72 170)">
       <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
       <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">LIKE LIFT</text><text x="28" y="72" fill="#746B5A" font-size="17">360ms · acknowledge, then leave</text>
       <path d="M75 190 L219 120 L455 95" fill="none" stroke="#B9AE96" stroke-width="2" stroke-dasharray="6 8"/>
       <path d="M75 190 Q219 120 455 95" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
-      <circle cx="75" cy="190" r="9" fill="#322819"/><circle cx="219" cy="120" r="7" fill="#D99E12"/><circle cx="455" cy="95" r="9" fill="#322819"/>
+      <circle cx="75" cy="190" r="9" fill="#322819"/><circle cx="219" cy="120" r="7" fill="#D99E12"/><circle cx="455" cy="95" r="9" fill="#FFF7CC" stroke="#322819" stroke-width="4"/>
     </g>
     <g transform="translate(628 170)">
       <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
       <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">SHARE CARRY</text><text x="28" y="72" fill="#746B5A" font-size="17">720ms · hand off toward the comb</text>
       <path d="M455 190 L436 130 L75 90" fill="none" stroke="#B9AE96" stroke-width="2" stroke-dasharray="6 8"/>
       <path d="M455 190 Q436 130 75 90" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
-      <circle cx="455" cy="190" r="9" fill="#322819"/><circle cx="436" cy="130" r="7" fill="#D99E12"/><circle cx="75" cy="90" r="9" fill="#322819"/>
+      <circle cx="455" cy="190" r="9" fill="#322819"/><circle cx="436" cy="130" r="7" fill="#D99E12"/><circle cx="75" cy="90" r="9" fill="#FFF7CC" stroke="#322819" stroke-width="4"/>
     </g>
     <g transform="translate(72 430)">
       <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
       <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">FEED ARRIVAL</text><text x="28" y="72" fill="#746B5A" font-size="17">520ms · quiet touchdown, then absent</text>
       <path d="M75 105 L227 179 L455 190" fill="none" stroke="#B9AE96" stroke-width="2" stroke-dasharray="6 8"/>
       <path d="M75 105 Q227 179 455 190" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
-      <circle cx="75" cy="105" r="9" fill="#322819"/><circle cx="227" cy="179" r="7" fill="#D99E12"/><circle cx="455" cy="190" r="9" fill="#322819"/>
+      <circle cx="75" cy="105" r="9" fill="#322819"/><circle cx="227" cy="179" r="7" fill="#D99E12"/><circle cx="455" cy="190" r="9" fill="#FFF7CC" stroke="#322819" stroke-width="4"/>
     </g>
     <g transform="translate(628 430)">
       <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
       <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">SEAL ARRIVAL</text><text x="28" y="72" fill="#746B5A" font-size="17">960ms · consequential approach, lands present</text>
       <path d="M75 123 L265 90 L455 190" fill="none" stroke="#B9AE96" stroke-width="2" stroke-dasharray="6 8"/>
       <path d="M75 123 Q265 90 455 190" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
-      <circle cx="75" cy="123" r="9" fill="#322819"/><circle cx="265" cy="90" r="7" fill="#D99E12"/><circle cx="455" cy="190" r="9" fill="#322819"/>
+      <circle cx="75" cy="123" r="9" fill="#322819"/><circle cx="265" cy="90" r="7" fill="#D99E12"/><circle cx="455" cy="190" r="9" fill="#FFF7CC" stroke="#322819" stroke-width="4"/>
     </g>
   </g>
 </svg>
