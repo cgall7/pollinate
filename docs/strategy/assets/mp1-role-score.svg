@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Four BeeTransition role trajectories">
+  <rect width="1200" height="720" fill="#FFFDF7"/>
+  <text x="72" y="78" fill="#322819" font-family="Arial, sans-serif" font-size="38" font-weight="700">BeeTransition — four distinct causes</text>
+  <text x="72" y="113" fill="#746B5A" font-family="Arial, sans-serif" font-size="19">One curve per cause. Interior points guide velocity; they never become stops.</text>
+  <g font-family="Arial, sans-serif">
+    <g transform="translate(72 170)">
+      <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
+      <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">LIKE LIFT</text><text x="28" y="72" fill="#746B5A" font-size="17">360ms · acknowledge, then leave</text>
+      <path d="M75 180 C145 174 173 119 250 123 S389 63 455 34" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="75" cy="180" r="9" fill="#322819"/><circle cx="250" cy="123" r="7" fill="#D99E12"/><circle cx="455" cy="34" r="9" fill="#322819"/>
+    </g>
+    <g transform="translate(628 170)">
+      <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
+      <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">SHARE CARRY</text><text x="28" y="72" fill="#746B5A" font-size="17">720ms · hand off toward the comb</text>
+      <path d="M75 180 C156 188 156 112 248 89 S376 45 455 25" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="75" cy="180" r="9" fill="#322819"/><circle cx="248" cy="89" r="7" fill="#D99E12"/><circle cx="455" cy="25" r="9" fill="#322819"/>
+    </g>
+    <g transform="translate(72 430)">
+      <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
+      <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">FEED ARRIVAL</text><text x="28" y="72" fill="#746B5A" font-size="17">520ms · quiet touchdown, then absent</text>
+      <path d="M75 113 C146 84 182 173 250 172 S369 198 455 198" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="75" cy="113" r="9" fill="#322819"/><circle cx="250" cy="172" r="7" fill="#D99E12"/><circle cx="455" cy="198" r="9" fill="#322819"/>
+    </g>
+    <g transform="translate(628 430)">
+      <rect width="500" height="220" rx="24" fill="#FFF7CC"/>
+      <text x="28" y="43" fill="#322819" font-size="25" font-weight="700">SEAL ARRIVAL</text><text x="28" y="72" fill="#746B5A" font-size="17">960ms · consequential approach, lands present</text>
+      <path d="M75 176 C140 151 163 46 250 75 S374 150 455 154" fill="none" stroke="#D99E12" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="75" cy="176" r="9" fill="#322819"/><circle cx="250" cy="75" r="7" fill="#D99E12"/><circle cx="455" cy="154" r="9" fill="#322819"/>
+    </g>
+  </g>
+</svg>
