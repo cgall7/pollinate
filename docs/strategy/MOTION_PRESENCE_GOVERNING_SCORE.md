@@ -35,14 +35,15 @@ one continuously curved, arc-length-resampled track per role. X, Y, bank,
 facing, and opacity read that sampled track and one master progress value.
 Interior control points are not stops.
 
-| Role | Cause | Visible response / authored local track | Energy | Settle | Interruption | Reduced Motion substitute |
-|---|---|---|---|---|---|---|
-| `like-lift` | A successful new like | 360ms: `(-4,+4) → (+21,-18) → (+46,-38)` | A light upward acknowledgment; quick lift, never a celebration loop. | Exit, no rest. | Coalesce while active; never queue. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
-| `share-carry` | Today’s entry was shared | 720ms: `(+10,+10) → (-10,-60) → (-30,-130)` | Deliberate hand-off toward the comb; longer reach, not faster flight. | Exit toward comb, no rest. | One-shot; caller serializes. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
-| `feed-arrival` | A fresh feed batch becomes visible | 520ms: `(-50,-24) → (-10,-4) → (+30,+6)` | Quiet arrival with the least visual claim; content remains primary. | Soft touchdown, then absent; no bounce or hover. | One per refresh batch, never per row. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
-| `seal-arrival` | Seal ceremony mounts | 960ms: `(-130,-60) → (-65,-90) → (0,0)` | Consequential approach; sustained intention rather than spectacle. | Land and remain; completion is explicit through real flight `onSettle`. | One-shot; completion is explicit. | Opacity-only `DURATIONS.reducedMotionFade`, then present. |
+| Role | Cause | Visible response / authored local track | Energy | Easing | Settle | Interruption | Reduced Motion substitute |
+|---|---|---|---|---|---|---|---|
+| `like-lift` | A successful new like | 360ms: `(-4,+4) → (+21,-18) → (+46,-38)` | A light upward acknowledgment; quick lift, never a celebration loop. | `out(cubic)` — prompt acknowledgment, soft exit. | Exit, no rest. | Coalesce while active; never queue. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
+| `share-carry` | Today’s entry was shared | 720ms: `(+10,+10) → (-10,-60) → (-30,-130)` | Deliberate hand-off toward the comb; longer reach, not faster flight. | `inOut(quad)` — gathers and lands without a long nose. | Exit toward comb, no rest. | One-shot; caller serializes. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
+| `feed-arrival` | A fresh feed batch becomes visible | 520ms: `(-50,-24) → (-10,-4) → (+30,+6)` | Quiet arrival with the least visual claim; content remains primary. | `out(cubic)` — prompt arrival, soft settle. | Soft touchdown, then absent; no bounce or hover. | One per refresh batch, never per row. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
+| `seal-arrival` | Seal ceremony mounts | 960ms: `(-130,-60) → (-65,-90) → (0,0)` | Consequential approach; sustained intention rather than spectacle. | `inOut(quad)` — gathers and lands without a long nose. | Land and remain; completion is explicit through real flight `onSettle`. | One-shot; completion is explicit. | Opacity-only `DURATIONS.reducedMotionFade`, then present. |
 
-Traversal is `Animated.timing` at the exact role duration. A traversal spring,
+Traversal is `Animated.timing` at the exact role duration and role-owned easing
+named above; `Easing.linear` is not a permitted role mapping. A traversal spring,
 elastic time, transform animation in RM, or `SealCrack.settleShadow` is banned.
 Start/end positions are exact; tangent-derived bank stays inside the existing
 attitude gate; interior speed never reaches zero. Five rapid triggers must
