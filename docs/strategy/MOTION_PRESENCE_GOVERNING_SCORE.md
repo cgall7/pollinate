@@ -37,17 +37,20 @@ Interior control points are not stops.
 
 | Role | Cause | Visible response / authored local track | Energy | Easing | Settle | Interruption | Reduced Motion substitute |
 |---|---|---|---|---|---|---|---|
-| `like-lift` | A successful new like | 360ms: `(-4,+4) → (+21,-18) → (+46,-38)` | A light upward acknowledgment; quick lift, never a celebration loop. | `out(cubic)` — prompt acknowledgment, soft exit. | Exit, no rest. | Coalesce while active; never queue. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
-| `share-carry` | Today’s entry was shared | 720ms: `(+10,+10) → (-10,-60) → (-30,-130)` | Deliberate hand-off toward the comb; longer reach, not faster flight. | `inOut(quad)` — gathers and lands without a long nose. | Exit toward comb, no rest. | One-shot; caller serializes. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
-| `feed-arrival` | A fresh feed batch becomes visible | 520ms: `(-50,-24) → (-10,-4) → (+30,+6)` | Quiet arrival with the least visual claim; content remains primary. | `out(cubic)` — prompt arrival, soft settle. | Soft touchdown, then absent; no bounce or hover. | One per refresh batch, never per row. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
-| `seal-arrival` | Seal ceremony mounts | 960ms: `(-130,-60) → (-65,-90) → (0,0)` | Consequential approach; sustained intention rather than spectacle. | `inOut(quad)` — gathers and lands without a long nose. | Land and remain; the present-role painter owns real completion, holds final progress, and disables flutter. | One-shot; completion is internal to the present-role painter. | Opacity-only `DURATIONS.reducedMotionFade`, then present. |
+| `like-lift` | A successful new like | 360ms: `(-4,+4) → (+15,-27) → (+46,-38)` | A light upward acknowledgment; quick lift, never a celebration loop. | `out(cubic)` — prompt acknowledgment, soft exit. | Exit, no rest. | Coalesce while active; never queue. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
+| `share-carry` | Today’s entry was shared | 720ms: `(+10,+10) → (+8,-74) → (-30,-130)` | Deliberate hand-off toward the comb; longer reach, not faster flight. | `inOut(quad)` — gathers and lands without a long nose. | Exit toward comb, no rest. | One shot per successful share; caller serializes. An active share coalesces, a fresh successful-share key starts after completion. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
+| `feed-arrival` | A fresh feed batch becomes visible | 520ms: `(-50,-24) → (-18,+2) → (+30,+6)` | Quiet arrival with the least visual claim; content remains primary. | `out(cubic)` — prompt arrival, soft settle. | Soft touchdown, then absent; no bounce or hover. | One per refresh batch, never per row. | Opacity-only `DURATIONS.reducedMotionFade`, then absent. |
+| `seal-arrival` | Seal ceremony mounts | 960ms: `(-130,-60) → (-65,-90) → (0,0)` | Consequential approach; sustained intention rather than spectacle. | `inOut(quad)` — gathers and lands without a long nose. | Land and remain; the present-role painter owns real completion, holds final progress, disables flutter, and unwinds bank to exactly `0°` over the final quarter. | One shot for the mounted seal; only this present role remains lifetime-settled. | Opacity-only `DURATIONS.reducedMotionFade`, then present. |
 
 Traversal is `Animated.timing` at the exact role duration and role-owned easing
 named above; `Easing.linear` is not a permitted role mapping. A traversal spring,
 elastic time, transform animation in RM, or `SealCrack.settleShadow` is banned.
 Start/end positions are exact; tangent-derived bank stays inside the existing
-attitude gate; interior speed never reaches zero. Five rapid triggers must
-prove each role’s stated interruption policy without an after-flight replay.
+attitude gate; interior speed never reaches zero. For `seal-arrival` only, keep
+the tangent bank during flight and smoothly reduce its magnitude over the final
+quarter to an exact `0°` at settled presence without changing X/Y travel. Five
+rapid triggers must prove each role’s stated interruption policy without an
+after-flight replay.
 
 ## Locked amendments for the other lanes
 
@@ -92,7 +95,8 @@ prove each role’s stated interruption policy without an after-flight replay.
 
 Capture each MP-1 role in normal and RM at 60fps, with stable first/last frames
 and no touch indicator over the subject. The MP-1 gate must resolve all four
-roles, reject a default role, prove curvature/tangent and nonzero interior
-speed, reject spring/`COOLDOWN_MS`/`settleShadow`, execute rapid retrigger
-policies, and sample transform identity in RM. Lumen owns visual ratification;
-mechanical green is not a taste verdict.
+roles, reject a default role, prove each control clears its endpoint chord
+(`≥4pt` like/feed; `≥8pt` share/seal), prove nonzero interior speed, reject
+spring/`COOLDOWN_MS`/`settleShadow`, execute rapid retrigger policies, prove
+seal’s decreasing late bank ends at `0°`, and sample transform identity in RM.
+Lumen owns visual ratification; mechanical green is not a taste verdict.
