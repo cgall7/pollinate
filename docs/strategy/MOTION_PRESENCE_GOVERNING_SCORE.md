@@ -102,8 +102,8 @@ the normal score arms only for a subsequent flight.
 
 Capture each MP-1 role in normal and RM at 60fps, with stable first/last frames
 and no touch indicator over the subject. The MP-1 gate must resolve all four
-roles, reject a default role, prove each control clears its endpoint chord
-(`≥4pt` like/feed; `≥8pt` share/seal), prove nonzero interior speed, reject
+roles, reject a default role, prove the sampled rendered track clears its
+endpoint chord (`≥4pt` like/feed; `≥8pt` share/seal), prove nonzero interior speed, reject
 spring/`COOLDOWN_MS`/`settleShadow`, execute rapid retrigger policies, prove
 seal’s decreasing late bank ends at `0°`, and sample transform identity in RM.
 It must also fake-drive an unresolved initial interaction and a live normal →
