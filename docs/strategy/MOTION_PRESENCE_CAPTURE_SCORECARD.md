@@ -18,7 +18,7 @@ scorecard owns repeatable capture and taste decisions.
 - MP-3 code + gate green: `pixel/mp3-nectar-lifecycle@3c6934130308ca909af8dbe8eeaf73d2762ca29d`.
 - MP-4 code + gate green: `pixel/mp4-flight-continuity@59b87842b77151b1e2efee46ba49f380c689d480`.
 - MP-5 code + gate green: `pixel/mp5-press-feedback@2afad04a2938091841659ef4465d789f5b62d56e`.
-- MP-1 remains unbuilt until its governing four-role score lands.
+- MP-1 code + gate green: `pixel/mp1-bee-transition@12c0ffd947be75ece498afb22d568b4204e2ce50`.
 
 ## Status language
 
