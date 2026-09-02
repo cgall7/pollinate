@@ -24,12 +24,12 @@
 // by inspecting its irises, not by its name — a rename only moves a trap. It
 // is a guard rather than a comment because a comment is what failed here.
 //
-// Acceptance for the repair was a ROUND TRIP, not a colour match (Lumen's bar,
-// 2026-08-25): the repaired master back through the chain must reproduce what
-// already ships. It does — `mascot-wing.png` byte-identical by sha256, and
-// `mascot-body.png` differing in 2 pixels of 98,880, max channel diff 2, both
-// inside the iris box, dE00 max 0.5731. The shipped face is the face of record;
-// the master conforms to it, never the reverse.
+// The 2026-08-25 iris round trip made `mascot-wing.png` byte-identical and
+// changed only two sub-JND iris pixels in `mascot-body.png`. The 2026-09-02
+// split repair intentionally changes the BODY mask: the master's charcoal
+// wing perimeter belongs to the moving wing pose, never the still body layer.
+// `check:mascot-presence` measures the shipped bytes and the pipeline records
+// the ownership rule; see design/README.md.
 
 // Character box: the union of the two layers' bounding boxes, 1013 x 1049px.
 // Both PNGs are cropped to it, so they stack by being the same size in the
@@ -42,6 +42,12 @@ export const MASCOT_ASPECT = 1013 / 1049;
 // footprint. Height follows from the aspect and comes out at 0.708 of the box
 // against StripedBee's 0.47: the mascot has a head and a trailing abdomen.
 export const MASCOT_WIDTH_FRACTION = 16.4 / 24;
+
+// WelcomeBee's character box inside its ceremonial stage. This is layout,
+// not motion, but it lives beside the mascot geometry so measurements of the
+// hero use the box the component actually passes rather than the 132pt stage
+// around it. Moving it changes the hero's silhouette, not merely a comment.
+export const WELCOME_BEE_STAGE_FRACTION = 0.68;
 
 // Wing root, as a fraction of the character box. This is the pivot for the
 // beat; it is not the box centre, which is why `MascotBee` composes the pivot
@@ -171,8 +177,8 @@ export const MASCOT_CLEARANCE = [
 //
 // **He is right, and the arithmetic says how right.** Breath's entire visible
 // output is the wing tip travelling `2 * BREATH_FLAP_RADIUS * sin(1 degree)`
-// = 1.4346% of the box height. At the 132pt hero that is **1.3400pt
-// peak-to-peak over 2100ms — 0.638 pt/s, 0.0106pt per frame at 60fps.** The
+// = 1.4346% of the drawn height. At WelcomeBee's 132pt stage that is **0.9111pt
+// peak-to-peak over 2100ms — 0.434pt/s, 0.0072pt per frame at 60fps.** The
 // character is, to the eye, a still image. The doctrine's bar is "you never
 // catch it performing; if you stare, it rewards you"; a stare is rewarded with
 // a hundredth of a point per frame, which is not a reward, it is a rounding
@@ -200,7 +206,9 @@ export const MASCOT_CLEARANCE = [
 export const BREATH_RISE_CYCLE_MS = 6500;
 
 // Peak-to-peak vertical travel of the whole character, as a fraction of its
-// drawn HEIGHT — 2.0553pt at the 132pt hero, 0.6851pt at chrome 44.
+// drawn HEIGHT. At WelcomeBee's 132pt stage the passed character box is
+// 89.76pt and the drawing is 63.5158pt high, so the travel below is 2.0325pt.
+// At a direct 44pt chrome mount the drawing is 31.1352pt high: 0.9963pt.
 //
 // **The doctrine's 1.5% ceiling is not available as the bound here, and saying
 // why is the point.** That figure was already converted into the wing's own
@@ -223,9 +231,8 @@ export const BREATH_RISE_CYCLE_MS = 6500;
 // measurement and the verdict was "flat." A tuned number inside a stated
 // interval, re-tuned by the follow-up its own note named.
 //
-// 3.2% is 4.224pt peak-to-peak at the 132pt hero and 1.408pt at chrome 44.
 // The clock does NOT move (6.5s, 42/58 split): peak drift-rate at the hero is
-// 0.65pt/s, still an order of magnitude under the ~5pt/s where a slow move
+// 0.31pt/s, still an order of magnitude under the ~5pt/s where a slow move
 // stops reading as breathing and starts reading as travel. That ordering is
 // the ruling — RETREAT AXIS IS AMPLITUDE, NEVER THE CLOCK. A faster cycle is
 // panting, and it fails the ceiling's own argument rather than tuning inside
@@ -304,8 +311,9 @@ export const SETTLE_INTERVAL_MAX_MS = 45000;
 
 // The dip, as a fraction of DRAWN height — the same denominator
 // `BREATH_RISE_FRACTION` uses, so the two body terms are comparable without a
-// conversion. 3% is 3.96pt at the 132pt hero, 1.32pt at chrome 44: slightly
-// LARGER than a whole breath's peak-to-peak, because a settle has to read as a
+// conversion. 3% is 1.9055pt at WelcomeBee's 132pt stage and 0.9341pt at a
+// direct chrome 44 mount — slightly LARGER than a whole breath's peak-to-peak,
+// because a settle has to read as a
 // distinct event against the breath it interrupts, not as a deeper breath.
 export const SETTLE_DIP_FRACTION = 0.03;
 
