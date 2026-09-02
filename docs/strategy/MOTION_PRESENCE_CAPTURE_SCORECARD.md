@@ -74,12 +74,14 @@ returned with its perceptual defect named.
 ## MP-1 — narrative bee transitions
 
 Capture one normal and one RM clip for like, share, feed arrival, and seal
-arrival, plus rapid-trigger like and refresh-batch feed. Like is a bright
-acknowledgement that leaves before celebration; share is a directional handoff;
-feed is the quietest role and content remains primary; seal carries the most
-gravity and remains without bounce, flourish, or an extra beat. Family
-resemblance comes from authored continuity and restraint, never a reused
-spring signature.
+arrival, plus rapid-trigger like, refresh-batch feed, one unresolved-initial
+interaction, and one live normal → RM role. Like is a bright acknowledgement
+that leaves before celebration; share is a directional handoff; feed is the
+quietest role and content remains primary; seal carries the most gravity and
+remains without bounce, flourish, or an extra beat. The unresolved and live-RM
+clips must show opacity-only substitution with no late travel injected on an
+RM → normal preference change. Family resemblance comes from authored
+continuity and restraint, never a reused spring signature.
 
 ## MP-2 — native reveal
 

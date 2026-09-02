@@ -52,6 +52,13 @@ quarter to an exact `0°` at settled presence without changing X/Y travel. Five
 rapid triggers must prove each role’s stated interruption policy without an
 after-flight replay.
 
+Reduced Motion is interaction state, not a late cosmetic override. While the
+preference is unresolved, `BeeTransition` fails closed to its opacity-only
+substitute. A live normal → RM change stops the active travel driver and starts
+that substitute in the same effect turn; it does not wait for a native-stop
+callback. RM → normal never injects travel into the gesture already underway:
+the normal score arms only for a subsequent flight.
+
 ## Locked amendments for the other lanes
 
 ### MP-2 — native reveal (preserved mechanism boundary)
@@ -99,4 +106,7 @@ roles, reject a default role, prove each control clears its endpoint chord
 (`≥4pt` like/feed; `≥8pt` share/seal), prove nonzero interior speed, reject
 spring/`COOLDOWN_MS`/`settleShadow`, execute rapid retrigger policies, prove
 seal’s decreasing late bank ends at `0°`, and sample transform identity in RM.
+It must also fake-drive an unresolved initial interaction and a live normal →
+RM flight (including a withheld native stop callback) to prove fail-closed
+replacement execution; RM → normal may not inject travel into that live flight.
 Lumen owns visual ratification; mechanical green is not a taste verdict.
