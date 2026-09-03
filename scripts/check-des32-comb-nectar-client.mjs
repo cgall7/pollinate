@@ -118,6 +118,15 @@ check(
 );
 
 check(
+  'measurement-unavailable path still commits, refreshes balance, announces, haptics, and closes',
+  /const result = origin && destination[\s\S]*?: await NectarStore\.sendCombNectarNote/.test(baseSources.compose) &&
+    /setBalanceRefresh\(\(value\) => value \+ 1\)/.test(baseSources.compose) &&
+    /if \(!origin \|\| !destination\) Haptics\.notificationAsync\(Haptics\.NotificationFeedbackType\.Success\)/.test(baseSources.compose) &&
+    /AccessibilityInfo\.announceForAccessibility\(message\)/.test(baseSources.compose) &&
+    /navigation\.goBack\(\)/.test(baseSources.compose)
+);
+
+check(
   'missing consent opens the existing consent sheet and preserves the draft',
   hasConsentSheet(baseSources)
 );
