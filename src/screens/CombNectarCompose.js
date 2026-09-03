@@ -215,14 +215,14 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
   };
 
   return <View style={styles.container}>
-    <ScreenHeader eyebrow="" title="A little thanks" right={<PressableScale onPress={() => navigation.goBack()}><Text style={styles.close}>×</Text></PressableScale>} />
+    <ScreenHeader eyebrow="" title="A little thanks" right={<PressableScale accessibilityLabel="Close" onPress={() => navigation.goBack()}><Text style={styles.close}>×</Text></PressableScale>} />
     {loading ? <ActivityIndicator color={theme.colors.accent} /> : <>
       <Text style={styles.label}>TO</Text>
       <View style={styles.members}>{members.map((member) => <PressableScale key={member.profile_id} innerRef={recipientId === member.profile_id ? recipientDestination : undefined} onPress={() => chooseRecipient(member.profile_id)} style={[styles.member, recipientId === member.profile_id && styles.selected]}><Text style={styles.memberName}>{memberName(member.display_name)}</Text></PressableScale>)}</View>
       <Text style={styles.target}>To {recipientLabel}</Text>
       {!nectarConsent && <PressableScale onPress={() => setNectarConsentSheetOpen(true)} style={styles.consent}><Text style={styles.consentText}>Turn this on before sending.</Text></PressableScale>}
       {nectarConsent && (
-        senderInactive ? <PressableScale onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
+        senderInactive ? <PressableScale accessibilityLabel="Not now" onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
       )}
       {nectarConsent && <><Text style={styles.words}>{wordCount(note)}/8 words</Text>{validationMessage && <Text style={styles.validation}>{validationMessage}</Text>}</>}
       {successMessage && <Text accessibilityLiveRegion="polite" style={styles.srOnly}>{successMessage}</Text>}
