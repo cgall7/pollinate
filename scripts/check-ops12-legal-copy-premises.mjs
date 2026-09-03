@@ -1,72 +1,73 @@
 // OPS-12: legal-copy premise tripwire (Vector, thread b57ad406, 2026-08-30,
-// §1B.36.5 / LEGAL-2). Population extended 2026-09-03 (Bumble) — see
-// "SIZED TO THE DEFECT, NOT TO THE FINDER'S SAMPLE" below.
+// §1B.36.5 / LEGAL-2). Population extended twice on 2026-09-03 (Bumble) —
+// see "SIZED TO THE DEFECT, NOT TO THE FINDER'S SAMPLE" below.
 //
 //   npm run check:ops12-legal-copy-premises
 //
 // THIS IS A PREMISE TRIPWIRE, NOT A TRUTH-CHECKER. It does not attempt to
 // verify that src/constants/legalCopy.js is accurate — that is an
-// unbounded claim about prose with no finite check. It catches the
-// premises that were true THE DAY THEY WERE WRITTEN and are false today:
-// a family of "your unshared entries never leave your phone" claims
-// written before P0-2 moved EntryStore onto Supabase (c4fe6a4), and a "we
-// have not built these controls into the app yet" claim written before
-// ENG-84 shipped the delete-account button (App.js:309, Account.js:218).
-// Nothing else in this suite would have caught the drift — a commit
-// message reading "written to what the app actually does" is a timestamp,
-// not a property.
+// unbounded claim about prose with no finite check. It catches premises
+// that were true THE DAY THEY WERE WRITTEN and are false today, each one
+// pinned to the specific code fact that falsified it.
 //
 // SIZED TO THE DEFECT, NOT TO THE FINDER'S SAMPLE: this gate originally
 // keyed on the two sentences Vector found on 2026-08-30. That is a
-// PROVENANCE, not a POPULATION. Sage found a third (:228) on 09-03; a
-// whole-file sweep then found eight sites sharing the one falsified
-// premise, seven of them in PRIVACY_POLICY and one in TERMS_OF_SERVICE.
-// The original anchor (:215) was the LEAST severe — a parenthetical in the
-// tenth section — while :158 is the first sentence of "The short version",
-// i.e. the sentence a user and App Review actually read. Had the gate kept
-// its original two anchors, rewriting :215 and :226 would have turned it
-// GREEN with six false sentences still shipping. Every site below is
-// enumerated with its own named assertion so a partial fix cannot report
-// as a whole one.
+// PROVENANCE, not a POPULATION — and the gate has now been resized twice
+// for exactly that reason, which is itself the argument for enumerating a
+// premise's sites rather than its discoveries:
+//
+//   round 1 (Sage, 09-03) found a third site, :228.
+//   round 2 (Bumble, 09-03) swept the whole file for the CLASS and found
+//     eight device-local sites, one of them in TERMS_OF_SERVICE — outside
+//     every "fix the privacy copy" scoping used up to that point.
+//   round 3 (Lumen, 09-03) found three more the phrase-sweep could not
+//     see, because they assert the same premises OBLIQUELY: Terms :262
+//     (storage permission granted at Share — so storage is framed as a
+//     consequence of sharing), Terms :295 (email-us-to-delete, the
+//     deletion-controls premise in the SECOND document), and a premise
+//     class that did not exist that morning — see PREMISE 4.
+//
+// The original anchor (:215) was the LEAST severe of its family — a
+// parenthetical in the tenth section — while :158 is the first sentence of
+// "The short version", i.e. the sentence a user and App Review actually
+// read. Had the gate kept its original two anchors, rewriting :215 and
+// :226 would have turned it GREEN with eleven false sentences shipping.
+// Every site below is enumerated with its own named assertion so a partial
+// fix cannot report as a whole one.
 //
 // SELF-DELETING BY CONSTRUCTION: each assertion is really "NOT (the stale
 // sentence exists AND the code fact it depends on contradicts it)." Today
 // every conjunction is true, so every premise assertion is RED — that is
 // this gate correctly reporting a live, already-routed defect (LEGAL-2;
-// wording ruled and delivered by Lumen 2026-08-30, event 007ea551…,
-// Colin's remaining call is veto-only), not a bug in the gate. Once the
-// copy is corrected — each stale sentence rewritten or removed — the first
-// conjunct goes false and stays false: nothing in this codebase's
-// trajectory un-deletes a shipped migration or un-registers a screen. The
-// assertions go green permanently, with no exemption list and no further
-// maintenance. Same register as check-legal-consent-gate's self-deleting
-// transition, one door down: that gate arms on a future flip (four FILL
-// values landing); this one is armed by a past flip (an architecture
-// change) that already happened underneath copy nobody re-read.
+// replacement wording ruled and delivered by Lumen, event 007ea551… and
+// the 09-03 re-cut, Colin's remaining call veto-only), not a bug in the
+// gate. Once the copy is corrected the first conjunct goes false and stays
+// false: nothing in this codebase's trajectory un-deletes a shipped
+// migration, un-registers a screen, or un-removes a caller. The assertions
+// go green permanently, with no exemption list and no further maintenance.
 //
 // WHY KEY ON SPECIFIC SENTENCES RATHER THAN "IS THE COPY ACCURATE": the
-// general question has no finite answer — the Privacy Policy makes dozens
-// of claims about the app, and treating every one as gate material invites
-// exactly the false-positive noise this repo's copy gates avoid elsewhere
-// (a name that fails loudly beats a pattern that passes quietly). Keying
-// on specific sentences and the specific code fact they depend on keeps
-// this gate's universe finite and gives it a real off switch. The
-// enumeration is bounded by ONE code fact — EntryStore is Supabase-backed
-// — not by the finder who happened to read that paragraph.
+// general question has no finite answer, and treating every claim in the
+// document as gate material invites exactly the false-positive noise this
+// repo's copy gates avoid elsewhere. Keying on specific sentences and the
+// specific code fact each depends on keeps this gate's universe finite and
+// gives it a real off switch. The enumeration is bounded by FOUR code
+// facts, not by the finders who happened to read those paragraphs.
 //
-// EACH SITE IS PINNED TO ITS DOCUMENT: the Terms site (:284) is asserted
-// against the TERMS_OF_SERVICE slice, not the whole file. Every human
-// description of this defect so far — Vector's, Sage's, mine — called it
-// "the privacy copy". A fix scoped to that phrase leaves the Terms saying
-// we cannot recover entries we hold, and a whole-file regex would have let
-// that pass unnoticed because the same fragment matched elsewhere.
+// EACH SITE IS PINNED TO ITS DOCUMENT: the Terms sites (:262, :284, :295)
+// are asserted against the TERMS_OF_SERVICE slice, not the whole file.
+// Every human description of this defect through round 2 — Vector's,
+// Sage's, mine — called it "the privacy copy". A fix scoped to that phrase
+// leaves the Terms saying we cannot recover entries we hold, and a
+// whole-file regex would have let that pass because the same fragment
+// matched elsewhere.
 //
 // CANNOT-TELL IS A FAILURE, NOT A PASS: if a source file cannot be read, or
 // if a control string this gate uses to prove it is reading the right
 // place goes missing, that is a FAIL, not a silent pass — a gate that can
 // no longer find its own anchors is not proof the anchors are fine.
 
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,29 +89,59 @@ const readSource = async (rel) => {
   }
 };
 
+const ENG84_MIGRATION = 'supabase/migrations/20260830000001_eng84_account_deletion.sql';
+
 const legalCopy = await readSource('src/constants/legalCopy.js');
 const entryStore = await readSource('src/services/EntryStore.js');
 const appJs = await readSource('App.js');
+const deletionMigration = await readSource(ENG84_MIGRATION);
+const honeycombStore = await readSource('src/services/HoneycombStore.js');
 
 check('legalCopy.js is readable', legalCopy !== null, true);
 check('EntryStore.js is readable', entryStore !== null, true);
 check('App.js is readable', appJs !== null, true);
+check(`${ENG84_MIGRATION} is readable`, deletionMigration !== null, true);
+check('HoneycombStore.js is readable', honeycombStore !== null, true);
 
-// --- Anchors: prove the extractor is looking at the right place, so an
-// unmatched premise reads as "the sentence is gone" rather than "the read
-// silently broke." ---------------------------------------------------------
+// --- Controls: prove each code fact is really present, so an unmatched
+// premise reads as "the sentence is gone" rather than "the read silently
+// broke", and a premise assertion can never go green because its
+// FALSIFIER disappeared unnoticed. -----------------------------------------
 const SUPABASE_IMPORT = /from ['"]\.\/supabase['"]/;
 const DELETE_ACCOUNT_SCREEN = /Stack\.Screen\s+name=["']DeleteAccount["']/;
-const UNBUILT_CONTROLS_CLAIM = /have not built these controls into the app yet/i;
+const FKEY_DROPPED = /alter table public\.profiles\s+drop constraint profiles_id_fkey/i;
+const SEALED_SURVIVE = /delete from public\.entries[\s\S]{0,120}?is_volume_open\(volume_id\)/i;
+const PROFILE_TOMBSTONED = /deleted_at = now\(\)/i;
+const SIGNUP_DEFINED = /async signUp\(\s*email,\s*password,\s*displayName\s*\)/;
 
 check(
-  "control: EntryStore.js imports the Supabase client (proves the read reaches the right file)",
+  'control: EntryStore.js imports the Supabase client (proves the read reaches the right file)',
   entryStore !== null && SUPABASE_IMPORT.test(entryStore),
   true,
 );
 check(
   'control: App.js registers a DeleteAccount screen (proves the read reaches the right file)',
   appJs !== null && DELETE_ACCOUNT_SCREEN.test(appJs),
+  true,
+);
+check(
+  'control: ENG-84 drops profiles_id_fkey (proves the account-deletion cascade does NOT fire)',
+  deletionMigration !== null && FKEY_DROPPED.test(deletionMigration),
+  true,
+);
+check(
+  "control: delete_own_account() excludes sealed volumes from its entry DELETE (proves keepsakes survive)",
+  deletionMigration !== null && SEALED_SURVIVE.test(deletionMigration),
+  true,
+);
+check(
+  'control: delete_own_account() tombstones the profiles row rather than deleting it',
+  deletionMigration !== null && PROFILE_TOMBSTONED.test(deletionMigration),
+  true,
+);
+check(
+  'control: HoneycombStore still DEFINES the email/password signUp (proves premise 4 measures reachability, not deletion)',
+  honeycombStore !== null && SIGNUP_DEFINED.test(honeycombStore),
   true,
 );
 
@@ -133,8 +164,21 @@ check(
 
 const privacyDoc = privacyStart >= 0 && termsStart > privacyStart ? legalCopy.slice(privacyStart, termsStart) : '';
 const termsDoc = termsStart >= 0 ? legalCopy.slice(termsStart) : '';
+const scopeFor = (doc) => (doc === 'terms' ? termsDoc : privacyDoc);
 
-// --- Premise 1: the device-local storage claim, EVERY site of it ----------
+// Every premise below is asserted the same way: the sentence still stands
+// AND the code fact still contradicts it. `want` is always false.
+const assertPremise = (site, codeContradicts) => {
+  const scope = scopeFor(site.doc);
+  const claimStands = scope !== '' && site.re.test(scope);
+  check(
+    `legalCopy.js ${site.id} — ${site.why}`,
+    claimStands && codeContradicts,
+    false,
+  );
+};
+
+// === PREMISE 1: entries are stored on the device ==========================
 //
 // One code fact falsifies all of them: EntryStore.js is Supabase-backed —
 // its own header dates the move ("Supabase-backed as of P0-2 — was a
@@ -187,36 +231,162 @@ const DEVICE_LOCAL_SITES = [
   {
     id: ':228 not ours to delete',
     doc: 'privacy',
-    why: 'Sage 09-03 — tells the user there is nothing on our servers to delete, and contradicts the retention section two above it',
+    why: 'Sage 09-03 — tells the user there is nothing on our servers to delete',
     re: /not ours to delete/i,
+  },
+  {
+    id: ':262 TERMS permission to store',
+    doc: 'terms',
+    why: 'Lumen 09-03 — frames storage as a permission granted at Share; storage happened at save. Oblique: matches no stays-on-your-phone phrase',
+    re: /you give us permission to store it/i,
   },
   {
     id: ':284 TERMS this is early software',
     doc: 'terms',
-    why: 'in TERMS_OF_SERVICE, outside every "fix the privacy copy" scoping so far',
+    why: 'in TERMS_OF_SERVICE, outside every "fix the privacy copy" scoping through round 2',
     re: /unshared entries live only on your phone/i,
   },
 ];
 
 const isSupabaseBacked = entryStore !== null && SUPABASE_IMPORT.test(entryStore);
-
 for (const site of DEVICE_LOCAL_SITES) {
-  const scope = site.doc === 'terms' ? termsDoc : privacyDoc;
-  const claimStands = scope !== '' && site.re.test(scope);
-  check(
-    `legalCopy.js ${site.id} does not claim device-local storage while EntryStore is Supabase-backed (${site.why})`,
-    claimStands && isSupabaseBacked,
-    false,
-  );
+  assertPremise(site, isSupabaseBacked);
 }
 
-// --- Premise 2: "unbuilt controls" claim vs. a shipped delete-account UI --
-const claimsUnbuilt = privacyDoc !== '' && UNBUILT_CONTROLS_CLAIM.test(privacyDoc);
+// === PREMISE 2: the deletion controls are not built ======================
+//
+// Falsified by ENG-84: App.js registers a DeleteAccount screen. Two sites,
+// one per document — the Terms site (:295) was outside round 2's sweep
+// because it names no control at all, it just routes the user to email.
+const UNBUILT_CONTROL_SITES = [
+  {
+    id: ':227 email rather than a button',
+    doc: 'privacy',
+    why: 'the original OPS-12 anchor (Vector 08-30) — claims the control is unbuilt while DeleteAccount is a registered screen',
+    re: /have not built these controls into the app yet/i,
+  },
+  {
+    id: ':295 TERMS ending your account',
+    doc: 'terms',
+    why: 'Lumen 09-03 — routes account deletion to email in the SECOND document; round 2 stopped one section short of it',
+    re: /To have your account and its data deleted, email/i,
+  },
+];
+
 const controlIsBuilt = appJs !== null && DELETE_ACCOUNT_SCREEN.test(appJs);
+for (const site of UNBUILT_CONTROL_SITES) {
+  assertPremise(site, controlIsBuilt);
+}
+
+// === PREMISE 3: account deletion deletes every entry attached to it ======
+//
+// This one reads TRUE from the schema and FALSE from the writer, which is
+// why it survived two sweeps: `entries.user_id references profiles on
+// delete cascade` is really in 20260808000001, so a reader who stops at
+// the foreign key concludes the sentence holds. The FK never fires —
+// ENG-84 drops profiles_id_fkey outright, and account deletion TOMBSTONES
+// the profiles row (deleted_at, immutable once set) rather than deleting
+// it, so nothing is ever cascaded from. The actual deletion is
+// delete_own_account()'s own statement, whose WHERE clause is written to
+// EXCLUDE sealed keepsakes: `hive_id is null or is_volume_open(volume_id)`.
+// Sealed writing survives account deletion by design — keep-and-disclose,
+// the ruled product position that DeleteAccount.js:20-23 already renders.
+//
+// Resolve a deletion claim to the statement that deletes, not to the
+// constraint that would have. (Lumen 09-03, corroborated by Sage.)
+assertPremise(
+  {
+    id: ':221 deleted with it',
+    doc: 'privacy',
+    why: 'claims every entry is deleted with the account, while delete_own_account() excludes sealed keepsakes and the FK it appears to rest on is dropped',
+    re: /When an account is deleted[^.]*are deleted with it/i,
+  },
+  deletionMigration !== null
+    && FKEY_DROPPED.test(deletionMigration)
+    && SEALED_SURVIVE.test(deletionMigration),
+);
+
+// === PREMISE 4: making an account collects a password and a display name =
+//
+// A premise class that did not exist on 2026-08-30 — it was falsified the
+// same morning this gate was extended, by the I10 zero-onboarding merge in
+// 9ffd215. The policy drifted DURING the thread that was auditing it,
+// which is the argument for a standing gate over a one-time sweep.
+//
+// The shipped account-creation paths are Apple (signInWithApple) and
+// magic-link OTP (signInWithOtp). Neither creates a password, and neither
+// collects a name: the rewritten Onboarding.js has no name field at all,
+// handle_new_user defaults display_name to 'New user', and a name is
+// collected later and contextually (CombInvite's isPlaceholderName step).
+//
+// REACHABILITY IS THE MEASUREMENT, AND IT IS TAKEN BY PATH, NOT BY SYMBOL.
+// HoneycombStore.signUp still EXISTS — it takes (email, password,
+// displayName) and writes options.data.display_name. Reading its existence
+// as "password signup still ships" is the mistake this assertion is built
+// to avoid: it has zero callers. Its former call site was Onboarding.js,
+// removed by the I10 rewrite. The census below therefore excludes
+// HoneycombStore.js BY PATH. Filtering the symbol instead — grep signUp
+// then drop lines matching HoneycombStore — deletes the very call sites it
+// is looking for, because a call site reads `HoneycombStore.signUp(...)`
+// and contains both tokens. That exact false negative is on the record in
+// docs/strategy/POLLINATE_COMB_ROTATION.md:8320; this is its gate form.
+const SRC_DIR = 'src';
+const CALLER_EXCLUDED = path.join('src', 'services', 'HoneycombStore.js');
+const SIGNUP_CALL = /signUp\s*\(/;
+
+const walk = async (rel) => {
+  let entries;
+  try {
+    entries = await readdir(path.join(ROOT, rel), { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const out = [];
+  for (const entry of entries) {
+    const child = path.join(rel, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await walk(child);
+      if (nested === null) return null;
+      out.push(...nested);
+    } else if (/\.(js|jsx|mjs|ts|tsx)$/.test(entry.name)) {
+      out.push(child);
+    }
+  }
+  return out;
+};
+
+const srcFiles = await walk(SRC_DIR);
+check('control: src/ is walkable (proves the caller census actually ran)', srcFiles !== null, true);
 check(
-  'legalCopy.js does not claim account-deletion controls are unbuilt while DeleteAccount is a registered screen',
-  claimsUnbuilt && controlIsBuilt,
-  false,
+  `control: the caller census excludes ${CALLER_EXCLUDED} by PATH and still sees the rest of src/`,
+  srcFiles !== null && srcFiles.includes(CALLER_EXCLUDED) && srcFiles.length > 1,
+  true,
+);
+
+let signUpCallers = null;
+if (srcFiles !== null) {
+  signUpCallers = [];
+  for (const rel of srcFiles) {
+    if (rel === CALLER_EXCLUDED) continue;
+    const text = await readSource(rel);
+    if (text === null) {
+      signUpCallers = null;
+      break;
+    }
+    if (SIGNUP_CALL.test(text)) signUpCallers.push(rel);
+  }
+}
+check('control: every src/ file in the caller census was readable', signUpCallers !== null, true);
+
+const passwordSignupUnreachable = signUpCallers !== null && signUpCallers.length === 0;
+assertPremise(
+  {
+    id: ':176 what we collect',
+    doc: 'privacy',
+    why: "claims account creation collects a password and a display name, while the only shipped creation paths are Apple and magic-link and signUp has no caller",
+    re: /we collect your email address, a password/i,
+  },
+  passwordSignupUnreachable,
 );
 
 console.log(`\ncheck-ops12-legal-copy-premises: ${pass} passed, ${fail} failed`);
