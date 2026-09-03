@@ -23,6 +23,7 @@ import {
   ringStepFor,
   shouldAbortPollination,
 } from './combLattice';
+import { boundedPollinationAims } from './pollinationIdentity';
 
 // Lane D — the hex tap's beat boundaries in ms from contact. `HONEY` names
 // only the fill; contact and ignition (Beats 1-2) belong to the FINGER and
@@ -582,6 +583,8 @@ export const HoneycombGrid = forwardRef(({
   // derive an origin from. See `aimOwnCell`.
   const clusterRef = useRef(null);
   const [tapCentre, setTapCentre] = useState(null);
+  const [landingCentre, setLandingCentre] = useState(null);
+  const [landingLightRequest, setLandingLightRequest] = useState(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -613,7 +616,10 @@ export const HoneycombGrid = forwardRef(({
   // aimed at, and where the aim point sat in cluster space when the tap
   // happened. Held in a ref because nothing renders from it.
   const aimRef = useRef(null);
+  const aimsRef = useRef(new Map());
   const pollinationKeyRef = useRef(0);
+  const lightGenerationRef = useRef(0);
+  const landingLightRef = useRef(null);
   const readScrollY = () => scrollYRef?.current ?? 0;
 
   // LP-R19's release beat, built here rather than deferred, because LP-R21
@@ -668,6 +674,10 @@ export const HoneycombGrid = forwardRef(({
 
   const handleSelect = (member, tap) => {
     setSelectedId(personKey(member));
+    lightGenerationRef.current += 1;
+    landingLightRef.current?.stop();
+    setLandingLightRequest(null);
+    setLandingCentre(null);
     // §28.1 — the CELL answers at t=0. The stroke was already here; the
     // haptic is new, and it is what makes the acknowledgement independent of
     // the bee. Everything the beat asserts is carried by the stroke, the
@@ -818,11 +828,13 @@ export const HoneycombGrid = forwardRef(({
   // 524.2ms, on the largest container, so the margin is 94.2ms. The
   // conclusion held through all three figures; the number in the comment is
   // what the next person retuning `HONEY.fill` reads, so it is the number
-  // that has to be true rather than the conclusion. No cell reference crosses with it (§28.2) — this re-triggers
-  // whichever cell `glowBloomOpacity`/`tapCentre` already point at, and by
-  // §28.9 that is always the cell that just finished landing: an aborted
-  // flight never reaches `onPollinateEnd`, so a re-tap elsewhere always
-  // retargets to a NEW flight before this one could fire for the old cell.
+  // that has to be true rather than the conclusion.
+  //
+  // MP-4: the landing signal is keyed. A later tap may already have replaced
+  // `aimRef.current` while the first errand is still landing, so a bare
+  // "landed" callback would illuminate and clear the wrong cell. The key is
+  // identity, not geometry: no cell coordinate crosses back, and stale keys
+  // do nothing.
   //
   // Peak deliberately UNDER the ignition's (0.45 of it) — a grace note, not
   // a second announcement; matching it would read as the tap firing twice.
@@ -830,8 +842,21 @@ export const HoneycombGrid = forwardRef(({
   const LANDING_LIGHT_RISE_MS = 120;
   const LANDING_LIGHT_FALL_MS = 420;
 
-  const igniteLanding = () => {
-    Animated.sequence([
+  const igniteLanding = (key) => {
+    const aim = aimsRef.current.get(key);
+    if (!aim) return;
+    setLandingCentre({ x: aim.localX, y: aim.localY });
+    aimsRef.current.delete(key);
+    if (aimRef.current?.key === key) aimRef.current = null;
+    boundedPollinationAims(aimsRef.current, { currentKey: activePollinationKey, latestKey: aimRef.current?.key ?? null });
+    lightGenerationRef.current += 1;
+    setLandingLightRequest({ key, generation: lightGenerationRef.current });
+  };
+
+  useEffect(() => {
+    if (!landingLightRequest || !landingCentre) return undefined;
+    const generation = landingLightRequest.generation;
+    const animation = Animated.sequence([
       Animated.timing(glowBloomOpacity, {
         toValue: LANDING_LIGHT_PEAK,
         duration: LANDING_LIGHT_RISE_MS,
@@ -844,8 +869,20 @@ export const HoneycombGrid = forwardRef(({
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: true,
       }),
-    ]).start();
-  };
+    ]);
+    landingLightRef.current = animation;
+    animation.start(({ finished }) => {
+      if (lightGenerationRef.current !== generation) return;
+      landingLightRef.current = null;
+      setLandingLightRequest(null);
+      setLandingCentre(null);
+      if (!finished) setLandingCentre(null);
+    });
+    return () => {
+      animation.stop();
+      if (landingLightRef.current === animation) landingLightRef.current = null;
+    };
+  }, [landingLightRequest, landingCentre, glowBloomOpacity]);
 
   // R-N4.1 — THE CROSSING IS A COMMAND IN; THE POINT LEAVES THE WAY POINTS
   // ALREADY LEAVE.
@@ -886,6 +923,8 @@ export const HoneycombGrid = forwardRef(({
     const centre = cellCentre(cell, cellSize);
     pollinationKeyRef.current += 1;
     const key = pollinationKeyRef.current;
+    const latestKey = aimRef.current?.key ?? null;
+    if (latestKey != null && latestKey !== activePollinationKey) aimsRef.current.delete(latestKey);
     aimRef.current = {
       key,
       personId: personKey(cell.member),
@@ -893,6 +932,8 @@ export const HoneycombGrid = forwardRef(({
       localY: centre.y,
       scrollY: readScrollY(),
     };
+    aimsRef.current.set(key, aimRef.current);
+    boundedPollinationAims(aimsRef.current, { currentKey: activePollinationKey, latestKey: key });
     onPollinate({
       key,
       cause,
@@ -959,7 +1000,18 @@ export const HoneycombGrid = forwardRef(({
     });
   };
 
-  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell }));
+  const cancelPollination = (key) => {
+    aimsRef.current.delete(key);
+    if (aimRef.current?.key === key) aimRef.current = null;
+    if (landingLightRequest?.key === key) {
+      lightGenerationRef.current += 1;
+      landingLightRef.current?.stop();
+      setLandingLightRequest(null);
+      setLandingCentre(null);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell, cancelPollination }));
 
   const requestPollination = (member, tap) => {
     // Under Reduce Motion there is no bee to break from — `FlyingBee` renders
@@ -995,13 +1047,20 @@ export const HoneycombGrid = forwardRef(({
   // `layout`'s identity changes on every parent render, which is fine: it is
   // the trigger, and the decision is the by-value person check.
   useEffect(() => {
-    const aim = aimRef.current;
-    if (!aim || aim.key !== activePollinationKey) return;
+    const aim = aimsRef.current.get(activePollinationKey);
+    if (!aim) return;
     if (shouldAbortPollination(layout, aim, readScrollY())) {
-      aimRef.current = null;
-      onPollinateCancel?.();
+      aimsRef.current.delete(aim.key);
+      if (aimRef.current?.key === aim.key) aimRef.current = null;
+      onPollinateCancel?.(aim.key);
     }
   }, [layout, scrollTick, activePollinationKey]);
+
+  useEffect(() => () => {
+    landingLightRef.current?.stop();
+    aimRef.current = null;
+    aimsRef.current.clear();
+  }, []);
 
   // The camera dive-in is the screen's signature move, but it's also pure
   // travel — under Reduce Motion the cluster simply fades up in place.
@@ -1011,8 +1070,9 @@ export const HoneycombGrid = forwardRef(({
   // — `StyleSheet.absoluteFill` covers a View for free, but an `<Svg>` needs
   // its canvas size stated, and this is the only container-space size the
   // component doesn't already have from `layout`.
+  const overlayCentre = landingCentre ?? tapCentre;
   const centreForOverlay =
-    clusterOrigin && tapCentre ? { x: clusterOrigin.x + tapCentre.x, y: clusterOrigin.y + tapCentre.y } : null;
+    clusterOrigin && overlayCentre ? { x: clusterOrigin.x + overlayCentre.x, y: clusterOrigin.y + overlayCentre.y } : null;
 
   return (
     <View style={styles.container} onLayout={(e) => setContainerSize(e.nativeEvent.layout)}>

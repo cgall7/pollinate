@@ -16,6 +16,7 @@ import { HoneycombGrid, HIVE_SLOTS, personKey } from '../components/HoneycombGri
 import { ScreenHeader } from '../components/ScreenHeader';
 import { BeeTransition } from '../components/BeeTransition';
 import { FlyingBee } from '../components/FlyingBee';
+import { pollinationCancelResult, pollinationLandingResult } from '../components/pollinationIdentity';
 import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { demoHiveShares } from '../constants/demoHive';
@@ -376,6 +377,16 @@ const HoneycombFeed = () => {
   const [pollination, setPollination] = useState(null);
   const pollinationRef = useRef(null);
   pollinationRef.current = pollination;
+  const [airbornePollinationKey, setAirbornePollinationKey] = useState(null);
+  const airbornePollinationKeyRef = useRef(null);
+  airbornePollinationKeyRef.current = airbornePollinationKey;
+  const [canceledPollination, setCanceledPollination] = useState(null);
+  const cancelPollinationKey = useCallback((key) => {
+    combRef.current?.cancelPollination(key);
+    setAirbornePollinationKey((current) => (current === key ? null : current));
+    setCanceledPollination({ key, at: Date.now() });
+    setPollination((current) => pollinationCancelResult(current, key).pollination);
+  }, []);
   // The live scroll offset (read by value by the abort predicate) and a tick
   // that carries no information and exists only to re-run it. §28.9: put
   // completeness in the trigger and correctness in the predicate.
@@ -386,7 +397,7 @@ const HoneycombFeed = () => {
     // Only publish while a flight is airborne. The predicate is the tick's
     // only consumer, and a per-frame setState on a screen with fourteen
     // `useState` hooks is a real cost to pay when there is no bee to abort.
-    if (pollinationRef.current) setScrollTick((n) => n + 1);
+    if (airbornePollinationKeyRef.current != null) setScrollTick((n) => n + 1);
   }, []);
 
   const loadAll = useCallback(async ({ suppressArrival = false } = {}) => {
@@ -598,6 +609,7 @@ const HoneycombFeed = () => {
           active
           perches={hiveView === 'week' ? null : perches}
           pollinate={pollination}
+          canceledPollination={canceledPollination}
           // R-N4 — THE DROP IS A PROPERTY OF THE FLIGHT, NOT OF THIS SCREEN.
           // Derived from the fact the comb publishes (`cause`), so it is
           // born with the flight and dies with it: `setPollination(null)`
@@ -608,7 +620,10 @@ const HoneycombFeed = () => {
           // same frame as `burstPollen` — the drop leaves him exactly when
           // the pollen fires.
           carrying={pollination?.cause === 'arrival' ? giftDrops : null}
-          onPollinateEnd={() => {
+          onPollinateFlightStart={(key) => {
+            setAirbornePollinationKey(key);
+          }}
+          onPollinateEnd={(key) => {
             // R-LF-5 — the landing light. This USED to be the whole story
             // ("'I landed' is the only thing that crosses back"), and that
             // sentence went stale the moment R-N4.1 put a second command on
@@ -616,8 +631,14 @@ const HoneycombFeed = () => {
             // by any landing. What still holds is the narrower claim it was
             // making — the comb already knows which cell a landing means
             // (§28.2), so no cell reference travels back with it.
-            combRef.current?.igniteLanding();
-            setPollination(null);
+            combRef.current?.igniteLanding(key);
+            setAirbornePollinationKey((current) => (current === key ? null : current));
+            const result = pollinationLandingResult(pollinationRef.current, key);
+            if (!result.accepted) return;
+            setPollination(result.pollination);
+          }}
+          onPollinateCancel={(key) => {
+            cancelPollinationKey(key);
           }}
         />
       )}
@@ -764,9 +785,11 @@ const HoneycombFeed = () => {
           onInvitePress={() => setAddOpen(true)}
           scrollYRef={scrollYRef}
           scrollTick={scrollTick}
-          activePollinationKey={pollination?.key ?? null}
+          activePollinationKey={airbornePollinationKey ?? null}
           onPollinate={setPollination}
-          onPollinateCancel={() => setPollination(null)}
+          onPollinateCancel={(key) => {
+            cancelPollinationKey(key);
+          }}
         />
         </PerchAnchor>
       )}

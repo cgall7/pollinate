@@ -167,10 +167,10 @@ export const MUTATIONS = [
   },
   {
     row: 'F5',
-    why: 'the crossing stops escaping the component — the handle narrows back to one function and R-N4 has no door in',
+    why: 'the keyed cancel command stops escaping the component — abort/suppression can no longer clear the grid registry and flight state together',
     file: 'src/components/HoneycombGrid.js',
-    from: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell }));",
-    to: "  useImperativeHandle(ref, () => ({ igniteLanding }));",
+    from: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell, cancelPollination }));",
+    to: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell }));",
   },
   {
     row: 'F5',
@@ -225,8 +225,8 @@ export const MUTATIONS = [
     row: 'G3',
     why: 'THE LANDING BECOMES THE ONLY WRITER — the level is committed from the flight\'s own callback instead of from the read. Every gift the bee never delivers (Reduce Motion, no seat, an abort) is then silently lost, which is the failure R-N4.1 names',
     file: 'src/screens/HoneycombTab.js',
-    from: "            combRef.current?.igniteLanding();\n            setPollination(null);",
-    to: "            combRef.current?.igniteLanding();\n            setHoneyLevel(honeyLevelForDrops(drops));\n            setPollination(null);",
+    from: "            combRef.current?.igniteLanding(key);\n            setAirbornePollinationKey((current) => (current === key ? null : current));\n            const result = pollinationLandingResult(pollinationRef.current, key);\n            if (!result.accepted) return;\n            setPollination(result.pollination);",
+    to: "            combRef.current?.igniteLanding(key);\n            setAirbornePollinationKey((current) => (current === key ? null : current));\n            const result = pollinationLandingResult(pollinationRef.current, key);\n            if (!result.accepted) return;\n            setHoneyLevel(honeyLevelForDrops(giftDrops));\n            setPollination(result.pollination);",
   },
   {
     row: 'G4',
@@ -239,8 +239,8 @@ export const MUTATIONS = [
     row: 'G5',
     why: 'the cargo gets its own scale instead of the gift\'s — a fixed radius, so every gift is the same size and R-N3\'s "the amount IS the radius" stops being true the moment the drop changes hands',
     file: 'src/components/FlyingBee.js',
-    from: "  const carriedRadius = carrying ? Math.min(dropRadiusForAmount(carrying), size / 2) : 0;",
-    to: "  const carriedRadius = carrying ? 12 : 0;",
+    from: "  const carriedRadius = planCarrying ? Math.min(dropRadiusForAmount(planCarrying), size / 2) : 0;",
+    to: "  const carriedRadius = planCarrying ? 12 : 0;",
   },
   {
     row: 'G6',
@@ -1408,7 +1408,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     }
     if (n.type === 'VariableDeclarator' && n.id?.name && n.init) gridFns.set(n.id.name, n.init);
   });
-  const expectedHandle = ['igniteLanding', 'pollinateOwnCell'];
+  const expectedHandle = ['igniteLanding', 'pollinateOwnCell', 'cancelPollination'];
   // "No state out" — for each member, walk its own body and collect any
   // `return` that carries an argument. Nested function expressions are
   // deliberately INCLUDED: `aimOwnCell` leaked through a `new Promise`
@@ -1427,7 +1427,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   }
   const handleSetOk = handleKeys && handleKeys.length === expectedHandle.length && expectedHandle.every((k) => handleKeys.includes(k));
   if (handleSetOk && stateOut.length === 0) {
-    ok(`F5 the comb's handle publishes exactly {${handleKeys.join(', ')}} and EVERY member is a command: zero value-carrying returns across both bodies, nested function expressions included. The membership is asserted as a SET so a third escape reds this row rather than arriving unremarked; the no-state-out half is the invariant itself, and it is what a key-count row could not see — \`aimOwnCell\` was one key and still a fact leaving`);
+    ok(`F5 the comb's handle publishes exactly {${handleKeys.join(', ')}} and EVERY member is a command: zero value-carrying returns across every body, nested function expressions included. The membership is asserted as a SET so a missing keyed cancel command reds this row rather than leaving abort/suppression as host-only state; the no-state-out half is the invariant itself, and it is what a key-count row could not see — \`aimOwnCell\` was one key and still a fact leaving`);
   } else {
     bad('F5', `handle keys = ${handleKeys ? `{${handleKeys.join(', ')}}` : 'unresolved'} (want exactly {${expectedHandle.join(', ')}}), state leaving = [${stateOut.join(' | ')}]`);
   }
@@ -1652,11 +1652,11 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // for later" — a drop the bee keeps until a cell appears is the badge this
   // beat exists to replace).
   //
-  // The guarantee is structural and the row asserts the structure: what the
-  // bee carries is DERIVED from the live flight's `cause`, so it is born
-  // with the flight and dies with it. A `carrying` held in its own state and
-  // cleared on landing would be a second thing to keep in step, and the
-  // failure mode of getting that wrong is a permanent badge.
+  // The guarantee is structural and the row asserts the structure: the host
+  // still hands the arrival amount to the flight channel, and `FlyingBee`
+  // snapshots that amount onto the visit plan at launch. That extra boundary
+  // became necessary in MP-4, where the host may already be publishing a
+  // later tap while an older gift flight is still in the air.
   const carryAttr = (() => {
     let v = null;
     visit(tabTree, (n) => {
@@ -1665,13 +1665,14 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     return v;
   })();
   const derivedFromFlight = Boolean(carryAttr) && /pollination\?\.cause === 'arrival'/.test(carryAttr);
-  // Both terminations must clear the flight, or one of them strands it.
-  const clearsOnEnd = /onPollinateEnd=\{\(\) => \{[\s\S]{0,900}?setPollination\(null\)/.test(TAB);
-  const clearsOnCancel = /onPollinateCancel=\{\(\) => setPollination\(null\)\}/.test(TAB);
-  if (derivedFromFlight && clearsOnEnd && clearsOnCancel) {
-    ok('G4 the drop cannot be stranded: `carrying` is derived from the live flight\'s own `cause`, and BOTH terminations clear the flight — touchdown (`onPollinateEnd`) and abort (`onPollinateCancel`). There is no path on which the bee keeps a drop, and the release lands on the same frame as `burstPollen`');
+  const snapshottedOnPlan = /carrying:\s*nextPollinate\.cause\s*===\s*'arrival'\s*\?\s*carrying\s*:\s*null/.test(BEE);
+  // Both terminations must clear the matching flight, or one of them strands it.
+  const clearsOnEnd = /pollinationLandingResult\(pollinationRef\.current,\s*key\)[\s\S]{0,300}setPollination\(result\.pollination\)/.test(TAB);
+  const clearsOnCancel = /pollinationCancelResult\(current,\s*key\)\.pollination/.test(TAB);
+  if (derivedFromFlight && snapshottedOnPlan && clearsOnEnd && clearsOnCancel) {
+    ok('G4 the drop cannot be stranded: the host publishes arrival cargo on the flight channel, FlyingBee snapshots it onto the visit plan, and BOTH keyed terminations clear only the matching flight. There is no path where a stale host pollination changes the cargo of the errand already in the air');
   } else {
-    bad('G4', `carrying derived from the flight=${derivedFromFlight} (${carryAttr ?? 'attribute missing'}), clears on touchdown=${clearsOnEnd}, clears on abort=${clearsOnCancel}`);
+    bad('G4', `carrying derived from the flight=${derivedFromFlight} (${carryAttr ?? 'attribute missing'}), snapshottedOnPlan=${snapshottedOnPlan}, clears on touchdown=${clearsOnEnd}, clears on abort=${clearsOnCancel}`);
   }
 
   // G5 — THE CARGO IS THE GIFT'S OWN SIZE, and the clamp is a guard rather
@@ -1683,7 +1684,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // on nothing, and at a smaller mount it binds — because a clamp asserted
   // only where it is inert is a clamp nobody has tested.
   const { dropRadiusForAmount, DROP_MAX_RADIUS } = await import('../src/components/nectarFlight.js');
-  const carriedExpr = /const carriedRadius = carrying \? Math\.min\(dropRadiusForAmount\(carrying\), size \/ 2\) : 0;/.test(BEE);
+  const carriedExpr = /const planCarrying = plan\?\.kind === 'visit' \? plan\.carrying : null;\s*const carriedRadius = planCarrying \? Math\.min\(dropRadiusForAmount\(planCarrying\), size \/ 2\) : 0;/.test(BEE);
   const mountSize = (() => { const m = BEE.match(/const DEFAULT_SIZE = (\d+);/); return m ? Number(m[1]) : null; })();
   // The largest amount the ledger can put in one arrival is unbounded above
   // in principle, so the bound that matters is the function's own ceiling.

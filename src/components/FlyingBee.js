@@ -3,7 +3,7 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { MascotBee } from './MascotBee';
 import { HoneyDrop } from './HoneyDrop';
 import { dropRadiusForAmount } from './nectarFlight';
-import { buildAttitude } from './beeAttitude';
+import { buildAttitude, facingFor, TURN_MS } from './beeAttitude';
 import {
   APPROACH_SPEED_RATIO,
   DESCENT_MS,
@@ -13,6 +13,7 @@ import {
   pollenCountFor,
   pollenFlecks,
 } from './pollinationFlight';
+import { pollinationCancelPlanEffect } from './pollinationIdentity';
 import { buildRestPlan, referenceSpeedPxS } from './flightSequencer';
 import { theme } from '../constants/theme';
 import { CLEARANCE_BIN_DEG, MASCOT_CLEARANCE, MASCOT_WIDTH_FRACTION } from '../constants/mascot';
@@ -126,6 +127,24 @@ const buildTrack = (path) => ({
 // a window in `t`.
 const PRESET_EASING = Easing.out(Easing.cubic);
 
+const buildPreflightWheelPlan = ({ at, width, height, fromFacing, toFacing }) => ({
+  kind: 'preflight-wheel',
+  path: [at, at].map((p) => ({ x: p.x / width, y: p.y / height })),
+  inputRange: [0, 1],
+  easing: Easing.inOut(Easing.cubic),
+  durationMs: TURN_MS,
+  trail: false,
+  flutter: false,
+  heldFacing: fromFacing,
+  attitude: {
+    inputRange: [0, 0.5, 1],
+    rotateOutput: [0, 0, 0],
+    scaleXOutput: [fromFacing, 0, toFacing],
+    segments: [{ dx: 0, dy: 0, pitch: 0, bank: 0, bodyWidths: 0, facing: toFacing }],
+    windows: [{ tStart: 0, tMid: 0.5, tEnd: 1, from: fromFacing, to: toFacing }],
+  },
+});
+
 
 const PRESETS = {
   // In from off-right, up over the top, back down across to the lower
@@ -186,19 +205,22 @@ export const FlyingBee = ({
   preset,
   onSettle,
   pollinate = null,
+  canceledPollination = null,
   onPollinateEnd,
+  onPollinateCancel,
+  onPollinateFlightStart,
   perches = null,
   carrying = null,
 }) => {
   const reduced = useReducedMotion();
   const [layout, setLayout] = useState(null);
-  // The pollination plan currently in the air: a `visit`, then a `return`,
-  // then null (cruise). One driver throughout — R46: `AnimatedValue` holds a
-  // single `_animation` and both `setValue` and `animate` stop the incumbent,
-  // so the legal move is stop, rebuild the track, and re-run `t` from 0 in a
-  // TIMING. Never a spring onto a just-rewound value; that is the one
-  // configuration R46 left open.
+  // The pollination plan currently in the air. Cruise/rest may use the shared
+  // driver; MP-4 visit/preflight plans own their own drivers so a terminal
+  // wheel cannot paint the successor visit for one frame. A newer tap is
+  // coalesced into one pending slot, not used to stop/rebuild the active
+  // errand. Keyed cancel is the only cross-boundary stop signal.
   const [plan, setPlan] = useState(null);
+  const [drainPendingToken, setDrainPendingToken] = useState(0);
   const planRef = useRef(null);
   planRef.current = plan;
   const t = useRef(new Animated.Value(0)).current;
@@ -220,6 +242,8 @@ export const FlyingBee = ({
   // is not simply cached.
   const originRef = useRef({ x: 0, y: 0 });
   const pollinateKeyRef = useRef(null);
+  const pendingPollinateRef = useRef(null);
+  const pendingLaunchRef = useRef(null);
   // Ref so a new callback identity never restarts an in-progress flight.
   const onSettleRef = useRef(onSettle);
   onSettleRef.current = onSettle;
@@ -248,9 +272,14 @@ export const FlyingBee = ({
   const residentSettledRef = useRef(false);
   const onPollinateEndRef = useRef(onPollinateEnd);
   onPollinateEndRef.current = onPollinateEnd;
+  const onPollinateCancelRef = useRef(onPollinateCancel);
+  onPollinateCancelRef.current = onPollinateCancel;
+  const onPollinateFlightStartRef = useRef(onPollinateFlightStart);
+  onPollinateFlightStartRef.current = onPollinateFlightStart;
 
   const presetDef = preset ? PRESETS[preset] : null;
   const track = plan ?? presetDef?.track ?? null;
+  const driver = plan?.driver ?? t;
   // TWO SUPPRESSIONS, BECAUSE REDUCE MOTION HAS NOTHING TO TAKE FROM A
   // RESIDENCE (Pixel, 2026-08-28, P1a — and this was a live defect before it
   // was a staging requirement).
@@ -348,6 +377,7 @@ export const FlyingBee = ({
         : null,
     [layout, size, preset, plan]
   );
+  const drawnAttitude = plan?.attitude ?? attitude;
 
   // One interpolation node per channel, built once and shared by the render
   // style AND the sampler below. Two things rest on that single identity, and
@@ -370,16 +400,16 @@ export const FlyingBee = ({
   const translateX = useMemo(
     () =>
       layout && track
-        ? t.interpolate({ inputRange: track.inputRange, outputRange: track.path.map((p) => p.x * layout.width) })
+        ? driver.interpolate({ inputRange: track.inputRange, outputRange: track.path.map((p) => p.x * layout.width) })
         : null,
-    [layout, track]
+    [layout, track, driver]
   );
   const translateY = useMemo(
     () =>
       layout && track
-        ? t.interpolate({ inputRange: track.inputRange, outputRange: track.path.map((p) => p.y * layout.height) })
+        ? driver.interpolate({ inputRange: track.inputRange, outputRange: track.path.map((p) => p.y * layout.height) })
         : null,
-    [layout, track]
+    [layout, track, driver]
   );
 
   // Fixed pool of trail-particle drivers — hard-capped per §12.5 Rule 3
@@ -473,8 +503,8 @@ export const FlyingBee = ({
   // opacity, kept in refs (not state) so the 160ms trail tick and the plan
   // builders can sample them without re-rendering every frame.
   //
-  // **Listen on `t`; read the nodes.** R89 — a listener on a DERIVED node
-  // (`t.interpolate(...)`) is registered and then never called once `t` goes
+  // **Listen on the plan driver; read the nodes.** R89 — a listener on a
+  // DERIVED node (`driver.interpolate(...)`) is registered and then never called once `driver` goes
   // native. `AnimatedWithChildren.__callListeners` cascades to children only
   // `if (!this.__isNative)` (`:74`), and `__makeNative` walks *down* (`:24-39`),
   // so every descendant of a natively-driven value loses its listeners — the
@@ -504,17 +534,17 @@ export const FlyingBee = ({
     // Cruise opacity is a constant 1, so there is nothing to sample; a preset
     // is the only flight whose bee fades, and a seeded particle scales by this.
     if (!presetOpacity) beeOpacityRef.current = 1;
-    const id = t.addListener(() => {
+    const id = driver.addListener(() => {
       posRef.current.x = translateX.__getValue();
       posRef.current.y = translateY.__getValue();
       if (presetOpacity) beeOpacityRef.current = presetOpacity.__getValue();
     });
-    return () => t.removeListener(id);
+    return () => driver.removeListener(id);
     // The nodes themselves are the deps. `translateX`/`translateY` change
     // identity exactly when `track` does (a new plan, a preset, a resize), and
     // `presetOpacity` exactly when `preset` does — so this can no longer be
     // right by coincidence between two hand-written dep arrays.
-  }, [layout, flightSuppressed, translateX, translateY, presetOpacity]);
+  }, [layout, flightSuppressed, driver, translateX, translateY, presetOpacity]);
 
   // §28.5 / §32.1 — every speed in the beat still derives from one reference,
   // and the reference is still a property of the box rather than a constant.
@@ -634,6 +664,74 @@ export const FlyingBee = ({
     );
   };
 
+  const pollinationTargetFor = (nextPollinate) => {
+    const boxOrigin = readOrigin();
+    return {
+      x: nextPollinate.x - boxOrigin.x - size / 2,
+      y: nextPollinate.y - boxOrigin.y - size / 2,
+    };
+  };
+
+  const buildVisitPlan = (nextPollinate, target, heldFacing) => ({
+    ...buildPollinationPlan({
+      from: { ...posRef.current },
+      target,
+      ringStep: nextPollinate.ringStep,
+      // C′ — the staging offset is the bee's own drawn length, so it is
+      // measured here, in the box that owns the bee, and never inferred
+      // from the comb. `size` is the BOX; the character inside it spans
+      // `MASCOT_WIDTH_FRACTION` of that, and it is the character the eye
+      // reads a length off.
+      bodyLengthPx: MASCOT_WIDTH_FRACTION * size,
+      width: layout.width,
+      height: layout.height,
+      approachSpeedPxS: cruiseSpeed * APPROACH_SPEED_RATIO,
+      // R-LF-2.1 — **there are no easings to pass any more.** R-LF-2 handed
+      // this builder `Easing.out(quad)` for the launch and
+      // `Easing.out(cubic)` for the settle; both landed on ONE SEGMENT
+      // rather than one leg, which made the launch unobservable (its
+      // segment is 6ms) and the settle a lunge (its segment is the whole
+      // drop, so `out(cubic)`'s 3x-mean opening velocity was a leg-scale
+      // event). The flight's speed is now a property of the flight —
+      // `buildSpeedProfile`, one continuous v(t) — and this call site's job
+      // is to name the SPEED, which it still does, one line up.
+      // R-LF-3 — alternates the weave's first excursion so consecutive
+      // taps never draw the same figure. Seeded off the pollination key
+      // (an incrementing counter, never `Math.random()`) because
+      // `buildPollinationPlan` is a pure function a gate can sample.
+      weaveSign: nextPollinate.key % 2 === 0 ? 1 : -1,
+    }),
+    pollinationKey: nextPollinate.key,
+    carrying: nextPollinate.cause === 'arrival' ? carrying : null,
+    heldFacing,
+    driver: new Animated.Value(0),
+  });
+
+  const launchPollination = (nextPollinate) => {
+    pollinateKeyRef.current = nextPollinate.key;
+    pendingPollinateRef.current = null;
+    pendingLaunchRef.current = null;
+    onPollinateFlightStartRef.current?.(nextPollinate.key);
+    const target = pollinationTargetFor(nextPollinate);
+    const heldFacing = drawnAttitude?.scaleXOutput?.[drawnAttitude.scaleXOutput.length - 1] ?? 1;
+    const targetFacing = facingFor(target.x - posRef.current.x, size, heldFacing);
+    if (targetFacing !== heldFacing) {
+      pendingLaunchRef.current = { pollinate: nextPollinate, target, heldFacing: targetFacing };
+      setPlan({
+        ...buildPreflightWheelPlan({
+          at: { ...posRef.current },
+          width: layout.width,
+          height: layout.height,
+          fromFacing: heldFacing,
+          toFacing: targetFacing,
+        }),
+        driver: new Animated.Value(0),
+      });
+      return;
+    }
+    setPlan(buildVisitPlan(nextPollinate, target, heldFacing));
+  };
+
   /**
    * Put the bee at home before anything else happens.
    *
@@ -661,74 +759,80 @@ export const FlyingBee = ({
     return true;
   };
 
-  // A target arrives, or the one in the air stops being the one you tapped.
+  // A target arrives, or the host stops publishing one.
   //
-  // §28.9, ratified: **the flight aborts; it does not re-aim.** By §28.1 the
-  // bee is off the critical path, so a bee that gives up costs the user
-  // exactly nothing — while a bee that chases a moving cell is doing the very
-  // thing "never fetch the card" exists to prevent. And abort needs no new
-  // mechanism: it IS the return leg, started early, with no pollen because he
-  // never landed.
-  //
-  // A second tap mid-flight re-targets by the same stop-and-rebuild, so unlike
-  // `BeeTransition` this beat needs no cooldown — there is no state to protect.
+  // MP-4: a second target while a visit is in flight must not stop, rebuild or
+  // re-aim the current errand. The active bee lands once for its own key; at
+  // most one later target is retained, and that slot is overwritten by newer
+  // taps until the current visit has settled back into rest.
   useEffect(() => {
     if (!layout || flightSuppressed || sequenceHalted) return;
     if (!pollinate) {
+      const pendingKey = pendingPollinateRef.current?.key;
+      if (pendingKey != null) {
+        pendingPollinateRef.current = null;
+        if (pendingLaunchRef.current?.pollinate?.key === pendingKey) {
+          pendingLaunchRef.current = null;
+        }
+        pollinateKeyRef.current = planRef.current?.kind === 'visit' ? planRef.current.pollinationKey : null;
+        return;
+      }
       // Abort. It used to be `buildReturnPlan` to `PATH[0]`, then the next
       // sortie; under the doctrine an aborted errand ends where it gave up and
       // the bee simply rests there. §28.9 is unchanged and now costs nothing:
       // aborting is stopping, and stopping is a position.
-      if (planRef.current?.kind === 'visit') rest();
+      if (planRef.current?.kind === 'visit' || planRef.current?.kind === 'preflight-wheel') {
+        pendingLaunchRef.current = null;
+        rest();
+      }
       return;
     }
     if (pollinate.key === pollinateKeyRef.current) return;
-    pollinateKeyRef.current = pollinate.key;
-    // §28.3 — the waypoint names a CORNER, not a bee. `styles.bee` is
-    // absolutely positioned with no offsets, so `translateX/Y` place the
-    // top-left of the box; the character is centred inside it. Uncorrected the
-    // bee lands `size / 2` down and right of the face he came to visit, which
-    // on a 7-seat comb is 0.408 of a seat step — most of the way to the
-    // neighbour. One place, one expression.
-    // `boxOrigin`, not `origin` — `origin` is already taken in this file by the
-    // pollen emission point, and two different origins one screen apart is how
-    // a later reader subtracts the wrong one.
-    const boxOrigin = readOrigin();
-    const target = {
-      x: pollinate.x - boxOrigin.x - size / 2,
-      y: pollinate.y - boxOrigin.y - size / 2,
-    };
-    setPlan({
-      ...buildPollinationPlan({
-        from: { ...posRef.current },
-        target,
-        ringStep: pollinate.ringStep,
-        // C′ — the staging offset is the bee's own drawn length, so it is
-        // measured here, in the box that owns the bee, and never inferred
-        // from the comb. `size` is the BOX; the character inside it spans
-        // `MASCOT_WIDTH_FRACTION` of that, and it is the character the eye
-        // reads a length off.
-        bodyLengthPx: MASCOT_WIDTH_FRACTION * size,
-        width: layout.width,
-        height: layout.height,
-        approachSpeedPxS: cruiseSpeed * APPROACH_SPEED_RATIO,
-        // R-LF-2.1 — **there are no easings to pass any more.** R-LF-2 handed
-        // this builder `Easing.out(quad)` for the launch and
-        // `Easing.out(cubic)` for the settle; both landed on ONE SEGMENT
-        // rather than one leg, which made the launch unobservable (its
-        // segment is 6ms) and the settle a lunge (its segment is the whole
-        // drop, so `out(cubic)`'s 3x-mean opening velocity was a leg-scale
-        // event). The flight's speed is now a property of the flight —
-        // `buildSpeedProfile`, one continuous v(t) — and this call site's job
-        // is to name the SPEED, which it still does, one line up.
-        // R-LF-3 — alternates the weave's first excursion so consecutive
-        // taps never draw the same figure. Seeded off the pollination key
-        // (an incrementing counter, never `Math.random()`) because
-        // `buildPollinationPlan` is a pure function a gate can sample.
-        weaveSign: pollinate.key % 2 === 0 ? 1 : -1,
-      }),
-    });
+    if (planRef.current?.kind === 'visit' || planRef.current?.kind === 'preflight-wheel') {
+      pendingPollinateRef.current = pollinate;
+      pollinateKeyRef.current = pollinate.key;
+      return;
+    }
+    launchPollination(pollinate);
   }, [pollinate, layout, flightSuppressed, sequenceHalted]);
+
+  useEffect(() => {
+    const canceledPollinationKey = canceledPollination?.key;
+    if (canceledPollinationKey == null) return;
+    const cancelPlanEffect = pollinationCancelPlanEffect({
+      planKind: planRef.current?.kind,
+      planKey: planRef.current?.pollinationKey,
+      pendingLaunchKey: pendingLaunchRef.current?.pollinate?.key,
+      cancelKey: canceledPollinationKey,
+    });
+    if (pendingPollinateRef.current?.key === canceledPollinationKey) pendingPollinateRef.current = null;
+    if (cancelPlanEffect.clearPendingLaunch) pendingLaunchRef.current = null;
+    if (cancelPlanEffect.stopActive) {
+      rest();
+      if (pendingPollinateRef.current) setDrainPendingToken((n) => n + 1);
+    }
+  }, [canceledPollination]);
+
+  useEffect(() => {
+    if (!flightSuppressed && !sequenceHalted) return;
+    const keys = new Set();
+    if (planRef.current?.kind === 'visit') keys.add(planRef.current.pollinationKey);
+    if (pendingPollinateRef.current?.key != null) keys.add(pendingPollinateRef.current.key);
+    if (pendingLaunchRef.current?.pollinate?.key != null) keys.add(pendingLaunchRef.current.pollinate.key);
+    pendingPollinateRef.current = null;
+    pendingLaunchRef.current = null;
+    pollinateKeyRef.current = planRef.current?.kind === 'visit' ? planRef.current.pollinationKey : null;
+    keys.forEach((key) => onPollinateCancelRef.current?.(key));
+  }, [flightSuppressed, sequenceHalted]);
+
+  useEffect(() => {
+    if (!layout || flightSuppressed || sequenceHalted) return;
+    if (planRef.current?.kind !== 'rest') return;
+    const pending = pendingPollinateRef.current;
+    if (!pending) return;
+    pendingPollinateRef.current = null;
+    launchPollination(pending);
+  }, [drainPendingToken, layout, flightSuppressed, sequenceHalted]);
 
   // Drive the flight — one beat of the sequence, a one-shot preset that
   // settles, or a pollination visit.
@@ -770,7 +874,7 @@ export const FlyingBee = ({
       }
       return undefined;
     }
-    t.setValue(0);
+    driver.setValue(0);
     // REST — Bee Doctrine State 1. `durationMs: null` is the absence of an
     // animation, not a zero-length one: `t` is already at 0, the track's two
     // waypoints are identical, so the bee is AT the rest point and nothing is
@@ -781,7 +885,7 @@ export const FlyingBee = ({
       return () => loopRef.current?.stop();
     }
     if (plan) {
-      loopRef.current = Animated.timing(t, {
+      loopRef.current = Animated.timing(driver, {
         toValue: 1,
         duration: plan.durationMs,
         easing: plan.easing,
@@ -789,12 +893,20 @@ export const FlyingBee = ({
       });
       loopRef.current.start(({ finished }) => {
         if (!finished) return;
+        if (plan.kind === 'preflight-wheel') {
+          const pendingLaunch = pendingLaunchRef.current;
+          if (pendingLaunch) {
+            pendingLaunchRef.current = null;
+            setPlan(buildVisitPlan(pendingLaunch.pollinate, pendingLaunch.target, pendingLaunch.heldFacing));
+          }
+          return;
+        }
         if (plan.kind === 'visit') {
           burstPollen(plan.landing);
           // The abort window closes the instant he lands; tell the host so it
           // stops publishing scroll positions for a flight that can no longer
           // be aborted.
-          onPollinateEndRef.current?.();
+          onPollinateEndRef.current?.(plan.pollinationKey);
         }
         // Doctrine State 3's ending, verbatim: "bee settles at a perch near
         // the reveal card, then transitions to Breath". He does NOT fly home
@@ -802,6 +914,7 @@ export const FlyingBee = ({
         // Outright deletes, and it would be the retired behaviour re-entering
         // through the one door still open to it.
         rest();
+        if (pendingPollinateRef.current) setDrainPendingToken((n) => n + 1);
       });
     } else {
       loopRef.current = Animated.timing(t, {
@@ -925,14 +1038,14 @@ export const FlyingBee = ({
   // the *last* entry is applied first — scaleX must sit after rotate for
   // the bee to be mirrored and then banked, and the sign of the bank is
   // already folded into `rotateOutput` for that reason.
-  const rotate = attitude
-    ? t.interpolate({
-        inputRange: attitude.inputRange,
-        outputRange: attitude.rotateOutput.map((deg) => `${deg}deg`),
+  const rotate = drawnAttitude
+    ? driver.interpolate({
+        inputRange: drawnAttitude.inputRange,
+        outputRange: drawnAttitude.rotateOutput.map((deg) => `${deg}deg`),
       })
     : '0deg';
-  const scaleX = attitude
-    ? t.interpolate({ inputRange: attitude.inputRange, outputRange: attitude.scaleXOutput })
+  const scaleX = drawnAttitude
+    ? driver.interpolate({ inputRange: drawnAttitude.inputRange, outputRange: drawnAttitude.scaleXOutput })
     : 1;
   // R-N4 — THE CARGO, and its size is the gift's size read from the one
   // function that answers that question (R-N3's `dropRadiusForAmount`, whose
@@ -947,7 +1060,8 @@ export const FlyingBee = ({
   // out-measured by its cargo and still read as carrying it — past that
   // point it is two objects colliding, which is a different picture and not
   // a smaller version of this one.
-  const carriedRadius = carrying ? Math.min(dropRadiusForAmount(carrying), size / 2) : 0;
+  const planCarrying = plan?.kind === 'visit' ? plan.carrying : null;
+  const carriedRadius = planCarrying ? Math.min(dropRadiusForAmount(planCarrying), size / 2) : 0;
 
   const flightOpacity = presetOpacity ?? 1;
 
