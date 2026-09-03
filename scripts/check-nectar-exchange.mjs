@@ -64,14 +64,14 @@ export const MUTATIONS = [
     row: 'E5',
     why: 'a new ambient loop on this screen — the standing no-new-ambient rule, banned by name in R-N6',
     file: 'src/screens/PackageOpen.js',
-    from: '  const bloomScale = useRef(new Animated.Value(0.85)).current;',
-    to: '  const bloomScale = useRef(new Animated.Value(0.85)).current;\n  const doorPulse = Animated.loop(Animated.timing(bloomScale, { toValue: 1 }));',
+    from: '  const dwellProgressAnim = useRef(new Animated.Value(0)).current;',
+    to: '  const dwellProgressAnim = useRef(new Animated.Value(0)).current;\n  const doorPulse = Animated.loop(Animated.timing(arrivalProgressAnim, { toValue: 1 }));',
   },
   {
     row: 'E5',
     why: 'the door keeps its absence of a clock but loses its position — no animated ancestor means it arrives out of nowhere, which "no clock of its own" alone would not catch',
     file: 'src/screens/PackageOpen.js',
-    from: 'style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}',
+    from: 'style={[\n                  styles.entryCard,\n                  { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }, { scale: cardScale }] },\n                ]}',
     to: 'style={[styles.entryCard]}',
   },
   {
@@ -961,9 +961,14 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // load-bearing — a door with no animated ancestor at all would also have
   // "no clock of its own" and would arrive out of nowhere.
   const hasLoop = /Animated\.loop\s*\(/.test(SCREEN);
-  const ridesBloom = post && post.animatedAncestor && /styles\.entryCard/.test(post.animatedAncestor) && /bloomOpacity/.test(post.animatedAncestor);
+  const ridesBloom =
+    post &&
+    post.animatedAncestor &&
+    /styles\.entryCard/.test(post.animatedAncestor) &&
+    /cardOpacity/.test(post.animatedAncestor) &&
+    /cardScale/.test(post.animatedAncestor);
   if (!hasLoop && ridesBloom) {
-    ok('E5 the door has no clock of its own and is not clockless — zero `Animated.loop` on this screen (the standing no-new-ambient rule), and its nearest animated ancestor is the entry card\'s own `bloomOpacity`/`bloomScale` view. The ruling is satisfied by an ABSENCE, so the row asserts the absence and the position together');
+    ok('E5 the door has no clock of its own and is not clockless — zero `Animated.loop` on this screen (the standing no-new-ambient rule), and its nearest animated ancestor is the entry card\'s own arrival-progress view. The ruling is satisfied by an ABSENCE, so the row asserts the absence and the position together');
   } else {
     bad('E5', `Animated.loop present=${hasLoop}, nearest animated ancestor of the post-consent door=${post ? post.animatedAncestor : 'none'} — R-N6 bans a new ambient loop and puts the door on the entry's bloom`);
   }
