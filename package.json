@@ -75,6 +75,7 @@
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",
+    "check:ops12-legal-copy-premises": "node scripts/check-ops12-legal-copy-premises.mjs",
     "preflight:prod-schema": "node scripts/prod-schema-check.mjs",
     "check:absolute-fill": "node scripts/check-absolute-fill.mjs",
     "check:nectar-consent": "node scripts/check-nectar-consent.mjs",

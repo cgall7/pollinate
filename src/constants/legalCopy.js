@@ -155,7 +155,7 @@ export const PRIVACY_POLICY = {
     {
       heading: 'The short version',
       body:
-        'What you write stays on your phone. We never receive an entry unless you tap Share, and when you do, only the people you have accepted into your honeycomb can read it.\n\n' +
+        'What you write is yours alone until you decide otherwise. Your journal is stored with your account on our servers — that is how it survives a lost phone — but an unshared entry can be read by exactly one person: you. Sharing is what changes that, and only for the people you have accepted into your honeycomb.\n\n' +
         'There are no ads in this app. There is no analytics, crash-reporting or tracking code in it either — nothing here reports what you do back to us or to anyone else. We do not sell or share anything about you.\n\n' +
         'The rest of this page is the same thing said precisely.',
     },
@@ -167,26 +167,27 @@ export const PRIVACY_POLICY = {
       heading: 'Who we are',
       body:
         `This app is published by ${LEGAL_ENTITY}. We are responsible for the information described on this page — in data-protection terms, its controller.\n\n` +
-        `Most of what you write never reaches us at all, so this responsibility is narrower than it usually is: it covers your account, anything you chose to share, and the likes and comments attached to it. The next section says exactly what that means.\n\n` +
+        `We are responsible for everything the app stores: your account, your journal — shared and unshared — and the likes and comments attached to what you share. The next sections say exactly what that means.\n\n` +
         `Anything you want to ask or ask us to do, ${CONTACT_EMAIL} reaches a person.`,
     },
     {
       heading: 'What we collect',
       body:
-        'When you make an account we collect your email address, a password, and the display name you choose.\n\n' +
-        'Your password is handled by our authentication provider and stored only as a cryptographic hash. We cannot read it, and neither can anyone who works on this app.\n\n' +
+        'When you make an account we collect an email address — the one you type, or, if you sign in with Apple, the one Apple gives us for you, which can be Apple\'s private relay address rather than your personal one. No password is created: you sign in with Apple or with a link we email you. You choose a display name later, the first time the app needs one.\n\n' +
+        'Some older accounts were made with a password. If yours was, it is handled by our authentication provider and stored only as a cryptographic hash. We cannot read it, and neither can anyone who works on this app.\n\n' +
         'We do not ask for your phone number, and the app never requests access to your contacts, camera roll, location or microphone.',
     },
     {
       heading: 'Your journal entries',
       body:
-        'Entries you write are saved in the app\'s own storage on your device. They are not uploaded to us, not backed up by us, and not readable by us.\n\n' +
-        'The honest consequence: because we hold no copy, we cannot restore your entries. If you delete the app, or lose the phone, unshared entries are gone. Keep your own copy of anything you would be sorry to lose.',
+        'Entries you write are stored with your account on our servers, whether or not you share them — storing them is how your journal follows your account instead of dying with a phone.\n\n' +
+        'An unshared entry can be read from the app by exactly one account: yours. The database enforces that limit itself, the same way it protects shared entries, so a bug in the app cannot widen it.\n\n' +
+        'The honest consequence has changed direction: we can no longer say your entries never reach us, because they do. What we can say is who sees them — nobody — and what happens when you leave: deleting your account permanently deletes every entry you never shared, and we cannot recover them afterwards.',
     },
     {
       heading: 'When you share an entry',
       body:
-        'Tapping Share is the one action that sends an entry to our servers. It sends the text of that single entry and the date you wrote it.\n\n' +
+        'Sharing does not send your entry anywhere new — it is already stored with your account. Tapping Share changes one thing: who may read it.\n\n' +
         'A shared entry can be read by you and by the people whose honeycomb connection you have accepted. Nobody else. That limit is enforced by the database itself, so a bug in the app cannot widen it.\n\n' +
         'Please know: there is currently no way to un-share an entry from inside the app. Until we add one, treat sharing as final. If you need something taken down, email us and we will remove it by hand.',
     },
@@ -211,21 +212,20 @@ export const PRIVACY_POLICY = {
     {
       heading: 'Where your information is kept',
       body:
-        `Accounts, shared entries, comments and connections are stored with our hosting provider, Supabase, in ${HOSTING_REGION}. They hold this data on our behalf and do not use it for their own purposes.\n\n` +
-        'Unshared entries are not covered by any of this, because they never leave your phone.',
+        `Accounts, journal entries — shared and unshared — comments and connections are stored with our hosting provider, Supabase, in ${HOSTING_REGION}. They hold this data on our behalf and do not use it for their own purposes.`,
     },
     {
       heading: 'How long we keep it',
       body:
         'Shared entries, comments and likes are kept until you or we remove them. Account details are kept while your account exists.\n\n' +
-        'When an account is deleted, the entries, shares, comments, likes and connections attached to it are deleted with it.',
+        'When you delete your account: Your account, your details, and any unsealed writing are deleted. Keepsakes you already gave stay with the people you gave them to, signed with the name you used then.',
     },
     {
       heading: 'Getting your data, or deleting it',
       body:
-        `You can ask us for a copy of what we hold about you, ask us to correct it, or ask us to delete your account entirely. Email ${CONTACT_EMAIL} from the address on your account and we will act within 30 days.\n\n` +
-        'We have not built these controls into the app yet, which is why this is an email rather than a button. That is a gap we intend to close.\n\n' +
-        'Entries you never shared are not ours to delete — removing the app removes them.',
+        `You can delete your account from inside the app: Account → Delete account. The screen tells you exactly what will be deleted before you confirm. If you would rather write to us instead, ${CONTACT_EMAIL} works too.\n\n` +
+        `For a copy of what we hold about you, or to have something corrected, email ${CONTACT_EMAIL} from the address on your account and we will act within 30 days. Export and correction have not been built into the app yet — that is why those two are an email rather than a button, and it is a gap we intend to close.\n\n` +
+        'Entries you never shared are part of your account, so deleting your account deletes them too.',
     },
     {
       heading: 'Children',
@@ -259,7 +259,7 @@ export const TERMS_OF_SERVICE = {
       heading: 'Your writing is yours',
       body:
         'You own everything you write here. We claim no ownership of it.\n\n' +
-        'When you share an entry, you give us permission to store it and show it to the honeycomb connections you chose — and nothing beyond that. We will not publish it, sell it, use it in marketing, or show it to anyone you did not share it with. That permission ends when the entry is removed.',
+        'We store what you write so your journal can follow your account. Sharing an entry gives us permission to show it to the honeycomb connections you chose — and nothing beyond that. We will not publish it, sell it, use it in marketing, or show it to anyone you did not share it with. That permission ends when the entry is removed.',
     },
     {
       heading: 'What other people share with you',
@@ -281,7 +281,7 @@ export const TERMS_OF_SERVICE = {
       heading: 'This is early software',
       body:
         'The app is provided as it is. We do not promise it will always be available, always work correctly, or never lose data. Features may change or disappear.\n\n' +
-        'Because unshared entries live only on your phone and we hold no copy, we cannot recover them for you.',
+        'Deleting your account permanently deletes your unshared entries, and we cannot recover them for you afterwards.',
     },
     {
       heading: 'Limits of our responsibility',
@@ -292,7 +292,7 @@ export const TERMS_OF_SERVICE = {
     {
       heading: 'Ending your account',
       body:
-        `You can stop using the app whenever you like. To have your account and its data deleted, email ${CONTACT_EMAIL}.\n\n` +
+        `You can stop using the app whenever you like. To delete your account and its data, use Account → Delete account in the app, or email ${CONTACT_EMAIL} and we will do it for you.\n\n` +
         'We may end an account that seriously or repeatedly breaks these terms.',
     },
     {
