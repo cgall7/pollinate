@@ -60,14 +60,19 @@ Pull from the code, don't invent:
 
 | Token | Value | Source |
 |---|---|---|
-| `DOOR_SIZE` | 52 | `src/navigation/AccountDoor.js:18` |
-| `DOOR_AVATAR_SIZE` | 34 | `AccountDoor.js:19` |
-| `SIDE_INSET` | 20 | `src/navigation/tabBarLayout.js:14` |
-| `DOOR_GAP` | 12 | `tabBarLayout.js:15` — **becomes dead once the door leaves the bar** |
-| `BAR_HEIGHT` | 60 | `tabBarLayout.js:16` |
-| `BAR_BOTTOM` | 28 | `tabBarLayout.js:17` |
-| Tab icon size | 24 | `MainTabs.js:61` |
-| Capsule radius | `theme.borderRadius.large` = 32 | `theme.js:104` |
+| `DOOR_SIZE` | 52 | `src/navigation/AccountDoor.js` (exported; `tabBarLayout.js` imports it) |
+| `DOOR_AVATAR_SIZE` | 34 | `src/navigation/AccountDoor.js` — module-private `const` |
+| `SIDE_INSET` | 20 | `src/navigation/tabBarLayout.js` |
+| `BAR_HEIGHT` | 60 | `src/navigation/tabBarLayout.js` |
+| `BAR_BOTTOM` | 28 | `src/navigation/tabBarLayout.js` |
+| `DOOR_END_INSET` | `theme.spacing.lg` = 24 | `src/navigation/tabBarLayout.js` — replaces `DOOR_GAP`, dead since DES-27 |
+| `DOOR_TOP_GAP` | 17 | `src/navigation/tabBarLayout.js` |
+| Tab icon size | 24 | `src/navigation/MainTabs.js` — the `Tab.Screen` icon `size` prop (inline, no name to grep) |
+| Capsule radius | `theme.borderRadius.large` = 32 | `src/constants/theme.js` |
+
+Addresses are constant names, not line numbers — grep the token in the named
+file. A token that returns nothing has been retired; check the file's own
+comments for what replaced it.
 
 Spacing scale: `xs 4 · sm 8 · md 16 · lg 24 · xl 32`.
 Shadows: `theme.shadows.glass`, falling back to `theme.shadows.card` under

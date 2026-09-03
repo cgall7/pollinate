@@ -582,11 +582,13 @@ Slice 1 → store transition, not in Slice 2:**
 - `ENG-84` — **in-app account deletion.** No such path exists in `src/`. App
   Store **5.1.1(v)** is a hard rejection for any app with account creation.
 - `OPS-8` — **close the analytics contradiction before the privacy policy
-  publishes.** `src/constants/legalCopy.js:159,207` currently promises no
+  publishes.** `src/constants/legalCopy.js` — `PRIVACY_POLICY`'s `The short
+  version` body (the analytics sentence) and the first sentence of its `What
+  we do not do` body — currently promises no
   analytics will ever exist, which permanently forecloses the ~~four~~ **five**
   conditions the business rests on *(corrected 2026-08-31 — `C1`–`C5`;
   `POLLINATE_COMB_ROTATION.md` §6 and its own `:92` both say five. Third site
-  in this class today, with Strategy `:412` and `:419`)*. V2 §20.2 has the fix: narrow the promise, do not delete it.
+  in this class today, with Strategy `:412` and `:419`)*. V2 §20.2 has the fix: narrow the promise, do not delete it *(delivered via the COPY-9 arbitrated rewrite in the `ENG-74`/`ENG-75` commit — 2026-09-03 arbitration, `POLLINATE_COMB_ROTATION.md` §8.6 row `0.1`)*.
 
 Also still owed and still unbuilt: **digital export** (§17.4's durability
 promise — no `expo-print` / `expo-sharing` in `package.json`). Physical printing

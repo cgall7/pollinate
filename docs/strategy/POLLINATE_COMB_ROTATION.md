@@ -199,7 +199,7 @@ made an XL estimate carry work that is already done. **New number.**
 
 | ID | Owner | Est | Issue |
 |---|---|---|---|
-| **DES-33** | Deezine | S/M | **The reveal needs tense.** The collective bloom renders today (`PackageOpen.js:511`, `:618-620` — per-entry `authorName`, colophon roster, count-not-content). What it has no notion of is *"this month"* and *"next month, for someone else."* Design the **rotation frame** around the shipped bloom. Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`; **do not rebuild the bloom** |
+| **DES-33** | Deezine | S/M | **The reveal needs tense.** The collective bloom renders today (`PackageOpen` — per-entry `step.authorName`, the `styles.colophon` roster, count-not-content). What it has no notion of is *"this month"* and *"next month, for someone else."* Design the **rotation frame** around the shipped bloom. Spec against `GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md`; **do not rebuild the bloom** |
 
 ### 1B.4 — `ENG-85` needs a per-comb override, or §8.5 detonates in Phase 4.
 
@@ -3094,11 +3094,17 @@ produces a response instead of a re-litigation:**
 | Combs rotate, nobody pays (C1/C3 good, C4 low) | Value real, payer wrong | Move the charge to the artifact or to certainty (`ENG-80`). **Do not cut the price first** |
 | C5 near zero | The daily register does not exist for these users | Do **not** start 19b. `LEGAL-1` and `OPS-3` stay parked |
 
-**This is why the analytics contradiction must close first.**
-`src/constants/legalCopy.js` (:159, :207) promises *"There is no analytics,
-crash-reporting or tracking code in it either"* — a published claim that
-forecloses C1–C5 permanently. V2 §20.2 prescribes the fix: **narrow the promise,
-do not delete it**, and do it **before** the policy publishes. `OPS-8`.
+**This is why the analytics contradiction must close before any measurement ships.**
+`src/constants/legalCopy.js` promises *"There is no analytics,
+crash-reporting or tracking code in it either"* (`PRIVACY_POLICY`'s `The short
+version` body; the first sentence of its `What we do not do` body repeats the
+claim) — a published claim that forecloses C1–C5 permanently. V2 §20.2 prescribes the fix: **narrow the promise,
+do not delete it**, and do it **before** the policy publishes. `OPS-8` — delivered
+per the 2026-09-03 COPY-9 arbitration: text from `OUTBOX/COPY9_LEGALCOPY_REWRITE.md`,
+landing in the same commit as `ENG-74`/`ENG-75` (spec §20.4 obligation 1), never as a
+standalone merge — §8.6 row `0.1` carries the ruled wording. *(This sentence read
+"must close first" until 2026-09-03 — the same inverted ordering verb row `0.1`
+carried; repaired in the same sweep.)*
 
 ---
 
@@ -3173,7 +3179,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 | **ENG-89** | Fizz | M | **Instrument C1–C5** (§6). Extends `ENG-78`, which stays the highest-priority single event |
 | **ENG-93** | Fizz | M | **Create a comb.** NEW (§1B.29). `DES-29`'s happy path *person → occasion → date → invite by link → write* is designed and **built by nobody** — `create_comb`/`createComb` are zero hits in `src/`. Three parts: (a) the create screen + store method (**no migration** — `combs_insert_own` `20260830000002:165` and the owner-seat trigger `:352` are shipped, and `invite_code`'s `gen_random_uuid()` default `:150` is already 122 bits, closing `ENG-59`'s entropy sub-item); (b) **`comb_open_rotation()`** — a `security definer` mint granted to **both** `authenticated` and `service_role`, because `ENG-91` shipped seal-and-send only and **nothing mints a rotation at any month**; month 1 and `OPS-9`'s month N+1 must be the same body or every rotation invariant is written twice (§1B.29.2c). Carries §1B.24.1(c)'s tombstoned-subject refusal, which was filed into a function that does not exist; (c) **the organizer's name-collection gate** — Lumen's ruling `4fdd39e2…`, `ENG-59`'s component remounted with a header swap and *"Create the comb as Maya"*. ~~Depends on `ENG-92`~~ — **corrected §1B.30: `ENG-92` is a cleanup, not a gate.** The definer mint bypasses the `comb_members` WITH CHECK entirely (probed at `0f898ce`, CONTROL `42501` / PROBE succeeds), so the clause `ENG-92` deletes is never evaluated on this path. **Deps: `ENG-58` (done), `ENG-83`.** Two acceptance rows replace the dependency (§1B.30.1): the mint must **not** require the subject to be a `comb_members` row, and it carries the tombstoned-subject refusal |
 | **ENG-91** | Sage | M | **Server-side seal + send for a rotation.** `seal_hive`, `seal_volume` and `send_hive` all gate on `v_owner_id <> auth.uid()`, so **no scheduled job can seal or deliver a month** — `OPS-9` is structurally refused, not merely unwired (§1B.14). Needs a definer path gated on **the rotation's window having closed**, not on who is calling, plus the grants a service role actually holds. **Semantics ruled in §1B.16: seal-and-send, one event, idempotent.** **Cannot wrap `send_hive`** — its friend-connection precondition makes a comb undeliverable; authorization is **comb membership**. **Must refuse to deliver a zero-entry rotation.** **Gates the §1A definition of done** (there is no reveal without a seal) |
-| **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Amend `legalCopy.js:159,207` per V2 §20.2 — narrow the promise, do not delete it. **Blocks `ENG-89`/`ENG-78` from being honest** |
+| **OPS-8** | Lumen + Bumble | S | **Close the analytics contradiction before the privacy policy publishes.** Narrow the two promise sentences — `PRIVACY_POLICY`'s `The short version` body (the analytics sentence) and `What we do not do` body (first sentence) — do not delete them (V2 §20.2). **Superseded as a standalone task 2026-09-03 (COPY-9 arbitration):** text source is the arbitrated rewrite (`OUTBOX/COPY9_LEGALCOPY_REWRITE.md`, per-sentence provenance) — never `bumble/ops8-legalcopy-analytics`'s file, which is parked pre-storage-model-rewrite and would revert `ENG-84`'s changes if merged whole — and it lands in the same commit as `ENG-74`/`ENG-75` per spec §20.4 obligation 1, never as a standalone merge (row `0.1` is the ruled wording). **Blocks `ENG-89`/`ENG-78` from being honest** |
 | **OPS-9** | Bumble | M | **Rotation scheduler.** `pg_cron` jobs to **open a rotation**, fire notifications, seal on `closes_at`, trigger the reveal. `ENG-60`'s runtime. **§1B.31 — the open half is missing from the shipped branch and was routed to `ENG-60` in the migration's own comment; it cannot live there, because `OPS-9` *is* `ENG-60`'s runtime.** Also carries §1B.31's two unruled product decisions now ruled: next subject = `comb_members` by `joined_at` wrapping (skipping closed/tombstoned seats and **nobody else**), and `closes_at + cadence`, never `now() + cadence` |
 | **COPY-13** | Lumen | M | **Ruling sweep.** Retired tokens: `$39.99`, `annual only`/`annual-only`, `$79`, `$5.99`, `metered at delivery`, `delivery is the only meter`, `first delivery free`, `organizer pays` / `organizer[- ]paid` *(amended 2026-08-31: the hyphenated participle is the form every 08-30 defect site actually used — a list carrying only the verb form is blind to the adjective)*, `Slice 1 (still )?ship(s|ping) first` *(added 2026-08-31: a retired sequencing claim. The token was first written `ships first`; widened to the participle the same pass, because `Pollinate_The_Ruling.md`'s **"Unchanged:"** bullet says "Slice 1 shipping first" and is invisible to the verb form — the same blindness as `organizer pays` vs `organizer-paid`, one inflection over. census at `0077dce` with the widened token: 11 hits, 7 machinery, **4 live**, all repaired this pass)*. Follow `README.md`'s sweep procedure — eye-read cited rows, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate," never "zero hits" |
 
@@ -4719,6 +4725,9 @@ that the Privacy Policy mirror the **already-shipped** `DeleteAccount.js:20-23` 
 so the policy is the outlier, not the screen. **@Colin's call is veto-only, not a ruling from
 scratch.** My §1B.36.10 recommendation stands with a shorter fuse: land `OPS-12` in the same
 touch as the copy fix, re-cut against `OPS-8`/`COPY-9`'s parked edits to the same file.
+*(Amended 2026-09-03: overtaken by events — `LEGAL-2` landed at `d584e2c` and `OPS-12`'s
+tripwire at `c82c567`, both ancestors of `main`; `OPS-8`'s edit now rides the
+`ENG-74`/`ENG-75` commit per the COPY-9 arbitration, §8.6 row `0.1`.)*
 
 **Open:** `O3`, `O4`, `O8`, `O9`. No new row, no new `O`.
 
@@ -6144,6 +6153,10 @@ not one `1.6` supplied.
 Doc-only. **Rows `1.6`, `1.8` and `1.9` amended in this same commit** per the
 §1B.36.26 process invariant — the finder's section is not the builder's surface. The `OPS-9` finisher is @Bumble's and is currently unowned in
 practice — `OPS-8`, `OPS-12` and `LEGAL-2` are all parked on one word from @Colin.
+*(Amended 2026-09-03: stale in both directions — `OPS-12` (`c82c567`) and `LEGAL-2`
+(`d584e2c`) are merged ancestors of `main`, and `OPS-8` is no longer parked on Colin:
+per the COPY-9 arbitration it rides the `ENG-74`/`ENG-75` commit, §8.6 row `0.1`. The
+`OPS-9` finisher also landed — row `1.8` closed 2026-08-31.)*
 
 **The transferable rule, third instance tonight:** a merge tells you a diff landed;
 it never tells you a *row* closed. Row `1.8` said "partial" in its own text and
@@ -7139,7 +7152,7 @@ Then I sized the eleven the same way. **The rule I published is about *cells*, a
 
 **Residual, stated rather than claimed at zero: nine bare `:NNN` remain, all of them RECORDS, and the boundary is worth having.** @Lumen's record/citation scope is the right one and it needs one refinement — **the drift risk is a property of the FILE, not of the address.** **Six** of the nine point into **merged migrations** — four in row `1.7` into `…0002` (`comb_member_count`'s WHERE-clause authorization, plus three `revoke execute … from anon` blocks) and two in row `1.8` (`comb_rotations_one_open_per_comb`, re-verified at `…0002:495-496`; and `…0012`'s header). Migrations are append-only and immutable once merged, so those numbers cannot drift and the records need no pin. **Two** point into `check-ops9-rotation-scheduler` — a **script**, mutable, and it moved tonight — and both sit under the explicit `github/main@5d4a2ff` pin added in this commit. The ninth is row `1.6`'s `RotationFrame.js:9-22`, quoted inside the sentence that strikes it.
 
-So the rule lands as: **in a `§8.6` cell, an address is permitted only if it is (a) a construct name, (b) into a merged migration, or (c) carried under an explicit commit pin. Every other address is struck, and a strike is not declared in the same sentence that would perform it — it is performed, then counted.** Construct names throughout: *"`RotationFrame`'s countdown effect"*, *"the `Math.ceil` inside it"*, *"the `<RotationFrame>` element in `PackageOpen`"*, *"`daysSinceHiveCreated`, exported from `src/constants/hivePrompts.js`"* — which also answers @Lumen's path note: the line was right, the **path was never stated**, and the adjacent `src/utils/rotationDays.js` (my own recommendation, now superseded by `R-38.9-C`) invited exactly the sibling reading. Both are gone.
+So the rule lands as: **in a `§8.6` cell, an address is permitted only if it is (a) a construct name, (b) into a merged migration, or (c) carried under an explicit commit pin. Every other address is struck, and a strike is not declared in the same sentence that would perform it — it is performed, then counted.** *(Amended 2026-09-03, Sage's ruling on Vector's census, Lumen encoding: the scope "in a `§8.6` cell" was a container test and is replaced by a functional one — **the rule keys on the cell's FUNCTION, not its container.** In scope: any cell or row, in any `docs/strategy/` document, that instructs a reader to go act on current code — build orders, assignment orders, live-value design references such as `DESIGN_BRIEF_V2_NAVIGATION.md` §A3. Out of scope: cells that record what code said as of a dated ruling — `§1B` evidence tables, strike records — where the line number is part of the measurement. The live counterexample that forced this: an unpinned address in `POLLINATE_V2_ASSIGNMENTS.md`'s `OPS-8` row survived precisely because the container-scoped rule could not see that file.)* Construct names throughout: *"`RotationFrame`'s countdown effect"*, *"the `Math.ceil` inside it"*, *"the `<RotationFrame>` element in `PackageOpen`"*, *"`daysSinceHiveCreated`, exported from `src/constants/hivePrompts.js`"* — which also answers @Lumen's path note: the line was right, the **path was never stated**, and the adjacent `src/utils/rotationDays.js` (my own recommendation, now superseded by `R-38.9-C`) invited exactly the sibling reading. Both are gone.
 
 **`§1B.13`'s extension to source addresses is adopted as @Lumen states it, with their firing moment:** at authoring, every address in a ruling or a cell is either a construct name or carries its commit pin.
 
@@ -7226,7 +7239,7 @@ Rows `1.7`, `1.8` and `2.8` amended in this same commit: six addresses struck to
 
 **Announced (9):** `ENG-92`, `ENG-96`, `ENG-97`, `ENG-98`, `ENG-99`, `DES-38`, `DES-39`, `OPS-11`, `OPS-12`.
 **Reached `§8.6` (3):** `ENG-92`, `DES-39`, `OPS-11`.
-**Never reached it (6):** `ENG-96`, `ENG-97`, `ENG-98`, `DES-38` — plus **`ENG-99`, which shipped anyway** (its trigger is merged in `…0007` Part 7, cited by nine later sections), and **`OPS-12`, which is parked on @Colin with `OPS-8`/`LEGAL-2`**.
+**Never reached it (6):** `ENG-96`, `ENG-97`, `ENG-98`, `DES-38` — plus **`ENG-99`, which shipped anyway** (its trigger is merged in `…0007` Part 7, cited by nine later sections), and **`OPS-12`, which is parked on @Colin with `OPS-8`/`LEGAL-2`**. *(Amended 2026-09-03: the parked clause is stale — `OPS-12` (`c82c567`) and `LEGAL-2` (`d584e2c`) are merged ancestors of `main`; `OPS-8` rides the `ENG-74`/`ENG-75` commit per the COPY-9 arbitration, §8.6 row `0.1`, so none of the three waits on @Colin.)*
 
 `ENG-99` is the instructive one: **a ticket can be minted, ruled on five times, built and merged without ever having a row.** So the ritual is not load-bearing when the ruling and the build share an author and a night — and it is load-bearing for everything else, which is why the four in §3 sat still. Rows `1.14`–`1.18` close the four. `ENG-99` needs no row (record it as shipped-without-one); `OPS-12` is correctly tracked in the open-items table with `LEGAL-2` and needs no `§8.6` cell until @Colin rules.
 
