@@ -26,22 +26,6 @@ import { NectarStore } from '../services/NectarStore';
 import { hasNectarConsent, honeyLevelForDrops, nectarArrivalDrops } from '../constants/nectar';
 import { NectarArrivalState } from '../services/nectarArrivalState';
 
-// Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
-// button and carries it up toward the grid it just joined.
-const SHARE_CARRY_PATH = {
-  translateX: [10, -30],
-  translateY: [10, -60, -130],
-  rotate: ['6deg', '-14deg'],
-};
-
-// Feed arrival: a short touchdown at the top of the feed when a new share
-// lands there on refresh — the bee delivering it into the hive's view.
-const FEED_ARRIVAL_PATH = {
-  translateX: [-50, 30],
-  translateY: [-24, -4, 6],
-  rotate: ['-10deg', '4deg'],
-};
-
 // Real shares go first (center of the spiral, full opacity) so they read as
 // the actual hive; demo members fill the ring behind them so the honeycomb
 // always looks alive even with 0-2 real connections. The seat count lives in
@@ -838,16 +822,19 @@ const HoneycombFeed = () => {
         </View>
       )}
 
-      {todayEntry && !alreadySharedToday && (
+      {todayEntry && (
         <View style={styles.shareButtonAnchor}>
-          <PrimaryButton onPress={handleShareToday} disabled={sharing} style={styles.shareButton}>
-            {sharing ? 'Sharing…' : "Share today's gratitude"}
-          </PrimaryButton>
-          <BeeTransition triggerKey={shareCarryKey} path={SHARE_CARRY_PATH} anchorStyle={styles.shareCarryBeeAnchor} size={16} />
+          <View style={styles.shareActionStage}>
+            {!alreadySharedToday ? (
+              <PrimaryButton onPress={handleShareToday} disabled={sharing} style={styles.shareButton}>
+                {sharing ? 'Sharing…' : "Share today's gratitude"}
+              </PrimaryButton>
+            ) : (
+              <Text style={styles.sharedConfirmation}>Shared to your hive.</Text>
+            )}
+          </View>
+          <BeeTransition triggerKey={shareCarryKey} role="share-carry" anchorStyle={styles.shareCarryBeeAnchor} size={16} />
         </View>
-      )}
-      {todayEntry && alreadySharedToday && (
-        <Text style={styles.sharedConfirmation}>Shared to your hive.</Text>
       )}
 
       {/* §23.9.1 class (Lumen, this thread): emptiness copy reads the
@@ -892,7 +879,7 @@ const HoneycombFeed = () => {
           )
         ) : (
           <View style={styles.feedTopAnchor}>
-            <BeeTransition triggerKey={feedArrivalKey} path={FEED_ARRIVAL_PATH} anchorStyle={styles.feedArrivalBeeAnchor} size={16} />
+            <BeeTransition triggerKey={feedArrivalKey} role="feed-arrival" anchorStyle={styles.feedArrivalBeeAnchor} size={16} />
             {mergedFeed.map((item) =>
               item.kind === 'send' ? (
                 <SendEventCard key={`send-${item.id}`} event={item} />
@@ -1128,6 +1115,11 @@ const styles = StyleSheet.create({
   },
   shareButtonAnchor: {
     marginBottom: 20,
+    position: 'relative',
+  },
+  shareActionStage: {
+    height: 56,
+    justifyContent: 'center',
   },
   shareButton: {
     marginBottom: 0,
@@ -1140,7 +1132,6 @@ const styles = StyleSheet.create({
   sharedConfirmation: {
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
-    marginBottom: 20,
   },
   feedTopAnchor: {
     position: 'relative',

@@ -69,6 +69,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import vm from 'node:vm';
 import { parse } from '@babel/parser';
 import { deriveClearanceBins } from './lib/mascot-clearance.mjs';
 
@@ -642,6 +643,22 @@ console.log('\nD. BeeTransition paths');
 const BEE_TRANSITION = path.join(ROOT, 'src/components/BeeTransition.js');
 const btSource = await readFile(BEE_TRANSITION, 'utf8');
 const btAst = parseJs(btSource);
+let buildBeeTransitionTrack = null;
+try {
+  const rolesSource = await readFile(path.join(ROOT, 'src/components/beeTransitionRoles.js'), 'utf8');
+  const attitudeSource = await readFile(path.join(ROOT, 'src/components/beeAttitude.js'), 'utf8');
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(
+    `${attitudeSource.replace(/export const /g, 'const ').replace(/export /g, '')}\n` +
+      `${rolesSource.replace("import { bankFor, pitchFor } from './beeAttitude';\n\n", '').replace(/export const /g, 'const ').replace(/export /g, '')}\n` +
+      'this.buildBeeTransitionTrack = buildBeeTransitionTrack;',
+    context,
+  );
+  buildBeeTransitionTrack = context.buildBeeTransitionTrack;
+} catch {
+  buildBeeTransitionTrack = null;
+}
 
 // A path object as written in source: `{ translateX: [...], rotate: [...] }`.
 const readPathObject = (node) => {
@@ -738,7 +755,8 @@ walk(btAst.program, (n) => {
         if (a.type !== 'JSXAttribute') return;
         props[a.name.name] = a.value?.expression ?? a.value;
       });
-      // Three cases, and keeping them apart is the point. No `path` prop at
+      // Four cases, and keeping them apart is the point. A named `role`
+      // resolves through BeeTransition's product role table. No `path` prop at
       // all means the component's own default, which this gate has read. A
       // named constant resolves in the file that declares it. An inline
       // object resolves directly. Anything else — an import, a call, a
@@ -749,7 +767,11 @@ walk(btAst.program, (n) => {
       // and the first draft of this block did exactly that.
       let pathName = '(default path)';
       let def = DEFAULT_BT_PATH;
-      if (props.path) {
+      if (props.role?.type === 'StringLiteral' && buildBeeTransitionTrack) {
+        pathName = props.role.value;
+        const track = buildBeeTransitionTrack(pathName);
+        def = { translateX: track.translateX, rotate: track.rotate };
+      } else if (props.path) {
         if (props.path.type === 'Identifier') {
           pathName = props.path.name;
           def = consts.get(pathName) ?? null;
