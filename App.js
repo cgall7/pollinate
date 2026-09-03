@@ -251,7 +251,31 @@ export default function App() {
                     // (P0-2 fix, thread 19e90cf8). This is the one caller with
                     // a real session already — it owns the write now.
                     await EntryStore.saveEntry(new Date(), text, tagEntry(text), paper);
-                    props.navigation.replace('Main');
+                    // Deezine's post-auth nudge ruling (`6f9e87ad`) — the
+                    // one-shot first-save signal, carried through THIS
+                    // navigation rather than through a second mechanism.
+                    //
+                    // SYNCHRONOUS, AND THAT IS THE WHOLE DESIGN. The comment
+                    // below explains why the re-arm sits after this line;
+                    // the same overlay swallows anything else awaited here,
+                    // so the eligibility read and the persisted write both
+                    // live on Today, where the overlay is already gone. This
+                    // adds no I/O to the held animation — it is a param.
+                    //
+                    // It says only "an entry was just persisted", which is
+                    // all this site can honestly say: `saveEntry` is
+                    // upsert-shaped and its update and insert branches return
+                    // the same shape, so a first save and a re-save are
+                    // indistinguishable from here. TodayTab decides
+                    // first-ness against the account's own history.
+                    //
+                    // Nested `screen`/`params`: `Main` is
+                    // `component={MainTabs}`, so a flat param would land on
+                    // the navigator and never reach the tab.
+                    props.navigation.replace('Main', {
+                      screen: 'Today',
+                      params: { entryJustSaved: true },
+                    });
                     // §4.1's save-side re-arm, and it sits AFTER the
                     // navigation on purpose (Sage, 250bc4e9). This promise is
                     // the honey unlock's own: CoreRitual holds the unlocking

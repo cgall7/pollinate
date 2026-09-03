@@ -1,52 +1,9 @@
-// Gate for One Door — the onboarding rebuild (PLANS/ONBOARDING_ONE_DOOR_SPEC.md,
-// Lumen 2026-08-17, amended the same day).
+// Gate for the zero-onboarding Account Gate.
 //
-//   npm run check:onboarding-flow
-//
-// WHY THIS EXISTS
-//
-// One Door collapsed nine screens and two forks into five beats, and added
-// the app's first writer for Private Hives. Three of the properties it turns
-// on cannot be seen by any existing gate, and two of them are the kind that
-// fail silently — nobody watches a buffer not being written.
-//
-//   C6 (Sage, 2026-08-17). `AccountStep.handleSubmit` has three exits and,
-//   before this change, only two of them flushed the buffered first entry.
-//   The third — signUp returns no session, the confirm-your-email screen,
-//   `onNext` straight to `finish()` — navigated away with the write never
-//   performed, and the session-effect flush could not rescue it because it
-//   is gated on still being ON the account step. That path is DORMANT, and
-//   the thing keeping it dormant is not in this repository: production has
-//   `mailer_autoconfirm: true`, a dashboard toggle, no diff, one person.
-//   Turning email confirmation on before a public TestFlight arms it.
-//
-//   So a gate here cannot test the confirm-sent path's behaviour — the
-//   condition that reaches it is unreachable from this tree. It asserts the
-//   STRUCTURE that makes the path survivable instead.
-//
-// THE INVARIANT IS "NO EXIT MAY DROP THE BUFFER", NOT "EVERY EXIT MUST
-// WRITE IT". That distinction is the whole design. The confirm-sent exit
-// deliberately does not write: there is no session, which is the entire
-// reason it exists. What makes it safe is that the buffer is DURABLE at
-// COLLECTION time and the flush is fired by the SESSION'S ARRIVAL, from
-// AuthContext, in whatever process is running when the user follows the
-// link. So the three structural facts, each asserted separately:
-//
-//   (a) both collection sites write through to the durable store;
-//   (b) the durable store actually reaches AsyncStorage from both;
-//   (c) a flush fires from the session's arrival, outside the screen.
-//
-// Break any one and the confirm-sent path silently drops an answer again.
-//
-// WHY THE SPARK REGISTER IS IN HERE. B1–B3 moved into the prompt deck, and
-// a spark is never rendered alone — CoreRitual composes it into
-// `I am grateful for ${spark}.` So a spark that leads with a capital or a
-// preposition lands as broken grammar the user has to repair. Measured over
-// the deck before this change: 60/60 lowercase, 0/60 leading preposition —
-// an invariant the deck already held and nothing enforced. The twelve new
-// sparks arrived violating it 12/12, which is why it is enforced now.
-// check-copy-rules cannot see this: it asks whether a word is forbidden,
-// not whether a fragment composes.
+// The approved 2026-09-03 direction retires the legacy multi-step flow
+// instead of redesigning its steps. A signed-out user sees one Account Gate,
+// authenticates, and lands directly on Today. Product nouns and name
+// collection stay contextual to the objects/actions that need them.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
@@ -64,8 +21,6 @@ const bad = (label, detail) => {
   failures.push(`${label} — ${detail}`);
   console.log(`  FAIL ${label} — ${detail}`);
 };
-// Every assertion states WHAT WAS CHECKED, never the verdict — a name
-// written for the passing case inverts its own meaning on failure.
 const check = (label, actual, want) => {
   const a = JSON.stringify(actual);
   const w = JSON.stringify(want);
@@ -77,7 +32,6 @@ const read = (rel) => readFile(path.join(ROOT, rel), 'utf8');
 const ast = async (rel) =>
   parse(await read(rel), { sourceType: 'module', plugins: ['jsx', 'typescript'] });
 
-// Depth-first walk yielding every node.
 const walk = (node, visit) => {
   if (!node || typeof node.type !== 'string') return;
   visit(node);
@@ -89,9 +43,6 @@ const walk = (node, visit) => {
   }
 };
 
-// Finds a named function/arrow declaration's body, by ROLE (the binding
-// name it is declared under), never by an identifier that merely appears
-// inside it.
 const bodyOfBinding = (tree, name) => {
   let found = null;
   walk(tree.program, (node) => {
@@ -105,7 +56,6 @@ const bodyOfBinding = (tree, name) => {
   return found;
 };
 
-// `Obj.method(` anywhere inside a subtree.
 const callsMember = (subtree, objectName, propertyName) => {
   let found = false;
   walk(subtree, (node) => {
@@ -121,441 +71,120 @@ const callsMember = (subtree, objectName, propertyName) => {
 
 const onboardingSrc = await read('src/screens/Onboarding.js');
 const onboarding = await ast('src/screens/Onboarding.js');
-const pending = await ast('src/services/pendingOnboardingWrites.js');
 const auth = await ast('src/contexts/AuthContext.js');
 
-console.log('\n── A. one flow, five beats, nothing orphaned ──');
+console.log('\n── A. legacy onboarding is retired, not redesigned ──');
 
-// The step constants are ENUMERATED off the source, never typed here: a
-// gate that hardcodes the beats it expects passes by being blind to a beat
-// that was added or removed.
 const stepConsts = [];
+const legacyBindings = [];
 walk(onboarding.program, (node) => {
-  if (node.type !== 'VariableDeclarator') return;
-  if (node.id?.type !== 'Identifier' || !/^STEP_[A-Z]+$/.test(node.id.name)) return;
-  if (node.init?.type !== 'NumericLiteral') return;
-  stepConsts.push({ name: node.id.name, value: node.init.value });
-});
-
-check('walker control: Onboarding.js declares at least one STEP_ constant', stepConsts.length > 0, true);
-check(
-  'the STEP_ constants are a contiguous run from 0 (a gap is a beat that cannot be reached by next())',
-  stepConsts.map((s) => s.value).sort((a, b) => a - b),
-  stepConsts.map((_, i) => i)
-);
-
-// Every declared beat must appear as a case in the controller's switch, or
-// be the one the default arm serves. Otherwise a constant is a beat the
-// flow declares and never renders.
-const switchTests = [];
-let defaultArms = 0;
-walk(onboarding.program, (node) => {
-  if (node.type !== 'SwitchStatement') return;
-  for (const c of node.cases) {
-    if (!c.test) defaultArms += 1;
-    else if (c.test.type === 'Identifier') switchTests.push(c.test.name);
+  if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
+    if (/^STEP_[A-Z]+$/.test(node.id.name)) stepConsts.push(node.id.name);
+    if (/^(LandingStep|FirstEntryStep|CelebrationStep|WhoStep|AccountStep)$/.test(node.id.name)) {
+      legacyBindings.push(node.id.name);
+    }
   }
 });
-const declared = stepConsts.map((s) => s.name);
-const unrendered = declared.filter((n) => !switchTests.includes(n));
+
+check('Onboarding.js declares no STEP_ beat constants', stepConsts, []);
+check('legacy screen components are absent from Onboarding.js', legacyBindings, []);
+check('Onboarding.js has no controller switch over beats', /SwitchStatement/.test(JSON.stringify(onboarding.program)), false);
+check('Onboarding.js no longer imports PendingOnboardingWrites', /PendingOnboardingWrites/.test(onboardingSrc), false);
+check('Onboarding.js no longer imports getDailyPrompt', /getDailyPrompt/.test(onboardingSrc), false);
+check('Onboarding.js no longer imports HoneycombJourneyMap', /HoneycombJourneyMap/.test(onboardingSrc), false);
+check('Onboarding.js no longer renders the old Begin CTA', />Begin</.test(onboardingSrc), false);
+check('Onboarding.js no longer asks the pre-auth Who question', /Who's this year for\?/.test(onboardingSrc), false);
+check('Onboarding.js no longer collects a pre-auth display name', /placeholder="Your name"/.test(onboardingSrc), false);
+
+console.log('\n── B. Account Gate copy and actions ──');
+
+for (const required of [
+  'One good thing is enough.',
+  'Write one line. Keep it private. Share only what you choose.',
+  'Continue with Apple',
+  'Use email instead',
+  'Continue with email',
+  'Email me a link',
+  'Use password instead',
+  'We’ll send a secure link. No password needed.',
+  'Check your email.',
+]) {
+  check(`renders canonical copy: ${required}`, onboardingSrc.includes(required), true);
+}
+
 check(
-  'walker control: the controller has exactly one switch with a default arm',
-  defaultArms,
-  1
+  'withdrawn CTA is absent: Email me a secure link.',
+  onboardingSrc.includes('Email me a secure link.'),
+  false
 );
 check(
-  'every declared STEP_ constant is either a case in the controller switch or the single one left to default',
-  unrendered.length <= 1,
+  'pre-save failure copy speaks of a line, not an entry',
+  onboardingSrc.includes("Couldn't send the link. Your email is still here."),
   true
 );
 
-// The forks are gone, and stay gone. Named for what they were: a flow
-// letter and the module that persisted the choice.
+const primaryLabels = [...onboardingSrc.matchAll(/label:\s*busy \? '[^']+' : ([^,\n]+)/g)].map((m) => m[1].trim());
 check(
-  'Onboarding.js imports no onboarding-flow persistence module (the forks are deleted, not disabled)',
-  /from '\.\.\/services\/devSettings'/.test(onboardingSrc),
-  false
+  'each actionable auth state has exactly one primary label expression',
+  primaryLabels,
+  ["'Continue with Apple'", "emailPrimary ? 'Continue with email' : 'Email me a link'", "'Sign in'"]
 );
-const flowIdentifiers = [];
-walk(onboarding.program, (node) => {
-  if (node.type === 'Identifier' && /^(flow|initialFlow|isBeliefStep|BELIEF_START)$/.test(node.name)) {
-    flowIdentifiers.push(node.name);
-  }
-});
-check('Onboarding.js carries no flow-fork bindings', [...new Set(flowIdentifiers)], []);
+const emailLinkStart = onboardingSrc.indexOf('if (emailLinkSent)');
+const emailLinkEnd = onboardingSrc.indexOf('\n\n  return (', emailLinkStart + 1);
+const emailLinkBlock = emailLinkStart >= 0 && emailLinkEnd > emailLinkStart
+  ? onboardingSrc.slice(emailLinkStart, emailLinkEnd)
+  : '';
+check('walker control: email-link-sent wait-state block is found', emailLinkBlock.length > 0, true);
+check('email-link-sent wait state renders no PrimaryButton', /<PrimaryButton/.test(emailLinkBlock), false);
 
-console.log('\n── B. C6: no exit of AccountStep may drop the buffer ──');
+console.log('\n── C. auth completion still routes through the app boundary ──');
 
-// (a) Both collection sites write through to the durable store. Resolved
-// by BINDING NAME through the handler the JSX passes, not by grepping the
-// file for the store's name — a file-level mention proves nothing about
-// which handler does the writing.
-for (const [handler, method] of [
-  ['handleSaveEntry', 'stashEntry'],
-  ['handleAnswerWho', 'stashHive'],
+const finishBody = bodyOfBinding(onboarding, 'finish');
+check('finish resolves in Onboarding.js', !!finishBody, true);
+if (finishBody) {
+  check('finish marks onboarding complete for future cold starts', callsMember(finishBody, 'OnboardingState', 'markComplete'), true);
+  let callsOnDone = false;
+  walk(finishBody, (node) => {
+    if (node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'onDone') {
+      callsOnDone = true;
+    }
+  });
+  check('finish calls onDone so App.js owns Today/invite routing', callsOnDone, true);
+}
+
+for (const [handler, storeCall] of [
+  ['handleAppleSignIn', 'signInWithApple'],
+  ['handleEmailLink', 'signInWithOtp'],
+  ['handlePasswordSignIn', 'signIn'],
+  ['handleContinueAsDemo', 'signIn'],
 ]) {
   const body = bodyOfBinding(onboarding, handler);
-  if (!body) {
-    bad(
-      `${handler} resolves to a function in Onboarding.js`,
-      'binding not found or not a function — renamed? A row that cannot resolve its subject is a FAIL, not a pass'
-    );
-  } else {
-    ok(`${handler} resolves to a function in Onboarding.js`);
-    check(
-      `${handler} calls PendingOnboardingWrites.${method} (the answer is durable at collection time)`,
-      callsMember(body, 'PendingOnboardingWrites', method),
-      true
-    );
-  }
+  check(`${handler} resolves in Onboarding.js`, !!body, true);
+  if (body) check(`${handler} calls HoneycombStore.${storeCall}`, callsMember(body, 'HoneycombStore', storeCall), true);
 }
 
-// (b) The store reaches disk. Both stashers funnel through `write`, so the
-// chain is asserted link by link — each link's subject is the name the
-// PREVIOUS link resolved, never a typed string.
-const persistBody = bodyOfBinding(pending, 'persist');
-const writeBody = bodyOfBinding(pending, 'write');
-check('pendingOnboardingWrites declares a persist helper', !!persistBody, true);
-check('pendingOnboardingWrites declares a write helper', !!writeBody, true);
-if (persistBody && writeBody) {
-  check(
-    'persist calls AsyncStorage.setItem (the buffer survives the process, which is the whole fix)',
-    callsMember(persistBody, 'AsyncStorage', 'setItem'),
-    true
-  );
-  let writeCallsPersist = false;
-  walk(writeBody, (node) => {
-    if (node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'persist') {
-      writeCallsPersist = true;
-    }
-  });
-  check('write reaches persist', writeCallsPersist, true);
-}
-for (const stasher of ['stashEntry', 'stashHive']) {
-  let body = null;
-  walk(pending.program, (node) => {
-    if (node.type !== 'ObjectMethod' && node.type !== 'ObjectProperty') return;
-    if (node.key?.type !== 'Identifier' || node.key.name !== stasher) return;
-    body = node.type === 'ObjectMethod' ? node.body : node.value?.body;
-  });
-  if (!body) {
-    bad(`${stasher} resolves to a method on the store`, 'not found — renamed or reshaped');
-  } else {
-    let callsWrite = false;
-    walk(body, (node) => {
-      if (node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'write') {
-        callsWrite = true;
-      }
-    });
-    check(`${stasher} reaches write (and therefore disk)`, callsWrite, true);
-  }
-}
-
-// (c) The flush fires from the session's arrival, OUTSIDE the screen that
-// collected the buffer. This is the leg that catches the confirm-sent exit:
-// by the time that session exists, Onboarding is unmounted.
 let authFlushSites = 0;
 walk(auth.program, (node) => {
-  if (node.type === 'CallExpression') {
-    const c = node.callee;
-    if (
-      c?.type === 'MemberExpression' &&
-      c.object?.type === 'Identifier' &&
-      c.object.name === 'PendingOnboardingWrites' &&
-      c.property?.type === 'Identifier' &&
-      c.property.name === 'flush'
-    ) {
-      authFlushSites += 1;
-    }
-  }
-});
-check(
-  'AuthContext flushes the pending writes when a session appears (the only leg that can reach the confirm-sent exit)',
-  authFlushSites > 0,
-  true
-);
-
-// And the screen must not hold a private second copy that shadows it.
-const componentRefs = [];
-walk(onboarding.program, (node) => {
-  if (node.type !== 'VariableDeclarator') return;
-  if (node.id?.type !== 'Identifier' || !/pending/i.test(node.id.name)) return;
-  if (node.init?.type === 'CallExpression' && node.init.callee?.name === 'useRef') {
-    componentRefs.push(node.id.name);
-  }
-});
-check(
-  'Onboarding.js holds no useRef buffer of its own (a ref cannot survive the unmount the confirm-sent exit causes)',
-  componentRefs,
-  []
-);
-
-console.log('\n── C. the two failures are not symmetric ──');
-
-// flush() must report the two outcomes SEPARATELY, and the account screen
-// must consume the hive half. A single boolean would collapse "rewrite it
-// tomorrow" and "the name you gave is gone" into one word.
-const pendingSrc = await read('src/services/pendingOnboardingWrites.js');
-for (const key of ['entryFailed', 'hiveFailed']) {
-  check(`flush()'s result carries ${key}`, new RegExp(`\\b${key}\\b`).test(pendingSrc), true);
-}
-// BOTH member-access node types. The first draft asked only for
-// `MemberExpression` and went red on correct code: the call site reads
-// `outcome?.hiveFailed`, which Babel parses as `OptionalMemberExpression` —
-// a different node type in the same role. Matching a role by one of its
-// node types is the same error as matching it by one of its names.
-let readsHiveFailed = false;
-walk(onboarding.program, (node) => {
-  if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') return;
-  if (node.property?.type === 'Identifier' && node.property.name === 'hiveFailed') readsHiveFailed = true;
-});
-check(
-  'Onboarding.js reads .hiveFailed off the flush result (a failed hive write reaches a screen, not just a console)',
-  readsHiveFailed,
-  true
-);
-
-console.log('\n── D. the belief copy landed, and composes ──');
-
-// prompts.js is dependency-free, so this is the real module, sampled over
-// its domain — not a regex over its source.
-const prompts = await import(path.join(ROOT, 'src/constants/prompts.js'));
-const { DAILY_PROMPTS, FIRST_DAYS_PROMPTS, getDailyPrompt } = prompts;
-
-check('walker control: the rotation deck is non-empty', DAILY_PROMPTS.length > 0, true);
-check('the first-days deck has one prompt per belief screen (B1-B3)', FIRST_DAYS_PROMPTS.length, 3);
-
-// Sample the FUNCTION over its domain rather than checking three literals:
-// seniority 0..2 must come from the first-days deck, everything else and
-// "cannot tell" must come from the rotation.
-const anchor = new Date(2026, 7, 17);
-const seniorityHits = [];
-for (let d = 0; d < FIRST_DAYS_PROMPTS.length; d += 1) {
-  if (getDailyPrompt(anchor, d) === FIRST_DAYS_PROMPTS[d]) seniorityHits.push(d);
-}
-check(
-  'every seniority day inside the first-days deck returns that deck, in order',
-  seniorityHits,
-  FIRST_DAYS_PROMPTS.map((_, i) => i)
-);
-const fallthrough = [null, undefined, -1, 3, 4, 400, 1.5, '0'];
-const wrongFallthrough = fallthrough.filter((v) => !DAILY_PROMPTS.includes(getDailyPrompt(anchor, v)));
-check(
-  'every seniority outside the deck (including unknown, negative and non-integer) falls through to the rotation',
-  wrongFallthrough,
-  []
-);
-
-// THE COMPOSITION CONTRACT. A spark is set into `I am grateful for ${spark}.`
-// at CoreRitual.js and `I'm grateful for ${spark}.` in Onboarding.js, so it
-// must be a lowercase noun phrase. Enumerated over BOTH decks — a rule that
-// only covered the new deck would have missed the deck it was derived from.
-const allSparks = [...DAILY_PROMPTS, ...FIRST_DAYS_PROMPTS].flatMap((p) => p.sparks ?? []);
-check('walker control: the decks contribute sparks', allSparks.length > 0, true);
-check(
-  'no spark starts with a capital (it is composed mid-sentence, after "I am grateful for")',
-  allSparks.filter((s) => /^[A-Z]/.test(s)),
-  []
-);
-check(
-  'no spark starts with a preposition (it is composed as the OBJECT of "for", not a phrase after it)',
-  allSparks.filter((s) => /^(in|on|at|with|by|for|from|to|of)\b/i.test(s)),
-  []
-);
-// A repeated chip reads as a rendering bug, not as a second suggestion —
-// and the row a user sees is four chips wide, so a duplicate inside one deck
-// is visible in a single glance. The decks are duplicate-free today and that
-// state was held by nothing: the first recut of B2 proposed a spark already
-// sitting in the same array, and it survived on a reviewer's eyes. Enumerated
-// globally rather than per-deck, because day 1 and day 40 are two screens the
-// same user sees, and the assertion reports the STRINGS, not a count, so the
-// failure names the chip instead of the arithmetic.
-const sparkCounts = new Map();
-for (const s of allSparks) sparkCounts.set(s, (sparkCounts.get(s) ?? 0) + 1);
-check(
-  'no spark string appears twice across the decks (a repeated chip reads as a bug)',
-  [...sparkCounts].filter(([, n]) => n > 1).map(([s]) => s),
-  []
-);
-check(
-  'every prompt carries at least one spark',
-  [...DAILY_PROMPTS, ...FIRST_DAYS_PROMPTS].filter((p) => !p.sparks?.length).map((p) => p.question),
-  []
-);
-
-console.log('\n── D2. hive prompt ladders inherit the spark contract, and the selector is pure (ENG-44/45/45.4) ──');
-
-// hivePrompts.js is the Project 16 prompt engine (spec §16.2-16.3). Its
-// ladders start empty — COPY-1 (Lumen) has not landed yet — so most of
-// this section is vacuously true today. That is correct: the point is
-// CI catches a contract violation the moment copy lands, not that this
-// gate has something to fail on right now.
-const hivePromptsAst = await ast('src/constants/hivePrompts.js');
-const hivePrompts = await import(path.join(ROOT, 'src/constants/hivePrompts.js'));
-const {
-  HIVE_PROMPT_LADDERS,
-  RELATIONSHIP_TO_REGISTER,
-  registerForRelationship,
-  selectHivePrompt,
-} = hivePrompts;
-
-const EXPECTED_HIVE_BUCKETS = {
-  child: ['0-1', '1-3', '3-7', '7-12', '12-18', '18+'],
-  partner: ['0-1y', '1-3y', '3-10y', '10y+'],
-  parent: ['new', 'established'],
-  friend: ['new', 'established'],
-};
-check(
-  'walker control: all 4 prompt registers exist (spec §16.2)',
-  Object.keys(HIVE_PROMPT_LADDERS).sort(),
-  Object.keys(EXPECTED_HIVE_BUCKETS).sort()
-);
-for (const [register, buckets] of Object.entries(EXPECTED_HIVE_BUCKETS)) {
-  check(
-    `${register} ladder has exactly its spec §16.3 age buckets`,
-    Object.keys(HIVE_PROMPT_LADDERS[register] ?? {}),
-    buckets
-  );
-}
-check(
-  'every DB relationship value (spec §16.1: 7 values) maps to one of the 4 registers',
-  Object.entries(RELATIONSHIP_TO_REGISTER).filter(([, register]) => !EXPECTED_HIVE_BUCKETS[register]),
-  []
-);
-check(
-  'sibling/mentor/other fall back to friend (spec §16.2)',
-  ['sibling', 'mentor', 'other'].map((r) => registerForRelationship(r)),
-  ['friend', 'friend', 'friend']
-);
-
-// THE COMPOSITION CONTRACT, inherited verbatim from prompts.js (spec §16.2):
-// same three rules, enumerated across every register and bucket at once —
-// a duplicate spark in child/0-1 and friend/new is just as visible to a
-// user who owns both hives as a duplicate inside one deck.
-const allHiveSparks = Object.values(HIVE_PROMPT_LADDERS)
-  .flatMap((ladder) => Object.values(ladder).flat())
-  .flatMap((p) => p.sparks ?? []);
-check(
-  'no hive spark starts with a capital (composed mid-sentence, after "I am grateful for")',
-  allHiveSparks.filter((s) => /^[A-Z]/.test(s)),
-  []
-);
-check(
-  'no hive spark starts with a preposition (composed as the OBJECT of "for")',
-  allHiveSparks.filter((s) => /^(in|on|at|with|by|for|from|to|of)\b/i.test(s)),
-  []
-);
-const hiveSparkCounts = new Map();
-for (const s of allHiveSparks) hiveSparkCounts.set(s, (hiveSparkCounts.get(s) ?? 0) + 1);
-check(
-  'no hive spark string repeats across any register/bucket',
-  [...hiveSparkCounts].filter(([, n]) => n > 1).map(([s]) => s),
-  []
-);
-check(
-  'every hive prompt that exists carries at least one spark',
-  Object.values(HIVE_PROMPT_LADDERS)
-    .flatMap((ladder) => Object.values(ladder).flat())
-    .filter((p) => !p.sparks?.length)
-    .map((p) => p.question),
-  []
-);
-
-// Spec §16.3: "No AsyncStorage state, no server round-trip". Walked over
-// the AST rather than grepped raw text — this file's own comments name
-// AsyncStorage in prose (to state the invariant), which a text regex
-// would mistake for a violation.
-let touchesAsyncStorageOrNetwork = false;
-walk(hivePromptsAst.program, (node) => {
-  if (node.type === 'ImportDeclaration' && /AsyncStorage/.test(node.source?.value ?? '')) {
-    touchesAsyncStorageOrNetwork = true;
-  }
   if (node.type !== 'CallExpression') return;
-  const callee = node.callee;
-  if (callee?.type === 'Identifier' && callee.name === 'fetch') touchesAsyncStorageOrNetwork = true;
-  if (callee?.type === 'MemberExpression' && callee.object?.type === 'Identifier') {
-    if (['AsyncStorage', 'supabase'].includes(callee.object.name)) touchesAsyncStorageOrNetwork = true;
+  const c = node.callee;
+  if (c?.type === 'MemberExpression' && c.object?.name === 'PendingOnboardingWrites' && c.property?.name === 'flush') {
+    authFlushSites += 1;
   }
 });
-check(
-  'selector source touches neither AsyncStorage nor a network call (spec §16.3)',
-  touchesAsyncStorageOrNetwork,
-  false
-);
+check('AuthContext still owns legacy durable-buffer flushing on session arrival', authFlushSites > 0, true);
 
-// The formula itself (spec §16.3), exercised against a throwaway 3-entry
-// fixture monkey-patched into friend/new — this has to hold before COPY-1
-// lands too, since ENG-45.2 builds against the selector, not the copy.
-const fixtureLadder = [
-  { question: 'a', sparks: ['x'] },
-  { question: 'b', sparks: ['y'] },
-  { question: 'c', sparks: ['z'] },
-];
-const originalFriendNew = HIVE_PROMPT_LADDERS.friend.new;
-HIVE_PROMPT_LADDERS.friend.new = fixtureLadder;
-const sameDayPicks = [0, 1, 2, 3, 4, 5, 6].map((hiveAgeDays) =>
-  selectHivePrompt({ hiveId: 'fixture-hive', relationship: 'friend', hiveAgeDays, cadenceDays: 7 })
-);
-check(
-  'the selector holds steady for a full cadence window, then advances (no jumping, spec §16.3)',
-  new Set(sameDayPicks).size,
-  1
-);
-const nextWindowPick = selectHivePrompt({
-  hiveId: 'fixture-hive',
-  relationship: 'friend',
-  hiveAgeDays: 7,
-  cadenceDays: 7,
-});
-check(
-  'a same-day re-render selects the identical prompt (pure function, no hidden state)',
-  selectHivePrompt({ hiveId: 'fixture-hive', relationship: 'friend', hiveAgeDays: 3, cadenceDays: 7 }),
-  sameDayPicks[3]
-);
-// A +1 step mod a length-3 ladder can never land back on the same index,
-// so this is a guarantee for this fixture, not a probabilistic sample.
-check('crossing into the next cadence window always selects a different prompt', nextWindowPick, fixtureLadder[2]);
-check(
-  'a different hive_id can select a different prompt at the same age (per-hive variety, spec §16.3)',
-  selectHivePrompt({ hiveId: 'other-hive-id', relationship: 'friend', hiveAgeDays: 0, cadenceDays: 7 }) !== null,
-  true
-);
-HIVE_PROMPT_LADDERS.friend.new = originalFriendNew;
+console.log('\n── D. progressive disclosure and platform rules ──');
 
-console.log('\n── E. the progress map claims the length the flow has ──');
-
-// A progress map is a claim about how much is left. Six cells over a
-// five-beat flow says "five more to go" on the first screen of a flow with
-// four, and draws two cells nothing can ever fill.
-const mapAst = await ast('src/components/HoneycombJourneyMap.js');
-let stageOrder = null;
-let stageLabels = null;
-walk(mapAst.program, (node) => {
-  if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') return;
-  if (node.init?.type !== 'ArrayExpression') return;
-  const values = node.init.elements.map((e) => (e?.type === 'StringLiteral' ? e.value : null));
-  if (values.some((v) => v === null)) return;
-  if (node.id.name === 'STAGE_ORDER') stageOrder = values;
-  if (node.id.name === 'STAGE_LABELS') stageLabels = values;
-});
-check('walker control: STAGE_ORDER resolves to a literal array of strings', Array.isArray(stageOrder), true);
-if (stageOrder) {
-  check('STAGE_ORDER has one cell per declared beat', stageOrder.length, stepConsts.length);
-  check('STAGE_LABELS pairs one-to-one with STAGE_ORDER', stageLabels?.length ?? -1, stageOrder.length);
-
-  // Every stage a step actually asks for must exist in the map, or that
-  // step silently renders cell 0 as current (indexOf -> -1 -> clamped to 0).
-  const requestedStages = [...onboardingSrc.matchAll(/stage="([a-z]+)"/g)].map((m) => m[1]);
-  check('walker control: Onboarding.js requests at least one stage', requestedStages.length > 0, true);
-  check(
-    'every stage Onboarding.js requests exists in STAGE_ORDER (an unknown stage silently lights cell 0)',
-    [...new Set(requestedStages)].filter((s) => !stageOrder.includes(s)),
-    []
-  );
-}
+check('Apple availability is probed only on iOS', /if \(Platform\.OS !== 'ios'\) return;/.test(onboardingSrc), true);
+check('Apple is sole primary only in the choice state', /const applePrimary = appleAvailable && mode === AUTH_CHOICE;/.test(onboardingSrc), true);
+check('email is sole primary in the choice state when Apple is unavailable', /const emailPrimary = !appleAvailable && mode === AUTH_CHOICE;/.test(onboardingSrc), true);
+check('password is a tertiary link, not an initial primary', /Use password instead/.test(onboardingSrc), true);
+check('invite start opens the email-link state', /if \(startAt === 'invite'\) setMode\(AUTH_EMAIL_LINK\);/.test(onboardingSrc), true);
+check('demo skip stays build-gated by DEMO_CONTENT', /\{DEMO_CONTENT && \(/.test(onboardingSrc), true);
+check('demo login requires configured demo email inside the demo-only branch', /DEMO_CONTENT && \([\s\S]*DEMO_LOGIN_EMAIL && \(/.test(onboardingSrc), true);
 
 console.log(`\ncheck-onboarding-flow: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
-  failures.forEach((f) => console.log(`  - ${f}`));
+  for (const f of failures) console.log(`  - ${f}`);
   process.exit(1);
 }
