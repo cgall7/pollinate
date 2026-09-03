@@ -47,6 +47,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+// The expected-grant table lives in lib/ so the manual prod probe can read it
+// without this file's embedded-Postgres boot; see that module's header.
+import { DEFINER_GRANTS } from './lib/definer-grants.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS = path.join(ROOT, 'supabase/migrations');
@@ -365,85 +368,28 @@ async function main() {
   // so a function that never got an explicit revoke is not "ungranted",
   // it's silently open, and the only way to know is to ask the catalog.
   //
-  // EXPECTED_DEFINER_GRANTS below generalizes ALLOWED_ANON_DEFINERS to all
-  // three client-facing roles, asserted `==` (not just "not more than") in
-  // both directions, for every SECURITY DEFINER function in `public` — not
-  // just the ones a migration happened to touch. Two failure classes this
-  // catches that the anon-only check could not: (1) `extra` — a role can
-  // execute a function nothing here expects, whether from a genuinely new
-  // grant or a lost revoke on an old one; (2) `missing` — an expected grant
-  // (e.g. one of the four anon exceptions above) silently regressed, which
-  // for `is_hive_contributor`/`is_volume_open`/`owns_entry` would resurrect
-  // the exact inlining 500 those three migrations closed. A function with
-  // no row at all is also a failure — a new definer ships un-reviewed
-  // otherwise, which is the condition this whole gate exists to end.
-  //
-  // A TRIGGER function's grant is inert — Postgres refuses `select
-  // fn()`/`rpc/fn` on it directly ("trigger functions can only be called as
-  // triggers") regardless of what the catalog says — but its row still
-  // names the true grant state rather than being left out, because a
-  // silent row is exactly how `entries_mark_shared` and `handle_new_user`
-  // (authenticated-open via the un-revoked default privilege, no explicit
-  // grant statement, no comment) diverged unnoticed from the three sibling
-  // trigger functions that got an explicit — if redundant — grant written
-  // down (Vector's own measurement: "written by pattern, not per-function
-  // decision"). Being inert is why this is not a leak; it is still a fact
-  // the map has to state, not infer.
-  //
-  // `why` is one line, the standard the four anon paragraphs above already
-  // set: enough to tell a reviewer this was decided, not defaulted into.
-  const EXPECTED_DEFINER_GRANTS = new Map([
-    // -- anon-callable by name: the four exceptions argued in full above --
-    ['comb_preview_by_invite_code(text)', { roles: ['anon', 'authenticated', 'service_role'], why: 'DES-37 pre-auth invite landing — anon-callable by design, argued above' }],
-    ['is_hive_contributor(uuid)', { roles: ['anon', 'authenticated', 'service_role'], why: 'inlining-leak fix, named exception above' }],
-    ['is_volume_open(uuid)', { roles: ['anon', 'authenticated', 'service_role'], why: 'inlining-leak fix, named exception above' }],
-    ['owns_entry(uuid)', { roles: ['anon', 'authenticated', 'service_role'], why: 'inlining-leak fix, named exception above' }],
-
-    // -- ordinary logged-in RPCs / RPC helpers: anon revoked, authenticated needs a session --
-    ['comb_co_member_names(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster-name RPC, requires a session' }],
-    ['comb_join_by_invite_code(text)', { roles: ['authenticated', 'service_role'], why: 'ENG-59 post-auth join, requires a session' }],
-    ['comb_member_count(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster-count RPC, requires a session' }],
-    ['comb_open_rotation(uuid,uuid,timestamp with time zone)', { roles: ['authenticated', 'service_role'], why: 'ENG-93 organizer mint (authenticated) + advance_due_rotations cron (service_role)' }],
-    ['comb_rotation_roster(uuid)', { roles: ['authenticated', 'service_role'], why: 'roster RPC, requires a session' }],
-    ['comb_rotation_writer_count(uuid)', { roles: ['authenticated', 'service_role'], why: 'ENG-92 Part 2, C1 denominator RPC, requires a session (see §1B.23.2\'s caveat: only accurate for a subject who is a comb member)' }],
-    ['consent_to_nectar()', { roles: ['authenticated', 'service_role'], why: 'nectar consent RPC, requires a session' }],
-    ['delete_own_account()', { roles: ['authenticated', 'service_role'], why: 'ENG-84 self-service deletion, requires a session' }],
-    ['find_connectable_profile(text)', { roles: ['authenticated', 'service_role'], why: 'account-lookup RPC; anon revoked 20260813000005 (account-existence oracle)' }],
-    ['is_comb_member(uuid)', { roles: ['authenticated', 'service_role'], why: 'membership-check RPC helper, requires a session' }],
-    ['plant_seed(uuid,text,timestamp with time zone)', { roles: ['authenticated', 'service_role'], why: 'seed-planting RPC, requires a session' }],
-    ['profile_has_display_name(uuid)', { roles: ['authenticated', 'service_role'], why: 'invite-time display-name guard RPC helper, requires a session' }],
-    ['record_zap(uuid,nectar_zap_target_kind,uuid,bigint)', { roles: ['authenticated', 'service_role'], why: 'nectar zap RPC, requires a session' }],
-    ['send_comb_nectar_note(uuid,uuid,uuid,text,bigint)', { roles: ['authenticated', 'service_role'], why: 'ENG-90 comb nectar-note send RPC, requires a session' }],
-    ['seal_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'legacy (pre-volumes) hive-seal RPC, requires a session' }],
-    ['send_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'hive-send RPC, requires a session' }],
-
-    // -- service_role only: internal/cron, no client role needs direct EXECUTE --
-    ['comb_advance_rotation(uuid)', { roles: ['service_role'], why: 'ENG-60 row 1.9a, advance policy wrapper called by the clock (OPS-9) — an authenticated grant would be an unruled organizer force-advance, §1B.31.2' }],
-    ['advance_due_rotations()', { roles: ['service_role'], why: 'OPS-9 cron-only tick advance, explicit anon+authenticated revoke' }],
-    ['comb_subject_gone(uuid,uuid)', { roles: ['service_role'], why: 'ENG-95 shared predicate, called only from other definers — a definer body bypasses the caller EXECUTE check on what it calls' }],
-    ['seal_and_send_rotation(uuid)', { roles: ['service_role'], why: 'ENG-91 cron-only seal-and-send, explicit anon+authenticated revoke' }],
-    ['seal_volume(uuid)', { roles: ['service_role'], why: 'cron/service-only volume seal, explicit anon+authenticated revoke' }],
-    ['_nectar_send_tip(uuid,uuid,bigint,text,text,text)', { roles: ['service_role'], why: 'ENG-90 internal balanced-transfer helper, called only from definer RPC wrappers' }],
-
-    // -- trigger functions: grant is inert, row still states the true grant --
-    ['combs_create_owner_membership()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
-    ['comb_members_departure_closes_writing_seat()', { roles: ['authenticated', 'service_role'], why: 'ENG-99 trigger, inert; explicit (redundant) authenticated grant, documented' }],
-    ['entries_mark_shared()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
-    ['enforce_comb_entitlements()', { roles: ['authenticated', 'service_role'], why: 'ENG-85 trigger, inert by direct call; server-owned plan tables are read inside the definer' }],
-    ['entries_resolve_volume_id()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
-    ['handle_new_user()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
-    ['private_hives_create_volume_one()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
-  ]);
+  // The expected-grant table itself moved to lib/definer-grants.mjs so the
+  // manual prod probe (scripts/prod-anon-definer-check.mjs) can read the same
+  // rows without importing this file's embedded-Postgres boot. Its header
+  // carries the argument-name reasoning and the one row that is deliberately
+  // not probeable from outside.
   const CHECKED_ROLES = ['anon', 'authenticated', 'service_role'];
-  const definers = (
+  const definerRows = (
     await client.query(`
-      select p.oid::regprocedure::text as sig
+      select p.oid::regprocedure::text as sig,
+             p.proname,
+             p.pronargs,
+             coalesce(p.proargnames, '{}'::text[]) as proargnames,
+             coalesce(array(select format_type(t, null) from unnest(p.proargtypes) t), '{}'::text[]) as proargtypes,
+             (t.typname = 'trigger') as is_trigger
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
+      join pg_type t on t.oid = p.prorettype
       where n.nspname = 'public' and p.prosecdef
       order by 1
     `)
-  ).rows.map((r) => r.sig);
+  ).rows;
+  const definers = definerRows.map((r) => r.sig);
   if (definers.length === 0) {
     bad(
       'every SECURITY DEFINER function in `public` has a reviewed, catalog-matching execute-grant set',
@@ -452,7 +398,7 @@ async function main() {
   } else {
     const mismatches = [];
     for (const sig of definers) {
-      const expected = EXPECTED_DEFINER_GRANTS.get(sig);
+      const expected = DEFINER_GRANTS.get(sig);
       const actual = [];
       for (const role of CHECKED_ROLES) {
         const { rows } = await client.query('select has_function_privilege($1, $2, $3) as e', [role, sig, 'execute']);
@@ -460,7 +406,7 @@ async function main() {
       }
       if (!expected) {
         mismatches.push(
-          `${sig}: no row in EXPECTED_DEFINER_GRANTS (currently executable by: ${actual.join(', ') || 'no one'}) — ` +
+          `${sig}: no row in scripts/lib/definer-grants.mjs (currently executable by: ${actual.join(', ') || 'no one'}) — ` +
             'a new SECURITY DEFINER function needs a reviewed grant-set row, argued the way the rows above are, before this gate can pass'
         );
         continue;
@@ -477,10 +423,10 @@ async function main() {
         );
       }
     }
-    for (const sig of EXPECTED_DEFINER_GRANTS.keys()) {
+    for (const sig of DEFINER_GRANTS.keys()) {
       if (!definers.includes(sig)) {
         mismatches.push(
-          `${sig}: named in EXPECTED_DEFINER_GRANTS but no longer exists in the catalog — stale row, remove it ` +
+          `${sig}: named in scripts/lib/definer-grants.mjs but no longer exists in the catalog — stale row, remove it ` +
             '(a renamed/dropped function keeping its old signature here hides the new signature having no row at all)'
         );
       }
@@ -498,6 +444,110 @@ async function main() {
     }
   }
 
+
+  // --- The prod probe payload must match the catalog, not just parse -------
+  //
+  // lib/definer-grants.mjs carries a `probe` per row so
+  // scripts/prod-anon-definer-check.mjs can ask prod the anon half of the
+  // same question. PostgREST resolves an RPC by argument NAMES, and a real
+  // function called with the wrong name answers PGRST202/404 — the same code
+  // a function that does not exist answers (live-measured on prod 2026-08-29,
+  // recorded in lib/prod-schema-sentinels.mjs). So a drifted argument name
+  // does not make the prod probe fail: it makes every row report "anon cannot
+  // execute this", which is the answer the probe was hoping for. Nothing at
+  // the far end can catch that. It is caught here, against the catalog that
+  // owns the names.
+  {
+    const kindProblems = [];
+    const argProblems = [];
+    for (const row of definerRows) {
+      const expected = DEFINER_GRANTS.get(row.sig);
+      if (!expected) continue; // already reported as an unreviewed definer above
+      const probe = expected.probe;
+      if (!probe || !['call', 'trigger', 'unsafe'].includes(probe.kind)) {
+        kindProblems.push(`${row.sig}: no probe kind (expected one of call/trigger/unsafe)`);
+        continue;
+      }
+      if (row.is_trigger !== (probe.kind === 'trigger')) {
+        kindProblems.push(
+          row.is_trigger
+            ? `${row.sig}: returns trigger but is marked '${probe.kind}' — the prod probe would call a function Postgres refuses to call directly, and read the refusal as a grant answer`
+            : `${row.sig}: marked 'trigger' but does not return trigger — the prod probe skips it, so its anon revoke is asserted nowhere outside this local catalog`
+        );
+      }
+      if (probe.kind !== 'call') continue;
+      const inNames = (row.proargnames || []).slice(0, row.pronargs);
+      if (inNames.length !== row.pronargs || inNames.some((n) => !n)) {
+        argProblems.push(`${row.sig}: catalog has ${row.pronargs} argument(s) but only ${inNames.filter(Boolean).length} named — PostgREST cannot address it by name at all, so it cannot be a 'call' probe`);
+        continue;
+      }
+      const got = Object.keys(probe.args ?? {}).slice().sort();
+      const want = inNames.slice().sort();
+      if (got.join('|') !== want.join('|')) {
+        argProblems.push(`${row.sig}: probe.args names {${got.join(', ') || 'none'}}, catalog declares {${want.join(', ')}} — PostgREST would answer PGRST202 and the prod probe would read it as "anon revoked"`);
+      }
+    }
+    if (kindProblems.length === 0) {
+      ok(`every SECURITY DEFINER row carries a probe kind that matches the catalog (trigger vs callable)`);
+    } else {
+      bad('every SECURITY DEFINER row carries a probe kind that matches the catalog', kindProblems.join('; '));
+    }
+    if (argProblems.length === 0) {
+      ok(`every callable SECURITY DEFINER probe addresses its function by the argument names the catalog declares`);
+    } else {
+      bad('every callable SECURITY DEFINER probe addresses its function by the argument names the catalog declares', argProblems.join('; '));
+    }
+
+    // A 'call' probe POSTs to PRODUCTION as anon. If the grant it is looking
+    // for has regressed — the one condition the probe exists to detect — the
+    // body RUNS. So every callable row has to be unable to do damage in
+    // exactly that case, and "unable" has to be a property of the payload,
+    // not of the author's memory of what the body does.
+    //
+    // Two admissible ways to be safe, and nothing else:
+    //   POISONED  - some uuid-typed argument carries a value that is not a
+    //               uuid. Postgres raises 22P02 coercing it, which happens
+    //               AFTER the EXECUTE privilege check (live-measured against
+    //               prod 2026-09-03: anon-revoked seal_hive with a poisoned
+    //               uuid -> 401/42501; anon-granted is_hive_contributor with
+    //               the same poison -> 400/22P02). So the poison is fully
+    //               discriminating AND the body never starts.
+    //   SAFE      - the signature has no uuid argument to poison (all-text),
+    //               so the body does run, and the row states in `safety` why
+    //               running it changes nothing.
+    // A row that is neither is an exploit with a gate's name on it. This
+    // check is here rather than in the prod script because the prod script
+    // discovers the problem by having already caused it.
+    const poisonProblems = [];
+    for (const row of definerRows) {
+      const probe = DEFINER_GRANTS.get(row.sig)?.probe;
+      if (!probe || probe.kind !== 'call') continue;
+      const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      const names = (row.proargnames || []).slice(0, row.pronargs);
+      const types = (row.proargtypes || []).slice(0, row.pronargs);
+      const uuidArgs = names.filter((n, i) => types[i] === 'uuid');
+      const poisoned = uuidArgs.filter((n) => !isUuid(probe.args?.[n]));
+      if (uuidArgs.length === 0) {
+        if (!probe.safety) poisonProblems.push(`${row.sig}: no uuid argument to poison, so the body RUNS on prod if anon's grant has regressed — the row must carry a one-line \`safety\` saying why that is harmless`);
+        if (probe.poison !== null) poisonProblems.push(`${row.sig}: has no uuid argument but names poison '${probe.poison}' — a poison that cannot fire reads as protection that is not there`);
+        continue;
+      }
+      if (poisoned.length === 0) {
+        poisonProblems.push(`${row.sig}: every uuid argument carries a well-formed uuid, so nothing raises 22P02 and the body RUNS on prod as anon if the grant has regressed — poison one of {${uuidArgs.join(', ')}}`);
+        continue;
+      }
+      if (!uuidArgs.includes(probe.poison)) {
+        poisonProblems.push(`${row.sig}: probe.poison is '${probe.poison}', which is not a uuid argument of this function {${uuidArgs.join(', ')}} — the named poison and the acting poison must be the same argument, or a later edit "fixes" the wrong value`);
+      } else if (isUuid(probe.args?.[probe.poison])) {
+        poisonProblems.push(`${row.sig}: probe.poison names '${probe.poison}' but that argument carries a well-formed uuid — the row documents a protection it does not apply`);
+      }
+    }
+    if (poisonProblems.length === 0) {
+      ok(`every callable SECURITY DEFINER probe either poisons a uuid argument or states why running its body is harmless`);
+    } else {
+      bad('every callable SECURITY DEFINER probe either poisons a uuid argument or states why running its body is harmless', poisonProblems.join('; '));
+    }
+  }
   // --- Fixtures --------------------------------------------------------------
   await client.query('insert into auth.users (id) select * from unnest($1::uuid[])', [[ALICE, BOB, CAROL, MALLORY]]);
   await client.query(

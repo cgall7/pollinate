@@ -75,6 +75,7 @@
     "deploy:migrations": "bash scripts/deploy-migrations.sh",
     "check:legal-consent-gate": "node scripts/check-legal-consent-gate.mjs",
     "preflight:prod-schema": "node scripts/prod-schema-check.mjs",
+    "preflight:prod-anon-definers": "node scripts/prod-anon-definer-check.mjs",
     "check:absolute-fill": "node scripts/check-absolute-fill.mjs",
     "check:nectar-consent": "node scripts/check-nectar-consent.mjs",
     "check:glass-definition": "node scripts/check-glass-definition.mjs"
