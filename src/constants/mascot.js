@@ -341,3 +341,100 @@ export const SETTLE_OVERSHOOT_SPLIT = 0.72;
 // gesture, and a double-flick inside it would read as the punctuation term
 // firing coincidentally rather than as part of the same event.
 export const SETTLE_FLICK_BEATS = 1;
+
+// --- Lateral weight shift (R-SW) ------------------------------------------
+//
+// The fifth term. `GUIDES/POLLINATE_PERCH_WEIGHT_SPEC.md` §7, Colin's fox
+// re-ruling of 2026-09-03 after watching R-PW ship: *"how it moves side to
+// side and smoothly… I want you to replicate that."*
+//
+// **This reverses a decline, and the reversal is narrower than it looks.**
+// §5 declined "a third continuous term (lateral sway / body roll)" on the
+// ground that continuous terms blur into hover. That reason survives intact
+// and is why this is NOT what was declined: a continuous oscillator has no
+// rest, so its mean pose is a smear and the eye never finds the perch. This
+// is a one-shot GESTURE — out, DWELL, home, then nothing for 8-14s — and it
+// spends most of its life at rest, like the flick and the settle. Same class,
+// new axis.
+//
+// **Measured, not vibed** (Lumen, from the KRU clip frames, 24fps over the
+// 6.04s source): the fox's body centroid travels 7.49px peak-to-peak on a
+// ~112px-wide character — 6.7% of its own drawn width — one journey per
+// ~4-5s, with a smooth drift out, a 1-2s HOLD at the extreme, and an eased
+// return. THE DWELL IS THE SIGNATURE. A slow ease across the same distance
+// reads as drift; the hold is what reads as an animal standing on one side
+// of its own weight.
+
+// Peak lateral offset EACH SIDE, as a fraction of the character's DRAWN
+// WIDTH — half the fox's measured peak-to-peak, so the p2p lands at 6.6%
+// against its 6.7%.
+//
+// The denominator is drawn WIDTH, and it is not interchangeable with the
+// drawn HEIGHT the two vertical terms use. The fox's ratio was its centroid's
+// travel over its own drawn x-extent; a constant only means anything inside
+// the frame it was measured in (the standing rule, and R-PW-2's own
+// correction block is the last time this file got it wrong).
+//
+// 2.0241pt each side at the hero (a 132pt stage, so an 89.76pt character box
+// and a 61.3360pt drawn width) — 4.0482pt peak-to-peak, 1.99x the whole
+// breath's travel, which is correct: this is the term Colin's eye went
+// looking for and did not find. 0.9922pt each side at a direct 44pt chrome
+// mount, i.e. the ~2px shimmer §7's scale-honesty row asks for. Same
+// fraction at both; the character carries one physics (R-SW-4).
+//
+// IT CANNOT CLIP, AT ANY MOUNT, BY CONSTRUCTION — not by luck of the
+// numbers. The drawing occupies `MASCOT_WIDTH_FRACTION` of its box and is
+// centred, so there is (1 - 0.6833) / 2 = 15.83% of the box free on each
+// side, which is 23.17% of the DRAWN width. The excursion is 3.3% of the
+// same quantity, so the drawing never leaves the rect its box already
+// occupied and no ancestor's overflow can decide anything. Both sides of
+// that comparison are fractions of the same denominator, which is what makes
+// it a structural property rather than a measurement at two sizes.
+export const SWAY_OFFSET_FRACTION = 0.033;
+
+// NOT SHIPPED AT A CEILING (the R-series bar, same as `BREATH_RISE_CEILING`).
+// 5% each side is 1.5x the fox's own measurement, and past roughly there the
+// excursion stops reading as a weight shift and starts reading as a lean the
+// character never comes back from — the reference IS the ruling, so the
+// ceiling's job is only to give the advance axis a stop. If Colin's eye still
+// wants more: AMPLITUDE toward this, never the clock. A faster journey is a
+// pace, not a weight shift, and it fails §7's own dwell argument rather than
+// tuning inside it.
+export const SWAY_OFFSET_CEILING = 0.05;
+
+// The driver's positive extreme. Named rather than typed, for the same reason
+// every other number in this file is: `check-bee-attitude` §E forbids a bare
+// numeric declarator in `MascotBee.js`, and the sway needs a signed unit it
+// can flip. Writing the poles as `-SWAY_POLE` and `SWAY_POLE` is also what
+// makes the interpolation's symmetry about the perch point STRUCTURAL — two
+// ends that cannot be edited apart, rather than two numbers that agree today.
+export const SWAY_POLE = 1;
+
+// One journey every 8-14s, re-rolled after each one. Its own clock, and
+// deliberately incommensurate with everything else on the character: the
+// breath's 6.5s body cycle, the wing's 4.2s, the flick's 4-9s re-roll and the
+// settle's 20-45s. Five terms that never present the same pose twice inside a
+// glance is the whole argument for having five.
+export const SWAY_INTERVAL_MIN_MS = 8000;
+export const SWAY_INTERVAL_MAX_MS = 14000;
+
+// The journey: 1.1s out, 1.5s held, 1.4s home — 4.0s, inside the fox's
+// measured 4-5s. The hold sits mid-band of its measured 1-2s.
+//
+// The return is SLOWER than the departure, which is the opposite asymmetry to
+// the settle's (240ms down, 520ms up) and for the same physical reason read
+// the other way round: the settle is driven by gravity, which accelerates,
+// while a lateral shift is muscular in both directions and the way back is
+// the one being given up rather than taken. Neither is a mirror of the other,
+// and a symmetric out-and-back is the shape that reads as a metronome.
+export const SWAY_OUT_MS = 1100;
+export const SWAY_DWELL_MS = 1500;
+export const SWAY_HOME_MS = 1400;
+
+// Which side. Biased, not strict: strict alternation is a metronome one level
+// up — the interval is unlearnable but the SEQUENCE is left-right-left-right,
+// and the eye learns sequences. 70/30 away from the last side keeps the
+// long-run mean at the perch point (so zero net translation survives a bias
+// as well as it survives a coin flip) while making the next side genuinely
+// unpredictable.
+export const SWAY_DIRECTION_BIAS = 0.7;
