@@ -23,6 +23,7 @@ import { OrganizerCombCard } from '../components/OrganizerCombCard';
 import { Avatar } from '../components/Avatar';
 import { PressableScale } from '../components/PressableScale';
 import { RotationFold } from '../components/RotationFold';
+import { PendingCombRow } from '../components/PendingCombRow';
 import { useDaysLeft } from '../components/useDaysLeft';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
@@ -233,6 +234,10 @@ export const TodayTab = ({ navigation, route }) => {
   // inverse).
   const [contributingHives, setContributingHives] = useState([]);
   const [contributingHivesError, setContributingHivesError] = useState(false);
+  // COPY-6 addendum (Lumen) — combs joined before any month opened. Its own
+  // state and its own read for the same reason every shelf above has one: a
+  // failure here must not blank the hives beside it.
+  const [pendingCombs, setPendingCombs] = useState([]);
 
   // ELIGIBILITY. Runs only when the signal is present, so an ordinary Today
   // mount, a tab switch, a resume and a later save all cost nothing here.
@@ -362,6 +367,24 @@ export const TodayTab = ({ navigation, route }) => {
           console.warn('TodayTab: failed to load contributing hives', err);
           setContributingHivesError(true);
           setContributingHives([]);
+        }
+      })();
+      // The pre-launch/dormant membership read. No error flag beside it, and
+      // that is deliberate rather than an omission: the shelf's own standing
+      // treatment (see its comment below) is that a zero-row state and a
+      // failed read both simply WITHHOLD — there is no evergreen action this
+      // row could offer in place of itself, and a "we couldn't reach your
+      // combs" line here would double the one the organizer shelf already
+      // renders for the same outage.
+      (async () => {
+        try {
+          const list = await HiveStore.listPendingCombMemberships();
+          if (cancelled) return;
+          setPendingCombs(list);
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('TodayTab: failed to load pending comb memberships', err);
+          setPendingCombs([]);
         }
       })();
       return () => {
@@ -668,7 +691,7 @@ export const TodayTab = ({ navigation, route }) => {
             shelf could show in its place (unlike the private-hives shelf's
             "start a hive" door card), so a zero-row state and a failed read
             both simply withhold the shelf rather than asserting either one. */}
-        {contributingHives.length > 0 && (
+        {(contributingHives.length > 0 || pendingCombs.length > 0) && (
           <StaggeredItem index={3}>
             <PerchAnchor id="contributing-hive-shelf" on="left" at={0.5}>
               <View style={styles.hiveShelf}>
@@ -679,6 +702,19 @@ export const TodayTab = ({ navigation, route }) => {
                     hive={hive}
                     onPress={() => navigation.getParent()?.navigate('ContributingHive', { hiveId: hive.id })}
                   />
+                ))}
+                {/* Joined, no month open yet (COPY-6 addendum). THIS SHELF,
+                    not a new one: the pending row is the SAME row one mint
+                    earlier — when the month opens, `listPendingCombMemberships`
+                    drops the comb and `listContributingHives` picks up its
+                    hive, so the entry upgrades in place instead of a shelf
+                    appearing and disappearing around it. Below the live rows
+                    because a month already moving outranks one that hasn't
+                    started. Keyed on the comb id, which cannot collide with
+                    the hive ids above — two different tables, and a comb with
+                    a hive is never in this list. */}
+                {pendingCombs.map((comb) => (
+                  <PendingCombRow key={comb.id} combName={comb.name} />
                 ))}
               </View>
             </PerchAnchor>

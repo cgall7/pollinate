@@ -693,6 +693,73 @@ export const HiveStore = {
     );
   },
 
+  // COPY-6 addendum (Lumen, 2026-09-03, `OUTBOX/COPY6_INVITE_LANDING_FAILURE_
+  // STATES.md`) — the membership a joiner holds BEFORE any month has opened.
+  // Pixel's find, thread b57ad406: a pre-launch joiner is invisible to
+  // themselves. `listOrganizerCombs` keys on `owner_id` (a joiner is a
+  // member, not an owner) and `listContributingHives` inner-joins
+  // `hive_contributors` (the join RPC only writes that row when a rotation's
+  // hive exists, `20260831000001:40-45`), so both comb surfaces on Today are
+  // keyed on artifacts that only exist after the first mint. The join is
+  // real, the mint's roster snapshot provably carries them into month 1
+  // (`20260830000011:89-101`), and nothing in the app said so.
+  //
+  // QUERY LICENCE (Lumen's addendum, and the reason this card may say
+  // "month" where the invite landing may not): this read admits PRE-LAUNCH
+  // and DORMANT only. A subject-gone comb HAS an open rotation, so it is
+  // excluded here by construction and its members keep rendering through the
+  // contributing card above — the landing's `has_active_month` boolean
+  // collapses three states, this query admits two.
+  //
+  // No migration: `combs_select_own` is already
+  // `auth.uid() = owner_id or public.is_comb_member(id)`
+  // (`20260830000002:317-319`), so this SELECT returns exactly "combs I run
+  // + combs I am in". `.neq('owner_id', ...)` is the client's half of the
+  // licence, not a permission: an organizer's own pre-launch comb already
+  // has a card on COMBS YOU RUN (`listOrganizerCombs` returns it with
+  // `openRotation: null`), and rendering it here too would give one comb two
+  // shelf presences — the exact "one comb = one shelf presence" rule DES-39
+  // was ruled on.
+  async listPendingCombMemberships() {
+    const client = requireSupabase();
+    const profileId = await requireUserId(client);
+    const { data: combs, error } = await client
+      .from('combs')
+      .select('id, name, owner_id, created_at')
+      .neq('owner_id', profileId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!combs || combs.length === 0) return [];
+
+    // THIS READ FAILS LOUD ON PURPOSE. Every other rotation probe in this
+    // file throws on error too, but here the reason is specific: this
+    // query's answer is a NEGATIVE ("no open rotation"), and a refused or
+    // failed read produces zero rows — indistinguishable from the state it
+    // is looking for. Swallowing the error would render "you'll be writing
+    // when the next month opens" over a comb whose month is open right now,
+    // beside the contributing card for that same month. `comb_rotations_
+    // select` (`20260830000002:498-503`) admits members, so a member reading
+    // their own comb's rotations is a permitted read, not a hopeful one.
+    const combIds = combs.map((comb) => comb.id);
+    const { data: openRotations, error: rotationsError } = await client
+      .from('comb_rotations')
+      .select('comb_id')
+      .in('comb_id', combIds)
+      .is('sealed_at', null)
+      .is('voided_at', null);
+    if (rotationsError) throw rotationsError;
+
+    const openCombIds = new Set((openRotations ?? []).map((rotation) => rotation.comb_id));
+    // Nothing but the identity and the name leaves this method. §1B.38.1
+    // licenses a rendered future only from an existing rotation row, and
+    // here there is none — so no closes_at, no ordinal, no subject, no
+    // count. The card downstream cannot render a rotation fact because this
+    // read never hands it one.
+    return combs
+      .filter((comb) => !openCombIds.has(comb.id))
+      .map((comb) => ({ id: comb.id, name: comb.name }));
+  },
+
   // One contributing hive's header facts, for ContributingHive.js — same
   // inner-join-as-active-contributor shape as `listContributingHives`
   // above, single row. `.maybeSingle()` because the caller could be a

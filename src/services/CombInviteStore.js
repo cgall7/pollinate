@@ -59,13 +59,31 @@ export const CombInviteStore = {
       .is('voided_at', null)
       .maybeSingle();
     if (rotationError) throw rotationError;
-    if (!rotation?.hive_id) throw new Error('This comb does not have an open rotation');
 
+    // COPY-6 rider 1 (Lumen, 2026-09-03): AN ABSENT OPEN ROTATION AFTER A
+    // SUCCESSFUL JOIN IS A SUCCESS, NOT A FAILURE. `comb_join_by_invite_code`
+    // inserts the `comb_members` row gated on nothing but an invalid code and
+    // a previous removal (`20260831000001:26-29`); only the
+    // `hive_contributors` enrollment is gated on a rotation's hive existing
+    // (`:40-45`), and the RPC raises nothing when there is no rotation. So
+    // the membership is committed on the server by the time this query runs,
+    // and the old throw here MINTED A CLIENT-SIDE FAILURE FOR A REAL JOIN —
+    // reported to the joiner as "we couldn't join this comb," with a row in
+    // the table saying otherwise. The mint's roster snapshot carries them
+    // into the next month (`20260830000011:89-101`), so this is a legal
+    // steady state, not a half-finished one.
+    //
+    // Nulls rather than a missing key: the caller is told there is no
+    // rotation, which is a different fact from a shape that forgot to
+    // include one. `CombInvite.js`'s join handler navigates to Today either
+    // way — and Today can now represent this member
+    // (`HiveStore.listPendingCombMemberships`), which is what makes the
+    // navigation honest rather than a landing on an empty screen.
     return {
       combId,
-      rotationId: rotation.id,
-      hiveId: rotation.hive_id,
-      closesAt: rotation.closes_at,
+      rotationId: rotation?.id ?? null,
+      hiveId: rotation?.hive_id ?? null,
+      closesAt: rotation?.closes_at ?? null,
     };
   },
 };
