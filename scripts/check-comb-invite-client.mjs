@@ -125,8 +125,24 @@ check(
           ? deps.elements.map((e) => (e && e.type === 'Identifier' ? e.name : '?'))
           : null;
         const keyed = names && names.length === 1 && names[0] === 'session';
-        kind = keyed ? 'session-effect' : 'other-effect';
-        label = `useEffect([${names ? names.join(', ') : '?'}])`;
+        // The guard is the load-bearing half. A `[session]`-keyed effect is
+        // the sanctioned advance ONLY when the reference sits under an
+        // `if (session)` inside it; a bare finish() in the same effect
+        // PERFORMS the advance at first signed-out mount (session
+        // initialises null in AuthContext, and finish() is unconditional
+        // beyond finishedRef idempotence). Such a reference falls to
+        // 'other-effect', which is outside I10d's KNOWN list and drops
+        // I10b's session-effect count to zero — both red, by construction.
+        let guarded = false;
+        for (let j = i + 1; j < stack.length; j += 1) {
+          const g = stack[j];
+          if (g.type !== 'IfStatement') continue;
+          if (!g.test || g.test.type !== 'Identifier' || g.test.name !== 'session') continue;
+          const onPath = j + 1 < stack.length ? stack[j + 1] : node;
+          if (onPath === g.consequent) { guarded = true; break; }
+        }
+        kind = keyed && guarded ? 'session-effect' : 'other-effect';
+        label = `useEffect([${names ? names.join(', ') : '?'}])${keyed && !guarded ? ' \u2014 finish() not under if (session)' : ''}`;
         break;
       }
       if (a.type === 'VariableDeclarator' && a.id && a.id.type === 'Identifier' && isFn(a.init)) {
@@ -142,10 +158,25 @@ check(
 
   // I10b · the sanctioned advance exists: `if (session) finish()` keyed on
   // [session]. Asserted through the census, not a text match, so the effect's
-  // deps and its body are tied together rather than co-occurring.
+  // deps AND its guard are tied together rather than co-occurring.
+  //
+  // The deps alone were the original shape and they were not enough: the
+  // classifier scored a `[session]`-keyed effect as sanctioned whatever its
+  // body did, so deleting `if (session)` and leaving a bare `finish()` kept
+  // this row green while the effect fired the advance at first signed-out
+  // mount. "Deps and body tied together" reaches the reference; it does not
+  // reach the guard, which is the half that carries the claim. The
+  // classifier now requires the reference to sit under an `IfStatement`
+  // whose test is `session`, inside that effect.
+  //
+  // Named narrowly on purpose: the test must be the bare identifier. A
+  // stricter rewrite (`if (session?.user)`, `if (session !== null)`) reds
+  // this row rather than passing unverified — the guard is auth behaviour and
+  // a different predicate is a different claim, so it should reach a ruling
+  // rather than a classifier's guess.
   check(
     byKind('session-effect').length === 1,
-    'I10b the [session]-keyed effect is the sanctioned generic advance'
+    'I10b the [session]-keyed effect guards its finish() on session and is the sanctioned generic advance'
   );
 
   // I10c · exact reference count. Reds on a NEW advance site even when that
