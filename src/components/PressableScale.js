@@ -1,11 +1,12 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { SPRINGS, PRESS } from '../constants/motion';
+import { DURATIONS, PRESS, PRESS_EASING, PRESS_TIMING, SPRINGS, useReducedMotionState } from '../constants/motion';
+import { pressFeedbackScalePlan } from './pressFeedbackPlanner';
 
-// Shared tap feedback for every primary interaction: a light haptic tick
-// plus a spring scale-down, so choices and buttons feel physical instead
-// of flat. One component so the feel is consistent everywhere it's used.
+// Shared tap feedback for every primary interaction: a light haptic tick,
+// a timed compression, and a spring release. MP-5 keeps that sequence in one
+// component so call sites cannot invent local depths, clocks, or RM behavior.
 export const PressableScale = ({
   onPress,
   style,
@@ -55,12 +56,40 @@ export const PressableScale = ({
   // box is the pressed-scale transform rather than the control's position.
   innerRef,
 }) => {
+  const { reduced, resolved } = useReducedMotionState();
+  const scalePlan = pressFeedbackScalePlan({ resolved, reduced });
+  const scaleLocked = scalePlan.scaleLocked;
   const scale = useRef(new Animated.Value(1)).current;
   const colorOpacity = useRef(new Animated.Value(0)).current;
 
-  const animateTo = (value) => {
-    Animated.spring(scale, {
+  useEffect(() => {
+    if (!scaleLocked) return;
+    scale.stopAnimation();
+    scale.setValue(1);
+  }, [scaleLocked, scale]);
+
+  const compressTo = (value) => {
+    if (scaleLocked) {
+      scale.stopAnimation();
+      scale.setValue(1);
+      return;
+    }
+    Animated.timing(scale, {
       toValue: value,
+      duration: PRESS_TIMING.compress,
+      easing: PRESS_EASING.compress,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const releaseToRest = () => {
+    if (scaleLocked) {
+      scale.stopAnimation();
+      scale.setValue(1);
+      return;
+    }
+    Animated.spring(scale, {
+      toValue: 1,
       ...SPRINGS.press,
       useNativeDriver: true,
     }).start();
@@ -69,17 +98,17 @@ export const PressableScale = ({
   const animateColorTo = (value) => {
     Animated.timing(colorOpacity, {
       toValue: value,
-      duration: 120,
+      duration: DURATIONS.instant,
       useNativeDriver: true,
     }).start();
   };
 
   const handlePressIn = () => {
-    animateTo(scaleTo);
+    compressTo(scaleTo);
     if (pressedColor) animateColorTo(1);
   };
   const handlePressOut = () => {
-    animateTo(1);
+    releaseToRest();
     if (pressedColor) animateColorTo(0);
   };
 
