@@ -7,9 +7,14 @@
 // saved — App.js calls `reconcile()` on both, per §4.1. It does not query
 // Supabase for which days are written — the caller passes `writtenDaysISO`
 // in, so this file stays free of a Supabase import and makes no network call
-// of its own (Sage, C12's gate row: the settings surface promises
-// `src/constants/legalCopy.js`'s "no analytics, crash-reporting or tracking
-// code" stays true by construction, not by memory).
+// of its own (Sage, C12's gate row, RE-CITED 2026-09-03 for OPS-8): this file
+// reports nothing to a server at all — narrower than the legal-copy promise
+// now requires, and the promise it used to quote is gone. The sentence this
+// comment cited verbatim, `src/constants/legalCopy.js`'s "no analytics,
+// crash-reporting or tracking code", was narrowed by OPS-8 (V2 spec §20.2,
+// Colin ruling 2026-08-24) because Project 20 puts first-party analytics and
+// crash reporting in scope. What the gate row still proves is the property
+// of THIS file, not the policy's whole claim: no Supabase import, no fetch.
 //
 // THE RECONCILER IS AN ENUMERATOR, NOT A LEDGER (§4.5, RULED, C10). No
 // identifier is ever written to storage. Re-arming means: read the OS's own
