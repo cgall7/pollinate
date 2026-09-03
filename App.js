@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import * as Linking from 'expo-linking';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,8 +19,10 @@ import { ComposeNote } from './src/screens/ComposeNote';
 import { PlantSeed } from './src/screens/PlantSeed';
 import { SeedsInbox } from './src/screens/SeedsInbox';
 import { CreateHiveFlow } from './src/screens/CreateHive';
+import { CreateCombScreen } from './src/screens/CreateComb';
 import { HiveDetailScreen } from './src/screens/HiveDetail';
 import { ComposeHiveEntryScreen } from './src/screens/ComposeHiveEntry';
+import { CombNectarComposeScreen } from './src/screens/CombNectarCompose';
 import { SealHiveScreen } from './src/screens/SealHive';
 import { SendHiveScreen } from './src/screens/SendHive';
 import { InviteContributor } from './src/screens/InviteContributor';
@@ -28,6 +31,7 @@ import { MemoryLaneScreen } from './src/screens/MemoryLane';
 import { ReceivedPackagesScreen } from './src/screens/ReceivedPackages';
 import { PackageOpenScreen } from './src/screens/PackageOpen';
 import { PollinateWrapped } from './src/screens/PollinateWrapped';
+import { CombInviteLandingScreen, CombInviteNameScreen } from './src/screens/CombInvite';
 import { MainTabs } from './src/navigation/MainTabs';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -39,6 +43,8 @@ import { DEMO_MODE } from './src/constants/demoMode';
 import { resolveInitialRouteWithTimeout } from './src/utils/resolveInitialRoute';
 import { isNudgeResponse } from './src/services/dailyNudge';
 import { rearmDailyNudge } from './src/services/rearmDailyNudge';
+import { parseCombInviteUrl } from './src/services/combInviteLinking';
+import { PendingCombInvite } from './src/services/pendingCombInvite';
 
 const Stack = createStackNavigator();
 
@@ -109,9 +115,23 @@ export default function App() {
   // onto the same instances that just threw — a plain setState re-render
   // wouldn't touch component state a crash left in a bad shape.
   const [resetKey, setResetKey] = useState(0);
+  const pendingInviteNavigation = useRef(null);
 
   useEffect(() => {
     Font.loadAsync(fontAssets).then(() => setFontsLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    const handleInviteUrl = async (url) => {
+      const inviteCode = parseCombInviteUrl(url);
+      if (!inviteCode) return;
+      const destination = { name: 'CombInvite', params: { inviteCode } };
+      if (navigationRef.current?.isReady()) navigationRef.current.navigate(destination.name, destination.params);
+      else pendingInviteNavigation.current = destination;
+    };
+    Linking.getInitialURL().then(handleInviteUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleInviteUrl(url));
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {
@@ -172,6 +192,11 @@ export default function App() {
       if (isNudgeResponse(lastResponse)) {
         navigationRef.current?.navigate('Main', { screen: 'Today' });
       }
+      if (pendingInviteNavigation.current) {
+        const destination = pendingInviteNavigation.current;
+        pendingInviteNavigation.current = null;
+        navigationRef.current?.navigate(destination.name, destination.params);
+      }
     }
   }, [fontsLoaded]);
 
@@ -197,7 +222,11 @@ export default function App() {
                 <OnboardingFlow
                   {...props}
                   startAt={props.route.params?.startAt}
-                  onDone={() => props.navigation.replace('Main')}
+                  onDone={async () => {
+                    const inviteCode = await PendingCombInvite.get();
+                    if (inviteCode) props.navigation.replace('CombInvite', { inviteCode });
+                    else props.navigation.replace('Main');
+                  }}
                   splashHidden={splashHidden}
                 />
               )}
@@ -222,7 +251,31 @@ export default function App() {
                     // (P0-2 fix, thread 19e90cf8). This is the one caller with
                     // a real session already — it owns the write now.
                     await EntryStore.saveEntry(new Date(), text, tagEntry(text), paper);
-                    props.navigation.replace('Main');
+                    // Deezine's post-auth nudge ruling (`6f9e87ad`) — the
+                    // one-shot first-save signal, carried through THIS
+                    // navigation rather than through a second mechanism.
+                    //
+                    // SYNCHRONOUS, AND THAT IS THE WHOLE DESIGN. The comment
+                    // below explains why the re-arm sits after this line;
+                    // the same overlay swallows anything else awaited here,
+                    // so the eligibility read and the persisted write both
+                    // live on Today, where the overlay is already gone. This
+                    // adds no I/O to the held animation — it is a param.
+                    //
+                    // It says only "an entry was just persisted", which is
+                    // all this site can honestly say: `saveEntry` is
+                    // upsert-shaped and its update and insert branches return
+                    // the same shape, so a first save and a re-save are
+                    // indistinguishable from here. TodayTab decides
+                    // first-ness against the account's own history.
+                    //
+                    // Nested `screen`/`params`: `Main` is
+                    // `component={MainTabs}`, so a flat param would land on
+                    // the navigator and never reach the tab.
+                    props.navigation.replace('Main', {
+                      screen: 'Today',
+                      params: { entryJustSaved: true },
+                    });
                     // §4.1's save-side re-arm, and it sits AFTER the
                     // navigation on purpose (Sage, 250bc4e9). This promise is
                     // the honey unlock's own: CoreRitual holds the unlocking
@@ -255,8 +308,10 @@ export default function App() {
                 same as Lock/Input above: a flow you go deeper into, not a
                 utility sheet, so no `presentation: 'modal'`. */}
             <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
+            <Stack.Screen name="CreateComb" component={CreateCombScreen} />
             <Stack.Screen name="HiveDetail" component={HiveDetailScreen} />
             <Stack.Screen name="ComposeHiveEntry" component={ComposeHiveEntryScreen} />
+            <Stack.Screen name="CombNectarCompose" component={CombNectarComposeScreen} options={{ presentation: 'modal' }} />
             {/* ENG-61 — Multi-Writer Hives' invite half (20260827000001).
                 InviteContributor is a plain push, same reasoning as its
                 hive siblings here: reached from CreateHive right after a
@@ -268,6 +323,8 @@ export default function App() {
                 its "PRIVATE HIVES" shelf already uses. */}
             <Stack.Screen name="InviteContributor" component={InviteContributor} />
             <Stack.Screen name="ContributingHive" component={ContributingHiveScreen} />
+            <Stack.Screen name="CombInvite" component={CombInviteLandingScreen} />
+            <Stack.Screen name="CombInviteName" component={CombInviteNameScreen} />
             {/* Seal/Send (thread b57ad406, 2026-08-19 — the gap Fizz/Bumble/Sage
                 found: the 8b.2-8b.7 arc was live at the data layer with no
                 button anywhere to trigger it). Design Language §5-6, condensed

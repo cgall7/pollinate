@@ -52,6 +52,7 @@ const JOINER = '22222222-2222-2222-2222-222222222222';
 const REMOVED = '33333333-3333-3333-3333-333333333333';
 const STRANGER = '44444444-4444-4444-4444-444444444444';
 const SIXTH = '55555555-5555-5555-5555-555555555555';
+const SUBJECT = '66666666-6666-6666-6666-666666666666';
 
 let pass = 0;
 const failures = [];
@@ -126,13 +127,14 @@ async function main() {
     }
 
     await client.query(
-      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10)',
+      'insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6), ($7, $8), ($9, $10), ($11, $12)',
       [
         OWNER, JSON.stringify({ display_name: 'Owner' }),
         JOINER, JSON.stringify({ display_name: 'Joiner' }),
         REMOVED, JSON.stringify({ display_name: 'Removed' }),
         STRANGER, JSON.stringify({ display_name: 'Stranger' }),
         SIXTH, JSON.stringify({ display_name: 'Sixth' }),
+        SUBJECT, JSON.stringify({ display_name: 'Subject' }),
       ]
     );
 
@@ -176,6 +178,16 @@ async function main() {
     );
     const comb = combRows[0];
 
+    // Seed the monthly subject, then mint an open rotation. The subject is
+    // already a comb member but must never become a contributor to their
+    // own hive; JOINER is deliberately absent until the invite call below.
+    await asPostgres(() =>
+      client.query('insert into public.comb_members (comb_id, profile_id) values ($1, $2)', [comb.id, SUBJECT])
+    );
+    await asUser(OWNER, () =>
+      client.query("select public.comb_open_rotation($1, $2, now() + interval '30 days')", [comb.id, SUBJECT])
+    );
+
     // Seed a member who's already been removed — REMOVED never joins
     // through the RPC (unrepresentable once removed), so the fixture
     // inserts and then removes them directly.
@@ -199,6 +211,37 @@ async function main() {
         ok('fresh join: returns the comb id for a valid invite code');
       } else {
         bad('fresh join: returns the comb id for a valid invite code', JSON.stringify(rows[0]));
+      }
+    }
+    {
+      const { rows } = await asPostgres(() =>
+        client.query(
+          `select c.profile_id, c.invited_by
+           from public.hive_contributors c
+           join public.comb_rotations r on r.hive_id = c.hive_id
+           where r.comb_id = $1 and c.profile_id = $2`,
+          [comb.id, JOINER]
+        )
+      );
+      if (rows.length === 1 && rows[0].invited_by === OWNER) {
+        ok('fresh join: joiner is seated in the open rotation with the comb owner as inviter');
+      } else {
+        bad('fresh join: joiner is seated in the open rotation with the comb owner as inviter', JSON.stringify(rows));
+      }
+    }
+    {
+      await asUser(SUBJECT, () => client.query('select public.comb_join_by_invite_code($1)', [comb.invite_code]));
+      const { rows } = await asPostgres(() =>
+        client.query(
+          `select exists (select 1 from public.comb_members where comb_id = $1 and profile_id = $2 and removed_at is null) as member,
+                  exists (select 1 from public.hive_contributors c join public.comb_rotations r on r.hive_id = c.hive_id where r.comb_id = $1 and c.profile_id = $2) as contributor`,
+          [comb.id, SUBJECT]
+        )
+      );
+      if (rows[0].member && !rows[0].contributor) {
+        ok('current subject: join succeeds as membership only, never as own-hive contributor');
+      } else {
+        bad('current subject: join succeeds as membership only, never as own-hive contributor', JSON.stringify(rows[0]));
       }
     }
     {

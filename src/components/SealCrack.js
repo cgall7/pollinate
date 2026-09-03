@@ -2,9 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
-import { SPRINGS, DURATIONS, useReducedMotion } from '../constants/motion';
+import { DURATIONS, useReducedMotion } from '../constants/motion';
 import { BeeTransition } from './BeeTransition';
-import { MascotBee } from './MascotBee';
 import { CelebrationRays } from './CelebrationRays';
 
 // ┌─ NOT WIRED YET, AND HERE IS HOW TO TELL THAT FROM ORPHANED ─────────┐
@@ -38,14 +37,6 @@ const DISPLAY_H = (DISPLAY_W * MARK_H) / MARK_W;
 const EYE_LEFT = '47.6%';
 const EYE_TOP = '42.8%';
 
-// Starts off to the upper-left and arcs down onto the mark's center
-// (anchor sits at the mark's position, so the path's end value is 0,0).
-const BEE_PATH = {
-  translateX: [-130, 0],
-  translateY: [-60, -90, 0],
-  rotate: ['-6deg', '0deg'],
-};
-
 // §14.2 respec §3.0: the monthly edition keeps the pour metaphor (§15
 // reserves it for Wrapped exclusively) but moves the noun — "Your year,
 // poured" names a year Beat 0 no longer always tells. Exact wording is
@@ -54,19 +45,7 @@ export const SealCrack = ({ onCracked, copy = 'Your year, poured.' }) => {
   const reduced = useReducedMotion();
   const [beeKey, setBeeKey] = useState(0);
   const [cracked, setCracked] = useState(false);
-  const [landed, setLanded] = useState(false);
   const flash = useRef(new Animated.Value(0)).current;
-  const staticBeeOpacity = useRef(new Animated.Value(0)).current;
-  // R16: the seal's tap is user-paced and unbounded, so the bee must rest
-  // on the mark rather than vanish on arrival (BeeTransition unmounts at
-  // flight-end everywhere else, correctly — that rule isn't touched here).
-  // BeeTransition can't take an onSettle callback without changing a
-  // component every other flight in the app shares, so instead this runs a
-  // shadow spring with the identical SPRINGS.glide config, started on the
-  // same triggerKey change — its completion lands within a frame of
-  // BeeTransition's own, close enough for a static-bee handoff with no
-  // visible jump.
-  const settleShadow = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -87,15 +66,6 @@ export const SealCrack = ({ onCracked, copy = 'Your year, poured.' }) => {
       mountedRef.current = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (beeKey === 0) return;
-    settleShadow.setValue(0);
-    Animated.spring(settleShadow, { toValue: 1, ...SPRINGS.glide, useNativeDriver: true }).start(() => {
-      setLanded(true);
-      Animated.timing(staticBeeOpacity, { toValue: 1, duration: DURATIONS.quick, useNativeDriver: true }).start();
-    });
-  }, [beeKey]);
 
   const handleCrack = () => {
     if (cracked) return;
@@ -142,26 +112,7 @@ export const SealCrack = ({ onCracked, copy = 'Your year, poured.' }) => {
         // spiral's optical center regardless of what copy sits below.
       }
       <View style={styles.markStage}>
-        <BeeTransition triggerKey={beeKey} path={BEE_PATH} anchorStyle={styles.beeAnchor} size={22} />
-        {landed && (
-          // BEE_PATH's terminal translate is (0,0) at 0deg — exactly
-          // styles.beeAnchor with no transform, so the crossfade lands in
-          // the same spot BeeTransition's flight was already ending at.
-          //
-          // §17.3 correction: this bee is not a standing/keepsake bee — it
-          // is the last frame of a BeeTransition flight, crossfading from the
-          // bee that BeeTransition renders internally. Register follows
-          // provenance: a bee that flew in stays in flight register even
-          // standing on gold, so this must stay prop-identical to
-          // BeeTransition's internal render or the crossfade pops.
-          //
-          // R83: that render is now `MascotBee`, so this is too. The contract
-          // this comment states is exactly what a swap on one side of it would
-          // have broken — dormantly, since SealCrack has no importers yet.
-          <Animated.View pointerEvents="none" style={[styles.beeAnchor, { opacity: staticBeeOpacity }]}>
-            <MascotBee size={22} />
-          </Animated.View>
-        )}
+        <BeeTransition triggerKey={beeKey} role="seal-arrival" anchorStyle={styles.beeAnchor} size={22} />
         <Image
           source={require('../../assets/spiral-mark.png')}
           style={{ width: DISPLAY_W, height: DISPLAY_H }}

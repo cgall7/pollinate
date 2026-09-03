@@ -21,6 +21,14 @@ import {
   SETTLE_OVERSHOOT_FRACTION,
   SETTLE_OVERSHOOT_SPLIT,
   SETTLE_RECOVER_MS,
+  SWAY_DIRECTION_BIAS,
+  SWAY_DWELL_MS,
+  SWAY_HOME_MS,
+  SWAY_INTERVAL_MAX_MS,
+  SWAY_INTERVAL_MIN_MS,
+  SWAY_OFFSET_FRACTION,
+  SWAY_OUT_MS,
+  SWAY_POLE,
   WING_BEAT_DEG,
   WING_BEAT_MS,
 } from '../constants/mascot';
@@ -161,6 +169,13 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
   // (R-N4's rule). It takes nothing, returns nothing, and exists only while
   // the wing is perched, so the settle cannot half-fire on a channel that
   // is flying or caller-driven.
+  // The lateral weight shift's own value (R-SW), on its own axis. A FOURTH
+  // value rather than an excursion on `rise` or `settle`, for the reason the
+  // settle's own note gives one paragraph up and one axis over: those two are
+  // vertical and this one is horizontal, so sharing a value would mean one
+  // driver expressing two directions and the transform would have to decide
+  // which. One value per gesture; one driver per value (R46/R83), unchanged.
+  const sway = useRef(new Animated.Value(0)).current;
   const gesture = useRef({ busy: false, absorb: null }).current;
   const beat = driven ?? own;
   const breathing = breath && !flutter;
@@ -414,6 +429,106 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
     };
   }, [breathing, driven, gesture, rise, settle]);
 
+  // R-SW. The lateral weight shift — PERCH_WEIGHT_SPEC §7, Colin's fox
+  // re-ruling. The body drifts to one side, STANDS THERE, and comes home.
+  //
+  // **The dwell is the whole gesture and it is expressed as a `delay` on the
+  // return leg**, not as a slower ease and not as an `Animated.delay` step.
+  // A slow ease is what §7 row 8 exists to forbid — across the same distance
+  // it reads as drift, and drift is the hover the doctrine retires. And
+  // `Animated.delay` would mint a throwaway `new AnimatedValue(0)` and
+  // hardcode `useNativeDriver: false` — it takes no options, so there is no
+  // way to ask otherwise (react-native/Libraries/Animated/
+  // AnimatedImplementation.js:436-442) — which would put a JS-thread
+  // animation inside an otherwise native sequence to accomplish nothing but
+  // the passage of time. `delay:`
+  // on the timing that follows holds the value at the extreme for exactly as
+  // long, on one value, with one driver, entirely on the UI thread.
+  //
+  // **This effect does not depend on `driven`, and the settle's does.** The
+  // settle is gated on it because half a composed gesture is not the gesture:
+  // its dip needs the wing beat that absorbs it, and a caller holding the
+  // wing cannot supply one. The sway has no wing half to be missing. It is
+  // the same class as the body's own breath, which also runs under a driven
+  // wing — a bee whose wing someone else is holding still has its own weight.
+  //
+  // **The deference runs ONE WAY, deliberately, and this is the whole of the
+  // ruling.** §4's mutual defer is symmetric because it has to be: the flick
+  // and the settle's absorbing beat both drive `own`, so two drivers would
+  // meet on one value and that is what R46/R83 forbid. Nothing mechanical
+  // binds this gesture to those — it drives its own value on its own axis
+  // through its own conductor. What is left is arithmetic: a 4.0s journey
+  // landing every 8-14s occupies about a third of the clock, so a flick that
+  // deferred to it would see its effective interval stretch from ~6.5s to
+  // ~10s. R-PW-1's entire ruling is "the first flick lands inside 9s BY
+  // CONSTRUCTION", and §7 row 10 says R-SW never reopens the merged terms —
+  // so the new term yields to the old ones and never the other way. It reads
+  // the lock; it does not take it.
+  //
+  // The consequence is that a settle can fire mid-sway, and that is the
+  // better read rather than a tolerated one: the fox's measured lateral
+  // travel carries a vertical component of similar size, so a dip landing
+  // while the body is displaced sideways IS the compound weight shift the
+  // reference shows. Both terms are anchored and both return to exactly 0,
+  // so the perch point cannot drift under either of them or under both.
+  useEffect(() => {
+    if (!breathing) return undefined;
+    sway.setValue(0);
+
+    // Same discipline as both conductors above: ONE animation live at a time,
+    // its callback the only thing that advances the state.
+    let cancelled = false;
+    let current = null;
+    let timer = null;
+    // Which side he went last. A local, not a ref: it is idle punctuation
+    // state with no meaning across a mount, and the bias only has to be
+    // unlearnable inside one sitting.
+    let side = SWAY_POLE;
+
+    const scheduleSway = () => {
+      const wait =
+        SWAY_INTERVAL_MIN_MS + Math.random() * (SWAY_INTERVAL_MAX_MS - SWAY_INTERVAL_MIN_MS);
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        // §7's collision rule. Defer to the next re-roll, never queue — a
+        // queued gesture fires the instant the other releases, which is the
+        // one moment the character has just finished moving.
+        if (gesture.busy) {
+          scheduleSway();
+          return;
+        }
+        // 70/30 away from the last side: unpredictable without being
+        // uncorrelated, which is what an animal's weight actually is.
+        side = Math.random() < SWAY_DIRECTION_BIAS ? -side : side;
+        current = Animated.sequence([
+          Animated.timing(sway, {
+            toValue: side,
+            duration: SWAY_OUT_MS,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(sway, {
+            toValue: 0,
+            delay: SWAY_DWELL_MS,
+            duration: SWAY_HOME_MS,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]);
+        current.start(({ finished }) => {
+          if (finished && !cancelled) scheduleSway();
+        });
+      }, wait);
+    };
+
+    scheduleSway();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      current?.stop();
+    };
+  }, [breathing, gesture, sway]);
+
   const width = size * MASCOT_WIDTH_FRACTION;
   const height = width / MASCOT_ASPECT;
 
@@ -505,6 +620,24 @@ export const MascotBee = ({ size = 44, flutter = false, breath = false, beat: dr
                 0,
                 SETTLE_DIP_FRACTION * height,
               ],
+            }),
+          },
+          // R-SW, the third entry and the first one on the other axis. Its
+          // denominator is the drawn WIDTH — the fox's ratio was its
+          // centroid's travel over its own x-extent, and a constant only
+          // means anything inside the frame it was measured in. Reusing
+          // `height` here would be the same category error R-PW-2's
+          // correction block was written for, one axis over.
+          //
+          // Translations commute, so this composes additively with the two
+          // above and the body is still ONE channel carrying three terms.
+          // Symmetry about the perch point is structural: the two ends are
+          // one expression with a flipped sign, so they cannot be edited
+          // apart, and the rest stop maps to exactly 0.
+          {
+            translateX: sway.interpolate({
+              inputRange: [-SWAY_POLE, 0, SWAY_POLE],
+              outputRange: [-SWAY_OFFSET_FRACTION * width, 0, SWAY_OFFSET_FRACTION * width],
             }),
           },
         ],

@@ -66,11 +66,106 @@
 // A third easing is a FAILURE here, not a silent pass — a gate that cannot
 // tell must not look like a gate that has no objection.
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import vm from 'node:vm';
 import { parse } from '@babel/parser';
 import { deriveClearanceBins } from './lib/mascot-clearance.mjs';
+
+export const MUTATIONS = [
+  {
+    row: 'M14',
+    why: 'MP-4 requires each visit to inherit the rest/preflight-facing state instead of deriving its initial mirror from the target path.',
+    file: 'src/components/FlyingBee.js',
+    from: '    heldFacing,\n    driver: new Animated.Value(0),',
+    to: '    driver: new Animated.Value(0),',
+  },
+  {
+    row: 'M15',
+    why: 'MP-4 forbids a second tap from stopping/rebuilding the active errand; it must retain only the latest pending target until the current visit lands.',
+    file: 'src/components/FlyingBee.js',
+    from: "      pendingPollinateRef.current = pollinate;\n      pollinateKeyRef.current = pollinate.key;\n      return;",
+    to: "      pendingPollinateRef.current = pollinate;\n      pollinateKeyRef.current = pollinate.key;\n      launchPollination(pollinate);\n      return;",
+  },
+  {
+    row: 'M16',
+    why: 'MP-4 wheel-to-visit handoff must give the successor visit its own driver, or the old wheel driver can paint a terminal value in the successor frame.',
+    file: 'src/components/FlyingBee.js',
+    from: '  const driver = plan?.driver ?? t;',
+    to: '  const driver = t;',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 landing key identity must reject stale landings so key 1 cannot clear or illuminate key 3.',
+    file: 'src/components/pollinationIdentity.js',
+    from: 'export const pollinationLandingResult = (current, key) => ({\n  accepted: current?.key === key,\n  pollination: current?.key === key ? null : current,\n});',
+    to: 'export const pollinationLandingResult = (current, key) => ({\n  accepted: true,\n  pollination: null,\n});',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 cancel identity must reject stale cancels so abort/suppression cannot clear a newer pending target.',
+    file: 'src/components/pollinationIdentity.js',
+    from: 'export const pollinationCancelResult = (current, key) => ({\n  accepted: current?.key === key,\n  pollination: current?.key === key ? null : current,\n});',
+    to: 'export const pollinationCancelResult = (current, key) => ({\n  accepted: true,\n  pollination: null,\n});',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 keyed landing light must paint at the completed key, not at the latest tap centre.',
+    file: 'src/components/HoneycombGrid.js',
+    from: '    setLandingCentre({ x: aim.localX, y: aim.localY });',
+    to: '    return;',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 the overlay painter must prefer the completed landing centre over the latest tap centre.',
+    file: 'src/components/HoneycombGrid.js',
+    from: '  const overlayCentre = landingCentre ?? tapCentre;',
+    to: '  const overlayCentre = tapCentre;',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 airborne cancel must execute the product cancel effect; keeping tokens while disabling rest lets an aborted flight pollen/end/light.',
+    file: 'src/components/FlyingBee.js',
+    from: '    if (cancelPlanEffect.stopActive) {\n      rest();',
+    to: '    if (false) {\n      rest();',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 the product cancel controller must classify an airborne matching visit as active stop.',
+    file: 'src/components/pollinationIdentity.js',
+    from: "  stopActive: (planKind === 'visit' && planKey === cancelKey) || (planKind === 'preflight-wheel' && pendingLaunchKey === cancelKey),",
+    to: "  stopActive: (planKind === 'visit' && false) || (planKind === 'preflight-wheel' && pendingLaunchKey === cancelKey),",
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 keyed landing light must actually start from the completed key after centre rebinding; disabling the sequence is a visible failure.',
+    file: 'src/components/HoneycombGrid.js',
+    from: '    boundedPollinationAims(aimsRef.current, { currentKey: activePollinationKey, latestKey: aimRef.current?.key ?? null });\n    lightGenerationRef.current += 1;',
+    to: '    boundedPollinationAims(aimsRef.current, { currentKey: activePollinationKey, latestKey: aimRef.current?.key ?? null });\n    return;\n    lightGenerationRef.current += 1;',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 landing light must not return before the native opacity sequence starts.',
+    file: 'src/components/HoneycombGrid.js',
+    from: '    const animation = Animated.sequence([',
+    to: '    return undefined;\n    const animation = Animated.sequence([',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 landing light must start the constructed native opacity sequence; guarding start with if(false) disables the visible beat while leaving every token present.',
+    file: 'src/components/HoneycombGrid.js',
+    from: '    animation.start(({ finished }) => {',
+    to: '    if (false) animation.start(({ finished }) => {',
+  },
+  {
+    row: 'M17',
+    why: 'MP-4 current-plus-latest registry must stay bounded; displaced pending aims cannot survive forever.',
+    file: 'src/components/HoneycombGrid.js',
+    from: '    boundedPollinationAims(aimsRef.current, { currentKey: activePollinationKey, latestKey: key });',
+    to: '    // boundedPollinationAims removed by mutation',
+  },
+];
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE_PATH = path.join(ROOT, 'src/components/beeAttitude.js');
@@ -642,6 +737,22 @@ console.log('\nD. BeeTransition paths');
 const BEE_TRANSITION = path.join(ROOT, 'src/components/BeeTransition.js');
 const btSource = await readFile(BEE_TRANSITION, 'utf8');
 const btAst = parseJs(btSource);
+let buildBeeTransitionTrack = null;
+try {
+  const rolesSource = await readFile(path.join(ROOT, 'src/components/beeTransitionRoles.js'), 'utf8');
+  const attitudeSource = await readFile(path.join(ROOT, 'src/components/beeAttitude.js'), 'utf8');
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(
+    `${attitudeSource.replace(/export const /g, 'const ').replace(/export /g, '')}\n` +
+      `${rolesSource.replace("import { bankFor, pitchFor } from './beeAttitude';\n\n", '').replace(/export const /g, 'const ').replace(/export /g, '')}\n` +
+      'this.buildBeeTransitionTrack = buildBeeTransitionTrack;',
+    context,
+  );
+  buildBeeTransitionTrack = context.buildBeeTransitionTrack;
+} catch {
+  buildBeeTransitionTrack = null;
+}
 
 // A path object as written in source: `{ translateX: [...], rotate: [...] }`.
 const readPathObject = (node) => {
@@ -738,7 +849,8 @@ walk(btAst.program, (n) => {
         if (a.type !== 'JSXAttribute') return;
         props[a.name.name] = a.value?.expression ?? a.value;
       });
-      // Three cases, and keeping them apart is the point. No `path` prop at
+      // Four cases, and keeping them apart is the point. A named `role`
+      // resolves through BeeTransition's product role table. No `path` prop at
       // all means the component's own default, which this gate has read. A
       // named constant resolves in the file that declares it. An inline
       // object resolves directly. Anything else — an import, a call, a
@@ -749,7 +861,11 @@ walk(btAst.program, (n) => {
       // and the first draft of this block did exactly that.
       let pathName = '(default path)';
       let def = DEFAULT_BT_PATH;
-      if (props.path) {
+      if (props.role?.type === 'StringLiteral' && buildBeeTransitionTrack) {
+        pathName = props.role.value;
+        const track = buildBeeTransitionTrack(pathName);
+        def = { translateX: track.translateX, rotate: track.rotate };
+      } else if (props.path) {
         if (props.path.type === 'Identifier') {
           pathName = props.path.name;
           def = consts.get(pathName) ?? null;
@@ -996,6 +1112,7 @@ const FLIGHT_MODULE = path.join(ROOT, 'src/components/pollinationFlight.js');
 const LATTICE_MODULE = path.join(ROOT, 'src/components/combLattice.js');
 const HONEYCOMB_GRID = path.join(ROOT, 'src/components/HoneycombGrid.js');
 const MASCOT_CONSTANTS = path.join(ROOT, 'src/constants/mascot.js');
+const POLLINATION_IDENTITY = path.join(ROOT, 'src/components/pollinationIdentity.js');
 
 const SEQUENCER_MODULE = path.join(ROOT, 'src/components/flightSequencer.js');
 
@@ -1003,6 +1120,7 @@ const flightSource = await readFile(FLIGHT_MODULE, 'utf8');
 const latticeSource = await readFile(LATTICE_MODULE, 'utf8');
 const gridSource = await readFile(HONEYCOMB_GRID, 'utf8');
 const mascotSource = await readFile(MASCOT_CONSTANTS, 'utf8');
+const pollinationIdentitySource = await readFile(POLLINATION_IDENTITY, 'utf8');
 const sequencerSource = await readFile(SEQUENCER_MODULE, 'utf8');
 
 // --- F0. both modules are loadable, which is what every row below rests on
@@ -1011,6 +1129,7 @@ for (const [label, src] of [
   ['combLattice.js', latticeSource],
   ['constants/mascot.js', mascotSource],
   ['flightSequencer.js', sequencerSource],
+  ['pollinationIdentity.js', pollinationIdentitySource],
 ]) {
   const imports = parseJs(src).program.body.filter((n) => n.type === 'ImportDeclaration');
   if (imports.length === 0) {
@@ -1119,14 +1238,27 @@ if (CRUISE_DIAG_PER_S && CELL_SIZE && BEE_SIZE) {
 // row went red on a file where the correction was still present, on both
 // axes, unchanged. A locator built out of an identifier that merely happens
 // to appear inside the expression fails correct trees, and a row that fails
-// correct trees is a row people learn to edit. `const target = { … }` is what
-// this row is actually about, so that is what it looks for.
+// correct trees is a row people learn to edit. The target helper is what this
+// row is actually about, so that is what it looks for.
 const pollinationTarget = (() => {
   let found = null;
+  const returnObjectFrom = (fn) => {
+    let returned = null;
+    walk(fn?.body, (n) => {
+      if (returned) return;
+      if (n.type === 'ReturnStatement' && n.argument?.type === 'ObjectExpression') returned = n.argument;
+    });
+    return returned;
+  };
   walk(flyingBeeAst.program, (n) => {
-    if (found || n.type !== 'VariableDeclarator' || n.id?.name !== 'target') return;
-    if (n.init?.type !== 'ObjectExpression') return;
-    found = n.init;
+    if (found) return;
+    if (
+      n.type === 'VariableDeclarator' &&
+      n.id?.name === 'pollinationTargetFor' &&
+      (n.init?.type === 'ArrowFunctionExpression' || n.init?.type === 'FunctionExpression')
+    ) {
+      found = returnObjectFrom(n.init);
+    }
   });
   return found;
 })();
@@ -1137,7 +1269,7 @@ const targetAxisProp = (axis) =>
 {
   const NAME = 'the target is corrected by size / 2 on both axes (§28.3 — the waypoint names a corner, not a bee)';
   if (!pollinationTarget) {
-    bad(NAME, 'no `const target = { … }` object literal in FlyingBee.js, so this row could not find the expression it is about — CANNOT TELL, which is a fail.');
+    bad(NAME, 'no `pollinationTargetFor()` return object literal in FlyingBee.js, so this row could not find the expression it is about — CANNOT TELL, which is a fail.');
   } else {
     const halves = [];
     const others = [];
@@ -1253,7 +1385,7 @@ const targetAxisProp = (axis) =>
   // catch, and the specific line — the one that names `originRef.current` —
   // becomes unreachable exactly when it is true. Most specific cause first.
   if (!pollinationTarget) {
-    bad(NAME, 'no `const target = { … }` object literal in FlyingBee.js — CANNOT TELL, which is a fail.');
+    bad(NAME, 'no `pollinationTargetFor()` return object literal in FlyingBee.js — CANNOT TELL, which is a fail.');
   } else if (staleAxes.length) {
     bad(
       NAME,
@@ -4630,12 +4762,189 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
   //     incrementing counter) rather than `Math.random()` — the call site
   //     must stay a pure function of `pollinate.key` for a gate to sample.
   {
-    const hasWeaveSign = /weaveSign:\s*pollinate\.key\s*%\s*2/.test(flyingBeeSource);
+    const hasWeaveSign = /weaveSign:\s*(?:nextPollinate|pollinate)\.key\s*%\s*2/.test(flyingBeeSource);
     const noRandom = !/buildPollinationPlan[\s\S]{0,400}Math\.random/.test(flyingBeeSource);
     if (hasWeaveSign && noRandom) {
       ok('M7 weaveSign is keyed off `pollinate.key` (deterministic, alternating), not Math.random()');
     } else {
       bad('M7 weave sign source', `hasWeaveSign=${hasWeaveSign}, noRandom=${noRandom}`);
+    }
+  }
+
+  // --- M14. MP-4 — visits inherit facing from the already-drawn bee -------
+  //
+  // A target on the opposite side is allowed to turn the mascot only through
+  // the caused 120ms wheel. The following visit must start from the wheel's
+  // terminal facing; a same-facing visit must start from the rest facing it
+  // was already wearing. If `buildPollinationPlan` is allowed to stand alone,
+  // `buildAttitude` can infer from the path and the one-frame mirror snap
+  // comes back.
+  {
+    const visitHelperMatch = /const\s+buildVisitPlan\s*=\s*\(([^)]*)\)\s*=>\s*\(\{([\s\S]*?)\n\s*\}\);/.exec(flyingBeeSource);
+    const visitHelperCarriesFacing =
+      /heldFacing/.test(visitHelperMatch?.[1] ?? '') &&
+      /buildPollinationPlan/.test(visitHelperMatch?.[2] ?? '') &&
+      /heldFacing\s*,/.test(visitHelperMatch?.[2] ?? '');
+    const sameFacingLaunchPassesHeld =
+      /setPlan\(buildVisitPlan\(nextPollinate,\s*target,\s*heldFacing\)\)/.test(flyingBeeSource);
+    const oppositeLaunchStoresTargetFacing =
+      /pendingLaunchRef\.current\s*=\s*\{\s*pollinate:\s*nextPollinate,\s*target,\s*heldFacing:\s*targetFacing\s*\}/.test(flyingBeeSource);
+    const preflightLaunchPassesHeld =
+      /setPlan\(buildVisitPlan\(pendingLaunch\.pollinate,\s*pendingLaunch\.target,\s*pendingLaunch\.heldFacing\)\)/.test(flyingBeeSource);
+    const wheelMatch = /const\s+buildPreflightWheelPlan\s*=\s*\([^)]*\)\s*=>\s*\(\{([\s\S]*?)\n\}\);/.exec(flyingBeeSource);
+    const wheelBody = wheelMatch?.[1] ?? '';
+    const wheelIsCaused =
+      /kind:\s*'preflight-wheel'/.test(wheelBody) &&
+      /durationMs:\s*TURN_MS/.test(wheelBody) &&
+      /path:\s*\[\s*at,\s*at\s*\]/.test(wheelBody) &&
+      /trail:\s*false/.test(wheelBody) &&
+      /flutter:\s*false/.test(wheelBody) &&
+      /scaleXOutput:\s*\[\s*fromFacing,\s*0,\s*toFacing\s*\]/.test(wheelBody);
+    if (
+      visitHelperCarriesFacing &&
+      sameFacingLaunchPassesHeld &&
+      oppositeLaunchStoresTargetFacing &&
+      preflightLaunchPassesHeld &&
+      wheelIsCaused
+    ) {
+      ok('M14 MP-4 visits inherit the drawn/rest facing, and opposite-facing visits pass through the stationary 120ms preflight wheel');
+    } else {
+      bad(
+        'M14 MP-4 inherited facing and caused preflight wheel',
+        `visitHelperCarriesFacing=${visitHelperCarriesFacing}, sameFacingLaunchPassesHeld=${sameFacingLaunchPassesHeld}, oppositeLaunchStoresTargetFacing=${oppositeLaunchStoresTargetFacing}, preflightLaunchPassesHeld=${preflightLaunchPassesHeld}, wheelIsCaused=${wheelIsCaused}`,
+      );
+    }
+  }
+
+  // --- M15. MP-4 — active visits coalesce later taps, they do not rebuild -
+  {
+    const activeBranch = /if\s*\(\s*planRef\.current\?\.kind\s*===\s*'visit'\s*\|\|\s*planRef\.current\?\.kind\s*===\s*'preflight-wheel'\s*\)\s*\{([\s\S]*?)\n\s{4}\}\n\s{4}launchPollination\(pollinate\);/.exec(flyingBeeSource)?.[1] ?? '';
+    const storesPending = /pendingPollinateRef\.current\s*=\s*pollinate/.test(activeBranch);
+    const returnsBeforeLaunch = /pendingPollinateRef\.current\s*=\s*pollinate[\s\S]{0,160}return\s*;/.test(activeBranch) &&
+      !/launchPollination\(pollinate\)|setPlan\(|buildVisitPlan\(|buildPreflightWheelPlan\(/.test(activeBranch);
+    const singlePendingSlot = (flyingBeeSource.match(/pendingPollinateRef/g) ?? []).length >= 5 &&
+      !/pendingPollinateRef\.current\.(push|unshift|splice)|\[\]\s*\)|pendingPollinateQueue|pollinateQueue/.test(flyingBeeSource);
+    const drainsAfterRest =
+      /if\s*\(\s*planRef\.current\?\.kind\s*!==\s*'rest'\s*\)\s*return[\s\S]{0,250}const\s+pending\s*=\s*pendingPollinateRef\.current[\s\S]{0,250}pendingPollinateRef\.current\s*=\s*null[\s\S]{0,250}launchPollination\(pending\)/.test(flyingBeeSource);
+    if (storesPending && returnsBeforeLaunch && singlePendingSlot && drainsAfterRest) {
+      ok('M15 MP-4 active pollination visits retain only the latest pending target and do not stop/rebuild the current errand');
+    } else {
+      bad(
+        'M15 MP-4 active visit coalesces instead of stop/rebuild',
+        `storesPending=${storesPending}, returnsBeforeLaunch=${returnsBeforeLaunch}, singlePendingSlot=${singlePendingSlot}, drainsAfterRest=${drainsAfterRest}`,
+      );
+    }
+  }
+
+  // --- M16. MP-4 — wheel-to-visit cannot publish progress 1 --------------
+  {
+    const planDriverSelected = /const\s+driver\s*=\s*plan\?\.driver\s*\?\?\s*t/.test(flyingBeeSource);
+    const visitPlanBody = /const\s+buildVisitPlan[\s\S]{0,1800}\n\s*\}\);/.exec(flyingBeeSource)?.[0] ?? '';
+    const visitOwnsDriver = /driver:\s*new\s+Animated\.Value\(0\)/.test(visitPlanBody);
+    const preflightOwnsDriver = /setPlan\(\s*\{[\s\S]{0,300}buildPreflightWheelPlan[\s\S]{0,800}driver:\s*new\s+Animated\.Value\(0\)/.test(flyingBeeSource);
+    const renderReadsSelectedDriver = /driver\.interpolate\(\{\s*inputRange:\s*track\.inputRange/.test(flyingBeeSource) &&
+      /driver\.interpolate\(\{\s*inputRange:\s*drawnAttitude\.inputRange/.test(flyingBeeSource);
+    const animationDrivesSelectedDriver = /Animated\.timing\(driver,\s*\{/.test(flyingBeeSource);
+    if (planDriverSelected && visitOwnsDriver && preflightOwnsDriver && renderReadsSelectedDriver && animationDrivesSelectedDriver) {
+      ok('M16 MP-4 wheel-to-visit handoff uses per-plan drivers, so the terminal preflight driver cannot paint the successor visit frame');
+    } else {
+      bad(
+        'M16 MP-4 atomic wheel-to-visit driver handoff',
+        `planDriverSelected=${planDriverSelected}, visitOwnsDriver=${visitOwnsDriver}, preflightOwnsDriver=${preflightOwnsDriver}, renderReadsSelectedDriver=${renderReadsSelectedDriver}, animationDrivesSelectedDriver=${animationDrivesSelectedDriver}`,
+      );
+    }
+  }
+
+  // --- M17. MP-4 — host landing identity is keyed end to end --------------
+  {
+    const identity = await import(pathToFileURL(POLLINATION_IDENTITY).href + `?gate=${Date.now()}`);
+    const key1 = { key: 1, cause: 'arrival' };
+    const key3 = { key: 3, cause: 'tap' };
+    const staleLanding = identity.pollinationLandingResult(key3, key1.key);
+    const liveLanding = identity.pollinationLandingResult(key3, key3.key);
+    const staleCancel = identity.pollinationCancelResult(key3, key1.key);
+    const liveCancel = identity.pollinationCancelResult(key3, key3.key);
+    const cancelVisit = identity.pollinationCancelPlanEffect({
+      planKind: 'visit',
+      planKey: key1.key,
+      pendingLaunchKey: key3.key,
+      cancelKey: key1.key,
+    });
+    const cancelPreflight = identity.pollinationCancelPlanEffect({
+      planKind: 'preflight-wheel',
+      planKey: null,
+      pendingLaunchKey: key1.key,
+      cancelKey: key1.key,
+    });
+    const cancelStale = identity.pollinationCancelPlanEffect({
+      planKind: 'visit',
+      planKey: key1.key,
+      pendingLaunchKey: key3.key,
+      cancelKey: key3.key,
+    });
+    const tabImportsHelper = /pollinationCancelResult,\s*pollinationLandingResult/.test(tabSource);
+    const tabPassesLandingKey = /onPollinateEnd=\{\(key\)\s*=>[\s\S]{0,1200}igniteLanding\(key\)[\s\S]{0,500}pollinationLandingResult\(pollinationRef\.current,\s*key\)/.test(tabSource);
+    const tabPassesCancelKey = /const\s+cancelPollinationKey\s*=\s*useCallback\(\(key\)\s*=>\s*\{[\s\S]{0,600}combRef\.current\?\.cancelPollination\(key\)[\s\S]{0,600}setCanceledPollination\(\{\s*key,\s*at:\s*Date\.now\(\)\s*\}\)[\s\S]{0,600}pollinationCancelResult\(current,\s*key\)/.test(tabSource) &&
+      (tabSource.match(/onPollinateCancel=\{\(key\)\s*=>\s*\{\s*cancelPollinationKey\(key\);\s*\}\}/g) ?? []).length >= 2;
+    const gridRequiresLandingKey = /const\s+aimsRef\s*=\s*useRef\(new\s+Map\(\)\)/.test(gridSource) &&
+      /aimsRef\.current\.set\(key,\s*aimRef\.current\)/.test(gridSource) &&
+      /const\s+aim\s*=\s*aimsRef\.current\.get\(key\)/.test(gridSource) &&
+      /aimsRef\.current\.delete\(key\)/.test(gridSource);
+    const gridRebindsPainterToLandingKey = /setLandingCentre\(\{\s*x:\s*aim\.localX,\s*y:\s*aim\.localY\s*\}\)/.test(gridSource) &&
+      /const\s+overlayCentre\s*=\s*landingCentre\s*\?\?\s*tapCentre/.test(gridSource) &&
+      /clusterOrigin\s*&&\s*overlayCentre\s*\?\s*\{\s*x:\s*clusterOrigin\.x\s*\+\s*overlayCentre\.x,\s*y:\s*clusterOrigin\.y\s*\+\s*overlayCentre\.y\s*\}/.test(gridSource);
+    const gridLandingRequestSurvivesRegistryCleanup = /boundedPollinationAims\(aimsRef\.current,\s*\{\s*currentKey:\s*activePollinationKey,\s*latestKey:\s*aimRef\.current\?\.key\s*\?\?\s*null\s*\}\);\s*lightGenerationRef\.current\s*\+=\s*1;\s*setLandingLightRequest\(\{\s*key,\s*generation:\s*lightGenerationRef\.current\s*\}\)/.test(gridSource);
+    const landingLightEffectBody = /useEffect\(\(\)\s*=>\s*\{([\s\S]*?)\n\s{4}return\s+\(\)\s*=>\s*\{[\s\S]*?animation\.stop\(\);[\s\S]*?\n\s{4}\};\n\s{2}\},\s*\[landingLightRequest,\s*landingCentre,\s*glowBloomOpacity\]\);/.exec(gridSource)?.[1] ?? '';
+    const afterLandingLightGuard = /if\s*\(!landingLightRequest\s*\|\|\s*!landingCentre\)\s*return\s+undefined;([\s\S]*)/.exec(landingLightEffectBody)?.[1] ?? '';
+    const gridLightArbiterStartsAfterCentreCommit = /setLandingLightRequest\(\{\s*key,\s*generation:\s*lightGenerationRef\.current\s*\}\)/.test(gridSource) &&
+      /const\s+animation\s*=\s*Animated\.sequence\(/.test(afterLandingLightGuard) &&
+      !/return\s+undefined;[\s\S]*const\s+animation\s*=\s*Animated\.sequence\(/.test(afterLandingLightGuard) &&
+      /(?:^|\n)\s{4}animation\.start\(\(\{\s*finished\s*\}\)\s*=>\s*\{/.test(landingLightEffectBody) &&
+      !/if\s*\(\s*false\s*\)\s*animation\.start\(/.test(landingLightEffectBody) &&
+      /animation\.start\(\(\{\s*finished\s*\}\)\s*=>\s*\{[\s\S]{0,140}lightGenerationRef\.current\s*!==\s*generation[\s\S]{0,300}setLandingCentre\(null\)/.test(gridSource) &&
+      /landingLightRef\.current\?\.stop\(\)[\s\S]{0,160}setLandingLightRequest\(null\)[\s\S]{0,80}setLandingCentre\(null\)/.test(gridSource);
+    const gridBoundsCurrentLatestRegistry = /import\s*\{\s*boundedPollinationAims\s*\}\s*from\s*'\.\/pollinationIdentity'/.test(gridSource) &&
+      /if\s*\(\s*latestKey\s*!=\s*null\s*&&\s*latestKey\s*!==\s*activePollinationKey\s*\)\s*aimsRef\.current\.delete\(latestKey\)/.test(gridSource) &&
+      (gridSource.match(/boundedPollinationAims\(aimsRef\.current,\s*\{\s*currentKey:\s*activePollinationKey,\s*latestKey:/g) ?? []).length >= 2 &&
+      /aimsRef\.current\.clear\(\)/.test(gridSource);
+    const airborneIdentitySeparatesCurrentFromLatest = /onPollinateFlightStart/.test(flyingBeeSource) &&
+      /onPollinateFlightStartRef\.current\?\.\(nextPollinate\.key\)/.test(flyingBeeSource) &&
+      /const\s+\[airbornePollinationKey,\s*setAirbornePollinationKey\]\s*=\s*useState\(null\)/.test(tabSource) &&
+      /canceledPollination=\{canceledPollination\}/.test(tabSource) &&
+      /activePollinationKey=\{airbornePollinationKey\s*\?\?\s*null\}/.test(tabSource) &&
+      /airbornePollinationKeyRef\.current\s*!=\s*null/.test(tabSource);
+    const gridAbortsAirborneKey = /const\s+aim\s*=\s*aimsRef\.current\.get\(activePollinationKey\)/.test(gridSource) &&
+      !/aimRef\.current;\s*[\s\S]{0,80}aim\.key\s*!==\s*activePollinationKey/.test(gridSource);
+    const gridPassesCancelKey = /onPollinateCancel\?\.\(aim\.key\)/.test(gridSource);
+    const beeClearsPendingOnHostCancel = /if\s*\(!pollinate\)\s*\{[\s\S]{0,500}pendingPollinateRef\.current\s*=\s*null[\s\S]{0,250}pendingLaunchRef\.current\s*=\s*null/.test(flyingBeeSource);
+    const beeStopsCanceledPlan = /import\s*\{\s*pollinationCancelPlanEffect\s*\}\s*from\s*'\.\/pollinationIdentity'/.test(flyingBeeSource) &&
+      /const\s+cancelPlanEffect\s*=\s*pollinationCancelPlanEffect\(\{[\s\S]{0,320}planKind:\s*planRef\.current\?\.kind[\s\S]{0,320}cancelKey:\s*canceledPollinationKey[\s\S]{0,80}\}\)/.test(flyingBeeSource) &&
+      /if\s*\(\s*cancelPlanEffect\.clearPendingLaunch\s*\)\s*pendingLaunchRef\.current\s*=\s*null/.test(flyingBeeSource) &&
+      /if\s*\(\s*cancelPlanEffect\.stopActive\s*\)\s*\{[\s\S]{0,60}rest\(\)/.test(flyingBeeSource);
+    const beeClearsPendingOnSuppression = /if\s*\(!flightSuppressed\s*&&\s*!sequenceHalted\)\s*return;[\s\S]{0,500}pendingPollinateRef\.current\s*=\s*null[\s\S]{0,250}pendingLaunchRef\.current\s*=\s*null[\s\S]{0,250}onPollinateCancelRef\.current\?\.\(key\)/.test(flyingBeeSource);
+    const gridHandleCarriesCancel = /useImperativeHandle\(ref,\s*\(\)\s*=>\s*\(\{\s*igniteLanding,\s*pollinateOwnCell,\s*cancelPollination\s*\}\)\)/.test(gridSource);
+    const timelineHolds =
+      staleLanding.accepted === false &&
+      staleLanding.pollination === key3 &&
+      liveLanding.accepted === true &&
+      liveLanding.pollination === null &&
+      staleCancel.accepted === false &&
+      staleCancel.pollination === key3 &&
+      liveCancel.accepted === true &&
+      liveCancel.pollination === null &&
+      cancelVisit.stopActive === true &&
+      cancelVisit.clearPendingLaunch === false &&
+      cancelPreflight.stopActive === true &&
+      cancelPreflight.clearPendingLaunch === true &&
+      cancelStale.stopActive === false &&
+      cancelStale.clearPendingLaunch === true;
+    if (timelineHolds && tabImportsHelper && tabPassesLandingKey && tabPassesCancelKey && gridRequiresLandingKey && gridRebindsPainterToLandingKey && gridLandingRequestSurvivesRegistryCleanup && gridLightArbiterStartsAfterCentreCommit && gridBoundsCurrentLatestRegistry && airborneIdentitySeparatesCurrentFromLatest && gridAbortsAirborneKey && gridPassesCancelKey && beeClearsPendingOnHostCancel && beeStopsCanceledPlan && beeClearsPendingOnSuppression && gridHandleCarriesCancel) {
+      ok('M17 MP-4 keyed host timeline holds: key1 landing/cancel cannot clear or illuminate key3, key3 clears only on its own landing/cancel, and stale pending identity is cleared on host cancel/suppression');
+    } else {
+      bad(
+        'M17 MP-4 keyed landing/cancel identity across FlyingBee, HoneycombTab and HoneycombGrid',
+        `timelineHolds=${timelineHolds}, tabImportsHelper=${tabImportsHelper}, tabPassesLandingKey=${tabPassesLandingKey}, tabPassesCancelKey=${tabPassesCancelKey}, gridRequiresLandingKey=${gridRequiresLandingKey}, gridRebindsPainterToLandingKey=${gridRebindsPainterToLandingKey}, gridLandingRequestSurvivesRegistryCleanup=${gridLandingRequestSurvivesRegistryCleanup}, gridLightArbiterStartsAfterCentreCommit=${gridLightArbiterStartsAfterCentreCommit}, gridBoundsCurrentLatestRegistry=${gridBoundsCurrentLatestRegistry}, airborneIdentitySeparatesCurrentFromLatest=${airborneIdentitySeparatesCurrentFromLatest}, gridAbortsAirborneKey=${gridAbortsAirborneKey}, gridPassesCancelKey=${gridPassesCancelKey}, beeClearsPendingOnHostCancel=${beeClearsPendingOnHostCancel}, beeStopsCanceledPlan=${beeStopsCanceledPlan}, beeClearsPendingOnSuppression=${beeClearsPendingOnSuppression}, gridHandleCarriesCancel=${gridHandleCarriesCancel}`,
+      );
     }
   }
 
@@ -4645,7 +4954,7 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
   //     exposes `igniteLanding` behind a ref; the screen wires the two
   //     together and does NOT let a new pixel constant cross with it.
   {
-    const burstThenEnd = /burstPollen\(plan\.landing\);[\s\S]{0,200}onPollinateEndRef\.current\?\.\(\)/.test(flyingBeeSource);
+    const burstThenEnd = /burstPollen\(plan\.landing\);[\s\S]{0,200}onPollinateEndRef\.current\?\.\(plan\.pollinationKey\)/.test(flyingBeeSource);
     const gridForwardRef = /export const HoneycombGrid = forwardRef\(/.test(gridSource);
     // AMENDED 2026-08-29 (R-N4.1). This used to pin the handle's ENTIRE
     // literal — `({ igniteLanding })`, exactly one key — and it went red on
@@ -4670,8 +4979,8 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
       const m = gridSource.match(/LANDING_LIGHT_PEAK\s*=\s*([\d.]+)/);
       return m ? Number(m[1]) < 1 : false;
     })();
-    const tabWiresRef = /ref=\{combRef\}/.test(tabSource) && /combRef\.current\?\.\s*igniteLanding\(\)/.test(tabSource);
-    const noNewCellCrossesToGrid = !/igniteLanding\s*\(/.test(tabSource.replace(/combRef\.current\?\.\s*igniteLanding\(\)/, ''));
+    const tabWiresRef = /ref=\{combRef\}/.test(tabSource) && /combRef\.current\?\.\s*igniteLanding\(key\)/.test(tabSource);
+    const noNewCellCrossesToGrid = !/igniteLanding\s*\((?!key\))/.test(tabSource.replace(/combRef\.current\?\.\s*igniteLanding\(key\)/, ''));
     if (burstThenEnd && gridForwardRef && gridExposesIgnite && peakUnderIgnition && tabWiresRef && noNewCellCrossesToGrid) {
       ok('M8 the landing light: onPollinateEnd still fires alongside burstPollen, HoneycombGrid exposes igniteLanding (peak under the ignition\'s) via a ref, and HoneycombTab wires the two with no new pixel or cell reference crossing (§28.2)');
     } else {

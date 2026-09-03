@@ -16,6 +16,7 @@ import { HoneycombGrid, HIVE_SLOTS, personKey } from '../components/HoneycombGri
 import { ScreenHeader } from '../components/ScreenHeader';
 import { BeeTransition } from '../components/BeeTransition';
 import { FlyingBee } from '../components/FlyingBee';
+import { pollinationCancelResult, pollinationLandingResult } from '../components/pollinationIdentity';
 import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { demoHiveShares } from '../constants/demoHive';
@@ -25,22 +26,6 @@ import { isBlooming } from '../utils/hiveState';
 import { NectarStore } from '../services/NectarStore';
 import { hasNectarConsent, honeyLevelForDrops, nectarArrivalDrops } from '../constants/nectar';
 import { NectarArrivalState } from '../services/nectarArrivalState';
-
-// Share carry (Sunbeam §11.2): the bee lifts the just-shared entry off the
-// button and carries it up toward the grid it just joined.
-const SHARE_CARRY_PATH = {
-  translateX: [10, -30],
-  translateY: [10, -60, -130],
-  rotate: ['6deg', '-14deg'],
-};
-
-// Feed arrival: a short touchdown at the top of the feed when a new share
-// lands there on refresh — the bee delivering it into the hive's view.
-const FEED_ARRIVAL_PATH = {
-  translateX: [-50, 30],
-  translateY: [-24, -4, 6],
-  rotate: ['-10deg', '4deg'],
-};
 
 // Real shares go first (center of the spiral, full opacity) so they read as
 // the actual hive; demo members fill the ring behind them so the honeycomb
@@ -392,6 +377,16 @@ const HoneycombFeed = () => {
   const [pollination, setPollination] = useState(null);
   const pollinationRef = useRef(null);
   pollinationRef.current = pollination;
+  const [airbornePollinationKey, setAirbornePollinationKey] = useState(null);
+  const airbornePollinationKeyRef = useRef(null);
+  airbornePollinationKeyRef.current = airbornePollinationKey;
+  const [canceledPollination, setCanceledPollination] = useState(null);
+  const cancelPollinationKey = useCallback((key) => {
+    combRef.current?.cancelPollination(key);
+    setAirbornePollinationKey((current) => (current === key ? null : current));
+    setCanceledPollination({ key, at: Date.now() });
+    setPollination((current) => pollinationCancelResult(current, key).pollination);
+  }, []);
   // The live scroll offset (read by value by the abort predicate) and a tick
   // that carries no information and exists only to re-run it. §28.9: put
   // completeness in the trigger and correctness in the predicate.
@@ -402,7 +397,7 @@ const HoneycombFeed = () => {
     // Only publish while a flight is airborne. The predicate is the tick's
     // only consumer, and a per-frame setState on a screen with fourteen
     // `useState` hooks is a real cost to pay when there is no bee to abort.
-    if (pollinationRef.current) setScrollTick((n) => n + 1);
+    if (airbornePollinationKeyRef.current != null) setScrollTick((n) => n + 1);
   }, []);
 
   const loadAll = useCallback(async ({ suppressArrival = false } = {}) => {
@@ -614,6 +609,7 @@ const HoneycombFeed = () => {
           active
           perches={hiveView === 'week' ? null : perches}
           pollinate={pollination}
+          canceledPollination={canceledPollination}
           // R-N4 — THE DROP IS A PROPERTY OF THE FLIGHT, NOT OF THIS SCREEN.
           // Derived from the fact the comb publishes (`cause`), so it is
           // born with the flight and dies with it: `setPollination(null)`
@@ -624,7 +620,10 @@ const HoneycombFeed = () => {
           // same frame as `burstPollen` — the drop leaves him exactly when
           // the pollen fires.
           carrying={pollination?.cause === 'arrival' ? giftDrops : null}
-          onPollinateEnd={() => {
+          onPollinateFlightStart={(key) => {
+            setAirbornePollinationKey(key);
+          }}
+          onPollinateEnd={(key) => {
             // R-LF-5 — the landing light. This USED to be the whole story
             // ("'I landed' is the only thing that crosses back"), and that
             // sentence went stale the moment R-N4.1 put a second command on
@@ -632,8 +631,14 @@ const HoneycombFeed = () => {
             // by any landing. What still holds is the narrower claim it was
             // making — the comb already knows which cell a landing means
             // (§28.2), so no cell reference travels back with it.
-            combRef.current?.igniteLanding();
-            setPollination(null);
+            combRef.current?.igniteLanding(key);
+            setAirbornePollinationKey((current) => (current === key ? null : current));
+            const result = pollinationLandingResult(pollinationRef.current, key);
+            if (!result.accepted) return;
+            setPollination(result.pollination);
+          }}
+          onPollinateCancel={(key) => {
+            cancelPollinationKey(key);
           }}
         />
       )}
@@ -780,9 +785,11 @@ const HoneycombFeed = () => {
           onInvitePress={() => setAddOpen(true)}
           scrollYRef={scrollYRef}
           scrollTick={scrollTick}
-          activePollinationKey={pollination?.key ?? null}
+          activePollinationKey={airbornePollinationKey ?? null}
           onPollinate={setPollination}
-          onPollinateCancel={() => setPollination(null)}
+          onPollinateCancel={(key) => {
+            cancelPollinationKey(key);
+          }}
         />
         </PerchAnchor>
       )}
@@ -838,16 +845,19 @@ const HoneycombFeed = () => {
         </View>
       )}
 
-      {todayEntry && !alreadySharedToday && (
+      {todayEntry && (
         <View style={styles.shareButtonAnchor}>
-          <PrimaryButton onPress={handleShareToday} disabled={sharing} style={styles.shareButton}>
-            {sharing ? 'Sharing…' : "Share today's gratitude"}
-          </PrimaryButton>
-          <BeeTransition triggerKey={shareCarryKey} path={SHARE_CARRY_PATH} anchorStyle={styles.shareCarryBeeAnchor} size={16} />
+          <View style={styles.shareActionStage}>
+            {!alreadySharedToday ? (
+              <PrimaryButton onPress={handleShareToday} disabled={sharing} style={styles.shareButton}>
+                {sharing ? 'Sharing…' : "Share today's gratitude"}
+              </PrimaryButton>
+            ) : (
+              <Text style={styles.sharedConfirmation}>Shared to your hive.</Text>
+            )}
+          </View>
+          <BeeTransition triggerKey={shareCarryKey} role="share-carry" anchorStyle={styles.shareCarryBeeAnchor} size={16} />
         </View>
-      )}
-      {todayEntry && alreadySharedToday && (
-        <Text style={styles.sharedConfirmation}>Shared to your hive.</Text>
       )}
 
       {/* §23.9.1 class (Lumen, this thread): emptiness copy reads the
@@ -892,7 +902,7 @@ const HoneycombFeed = () => {
           )
         ) : (
           <View style={styles.feedTopAnchor}>
-            <BeeTransition triggerKey={feedArrivalKey} path={FEED_ARRIVAL_PATH} anchorStyle={styles.feedArrivalBeeAnchor} size={16} />
+            <BeeTransition triggerKey={feedArrivalKey} role="feed-arrival" anchorStyle={styles.feedArrivalBeeAnchor} size={16} />
             {mergedFeed.map((item) =>
               item.kind === 'send' ? (
                 <SendEventCard key={`send-${item.id}`} event={item} />
@@ -1128,6 +1138,11 @@ const styles = StyleSheet.create({
   },
   shareButtonAnchor: {
     marginBottom: 20,
+    position: 'relative',
+  },
+  shareActionStage: {
+    height: 56,
+    justifyContent: 'center',
   },
   shareButton: {
     marginBottom: 0,
@@ -1140,7 +1155,6 @@ const styles = StyleSheet.create({
   sharedConfirmation: {
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
-    marginBottom: 20,
   },
   feedTopAnchor: {
     position: 'relative',

@@ -33,6 +33,34 @@
 // mutation loop cannot revert an uncommitted edit of your own.
 export const MUTATIONS = [
   {
+    row: 'D1b',
+    why: 'travel goes back to out(cubic), which launches from rest at peak velocity instead of zero endpoint velocity',
+    file: 'src/constants/motion.js',
+    from: '  travel: Easing.inOut(Easing.cubic),',
+    to: '  travel: Easing.out(Easing.cubic),',
+  },
+  {
+    row: 'D5b',
+    why: 'failure recovery adds a duplicate count at return start while leaving the correct origin count in place',
+    file: 'src/components/useNectarGift.js',
+    from: '          const returnHomeDone = new Promise((resolveReturnHome) => {\n            const reverseTravel = () => {',
+    to: '          const returnHomeDone = new Promise((resolveReturnHome) => {\n            countTo(settled.current);\n            const reverseTravel = () => {',
+  },
+  {
+    row: 'D5c',
+    why: 'Reduce Motion waits for the network before starting the optimistic count, making the gesture visually inert on a slow RPC',
+    file: 'src/components/useNectarGift.js',
+    from: '        const optimisticCountDone = countTo(optimistic);',
+    to: '',
+  },
+  {
+    row: 'D5b',
+    why: 'a known-at-contact failure skips the optimistic count before returning',
+    file: 'src/components/useNectarGift.js',
+    from: '          const countDone = countTo(optimistic);\n          if (commitResult && !commitResult.ok) {',
+    to: '          if (commitResult && !commitResult.ok) {',
+  },
+  {
     row: 'E1',
     why: 'a door that stops being a door — one call site loses the shared containerStyle, so the population is one and the branch pairing is gone',
     file: 'src/screens/PackageOpen.js',
@@ -64,14 +92,14 @@ export const MUTATIONS = [
     row: 'E5',
     why: 'a new ambient loop on this screen — the standing no-new-ambient rule, banned by name in R-N6',
     file: 'src/screens/PackageOpen.js',
-    from: '  const bloomScale = useRef(new Animated.Value(0.85)).current;',
-    to: '  const bloomScale = useRef(new Animated.Value(0.85)).current;\n  const doorPulse = Animated.loop(Animated.timing(bloomScale, { toValue: 1 }));',
+    from: '  const dwellProgressAnim = useRef(new Animated.Value(0)).current;',
+    to: '  const dwellProgressAnim = useRef(new Animated.Value(0)).current;\n  const doorPulse = Animated.loop(Animated.timing(arrivalProgressAnim, { toValue: 1 }));',
   },
   {
     row: 'E5',
     why: 'the door keeps its absence of a clock but loses its position — no animated ancestor means it arrives out of nowhere, which "no clock of its own" alone would not catch',
     file: 'src/screens/PackageOpen.js',
-    from: 'style={[styles.entryCard, { opacity: bloomOpacity, transform: [{ scale: bloomScale }] }]}',
+    from: 'style={[\n                  styles.entryCard,\n                  { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }, { scale: cardScale }] },\n                ]}',
     to: 'style={[styles.entryCard]}',
   },
   {
@@ -139,10 +167,10 @@ export const MUTATIONS = [
   },
   {
     row: 'F5',
-    why: 'the crossing stops escaping the component — the handle narrows back to one function and R-N4 has no door in',
+    why: 'the keyed cancel command stops escaping the component — abort/suppression can no longer clear the grid registry and flight state together',
     file: 'src/components/HoneycombGrid.js',
-    from: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell }));",
-    to: "  useImperativeHandle(ref, () => ({ igniteLanding }));",
+    from: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell, cancelPollination }));",
+    to: "  useImperativeHandle(ref, () => ({ igniteLanding, pollinateOwnCell }));",
   },
   {
     row: 'F5',
@@ -197,8 +225,8 @@ export const MUTATIONS = [
     row: 'G3',
     why: 'THE LANDING BECOMES THE ONLY WRITER — the level is committed from the flight\'s own callback instead of from the read. Every gift the bee never delivers (Reduce Motion, no seat, an abort) is then silently lost, which is the failure R-N4.1 names',
     file: 'src/screens/HoneycombTab.js',
-    from: "            combRef.current?.igniteLanding();\n            setPollination(null);",
-    to: "            combRef.current?.igniteLanding();\n            setHoneyLevel(honeyLevelForDrops(drops));\n            setPollination(null);",
+    from: "            combRef.current?.igniteLanding(key);\n            setAirbornePollinationKey((current) => (current === key ? null : current));\n            const result = pollinationLandingResult(pollinationRef.current, key);\n            if (!result.accepted) return;\n            setPollination(result.pollination);",
+    to: "            combRef.current?.igniteLanding(key);\n            setAirbornePollinationKey((current) => (current === key ? null : current));\n            const result = pollinationLandingResult(pollinationRef.current, key);\n            if (!result.accepted) return;\n            setHoneyLevel(honeyLevelForDrops(giftDrops));\n            setPollination(result.pollination);",
   },
   {
     row: 'G4',
@@ -211,8 +239,8 @@ export const MUTATIONS = [
     row: 'G5',
     why: 'the cargo gets its own scale instead of the gift\'s — a fixed radius, so every gift is the same size and R-N3\'s "the amount IS the radius" stops being true the moment the drop changes hands',
     file: 'src/components/FlyingBee.js',
-    from: "  const carriedRadius = carrying ? Math.min(dropRadiusForAmount(carrying), size / 2) : 0;",
-    to: "  const carriedRadius = carrying ? 12 : 0;",
+    from: "  const carriedRadius = planCarrying ? Math.min(dropRadiusForAmount(planCarrying), size / 2) : 0;",
+    to: "  const carriedRadius = planCarrying ? 12 : 0;",
   },
   {
     row: 'G6',
@@ -331,6 +359,7 @@ import {
   NECTAR_STARTER_GRANT_DROPS,
   nectarArrivalDrops,
 } from '../src/constants/nectar.js';
+import { nectarGiftLifecycleTrace } from '../src/components/nectarGiftLifecycle.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -371,7 +400,13 @@ const nectarMs = (key) => {
   if (!m) throw new Error(`check-nectar-exchange: NECTAR.${key} not found — a beat this gate measures has been renamed or removed`);
   return Number(m[1]);
 };
-const NECTAR = { gather: nectarMs('gather'), travel: nectarMs('travel'), settle: nectarMs('settle') };
+const NECTAR = {
+  gather: nectarMs('gather'),
+  travel: nectarMs('travel'),
+  absorbRise: nectarMs('absorbRise'),
+  absorbFall: nectarMs('absorbFall'),
+  settle: nectarMs('settle'),
+};
 
 const HIVE_THEMES_SRC = await read('src/constants/hiveThemes.js');
 const COVERS = [...HIVE_THEMES_SRC.matchAll(/base:\s*theme\.colors\.(\w+),\s*\n\s*textColor:\s*theme\.colors\.(\w+)/g)]
@@ -769,6 +804,44 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     bad('D1', `haptic in settle=${hapticInSettle}, haptic in a promise handler=${hapticInPromiseThen}, RM haptic=${rmHaptic} — §6 row 4 wants the call site inside absorption and nowhere else`);
   }
 
+  // MP-3: the travel profile starts and ends at rest. This samples the exact
+  // expression motion.js exports, with a tiny local Easing shim, rather than
+  // a hand-copied cubic that could keep passing after the app's curve changed.
+  const nectarEasingBlock = /export const NECTAR_EASING = \{[\s\S]*?\n\};/.exec(MOTION_SRC)?.[0] ?? '';
+  const travelExpr = /travel:\s*([^,\n]+),/.exec(nectarEasingBlock)?.[1] ?? '';
+  const EasingShim = {
+    cubic: (t) => t * t * t,
+    out: (fn) => (t) => 1 - fn(1 - t),
+    inOut: (fn) => (t) => (t < 0.5 ? fn(t * 2) / 2 : 1 - fn((1 - t) * 2) / 2),
+  };
+  let easeTravel = null;
+  try {
+    easeTravel = Function('Easing', `return (${travelExpr});`)(EasingShim);
+  } catch {
+    easeTravel = null;
+  }
+  const speeds = [];
+  const dt = 1 / 1000;
+  if (typeof easeTravel === 'function') {
+    for (let i = 0; i < 1000; i += 1) speeds.push((easeTravel((i + 1) * dt) - easeTravel(i * dt)) / dt);
+  }
+  const endpointEpsilon = 0.00001;
+  const endpointsRest = speeds[0] < 0.00001 && speeds[speeds.length - 1] < 0.00001;
+  const positiveInside = speeds.slice(1, -1).every((v) => v > 0);
+  let peaks = 0;
+  for (let i = 1; i < speeds.length - 1; i += 1) {
+    if (speeds[i] >= speeds[i - 1] && speeds[i] >= speeds[i + 1] && speeds[i] > 2.9) peaks += 1;
+  }
+  if (travelExpr === 'Easing.inOut(Easing.cubic)' && endpointsRest && positiveInside && peaks === 1) {
+    ok('D1b travel samples NECTAR_EASING.travel itself: endpoint velocity is zero at t=0/t=1, positive inside, and has one central peak at the cubic join');
+  } else {
+    bad(
+      'D1b',
+      `travelExpr="${travelExpr}", sampled=${typeof easeTravel === 'function'}, endpointsRest=${endpointsRest}, ` +
+        `positiveInside=${positiveInside}, peakSamples=${peaks}, epsilon=${endpointEpsilon}`,
+    );
+  }
+
   // ROW 5, MADE STRUCTURAL. "The numeral returns to its prior value exactly —
   // no drift from the count-down/count-up pair" is only checkable if the two
   // are NOT a pair: every count is a tween to an ABSOLUTE target, so
@@ -828,6 +901,145 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     ok(`D5 the beat's instants are composed from NECTAR rather than typed — contact = gather + travel = ${NECTAR.gather + NECTAR.travel}ms, matching R-N3's own Depart boundary, and rest follows from it. Retuning a duration moves the beat instead of stranding it`);
   } else {
     bad('D5', `contact is "${contact.trim()}" and rest is "${rest.trim()}" (contact resolves to ${NECTAR.gather + NECTAR.travel}ms) — a beat boundary spelled as a literal is a number that outlives its own duration`);
+  }
+
+  // MP-3: failure timing is contact-owned, and the returned send() promise is
+  // owned by the whole failure lifecycle. A failure known before contact
+  // starts the return immediately; a failure arriving during the stain stops
+  // that stain on the frame the RPC result appears; and the caller cannot
+  // leave its sending state until return-home plus the authoritative count
+  // both complete.
+  const failureTiming =
+    /let commitResult = null;/.test(HOOK) &&
+    /commitResult = \{ ok: false, err \};/.test(HOOK) &&
+    /const countDone = countTo\(optimistic\);\n\s*if \(commitResult && !commitResult\.ok\) \{/.test(HOOK) &&
+    /if \(commitResult && !commitResult\.ok\) \{[\s\S]{0,200}?Promise\.reject\(\{ err: commitResult\.err, collapsed: false, countDone \}\)/.test(HOOK) &&
+    /const failure = settledCommit\.then\(\(res\) => \(res\.ok \? null : res\)\);/.test(HOOK) &&
+    /Promise\.race\(\[stainDone\.then\(\(\) => null\), failure\]\)/.test(HOOK) &&
+    /stainAnimation\?\.stop\(\);/.test(HOOK) &&
+    /Promise\.reject\(\{ err: earlyFailure\.err, collapsed: true, countDone \}\)/.test(HOOK) &&
+    /return Promise\.all\(\[stainDone, countDone\]\);/.test(HOOK) &&
+    /const returnPlan = nectarFailureReturnPlan\(\{ collapsed, nectar: NECTAR \}\);/.test(HOOK) &&
+    /if \(returnPlan\.authoritativeCountAt !== 'origin'\) return;/.test(HOOK) &&
+    /const returnHomeDone = new Promise\(\(resolveReturnHome\) => \{/.test(HOOK) &&
+    /resolveReturnHome\(\);/.test(HOOK) &&
+    /const countHomeDone = countTo\(settled\.current\);/.test(HOOK) &&
+    /return returnHomeDone\.then\(\(\) => \(\{ ok: false, err \}\)\);/.test(HOOK);
+  const normalFailureTrace = [0, 200, 800].map((commitAtMs) =>
+    nectarGiftLifecycleTrace({ reduced: false, commitAtMs, ok: false, nectar: NECTAR })
+  );
+  const normalFailureClocksHold =
+    normalFailureTrace[0].optimisticCountStartMs === normalFailureTrace[0].contactMs &&
+    normalFailureTrace[0].returnStartMs === normalFailureTrace[0].contactMs &&
+    normalFailureTrace[0].firstPositionChangeMs === normalFailureTrace[0].contactMs &&
+    normalFailureTrace[0].authoritativeCountStartMs === normalFailureTrace[0].originMs &&
+    normalFailureTrace[1].returnStartMs === normalFailureTrace[1].contactMs &&
+    normalFailureTrace[2].returnStartMs === 800 &&
+    normalFailureTrace.every((t) => t.resolveMs >= t.authoritativeCountStartMs + NECTAR.settle);
+  const settledCountCalls = [];
+  visit(tree, (n, anc) => {
+    if (
+      n.type !== 'CallExpression' ||
+      n.callee?.type !== 'Identifier' ||
+      n.callee.name !== 'countTo' ||
+      n.arguments?.[0]?.type !== 'MemberExpression' ||
+      n.arguments[0].object?.name !== 'settled' ||
+      n.arguments[0].property?.name !== 'current'
+    ) return;
+
+    const insideReverseTravelCompletion = anc.some((a) => {
+      if (
+        a.type !== 'CallExpression' ||
+        a.callee?.type !== 'MemberExpression' ||
+        a.callee.property?.name !== 'start'
+      ) return false;
+      const timingCall = a.callee.object;
+      return (
+        timingCall?.type === 'CallExpression' &&
+        timingCall.callee?.type === 'MemberExpression' &&
+        timingCall.callee.object?.name === 'Animated' &&
+        timingCall.callee.property?.name === 'timing' &&
+        timingCall.arguments?.[0]?.type === 'Identifier' &&
+        timingCall.arguments[0].name === 'travel'
+      );
+    });
+    settledCountCalls.push({ insideReverseTravelCompletion });
+  });
+  const exactlyOneSettledCountAtOrigin =
+    settledCountCalls.length === 1 &&
+    settledCountCalls[0].insideReverseTravelCompletion;
+  if (failureTiming && normalFailureClocksHold && exactlyOneSettledCountAtOrigin) {
+    ok('D5b normal lifecycle inspects failure at contact, interrupts the stain on an in-stain rejection, starts exactly one authoritative count, starts it at reverse-travel origin, and send() resolves only after return-home plus authoritative count completion');
+  } else {
+    bad(
+      'D5b',
+      `failureTiming=${failureTiming}, settledCountCalls=${JSON.stringify(settledCountCalls)}, traces=${JSON.stringify(normalFailureTrace)}`,
+    );
+  }
+
+  const commitSamples = [0, 200, 800];
+  const lifecycleMatrix = [false, true].flatMap((reduced) =>
+    [true, false].flatMap((okResult) =>
+      commitSamples.map((commitAtMs) => ({
+        reduced,
+        ok: okResult,
+        commitAtMs,
+        trace: nectarGiftLifecycleTrace({ reduced, commitAtMs, ok: okResult, nectar: NECTAR }),
+      }))
+    )
+  );
+  const fullLifecycleMatrixHolds = lifecycleMatrix.every(({ reduced, ok: okResult, commitAtMs, trace }) => {
+    if (reduced && okResult) {
+      return trace.countStartMs === 0 && trace.resolveMs >= commitAtMs && trace.resolveMs >= NECTAR.settle;
+    }
+    if (reduced && !okResult) {
+      return trace.countStartMs === 0 && trace.authoritativeCountStartMs === commitAtMs && trace.resolveMs >= commitAtMs + NECTAR.settle;
+    }
+    if (!reduced && okResult) {
+      return (
+        trace.optimisticCountStartMs === trace.contactMs &&
+        trace.resolveMs >= commitAtMs &&
+        trace.resolveMs >= trace.contactMs + NECTAR.absorbRise + NECTAR.absorbFall &&
+        trace.resolveMs >= trace.contactMs + NECTAR.settle
+      );
+    }
+    return (
+      trace.optimisticCountStartMs === trace.contactMs &&
+      trace.returnStartMs === (commitAtMs <= trace.contactMs ? trace.contactMs : commitAtMs) &&
+      trace.firstPositionChangeMs === trace.returnStartMs &&
+      trace.authoritativeCountStartMs === trace.originMs &&
+      trace.resolveMs >= trace.originMs + NECTAR.gather &&
+      trace.resolveMs >= trace.authoritativeCountStartMs + NECTAR.settle
+    );
+  });
+
+  // MP-3: Reduce Motion still has no travel, but it must keep the gesture's
+  // optimism. The count starts before the network join; success awaits that
+  // visible optimistic count, and failure reverses to the authoritative base
+  // only when the rejection is known.
+  const rmReducedBlock = /if \(reduced\) \{([\s\S]*?)\n      \}/.exec(HOOK)?.[1] ?? '';
+  const rmOptimisticStartsBeforeNetwork =
+    /const optimisticCountDone = countTo\(optimistic\);[\s\S]*?return settledCommit/.test(rmReducedBlock);
+  const rmSuccessAwaitsOptimistic =
+    /if \(res\.ok\) \{[\s\S]*?await optimisticCountDone;/.test(rmReducedBlock);
+  const rmFailureReversesAuthoritative =
+    /\} else \{[\s\S]*?await countTo\(base\);/.test(rmReducedBlock);
+  const countPromiseOwned = /return new Promise\(\(resolve\) => \{[\s\S]*?a\.start\(resolve\);[\s\S]*?\}\);/.test(HOOK);
+  const rmTrace = [0, 200, 800].map((commitAtMs) =>
+    nectarGiftLifecycleTrace({ reduced: true, commitAtMs, ok: true, nectar: NECTAR })
+  );
+  const rmClocksHold = rmTrace.every((t, index) =>
+    t.countStartMs === 0 &&
+    t.resolveMs >= [0, 200, 800][index] &&
+    t.resolveMs >= NECTAR.settle
+  );
+  if (rmOptimisticStartsBeforeNetwork && rmSuccessAwaitsOptimistic && rmFailureReversesAuthoritative && countPromiseOwned && rmClocksHold && fullLifecycleMatrixHolds) {
+    ok('D5c Reduce Motion starts the optimistic count with the gesture, reverses only after a known failure, send() awaits the visible count callback, and the shared lifecycle planner covers the 12-case timing matrix');
+  } else {
+    bad(
+      'D5c',
+      `rmOptimisticStartsBeforeNetwork=${rmOptimisticStartsBeforeNetwork}, rmSuccessAwaitsOptimistic=${rmSuccessAwaitsOptimistic}, rmFailureReversesAuthoritative=${rmFailureReversesAuthoritative}, countPromiseOwned=${countPromiseOwned}, rmClocksHold=${rmClocksHold}, fullLifecycleMatrixHolds=${fullLifecycleMatrixHolds}, matrix=${JSON.stringify(lifecycleMatrix)}`,
+    );
   }
 
   // THE PANEL'S NUMERAL SURVIVES GATHER. This is the one place this build
@@ -961,9 +1173,14 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // load-bearing — a door with no animated ancestor at all would also have
   // "no clock of its own" and would arrive out of nowhere.
   const hasLoop = /Animated\.loop\s*\(/.test(SCREEN);
-  const ridesBloom = post && post.animatedAncestor && /styles\.entryCard/.test(post.animatedAncestor) && /bloomOpacity/.test(post.animatedAncestor);
+  const ridesBloom =
+    post &&
+    post.animatedAncestor &&
+    /styles\.entryCard/.test(post.animatedAncestor) &&
+    /cardOpacity/.test(post.animatedAncestor) &&
+    /cardScale/.test(post.animatedAncestor);
   if (!hasLoop && ridesBloom) {
-    ok('E5 the door has no clock of its own and is not clockless — zero `Animated.loop` on this screen (the standing no-new-ambient rule), and its nearest animated ancestor is the entry card\'s own `bloomOpacity`/`bloomScale` view. The ruling is satisfied by an ABSENCE, so the row asserts the absence and the position together');
+    ok('E5 the door has no clock of its own and is not clockless — zero `Animated.loop` on this screen (the standing no-new-ambient rule), and its nearest animated ancestor is the entry card\'s own arrival-progress view. The ruling is satisfied by an ABSENCE, so the row asserts the absence and the position together');
   } else {
     bad('E5', `Animated.loop present=${hasLoop}, nearest animated ancestor of the post-consent door=${post ? post.animatedAncestor : 'none'} — R-N6 bans a new ambient loop and puts the door on the entry's bloom`);
   }
@@ -1191,7 +1408,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     }
     if (n.type === 'VariableDeclarator' && n.id?.name && n.init) gridFns.set(n.id.name, n.init);
   });
-  const expectedHandle = ['igniteLanding', 'pollinateOwnCell'];
+  const expectedHandle = ['igniteLanding', 'pollinateOwnCell', 'cancelPollination'];
   // "No state out" — for each member, walk its own body and collect any
   // `return` that carries an argument. Nested function expressions are
   // deliberately INCLUDED: `aimOwnCell` leaked through a `new Promise`
@@ -1210,7 +1427,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   }
   const handleSetOk = handleKeys && handleKeys.length === expectedHandle.length && expectedHandle.every((k) => handleKeys.includes(k));
   if (handleSetOk && stateOut.length === 0) {
-    ok(`F5 the comb's handle publishes exactly {${handleKeys.join(', ')}} and EVERY member is a command: zero value-carrying returns across both bodies, nested function expressions included. The membership is asserted as a SET so a third escape reds this row rather than arriving unremarked; the no-state-out half is the invariant itself, and it is what a key-count row could not see — \`aimOwnCell\` was one key and still a fact leaving`);
+    ok(`F5 the comb's handle publishes exactly {${handleKeys.join(', ')}} and EVERY member is a command: zero value-carrying returns across every body, nested function expressions included. The membership is asserted as a SET so a missing keyed cancel command reds this row rather than leaving abort/suppression as host-only state; the no-state-out half is the invariant itself, and it is what a key-count row could not see — \`aimOwnCell\` was one key and still a fact leaving`);
   } else {
     bad('F5', `handle keys = ${handleKeys ? `{${handleKeys.join(', ')}}` : 'unresolved'} (want exactly {${expectedHandle.join(', ')}}), state leaving = [${stateOut.join(' | ')}]`);
   }
@@ -1435,11 +1652,11 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // for later" — a drop the bee keeps until a cell appears is the badge this
   // beat exists to replace).
   //
-  // The guarantee is structural and the row asserts the structure: what the
-  // bee carries is DERIVED from the live flight's `cause`, so it is born
-  // with the flight and dies with it. A `carrying` held in its own state and
-  // cleared on landing would be a second thing to keep in step, and the
-  // failure mode of getting that wrong is a permanent badge.
+  // The guarantee is structural and the row asserts the structure: the host
+  // still hands the arrival amount to the flight channel, and `FlyingBee`
+  // snapshots that amount onto the visit plan at launch. That extra boundary
+  // became necessary in MP-4, where the host may already be publishing a
+  // later tap while an older gift flight is still in the air.
   const carryAttr = (() => {
     let v = null;
     visit(tabTree, (n) => {
@@ -1448,13 +1665,14 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     return v;
   })();
   const derivedFromFlight = Boolean(carryAttr) && /pollination\?\.cause === 'arrival'/.test(carryAttr);
-  // Both terminations must clear the flight, or one of them strands it.
-  const clearsOnEnd = /onPollinateEnd=\{\(\) => \{[\s\S]{0,900}?setPollination\(null\)/.test(TAB);
-  const clearsOnCancel = /onPollinateCancel=\{\(\) => setPollination\(null\)\}/.test(TAB);
-  if (derivedFromFlight && clearsOnEnd && clearsOnCancel) {
-    ok('G4 the drop cannot be stranded: `carrying` is derived from the live flight\'s own `cause`, and BOTH terminations clear the flight — touchdown (`onPollinateEnd`) and abort (`onPollinateCancel`). There is no path on which the bee keeps a drop, and the release lands on the same frame as `burstPollen`');
+  const snapshottedOnPlan = /carrying:\s*nextPollinate\.cause\s*===\s*'arrival'\s*\?\s*carrying\s*:\s*null/.test(BEE);
+  // Both terminations must clear the matching flight, or one of them strands it.
+  const clearsOnEnd = /pollinationLandingResult\(pollinationRef\.current,\s*key\)[\s\S]{0,300}setPollination\(result\.pollination\)/.test(TAB);
+  const clearsOnCancel = /pollinationCancelResult\(current,\s*key\)\.pollination/.test(TAB);
+  if (derivedFromFlight && snapshottedOnPlan && clearsOnEnd && clearsOnCancel) {
+    ok('G4 the drop cannot be stranded: the host publishes arrival cargo on the flight channel, FlyingBee snapshots it onto the visit plan, and BOTH keyed terminations clear only the matching flight. There is no path where a stale host pollination changes the cargo of the errand already in the air');
   } else {
-    bad('G4', `carrying derived from the flight=${derivedFromFlight} (${carryAttr ?? 'attribute missing'}), clears on touchdown=${clearsOnEnd}, clears on abort=${clearsOnCancel}`);
+    bad('G4', `carrying derived from the flight=${derivedFromFlight} (${carryAttr ?? 'attribute missing'}), snapshottedOnPlan=${snapshottedOnPlan}, clears on touchdown=${clearsOnEnd}, clears on abort=${clearsOnCancel}`);
   }
 
   // G5 — THE CARGO IS THE GIFT'S OWN SIZE, and the clamp is a guard rather
@@ -1466,7 +1684,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // on nothing, and at a smaller mount it binds — because a clamp asserted
   // only where it is inert is a clamp nobody has tested.
   const { dropRadiusForAmount, DROP_MAX_RADIUS } = await import('../src/components/nectarFlight.js');
-  const carriedExpr = /const carriedRadius = carrying \? Math\.min\(dropRadiusForAmount\(carrying\), size \/ 2\) : 0;/.test(BEE);
+  const carriedExpr = /const planCarrying = plan\?\.kind === 'visit' \? plan\.carrying : null;\s*const carriedRadius = planCarrying \? Math\.min\(dropRadiusForAmount\(planCarrying\), size \/ 2\) : 0;/.test(BEE);
   const mountSize = (() => { const m = BEE.match(/const DEFAULT_SIZE = (\d+);/); return m ? Number(m[1]) : null; })();
   // The largest amount the ledger can put in one arrival is unbounded above
   // in principle, so the bound that matters is the function's own ceiling.

@@ -40,5 +40,7 @@ The ritual, in order:
 - [`POLLINATE_V2_ASSIGNMENTS.md`](./POLLINATE_V2_ASSIGNMENTS.md) — V2 work breakdown: issue IDs, owners, sequencing, critical path, gates. The source for V2 work assignments.
 - [`POLLINATE_V2_NAVIGATION.md`](./POLLINATE_V2_NAVIGATION.md) — **the operative navigation ruling** (Colin, 2026-08-26): three-tab bar `Today | Hive | Garden`, Wallet tab deleted, account door top-right, where money lives without a tab. Companion to the 2026-08-26 amendment in `Pollinate_The_Ruling.md`.
 - [`DESIGN_BRIEF_V2_NAVIGATION.md`](./DESIGN_BRIEF_V2_NAVIGATION.md) — the design brief for the navigation ruling: Part A (DES-27, three-tab capsule + door) and Part B (DES-28, zap surfaces; Surface 1 inherits DES-24).
+- [`MOTION_PRESENCE_GOVERNING_SCORE.md`](./MOTION_PRESENCE_GOVERNING_SCORE.md) — governing MP-1 role score and preserved boundaries for the five-lane motion pass; its role table is the sole value source for BeeTransition implementation.
+- [`MOTION_PRESENCE_CAPTURE_SCORECARD.md`](./MOTION_PRESENCE_CAPTURE_SCORECARD.md) — canonical visual-acceptance instrument: the capture population, hard vetoes, taste score, and frame-by-frame ratification protocol.
 
 `README.md` and `PROJECT_STRUCTURE.md` at repo root still describe the pre-pivot app; see `pixel/pollinate-rebrand-inventory` for the pending rewrite of those.

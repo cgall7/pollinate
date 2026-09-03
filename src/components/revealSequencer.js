@@ -130,26 +130,14 @@
 
 // --- the grammar ----------------------------------------------------------
 //
-// PLACEHOLDER. Both fields are Deezine's under the §12.5 ownership split;
-// these values exist so the engine can be built, sampled and gated before the
-// choreography spec lands, and they are NOT a design. Replacing this object
-// is the whole of the hand-off — no engine change should be needed to accept
-// a timing table.
-export const STUB_GRAMMAR = {
-  // THE BLOOM. Deezine's, and R118 hands it back unchanged: the choreography
-  // spec's §2 range is 800-1200ms and 900 is its own worked example. What the
-  // amendment removes from this number is a JOB it could not do — it is the
-  // arrival, it is no longer the pace, and Deezine's range needs no revision
-  // to stop being one.
-  bloomMs: 900,
-  // The Reduce Motion arrival — a crossfade, not a bloom. `DURATIONS
-  // .reducedMotionFade` in `src/constants/motion.js` is 200 today; it is
-  // copied rather than imported for the reason in the header, and the consumer
-  // passes the live one in. (The choreography spec §5 says 400-600 — that is a
-  // number to reconcile with the token the rest of the app already fades at,
-  // and it is Deezine's call which moves. Nothing here depends on which.)
-  // Ruling 3: this shortens the ARRIVAL. It does not appear in `dwellMs`.
-  reducedFadeMs: 200,
+// Final native reveal grammar, per MP-2. The engine stays dependency-free so
+// the pacing gate can keep importing and sampling it directly.
+export const NATIVE_REVEAL_GRAMMAR = {
+  // The arrival bloom. This is not the whole pace: `dwellMs` still adds the
+  // entry's own read floor, so the rail remains the early-tap refusal carrier.
+  bloomMs: 960,
+  // Reduced Motion substitutes only the arrival, not the dwell.
+  reducedFadeMs: 480,
 
   // THE READ RATE, and it is the one number in this table that is NOT a taste
   // decision — which is why it is mine and the bloom is Deezine's. Deezine
@@ -295,6 +283,50 @@ export const dwellMs = (grammar, step) => grammar.bloomMs + readMs(step, grammar
 // what it is about.
 export const arrivalMs = (grammar, reduced) => (reduced ? grammar.reducedFadeMs : grammar.bloomMs);
 
+export const REVEAL_CARD_KEYFRAME_MS = 300;
+export const REVEAL_DATE_ONSET_MS = 280;
+
+const easeOutCubic = (t) => 1 - ((1 - t) ** 3);
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);
+const clamp01 = (n) => Math.max(0, Math.min(1, n));
+
+export const normalRevealMasterProgressAtMs = (elapsedMs, grammar) => {
+  const first = REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs;
+  if (elapsedMs <= 0) return 0;
+  if (elapsedMs < REVEAL_CARD_KEYFRAME_MS) {
+    return first * easeOutCubic(elapsedMs / REVEAL_CARD_KEYFRAME_MS);
+  }
+  if (elapsedMs >= grammar.bloomMs) return 1;
+  const restMs = grammar.bloomMs - REVEAL_CARD_KEYFRAME_MS;
+  const rest = easeInOutCubic((elapsedMs - REVEAL_CARD_KEYFRAME_MS) / restMs);
+  return first + (1 - first) * rest;
+};
+
+export const normalRevealCardOpacityAtMaster = (master, grammar = NATIVE_REVEAL_GRAMMAR) => {
+  const first = REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs;
+  if (master <= 0) return 0;
+  if (master < first) return (master / first) * 0.92;
+  if (master >= 1) return 1;
+  return 0.92 + ((master - first) / (1 - first)) * 0.08;
+};
+
+export const normalRevealCardOpacityAtMs = (elapsedMs, grammar) =>
+  normalRevealCardOpacityAtMaster(normalRevealMasterProgressAtMs(elapsedMs, grammar), grammar);
+
+export const normalRevealCardOpacitySegmentEasing = (fromMs, toMs, grammar) => {
+  const start = normalRevealCardOpacityAtMs(fromMs, grammar);
+  const end = normalRevealCardOpacityAtMs(toMs, grammar);
+  const span = end - start;
+  if (Math.abs(span) < 1e-9) return () => 1;
+  return (t) => clamp01((normalRevealCardOpacityAtMs(fromMs + ((toMs - fromMs) * clamp01(t)), grammar) - start) / span);
+};
+
+export const normalRevealDateMasterBreakpoint = (grammar) =>
+  (REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs) * easeOutCubic(REVEAL_DATE_ONSET_MS / REVEAL_CARD_KEYFRAME_MS);
+
+export const normalRevealDateOpacityBreakpoint = (grammar) =>
+  normalRevealCardOpacityAtMaster(normalRevealDateMasterBreakpoint(grammar), grammar);
+
 export const canAdvance = (state, nowMs, sequence, grammar) =>
   !state.done && nowMs - state.arrivedAtMs >= dwellMs(grammar, sequence[state.index]);
 
@@ -365,7 +397,9 @@ export const dwellProgress = (state, nowMs, sequence, grammar) => {
 export const arrivalProgress = (state, nowMs, grammar, reduced) => {
   const a = arrivalMs(grammar, reduced);
   if (!(a > 0)) return 1;
-  return Math.max(0, Math.min(1, (nowMs - state.arrivedAtMs) / a));
+  const elapsed = nowMs - state.arrivedAtMs;
+  if (reduced) return clamp01(elapsed / a);
+  return clamp01(normalRevealCardOpacityAtMs(elapsed, grammar));
 };
 
 // THE tap. Ruling 2 is the `return state` on both refusal branches: the caller

@@ -40,8 +40,69 @@ import { readFile, readdir } from 'node:fs/promises';
 import { parse } from '@babel/parser';
 import { contrastRatio, over, parseColor, calibrate } from './lib/color.mjs';
 
+export const MUTATIONS = [
+  {
+    row: 'D14a',
+    why: 'arrivalProgress stops sampling rendered opacity and returns a linear elapsed fraction',
+    file: 'src/components/revealSequencer.js',
+    from: '  return clamp01(normalRevealCardOpacityAtMs(elapsed, grammar));',
+    to: '  return clamp01(elapsed / a);',
+  },
+  {
+    row: 'D14a',
+    why: 'the 280ms date onset is expressed in linear master space, so the date arrives about 102ms early',
+    file: 'src/components/revealSequencer.js',
+    from: '  (REVEAL_CARD_KEYFRAME_MS / grammar.bloomMs) * easeOutCubic(REVEAL_DATE_ONSET_MS / REVEAL_CARD_KEYFRAME_MS);',
+    to: '  REVEAL_DATE_ONSET_MS / grammar.bloomMs;',
+  },
+  {
+    row: 'D14c',
+    why: 'fresh RM steps inherit the previous rendered value instead of starting from their elapsed RM clock',
+    file: 'src/screens/PackageOpen.js',
+    from: '    if (sameStep && (toggledIntoReduced || spatialFrozen)) {',
+    to: '    if (toggledIntoReduced || spatialFrozen) {',
+  },
+  {
+    row: 'D14c',
+    why: 'a stale native-value callback can write into the successor step when the generation guard is removed',
+    file: 'src/screens/PackageOpen.js',
+    from: '      if (arrivalGenerationRef.current !== generation) return;',
+    to: '',
+  },
+  {
+    row: 'D14e',
+    why: 'a delayed normal mount restarts a fresh easing tail instead of tail-normalizing the absolute curve',
+    file: 'src/components/revealSequencer.js',
+    from: '  return (t) => clamp01((normalRevealCardOpacityAtMs(fromMs + ((toMs - fromMs) * clamp01(t)), grammar) - start) / span);',
+    to: '  return (t) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);',
+  },
+  {
+    row: 'D14d',
+    why: 'accepted taps publish the next step while the old drivers still hold complete values',
+    file: 'src/screens/PackageOpen.js',
+    from: '    arrivalProgressAnim.setValue(0);\n    dwellProgressAnim.setValue(0);',
+    to: '',
+  },
+  {
+    row: 'D14c',
+    why: 'turning RM off mid-step reintroduces spatial travel instead of freezing transforms until the next step',
+    file: 'src/screens/MemoryLane.js',
+    from: '    if (reduced) spatialFrozenStepRef.current = revealState.index;',
+    to: '    if (false && reduced) spatialFrozenStepRef.current = revealState.index;',
+  },
+  {
+    row: null,
+    why: 'a legal explanatory wording change in the sequencer header must not affect runtime pacing rows',
+    file: 'src/components/revealSequencer.js',
+    from: 'the pacing gate can keep importing and sampling it directly.',
+    to: 'the pacing gate can keep loading and sampling it directly.',
+  },
+];
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE = path.join(ROOT, 'src/components/revealSequencer.js');
+const PACKAGE_OPEN_MODULE = path.join(ROOT, 'src/screens/PackageOpen.js');
+const MEMORY_LANE_MODULE = path.join(ROOT, 'src/screens/MemoryLane.js');
 const SEED_MODULE = path.join(ROOT, 'src/utils/demoSeed.js');
 const PROMPTS_MODULE = path.join(ROOT, 'src/constants/prompts.js');
 const THEME_MODULE = path.join(ROOT, 'src/constants/theme.js');
@@ -68,6 +129,14 @@ const pend = (label, detail) => {
 };
 
 const parseJs = (src) => parse(src, { sourceType: 'module', plugins: ['jsx'] });
+const parseJsWithComments = (src) => parse(src, { sourceType: 'module', plugins: ['jsx'], attachComment: true });
+const uncommented = (src, ast) => {
+  const chars = src.split('');
+  for (const c of ast.comments ?? []) {
+    for (let i = c.start; i < c.end; i += 1) chars[i] = ' ';
+  }
+  return chars.join('');
+};
 const walk = (node, visit) => {
   if (!node || typeof node !== 'object') return;
   if (Array.isArray(node)) {
@@ -121,7 +190,7 @@ console.log('\nA. the module is sampleable at all');
 
 const seq = await import(`data:text/javascript;base64,${Buffer.from(moduleSource).toString('base64')}`);
 const {
-  STUB_GRAMMAR: G,
+  NATIVE_REVEAL_GRAMMAR: G,
   buildRevealSequence,
   startReveal,
   readMs,
@@ -130,8 +199,25 @@ const {
   canAdvance,
   dwellProgress,
   arrivalProgress,
+  normalRevealMasterProgressAtMs,
+  normalRevealCardOpacityAtMaster,
+  normalRevealDateMasterBreakpoint,
+  normalRevealCardOpacityAtMs,
+  normalRevealCardOpacitySegmentEasing,
+  normalRevealDateOpacityBreakpoint,
+  REVEAL_CARD_KEYFRAME_MS,
+  REVEAL_DATE_ONSET_MS,
   tapReveal,
 } = seq;
+
+const packageOpenSource = await readFile(PACKAGE_OPEN_MODULE, 'utf8');
+const packageOpenAst = parseJsWithComments(packageOpenSource);
+const memoryLaneSource = await readFile(MEMORY_LANE_MODULE, 'utf8');
+const memoryLaneAst = parseJsWithComments(memoryLaneSource);
+const revealMounts = [
+  { label: 'PackageOpen', source: packageOpenSource, ast: packageOpenAst },
+  { label: 'MemoryLane', source: memoryLaneSource, ast: memoryLaneAst },
+];
 
 // A step, as `buildRevealSequence` would produce it. Built through the real
 // builder rather than hand-written, so a change to the step shape reaches
@@ -144,6 +230,19 @@ const stepOf = (words) =>
 // ===========================================================================
 console.log('\nB. the floor, swept over its whole domain');
 // ===========================================================================
+
+// 0. MP-2 closes the placeholder grammar. The exact timing is now a contract
+//    because the PackageOpen arrival and the pacing floor both derive from it.
+{
+  if (G && G.bloomMs === 960 && G.reducedFadeMs === 480) {
+    ok('native reveal grammar is final: bloomMs 960ms and Reduced Motion arrival 480ms');
+  } else {
+    bad(
+      'native reveal grammar is final: bloomMs 960ms and Reduced Motion arrival 480ms',
+      `got bloomMs=${G && G.bloomMs}, reducedFadeMs=${G && G.reducedFadeMs}`,
+    );
+  }
+}
 
 // 1. Monotone in length. Catches the two ways a per-step floor degrades back
 //    into a constant: a literal, and a latch that saturates early.
@@ -540,6 +639,279 @@ console.log('\nD. the rail, and what this gate cannot reach');
   }
 }
 
+// D14a. MP-2: the arrival clock's public coordinate is rendered card opacity,
+//       not elapsed/duration and not eased-progress-before-opacity.
+//       These are Lumen's concrete samples made executable: at 150ms the
+//       normal eased geometry master is 0.2734375 and rendered opacity is 0.805;
+//       the date's 280ms onset is first converted through the first-leg
+//       easing and then through card opacity before becoming an Animated
+//       inputRange breakpoint.
+{
+  const s0 = startReveal(0);
+  const geometryMaster150 = normalRevealMasterProgressAtMs(150, G);
+  const opacity150 = arrivalProgress(s0, 150, G, false);
+  const opacityFromMaster150 = normalRevealCardOpacityAtMaster(geometryMaster150, G);
+  const linear150 = 150 / G.bloomMs;
+  const dateGeometryBreakpoint = normalRevealDateMasterBreakpoint(G);
+  const dateOpacityBreakpoint = normalRevealDateOpacityBreakpoint(G);
+  const expectedDateGeometryBreakpoint =
+    (REVEAL_CARD_KEYFRAME_MS / G.bloomMs) *
+    (1 - ((1 - REVEAL_DATE_ONSET_MS / REVEAL_CARD_KEYFRAME_MS) ** 3));
+  const expectedDateOpacityBreakpoint = normalRevealCardOpacityAtMaster(expectedDateGeometryBreakpoint, G);
+  if (
+    Math.abs(geometryMaster150 - 0.2734375) < 1e-9 &&
+    Math.abs(opacity150 - 0.805) < 1e-9 &&
+    Math.abs(opacityFromMaster150 - opacity150) < 1e-9 &&
+    Math.abs(opacity150 - linear150) > 0.6 &&
+    Math.abs(dateGeometryBreakpoint - expectedDateGeometryBreakpoint) < 1e-12 &&
+    Math.abs(dateOpacityBreakpoint - expectedDateOpacityBreakpoint) < 1e-12
+  ) {
+    ok('D14a arrivalProgress uses rendered opacity as its coordinate: 150ms geometry master=0.2734375/cardOpacity=0.805, and 280ms date onset is converted through first-leg easing plus opacity');
+  } else {
+    bad(
+      'D14a',
+      `geometryMaster150=${geometryMaster150}, opacity150=${opacity150}, opacityFromMaster150=${opacityFromMaster150}, ` +
+        `linear150=${linear150}, dateGeometry=${dateGeometryBreakpoint}/${expectedDateGeometryBreakpoint}, ` +
+        `dateOpacity=${dateOpacityBreakpoint}/${expectedDateOpacityBreakpoint}`,
+    );
+  }
+}
+
+// 14b. MP-2: neither native mount may reintroduce the 50ms React-state rail loop.
+//      The rail is a single Animated.Value over dwellMs, painted as a transform
+//      so it can move every frame without rerendering React.
+{
+  const badMounts = [];
+  revealMounts.forEach(({ label, source, ast }) => {
+    const setIntervalCalls = [];
+    const railStateHits = [];
+    const dwellAnim = [];
+    walk(ast.program, (n) => {
+      if (n.type === 'CallExpression' && n.callee?.name === 'setInterval') setIntervalCalls.push(n.start);
+      if (n.type === 'VariableDeclarator' && /railFill|setRailFill/.test(n.id?.name ?? '')) railStateHits.push(n.id.name);
+      if (n.type === 'CallExpression' && /setRailFill/.test(n.callee?.name ?? '')) railStateHits.push(n.callee.name);
+      if (
+        n.type === 'CallExpression' &&
+        n.callee?.object?.name === 'Animated' &&
+        n.callee?.property?.name === 'timing'
+      ) {
+        const text = source.slice(n.start, n.end);
+        if (
+          /dwellProgressAnim/.test(text) &&
+          /duration:\s*remaining/.test(text) &&
+          /Easing\.linear/.test(text)
+        ) {
+          dwellAnim.push(n.start);
+        }
+      }
+    });
+    const unsubstituted = uncommented(source, ast);
+    if (
+      setIntervalCalls.length !== 0 ||
+      railStateHits.length !== 0 ||
+      dwellAnim.length !== 1 ||
+      !/dwellProgress\(revealState,\s*now,\s*sequence,\s*NATIVE_REVEAL_GRAMMAR\)/.test(unsubstituted) ||
+      !/const remaining = Math\.max\(0,\s*stepDwellMs\s*-\s*\(now\s*-\s*revealState\.arrivedAtMs\)\)/.test(unsubstituted) ||
+      !/transform:\s*\[\{\s*scaleX:\s*dwellProgressAnim\s*\}\]/.test(unsubstituted) ||
+      !/transformOrigin:\s*['"]left center['"]/.test(unsubstituted)
+    ) {
+      badMounts.push(
+        `${label}: setInterval=${setIntervalCalls.length}, rail state=${railStateHits.length}, ` +
+          `remaining dwell timings=${dwellAnim.length}`,
+      );
+    }
+  });
+  if (badMounts.length === 0) {
+    ok('native reveal rails use one remaining-duration dwell driver, left-origin transform, and no state-width loop');
+  } else {
+    bad(
+      'native reveal rails use one remaining-duration dwell driver, left-origin transform, and no state-width loop',
+      badMounts.join('; '),
+    );
+  }
+}
+
+// 14c. MP-2: native reveal arrival is one master timing value; the old spring
+//      path and separate date clock must stay gone.
+{
+  const badMounts = [];
+  revealMounts.forEach(({ label, source, ast }) => {
+    const springs = [];
+    const arrivalTimings = [];
+    const dateTimingCalls = [];
+    walk(ast.program, (n) => {
+      if (
+        n.type === 'CallExpression' &&
+        n.callee?.object?.name === 'Animated' &&
+        n.callee?.property?.name === 'spring'
+      ) {
+        springs.push(n.start);
+      }
+      if (
+        n.type === 'CallExpression' &&
+        n.callee?.object?.name === 'Animated' &&
+        n.callee?.property?.name === 'timing'
+      ) {
+        const text = source.slice(n.start, n.end);
+        if (/arrivalProgressAnim/.test(text)) arrivalTimings.push(text);
+        if (/dateOpacity|dateTranslateY/.test(text)) dateTimingCalls.push(n.start);
+      }
+    });
+    const joined = arrivalTimings.join('\n');
+    if (
+      springs.length !== 0 ||
+      arrivalTimings.length !== 2 ||
+      dateTimingCalls.length !== 0 ||
+      !/toValue:\s*firstKeyframe/.test(joined) ||
+      !/duration:\s*Math\.max\(0,\s*300\s*-\s*elapsed\)/.test(joined) ||
+      !/normalRevealCardOpacitySegmentEasing\(elapsed,\s*300,\s*NATIVE_REVEAL_GRAMMAR\)/.test(joined) ||
+      !/duration:\s*Math\.max\(0,\s*duration\s*-\s*Math\.max\(elapsed,\s*activeReducedRegister\s*\?\s*0\s*:\s*300\)\)/.test(joined) ||
+      !/activeReducedRegister\s*\?\s*Easing\.linear\s*:\s*normalRevealCardOpacitySegmentEasing/.test(joined) ||
+      !/const cardOpacity = arrivalProgressAnim;/.test(source) ||
+      !/inputRange:\s*\[0,\s*0\.92,\s*1\]/.test(source) ||
+      !/normalRevealDateOpacityBreakpoint\(NATIVE_REVEAL_GRAMMAR\)/.test(source)
+    ) {
+      badMounts.push(
+        `${label}: springs=${springs.length}, arrival timings=${arrivalTimings.length}, ` +
+          `date timing calls=${dateTimingCalls.length}`,
+      );
+    }
+  });
+  if (badMounts.length === 0) {
+    ok('native reveal arrival uses the ruled 300ms/280ms keyframes and cubic curves from one master progress');
+  } else {
+    bad(
+      'D14c',
+      badMounts.join('; '),
+    );
+  }
+}
+
+// 14c2. MP-2: arrivedAtMs owns the state clock. A delayed effect start or a
+//       live Reduce Motion toggle may substitute only the unfinished arrival;
+//       it must not restart the rail or reset pixels to zero.
+{
+  const badMounts = [];
+  revealMounts.forEach(({ label, source }) => {
+    const dwellDeps = /\},\s*\[sequence,\s*revealState\?\.index,\s*revealState\?\.arrivedAtMs,\s*revealState\?\.done\]\)/.test(source);
+    const arrivalDeps = /\},\s*\[sequence,\s*revealState\?\.index,\s*revealState\?\.arrivedAtMs,\s*revealState\?\.done,\s*reduced\]\)/.test(source);
+    if (
+      !/const now = Date\.now\(\)/.test(source) ||
+      !/const sameStep = arrivalStepKeyRef\.current === revealState\.arrivedAtMs;/.test(source) ||
+      !/const activeReducedRegister = reduced \|\| spatialFrozen;/.test(source) ||
+      !/const toggledIntoReduced = reduced && lastReducedRef\.current === false;/.test(source) ||
+      !/const startFrom = \(initial\) => \{/.test(source) ||
+      !/if \(arrivalGenerationRef\.current !== generation\) return;/.test(source) ||
+      !/arrivalProgressAnim\.stopAnimation\(\(value\) => \{[\s\S]{0,120}startFrom\(value\);/.test(source) ||
+      !/startFrom\(arrivalProgress\(revealState,\s*now,\s*NATIVE_REVEAL_GRAMMAR,\s*reduced\)\);/.test(source) ||
+      !/dwellProgress\(revealState,\s*now,\s*sequence,\s*NATIVE_REVEAL_GRAMMAR\)/.test(source) ||
+      !/arrivalProgressAnim\.setValue\(initial\)/.test(source) ||
+      !/arrivalRenderedRef\.current = initial;/.test(source) ||
+      !/arrivalStepKeyRef\.current = revealState\.arrivedAtMs;/.test(source) ||
+      !/arrivalGenerationRef\.current \+= 1;/.test(source) ||
+      !/dwellProgressAnim\.setValue\(initial\)/.test(source) ||
+      !/if \(sameStep && \(toggledIntoReduced \|\| spatialFrozen\)\) \{/.test(source) ||
+      !/if \(reduced\) spatialFrozenStepRef\.current = revealState\.index;/.test(source) ||
+      !/const spatialFrozen = spatialFrozenStepRef\.current === revealState\.index;/.test(source) ||
+      !/const spatialFrozen = reduced \|\| spatialFrozenStepRef\.current === revealState\?\.index;/.test(source) ||
+      !dwellDeps ||
+      !arrivalDeps
+    ) {
+      badMounts.push(`${label}: arrivedAtMs-derived initial progress or effect dependency split is missing`);
+    }
+  });
+  if (badMounts.length === 0) {
+    ok('native reveal effects initialise from elapsed arrivedAtMs and RM changes do not restart the dwell rail');
+  } else {
+    bad(
+      'D14c',
+      badMounts.join('; '),
+    );
+  }
+}
+
+// D14d. MP-2: render-before-effect cases. These are arithmetic/AST backstops
+//       for the three frame-boundary defects Lumen found: normal->RM before
+//       the effect remaps, RM-start delayed effect, and accepted tap before
+//       the next effect resets the two drivers.
+{
+  const normalOpacity150 = normalRevealCardOpacityAtMs(150, G);
+  const rmElapsed150 = 150 / G.reducedFadeMs;
+  const rmStart50 = arrivalProgress(startReveal(0), 50, G, true);
+  const normalStart50 = normalRevealCardOpacityAtMs(50, G);
+  const freshRmScreenInitial50 = rmStart50;
+  const staleRenderedRefInitial = 0;
+  const resets = revealMounts.every(({ source }) =>
+    /arrivalProgressAnim\.stopAnimation\(\);[\s\S]{0,80}dwellProgressAnim\.stopAnimation\(\);[\s\S]{0,80}arrivalProgressAnim\.setValue\(0\);[\s\S]{0,80}dwellProgressAnim\.setValue\(0\);[\s\S]{0,160}arrivalStepKeyRef\.current = null;[\s\S]{0,80}arrivalGenerationRef\.current \+= 1;/.test(source)
+  );
+  if (
+    Math.abs(normalOpacity150 - 0.805) < 1e-9 &&
+    Math.abs(rmElapsed150 - 0.3125) < 1e-9 &&
+    normalOpacity150 > rmElapsed150 &&
+    Math.abs(rmStart50 - (50 / G.reducedFadeMs)) < 1e-12 &&
+    freshRmScreenInitial50 !== staleRenderedRefInitial &&
+    normalStart50 > rmStart50 &&
+    resets
+  ) {
+    ok('D14d render-boundary cases hold: normal→RM at 150ms preserves 0.805 opacity, RM-start delayed 50ms uses 50/480 not normal opacity, and accepted taps synchronously reset both drivers');
+  } else {
+    bad(
+      'D14d',
+      `normalOpacity150=${normalOpacity150}, rmElapsed150=${rmElapsed150}, rmStart50=${rmStart50}, normalStart50=${normalStart50}, resets=${resets}`,
+    );
+  }
+}
+
+// D14e. MP-2: timeline continuity after effect delay and sticky register
+//       continuity across RM-on/RM-off inside the same step.
+{
+  const start400 = normalRevealCardOpacityAtMs(400, G);
+  const tail = normalRevealCardOpacitySegmentEasing(400, G.bloomMs, G);
+  const resumed500 = start400 + (1 - start400) * tail(100 / (G.bloomMs - 400));
+  const resumed600 = start400 + (1 - start400) * tail(200 / (G.bloomMs - 400));
+  const absolute500 = normalRevealCardOpacityAtMs(500, G);
+  const absolute600 = normalRevealCardOpacityAtMs(600, G);
+  const rmValueAt400 = normalRevealCardOpacityAtMs(150, G) + (1 - normalRevealCardOpacityAtMs(150, G)) * ((400 - 150) / (G.reducedFadeMs - 150));
+  const stickyOffInitial = rmValueAt400;
+  const recomputedNormal400 = normalRevealCardOpacityAtMs(400, G);
+  const stickyDuration = Math.max(0, G.reducedFadeMs - 400);
+  const normalDuration = Math.max(0, G.bloomMs - 400);
+  if (
+    Math.abs(resumed500 - absolute500) < 1e-9 &&
+    Math.abs(resumed600 - absolute600) < 1e-9 &&
+    Math.abs(stickyOffInitial - rmValueAt400) < 1e-9 &&
+    stickyOffInitial > recomputedNormal400 &&
+    stickyDuration === 80 &&
+    normalDuration === 560
+  ) {
+    ok('D14e delayed normal mount resumes the absolute second-leg curve at 400→500/600ms, and RM-off keeps the sticky 480ms register value/duration for the step');
+  } else {
+    bad(
+      'D14e',
+      `resumed500=${resumed500}/${absolute500}, resumed600=${resumed600}/${absolute600}, stickyOffInitial=${stickyOffInitial}, recomputedNormal400=${recomputedNormal400}, stickyDuration=${stickyDuration}, normalDuration=${normalDuration}`,
+    );
+  }
+}
+
+// 14d. MP-2: no production reveal importer may still ask for a STUB grammar.
+{
+  const files = await jsFiles(SRC);
+  const offenders = [];
+  for (const f of files) {
+    const src = await readFile(f, 'utf8');
+    const ast = parseJsWithComments(src);
+    if (/\bSTUB_[A-Z0-9_]*GRAMMAR\b/.test(uncommented(src, ast))) offenders.push(path.relative(ROOT, f));
+  }
+  if (offenders.length === 0) {
+    ok('no production reveal importer references a STUB grammar symbol');
+  } else {
+    bad(
+      'no production reveal importer references a STUB grammar symbol',
+      `found ${offenders.join(', ')}`,
+    );
+  }
+}
+
 // 15. The rail's colour pair, as token arithmetic. §23.11 ruled this exact
 //     component — a progress track on `background` — and the pair it ratified
 //     is `ink` on `ink@0.5`. This row is a tripwire on the tokens, not on a
@@ -666,4 +1038,6 @@ if (pending > 0) {
   console.log('\nPending (not counted as pass or fail — see reason):');
   pendingRows.forEach((p) => console.log(`  - ${p}`));
 }
-process.exit(fail > 0 ? 1 : 0);
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  process.exit(fail > 0 ? 1 : 0);
+}

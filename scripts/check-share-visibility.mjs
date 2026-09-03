@@ -413,6 +413,7 @@ async function main() {
     ['plant_seed(uuid,text,timestamp with time zone)', { roles: ['authenticated', 'service_role'], why: 'seed-planting RPC, requires a session' }],
     ['profile_has_display_name(uuid)', { roles: ['authenticated', 'service_role'], why: 'invite-time display-name guard RPC helper, requires a session' }],
     ['record_zap(uuid,nectar_zap_target_kind,uuid,bigint)', { roles: ['authenticated', 'service_role'], why: 'nectar zap RPC, requires a session' }],
+    ['send_comb_nectar_note(uuid,uuid,uuid,text,bigint)', { roles: ['authenticated', 'service_role'], why: 'ENG-90 comb nectar-note send RPC, requires a session' }],
     ['seal_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'legacy (pre-volumes) hive-seal RPC, requires a session' }],
     ['send_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'hive-send RPC, requires a session' }],
 
@@ -422,11 +423,13 @@ async function main() {
     ['comb_subject_gone(uuid,uuid)', { roles: ['service_role'], why: 'ENG-95 shared predicate, called only from other definers — a definer body bypasses the caller EXECUTE check on what it calls' }],
     ['seal_and_send_rotation(uuid)', { roles: ['service_role'], why: 'ENG-91 cron-only seal-and-send, explicit anon+authenticated revoke' }],
     ['seal_volume(uuid)', { roles: ['service_role'], why: 'cron/service-only volume seal, explicit anon+authenticated revoke' }],
+    ['_nectar_send_tip(uuid,uuid,bigint,text,text,text)', { roles: ['service_role'], why: 'ENG-90 internal balanced-transfer helper, called only from definer RPC wrappers' }],
 
     // -- trigger functions: grant is inert, row still states the true grant --
     ['combs_create_owner_membership()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['comb_members_departure_closes_writing_seat()', { roles: ['authenticated', 'service_role'], why: 'ENG-99 trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['entries_mark_shared()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
+    ['enforce_comb_entitlements()', { roles: ['authenticated', 'service_role'], why: 'ENG-85 trigger, inert by direct call; server-owned plan tables are read inside the definer' }],
     ['entries_resolve_volume_id()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],
     ['handle_new_user()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; authenticated access is the un-revoked default-privilege grant, no explicit statement' }],
     ['private_hives_create_volume_one()', { roles: ['authenticated', 'service_role'], why: 'trigger, inert; explicit (redundant) authenticated grant, documented' }],

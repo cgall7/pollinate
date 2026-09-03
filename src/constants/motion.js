@@ -56,6 +56,17 @@ export const PRESS = {
   slab: 0.98,
 };
 
+export const PRESS_TIMING = {
+  // MP-5: press-in is force being applied, not elastic release. It compresses
+  // quickly and never overshoots into the surface; the spring remains legal
+  // only on release.
+  compress: 90,
+};
+
+export const PRESS_EASING = {
+  compress: Easing.out(Easing.cubic),
+};
+
 export const DURATIONS = {
   // Click/burst treatments — §12.5 Rule 2: must stay sub-200ms so they
   // never queue or feel laggy.
@@ -156,10 +167,10 @@ export const NECTAR = {
 };
 
 export const NECTAR_EASING = {
-  // The gesture's own curve. `out(cubic)` decelerating into the paper, and
-  // the drop does not bounce — R-N3 says so outright, which rules out every
-  // spring in this file for the travel.
-  travel: Easing.out(Easing.cubic),
+  // The gesture's own curve. Endpoint velocity is zero at lift-off and
+  // contact, with one interior speed peak. The drop does not bounce — R-N3
+  // says so outright, which rules out every spring in this file for travel.
+  travel: Easing.inOut(Easing.cubic),
   // The spec's own pair, quoted: rise `out(cubic)`, fall `inOut(cubic)`.
   absorbRise: Easing.out(Easing.cubic),
   absorbFall: Easing.inOut(Easing.cubic),

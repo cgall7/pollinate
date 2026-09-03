@@ -97,8 +97,12 @@ export const NectarSendPanel = ({
   onSelect,
   customValue,
   onChangeCustom,
+  note,
+  onChangeNote,
+  notePlaceholder = 'Up to 8 words',
   sending,
   failed,
+  sendDisabled,
   onSend,
   onCancel,
   controlsStyle,
@@ -130,6 +134,17 @@ export const NectarSendPanel = ({
         </Text>
 
         <Animated.View style={[styles.controls, controlsStyle]}>
+        {onChangeNote && (
+          <TextInput
+            style={styles.note}
+            placeholder={notePlaceholder}
+            placeholderTextColor={theme.colors.inkSoft}
+            value={note}
+            onChangeText={onChangeNote}
+            editable={!sending}
+            accessibilityLabel="Short note, up to eight words"
+          />
+        )}
         <View style={styles.presetRow}>
           {NECTAR_PRESETS.map((amount) => {
             const affordable = isSendableAmount(amount, balanceDrops);
@@ -179,7 +194,7 @@ export const NectarSendPanel = ({
         <PrimaryButton
           onPress={onSend}
           loading={sending}
-          disabled={!isSendableAmount(selected, balanceDrops)}
+          disabled={sendDisabled ?? !isSendableAmount(selected, balanceDrops)}
           containerStyle={styles.send}
           accessibilityLabel="Send nectar"
         >
@@ -287,6 +302,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  note: {
+    alignSelf: 'stretch',
+    fontFamily: theme.fonts.body,
+    fontSize: 16,
+    color: theme.colors.ink,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.inkSoft,
+    paddingVertical: theme.spacing.sm,
     marginTop: theme.spacing.md,
   },
   failed: {
