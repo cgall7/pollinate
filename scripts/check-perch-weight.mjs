@@ -689,7 +689,15 @@ const beeCodeOnly = (beeAst.comments || [])
   ];
   const broken = relations.filter(([held]) => !held).map(([, what, why]) => `${what}: ${why}`);
   if (broken.length === 0) {
-    ok(`P11b all ${relations.length} relations between the R-SW constants hold — including the one that keeps §5's decline true rather than overturned (journey ${journey}ms inside a ${mascot.SWAY_INTERVAL_MIN_MS}ms floor, at rest ${(100 * (1 - journey / ((mascot.SWAY_INTERVAL_MIN_MS + mascot.SWAY_INTERVAL_MAX_MS) / 2))).toFixed(1)}% of a median cycle)`);
+    // The at-rest share is over the CYCLE, and a cycle is the wait PLUS the
+    // journey — the conductor re-arms from the animation's own callback
+    // (`current.start(({ finished }) => ... scheduleSway())`), so the wait
+    // begins when the journey ENDS rather than running alongside it. Reading
+    // the interval as the whole cycle understates the rest by ~10 points,
+    // which is the wrong direction for a figure whose whole job is to say
+    // this term is mostly still.
+    const cycle = (mascot.SWAY_INTERVAL_MIN_MS + mascot.SWAY_INTERVAL_MAX_MS) / 2 + journey;
+    ok(`P11b all ${relations.length} relations between the R-SW constants hold — including the one that keeps §5's decline true rather than overturned (journey ${journey}ms inside a ${mascot.SWAY_INTERVAL_MIN_MS}ms floor, at rest ${(100 * (1 - journey / cycle)).toFixed(1)}% of a median ${cycle}ms cycle)`);
   } else {
     bad('P11b the relations between the R-SW constants hold', broken.join(' | '));
   }
