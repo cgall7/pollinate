@@ -1,9 +1,12 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { EntryStore } from '../services/EntryStore';
+import { toISODate } from '../utils/dateRanges';
+import { FirstSaveCelebration } from '../services/firstSaveCelebration';
+import { FirstSaveCard } from '../components/FirstSaveCard';
 import { HiveStore } from '../services/HiveStore';
 import { FlyingBee } from '../components/FlyingBee';
 import { GlowOrb } from '../components/GlowOrb';
@@ -157,8 +160,27 @@ const greeting = (date) => {
 const longDate = (date) =>
   date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-export const TodayTab = ({ navigation }) => {
+export const TodayTab = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
+  // Deezine's post-auth nudge ruling (`6f9e87ad`): the first-save celebration
+  // is a Today card, and it renders ONLY after the first `EntryStore.saveEntry`
+  // resolves — never on auth, mount, resume, failed save, or later saves.
+  //
+  // THE SIGNAL AND THE ELIGIBILITY ARE TWO DIFFERENT FACTS, carried by two
+  // different mechanisms on purpose:
+  //
+  //   the SIGNAL is `route.params.entryJustSaved`, set synchronously by
+  //   App.js's unlock handler as it navigates. It is the ruling's "one-shot
+  //   first-save signal through the existing replace-to-Main path", and it
+  //   costs no I/O — which is what keeps it out of the unlock overlay
+  //   CoreRitual holds for the whole life of `onUnlock` (App.js's own comment
+  //   at the save-side re-arm explains why anything awaited there animates
+  //   inside it). It says only "an entry was just persisted", which is all
+  //   the save site can honestly say.
+  //
+  //   the ELIGIBILITY is decided below, where the reads are clear of that
+  //   overlay and the account's own history is reachable.
+  const [showFirstSave, setShowFirstSave] = useState(false);
   const [error, setError] = useState(false);
   const [entry, setEntry] = useState(null);
   // §32.2 — where the bee may land, held by the screen and read by the flight.
@@ -211,6 +233,49 @@ export const TodayTab = ({ navigation }) => {
   // inverse).
   const [contributingHives, setContributingHives] = useState([]);
   const [contributingHivesError, setContributingHivesError] = useState(false);
+
+  // ELIGIBILITY. Runs only when the signal is present, so an ordinary Today
+  // mount, a tab switch, a resume and a later save all cost nothing here.
+  //
+  // TWO CONDITIONS, AND BOTH ARE NECESSARY:
+  //   - `FirstSaveCelebration.isUnspent()` — device-local, and it is what
+  //     makes relaunch unable to replay the card. It is not sufficient alone:
+  //     the key is absent on a fresh INSTALL, not on a fresh ACCOUNT, so a
+  //     long-time user reinstalling, or signing in on a second device,
+  //     arrives with it unset.
+  //   - `getFirstEntryDate()` equals today — the account's own history, which
+  //     is the only place "is this the FIRST save" is written down.
+  //     `saveEntry` cannot answer it (upsert-shaped; the update and insert
+  //     branches return the same shape), so no signal from the save site
+  //     could have carried it.
+  //
+  // THE PARAM IS CONSUMED EITHER WAY — eligible or not, this save has had its
+  // one look — so a re-render, a tab switch or a back-navigation cannot bring
+  // the question round again. That clear is synchronous and deliberately
+  // outside the async body: it has to happen on the early-return paths too.
+  useEffect(() => {
+    if (!route?.params?.entryJustSaved) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await FirstSaveCelebration.isUnspent())) return;
+        const firstDate = await EntryStore.getFirstEntryDate();
+        if (cancelled || firstDate !== toISODate(new Date())) return;
+        await FirstSaveCelebration.spend();
+        if (cancelled) return;
+        setShowFirstSave(true);
+      } catch (err) {
+        // A failed read is not a first save. Staying silent costs one absent
+        // card; guessing costs congratulating a long-time user on their first
+        // entry, and those are not symmetric.
+        console.warn('TodayTab: first-save celebration eligibility check failed', err);
+      }
+    })();
+    navigation.setParams({ entryJustSaved: undefined });
+    return () => {
+      cancelled = true;
+    };
+  }, [route?.params?.entryJustSaved, navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -505,6 +570,21 @@ export const TodayTab = ({ navigation }) => {
             </View>
           )}
           </PerchAnchor>
+          {/* IMMEDIATELY BENEATH the entry that was just persisted, and inside
+              index 0 so it settles with the journal card rather than opening a
+              cascade step of its own. `entry &&` is not belt and braces: the
+              ruling places this relative to a VISIBLE saved entry, and the
+              focus read that fills `entry` and the eligibility read above are
+              independent — a card celebrating an entry the screen failed to
+              load would congratulate the user on something they cannot see.
+
+              No modal, no full-screen beat, no forced dwell, nothing blocking:
+              it is one more card in the same ScrollView, and every control on
+              Today stays live beside it. Dismissal is local state only — the
+              persisted flag was already spent when it rendered, so closing
+              records no nudge choice, requests no permission, and leaves the
+              Account screen's re-ask available. */}
+          {entry && showFirstSave && <FirstSaveCard onDismiss={() => setShowFirstSave(false)} />}
         </StaggeredItem>
 
         {/* Private Hives shelf (8b.2/8b.3, WP-1 §26.1). Index 0 above

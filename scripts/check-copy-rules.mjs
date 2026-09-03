@@ -332,10 +332,10 @@ for (const position of POSITIONS) {
 // so these two are constrained by a gate that knows what they are.
 const NOT_COPY_ATTRS = new Set([
   // RN / component API enums and identifiers
-  'accessibilityRole', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
+  'accessibilityLiveRegion', 'accessibilityRole', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
   'importantForAccessibility', 'key', 'keyboardShouldPersistTaps', 'keyboardType',
   'countKind', 'mode', 'name', 'on', 'pointerEvents', 'preset', 'resizeMode',
-  'returnKeyType', 'size', 'stage', 'tint', 'tone', 'variant',
+  'returnKeyType', 'size', 'stage', 'textContentType', 'tint', 'tone', 'variant',
   // SVG geometry and paint
   'cx', 'cy', 'fill', 'fillRule', 'gradientUnits', 'height', 'offset',
   'patternTransform', 'patternUnits', 'preserveAspectRatio', 'r', 'stopOpacity',
@@ -489,15 +489,15 @@ check('no import path is in the copy set', importPaths, []);
 // --- D. Copy frozen by a ruling is still on screen ----------------------
 //
 // The other half of a copy gate: a forbidden word must not appear, and a
-// ruled line must not quietly disappear. These four are frozen — R15's thesis
-// and its bookend, and §27's two opening screens (merged 51fb6e7). A rewrite
-// of any of them is a ruling, so it should cost a deliberate edit here.
+// ruled line must not quietly disappear. The legacy R15/§27 onboarding beats
+// were deliberately retired by the zero-onboarding Account Gate ruling, so
+// the frozen lines here are the new one-door promise and auth copy.
 console.log(`\n--- D. copy frozen by a ruling ---`);
 const FROZEN = [
-  ['R15 thesis on Welcome', 'Start with what you were given.'],
-  ['R15 entry placeholder', 'Today I was given…'],
-  ['§27.2 Welcome subhead', "One line a day. That's how it starts."],
-  ['§27.1 write gate', 'Think of someone.'],
+  ['Account Gate promise headline', 'One good thing is enough.'],
+  ['Account Gate promise body', 'Write one line. Keep it private. Share only what you choose.'],
+  ['Account Gate email CTA', 'Email me a link'],
+  ['Account Gate email helper', 'We’ll send a secure link. No password needed.'],
 ];
 const texts = new Set(copy.map((c) => c.text));
 for (const [label, line] of FROZEN) check(`${label} is still rendered`, texts.has(line), true);

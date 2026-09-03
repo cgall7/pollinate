@@ -43,7 +43,21 @@ const WINDOW_MODULE = path.join(ROOT, 'src/services/nudgeWindow.js');
 const SERVICE_MODULE = path.join(ROOT, 'src/services/dailyNudge.js');
 const APP_JS = path.join(ROOT, 'App.js');
 const COPY_MODULE = path.join(ROOT, 'src/constants/nudgeCopy.js');
-const ONBOARDING_JS = path.join(ROOT, 'src/screens/Onboarding.js');
+// REPOINTED, not widened (Pixel, 2026-09-03, zero-onboarding successor).
+// The ask no longer lives in `Onboarding.js`: the pre-auth beat walker that
+// owned it was deleted with the Account Gate rewrite, and Deezine's ruling
+// (`6f9e87ad`) moved the beat to a Today card rendered after the first save.
+//
+// THE BINDING STAYS SINGLE-FILE ON PURPOSE. Relaxing row 11b to "somewhere
+// under src/" would satisfy it with a reference in ANY file — which is the
+// exact defect the row was written for: a value that is fine because nothing
+// reads it while the screen hardcodes its own copy instead. The row's claim
+// is exclusivity — THE SCREEN THAT OWNS THE BEAT READS THE FLAG — and that
+// claim survives the move only if the constant moves with the beat.
+//
+// Row 11a needs no change and got none: it already walks `allSrc` (App.js
+// plus every .js under src/, recursively), so it followed the beat for free.
+const ASK_OWNER_JS = path.join(ROOT, 'src/components/FirstSaveCard.js');
 
 let pass = 0;
 let fail = 0;
@@ -887,33 +901,56 @@ console.log('\nJ. the ask does not render until its string is ratified');
     }
   }
 
-  // 11b — the readiness flag must be READ by the screen that owns the beat.
+  // 11b — the readiness flag must be READ by the component that owns the beat.
   // Asserting the import alone would pass on an unused import, so this walks
-  // for an actual reference in Onboarding's own tree.
-  const onbSrc = allSrc.get(ONBOARDING_JS);
-  if (!onbSrc) {
-    bad('row 11b — the ask control is gated on the ratified-string flag', 'Onboarding.js not readable');
+  // for an actual reference in the owning component's own tree.
+  //
+  // THE IMPORT EXCLUSION IS NEW, AND IT IS A REPAIR OF THIS ROW, NOT OF THE
+  // MOVE (Pixel, 2026-09-03). The sentence above was already the row's stated
+  // claim and the row did not implement it: an `ImportSpecifier` carries an
+  // `imported` and a `local` Identifier, so a bare unused import scored two
+  // hits and the row went green. Measured at fec5a0b before this branch
+  // touched anything — deleting `NUDGE_ASK_READY &&` from the guard while
+  // leaving the import in place left row 11b GREEN on the untouched baseline.
+  // That is the same class of defect this row exists to catch, one level up:
+  // a guard that is fine because nothing reads it.
+  const importedIdentifiers = new Set();
+  const askOwner = path.relative(ROOT, ASK_OWNER_JS);
+  const askOwnerSrc = allSrc.get(ASK_OWNER_JS);
+  if (!askOwnerSrc) {
+    bad('row 11b — the ask control is gated on the ratified-string flag', `${askOwner} not readable`);
   } else {
-    const ast = parseJs(onbSrc);
+    const ast = parseJs(askOwnerSrc);
     let readsReady = 0;
     let readsLabel = 0;
     let withdrawnLiteral = null;
+    // Collected by NODE IDENTITY rather than by name: two identifiers can
+    // share a name, and only the ones physically inside an import statement
+    // are the ones that prove nothing.
     walk(ast.program, (n) => {
+      if (n.type !== 'ImportDeclaration') return;
+      for (const spec of n.specifiers) {
+        if (spec.imported) importedIdentifiers.add(spec.imported.start);
+        if (spec.local) importedIdentifiers.add(spec.local.start);
+      }
+    });
+    walk(ast.program, (n) => {
+      if (n.type === 'Identifier' && importedIdentifiers.has(n.start)) return;
       if (n.type === 'Identifier' && n.name === 'NUDGE_ASK_READY') readsReady += 1;
       if (n.type === 'Identifier' && n.name === 'NUDGE_ASK_LABEL') readsLabel += 1;
-      // The ask's own words may not be a literal in the screen: copy is
-      // Deezine's and lives in the constants module. Any literal starting
+      // The ask's own words may not be a literal in the owning component:
+      // copy is Deezine's and lives in the constants module. Any literal starting
       // "Let me know" is a hardcoded ask by construction.
       if (n.type === 'StringLiteral' && /^Let me know/i.test(n.value)) {
-        withdrawnLiteral = `${path.relative(ROOT, ONBOARDING_JS)}:${n.loc.start.line} ${JSON.stringify(n.value)}`;
+        withdrawnLiteral = `${askOwner}:${n.loc.start.line} ${JSON.stringify(n.value)}`;
       }
     });
     if (withdrawnLiteral) {
       bad('row 11b — the ask control is gated on the ratified-string flag', `the ask is a hardcoded literal in the screen: ${withdrawnLiteral} — copy belongs to nudgeCopy.js, and a literal here cannot be withdrawn by editing the constant`);
     } else if (readsReady < 1 || readsLabel < 1) {
-      bad('row 11b — the ask control is gated on the ratified-string flag', `Onboarding.js references NUDGE_ASK_READY ${readsReady}x and NUDGE_ASK_LABEL ${readsLabel}x — both must be read, or the sentinel guards nothing`);
+      bad('row 11b — the ask control is gated on the ratified-string flag', `${askOwner} references NUDGE_ASK_READY ${readsReady}x and NUDGE_ASK_LABEL ${readsLabel}x — both must be read, or the sentinel guards nothing`);
     } else {
-      ok(`row 11b — Onboarding.js gates the ask on NUDGE_ASK_READY and renders NUDGE_ASK_LABEL (no hardcoded ask literal)`);
+      ok(`row 11b — ${askOwner} gates the ask on NUDGE_ASK_READY and renders NUDGE_ASK_LABEL (no hardcoded ask literal)`);
     }
   }
 }
