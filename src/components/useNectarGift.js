@@ -3,6 +3,7 @@ import { Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { NECTAR, NECTAR_EASING } from '../constants/motion';
 import { buildDropFlight, dropRadiusForAmount } from './nectarFlight';
+import { nectarFailureReturnPlan } from './nectarGiftLifecycle';
 
 // R-N3 — the send, as a state machine the screen commands and this hook
 // performs. POLLINATE_NECTAR_LIVING_EXCHANGE §3 (Lumen, 2026-08-29).
@@ -38,6 +39,7 @@ export const GIFT_RETURN = 'return';
 // what moves. Flagged to Lumen; no pixel depends on which way it is read.
 export const GIFT_CONTACT_MS = NECTAR.gather + NECTAR.travel;
 export const GIFT_REST_MS = GIFT_CONTACT_MS + NECTAR.settle;
+export const GIFT_STAIN_MS = NECTAR.absorbRise + NECTAR.absorbFall;
 
 /**
  * The gift in flight.
@@ -117,7 +119,7 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
 
   const countTo = useCallback(
     (target) => {
-      if (target === null || target === undefined) return null;
+      if (target === null || target === undefined) return Promise.resolve();
       // §5: "The balance numeral still counts. A NUMBER CHANGING IS CONTENT,
       // NOT MOTION — §12.5 Rule 4 is about movement, and suppressing the
       // count would suppress the information rather than the animation." So
@@ -128,8 +130,9 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
         easing: NECTAR_EASING.settle,
         useNativeDriver: false,
       });
-      a.start();
-      return a;
+      return new Promise((resolve) => {
+        a.start(resolve);
+      });
     },
     [count],
   );
@@ -179,9 +182,16 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
       // promise that rejects before anything is attached to it is an
       // unhandled rejection, and this one can reject during a 520ms window
       // where nothing is listening yet.
+      let commitResult = null;
       const settledCommit = commit().then(
-        () => ({ ok: true }),
-        (err) => ({ ok: false, err }),
+        () => {
+          commitResult = { ok: true };
+          return commitResult;
+        },
+        (err) => {
+          commitResult = { ok: false, err };
+          return commitResult;
+        },
       );
 
       // §5 — under Reduce Motion "no drop travels" and "the bee does not
@@ -192,10 +202,14 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
       if (reduced) {
         setPhase(GIFT_SETTLE);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        countTo(optimistic);
+        const optimisticCountDone = countTo(optimistic);
         return settledCommit
-          .then((res) => {
-            if (!res.ok) countTo(base);
+          .then(async (res) => {
+            if (res.ok) {
+              await optimisticCountDone;
+            } else {
+              await countTo(base);
+            }
             return res;
           })
           .then((res) => new Promise((resolve) => {
@@ -238,8 +252,9 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
             useNativeDriver: true,
           }),
         ]),
-        // Depart. `out(cubic)` on an arc-uniform path, and NO SPRING: "it
-        // does not bounce" rules out every spring in motion.js for this leg.
+        // Depart. Endpoint-safe easing on an arc-uniform path, and NO
+        // SPRING: "it does not bounce" rules out every spring in motion.js
+        // for this leg.
         Animated.timing(travel, {
           toValue: 1,
           duration: NECTAR.travel,
@@ -260,50 +275,65 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
           // The drop's area collapses into the paper and the paper takes the
           // stain. Absorption and the count start on the same frame — the
           // contact IS the moment the balance changes.
-          Animated.parallel([
-            Animated.timing(dropScale, {
-              toValue: 0,
-              duration: NECTAR.absorbRise,
-              easing: NECTAR_EASING.absorbRise,
-              useNativeDriver: true,
-            }),
-            Animated.sequence([
-              Animated.timing(bloom, {
-                toValue: 1,
+          const countDone = countTo(optimistic);
+          if (commitResult && !commitResult.ok) {
+            resolve(Promise.reject({ err: commitResult.err, collapsed: false, countDone }));
+            return;
+          }
+          let stainAnimation = null;
+          const stainDone = new Promise((resolveStain) => {
+            stainAnimation = Animated.parallel([
+              Animated.timing(dropScale, {
+                toValue: 0,
                 duration: NECTAR.absorbRise,
                 easing: NECTAR_EASING.absorbRise,
                 useNativeDriver: true,
               }),
-              Animated.timing(bloom, {
-                toValue: 0,
-                duration: NECTAR.absorbFall,
-                easing: NECTAR_EASING.absorbFall,
-                useNativeDriver: true,
+              Animated.sequence([
+                Animated.timing(bloom, {
+                  toValue: 1,
+                  duration: NECTAR.absorbRise,
+                  easing: NECTAR_EASING.absorbRise,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(bloom, {
+                  toValue: 0,
+                  duration: NECTAR.absorbFall,
+                  easing: NECTAR_EASING.absorbFall,
+                  useNativeDriver: true,
+                }),
+              ]),
+            ]);
+            stainAnimation.start(resolveStain);
+          });
+          const failure = settledCommit.then((res) => (res.ok ? null : res));
+          resolve(
+            Promise.race([stainDone.then(() => null), failure])
+              .then((earlyFailure) => {
+                if (earlyFailure) {
+                  stainAnimation?.stop();
+                  return Promise.reject({ err: earlyFailure.err, collapsed: true, countDone });
+                }
+                return settledCommit.then((res) => {
+                  if (!res.ok) return Promise.reject({ err: res.err, collapsed: true, countDone });
+                  return Promise.all([stainDone, countDone]);
+                });
               }),
-            ]),
-          ]).start();
-          countTo(optimistic);
-          resolve();
+          );
         };
         setPhase(GIFT_TRAVEL);
         outbound.start(({ finished }) => {
           if (finished) settle();
         });
       })
-        .then(() => settledCommit)
-        .then((res) => {
-          if (!res.ok) return Promise.reject(res.err);
-          // Gone. The panel stands down after the count; the bloom's fall
-          // outlives it and is on a layer that takes no touches.
-          return new Promise((resolve) => {
-            setTimeout(() => {
-              inFlight.current = false;
-              reset();
-              resolve({ ok: true });
-            }, NECTAR.settle);
-          });
+        .then(() => {
+          inFlight.current = false;
+          reset();
+          return { ok: true };
         })
-        .catch((err) => {
+        .catch((failurePayload) => {
+          const err = failurePayload?.err ?? failurePayload;
+          const collapsed = !!failurePayload?.collapsed;
           // R-N3's failure state, and it needs no sentence: "the drop comes
           // back — it returns along its own path, is re-absorbed into the
           // balance, and the numeral counts back up." Along its OWN path, so
@@ -311,42 +341,54 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
           // re-derived and the two directions cannot disagree.
           setPhase(GIFT_RETURN);
           bloom.stopAnimation();
-          Animated.parallel([
-            Animated.timing(bloom, {
-              toValue: 0,
-              duration: NECTAR.gather,
-              easing: NECTAR_EASING.absorbFall,
-              useNativeDriver: true,
-            }),
-            Animated.timing(dropScale, {
-              toValue: 1,
-              duration: NECTAR.gather,
-              easing: NECTAR_EASING.absorbRise,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            Animated.timing(travel, {
-              toValue: 0,
-              duration: NECTAR.travel,
-              easing: NECTAR_EASING.travel,
-              useNativeDriver: true,
-            }).start(() => {
-              Animated.parallel([
-                Animated.timing(dropScale, { toValue: 0, duration: NECTAR.gather, easing: NECTAR_EASING.absorbFall, useNativeDriver: true }),
-                Animated.timing(dropOpacity, { toValue: 0, duration: NECTAR.gather, easing: NECTAR_EASING.absorbFall, useNativeDriver: true }),
-                Animated.timing(controls, { toValue: 1, duration: NECTAR.gather, easing: NECTAR_EASING.absorbRise, useNativeDriver: true }),
-                Animated.timing(scrim, { toValue: 1, duration: NECTAR.gather, easing: NECTAR_EASING.absorbRise, useNativeDriver: true }),
-              ]).start(() => {
-                inFlight.current = false;
-                setGift(null);
-                setPhase(GIFT_IDLE);
-              });
-            });
-          });
           // Back to the number the server actually holds — an absolute
           // target, so this lands exactly whatever the down-count did.
-          countTo(settled.current);
-          return { ok: false, err };
+          const returnHomeDone = new Promise((resolveReturnHome) => {
+            const reverseTravel = () => {
+              Animated.timing(travel, {
+                toValue: 0,
+                duration: NECTAR.travel,
+                easing: NECTAR_EASING.travel,
+                useNativeDriver: true,
+              }).start(() => {
+                if (returnPlan.authoritativeCountAt !== 'origin') return;
+                const countHomeDone = countTo(settled.current);
+                const reabsorbDone = new Promise((resolveReabsorb) => Animated.parallel([
+                  Animated.timing(dropScale, { toValue: 0, duration: NECTAR.gather, easing: NECTAR_EASING.absorbFall, useNativeDriver: true }),
+                  Animated.timing(dropOpacity, { toValue: 0, duration: NECTAR.gather, easing: NECTAR_EASING.absorbFall, useNativeDriver: true }),
+                  Animated.timing(controls, { toValue: 1, duration: NECTAR.gather, easing: NECTAR_EASING.absorbRise, useNativeDriver: true }),
+                  Animated.timing(scrim, { toValue: 1, duration: NECTAR.gather, easing: NECTAR_EASING.absorbRise, useNativeDriver: true }),
+                ]).start(resolveReabsorb));
+                Promise.all([reabsorbDone, countHomeDone]).then(() => {
+                  inFlight.current = false;
+                  setGift(null);
+                  setPhase(GIFT_IDLE);
+                  resolveReturnHome();
+                });
+              });
+            };
+            const returnPlan = nectarFailureReturnPlan({ collapsed, nectar: NECTAR });
+            const formationMs = returnPlan.formationMs;
+            if (formationMs === 0) {
+              reverseTravel();
+              return;
+            }
+            Animated.parallel([
+              Animated.timing(bloom, {
+                toValue: 0,
+                duration: formationMs,
+                easing: NECTAR_EASING.absorbFall,
+                useNativeDriver: true,
+              }),
+              Animated.timing(dropScale, {
+                toValue: 1,
+                duration: formationMs,
+                easing: NECTAR_EASING.absorbRise,
+                useNativeDriver: true,
+              }),
+            ]).start(reverseTravel);
+          });
+          return returnHomeDone.then(() => ({ ok: false, err }));
         });
     },
     [reduced, travel, dropScale, dropOpacity, bloom, scrim, controls, countTo, reset],
