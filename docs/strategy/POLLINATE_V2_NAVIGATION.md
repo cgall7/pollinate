@@ -101,13 +101,16 @@ The consent screen fires on the **first zap attempt**, never at signup.
 ```
 
 > ⚠️ **Fill is identity, marks are state** — Pixel-ruled 2026-08-13, shipped in
-> `HexShape.js:32` and `HoneycombGrid.js:91`. Cell fill is a name-hashed identity
+> `hexTintFor` (`src/components/Avatar.js`) and its application in
+> `HoneycombGrid`. Cell fill is a name-hashed identity
 > tint whose range is **capped per tint** (a `washSky` member's fill range
 > measured at under half of `washYellow`'s), so a fill-based balance would render
 > some people permanently quieter than others. **The honeyed state is a third
 > mark type**, tint-independent, stacking with the blooming ring and the seeded
 > seal. Collision against both must be resolved explicitly — the ring and the
-> seal already collided at 77% of mark width once (`HexShape.js:57-68`).
+> seal already collided at 77% of mark width once; see `hexSealPath` in
+> `src/components/hexGeometry.js`, including the R61 correction in its header:
+> angular clearance is the wrong instrument; measure 2D boundary-to-ink.
 
 No number in a nav bar. No badge. The comb carries it.
 

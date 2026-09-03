@@ -106,8 +106,8 @@ Reduce Transparency (already handled — keep both looks working).
 
 ### B1. 🔴 THE HARD CONSTRAINT — fill is identity, marks are state
 
-Pixel ruled this on 2026-08-13; it is shipped in `HexShape.js:32` and
-`HoneycombGrid.js:91`:
+Pixel ruled this on 2026-08-13; it is shipped in `hexTintFor`
+(`src/components/Avatar.js`) and its application in `HoneycombGrid`:
 
 > *Cell fill is identity. Marks and rings are state.*
 
@@ -125,7 +125,9 @@ tint-independent and stack cleanly with the two existing state marks:
 | **`honeyed`** | **you design this** | **you choose — must not collide** |
 
 ⚠️ The ring and the seal **already collided once**, at 77% of mark width, and
-had to be resolved (`HexShape.js:57-68`). A cell can be blooming **and** seeded
+had to be resolved — see `hexSealPath` in `src/components/hexGeometry.js`,
+**including the R61 correction in its header: angular clearance is the wrong
+instrument; measure 2D boundary-to-ink.** A cell can be blooming **and** seeded
 **and** honeyed simultaneously. **Explicit three-way collision analysis is part
 of this deliverable.**
 

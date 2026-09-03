@@ -806,7 +806,8 @@ hexagons. Denominate in **nectar drops**, not sats, in all default UI.
 cell as a third state **mark** — `honeyed` — stacking with the blooming ring.
 
 > **Corrected 2026-08-26.** An earlier draft said nectar "fills" the cell. It
-> cannot: `HexShape.js:32` / `HoneycombGrid.js:91` carry a Pixel ruling of
+> cannot: `hexTintFor` (`src/components/Avatar.js`) and its application in
+> `HoneycombGrid` carry a Pixel ruling of
 > 2026-08-13 — *cell fill is identity, marks and rings are state.* Fill is a
 > name-hashed identity tint whose range is capped per tint (a `washSky` member's
 > range measured under half of `washYellow`'s), so a fill-borne balance would
