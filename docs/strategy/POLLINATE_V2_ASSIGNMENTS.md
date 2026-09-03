@@ -17,7 +17,8 @@ features it measures. **Distribution is `OPS-10` EAS internal distribution**
 (`O7` closed); `11.1` TestFlight stays MVP2. **One release** (`O5` closed). `POLLINATE_COMB_ROTATION.md` governs; its §7 is the design handoff
 and §8 the engineering handoff. **Project 18 moves from Cycle 11–12 to the
 critical path; `ENG-79` is repriced and promoted to the primary paid line;
-`ENG-76` is blocked on ruling O1.** New rows in §5A below.
+~~`ENG-76` is blocked on ruling O1~~ — **`ENG-76` is CANCELLED**, ruling
+`O1` closed 2026-08-30 (`2fff2abe…`); see the §8 amendment and its row.** New rows in §5A below.
 **Estimates:** S / M / L / XL, matching `Pollinate_Linear_Breakdown.md` §Estimates.
 
 ---
@@ -223,7 +224,7 @@ Small project, no dependencies, can run alongside Project 16.
 
 | ID | Owner | Est | Issue | Deps |
 |---|---|---|---|---|
-| **COPY-9** | Lumen | M | **Rewrite the two promise sentences** in `legalCopy.js` — `The short version` and `What we do not do`. **Narrow, don't delete:** keep "we never read your entries / never sell or share / no ad networks / no cross-app tracking," retire "zero telemetry." Update the TRIPWIRE block (lines 20–37) in the same edit — it names these exact sentences | Colin: confirm §5A |
+| **COPY-9** | Lumen | M | **Rewrite the two promise sentences** in `legalCopy.js` — `The short version` and `What we do not do`. **Narrow, don't delete:** keep "we never read your entries / never sell or share / no ad networks / no cross-app tracking," retire "zero telemetry." Update the TRIPWIRE block (lines 20–37) in the same edit — it names these exact sentences | ~~Colin: confirm §5A~~ **DISCHARGED** — ruled 2026-08-24, `POLLINATE_V2_SPEC.md:998` at `6f83a6e`; §6 (`:1066`, same commit) records *"nothing in this document is waiting on Colin."* Cell closed 2026-09-03 (Vector). Remaining deps: **`ENG-74` + `ENG-75` in the same commit**; copy is arbitrated in `OUTBOX/COPY9_LEGALCOPY_REWRITE.md` v2 (Lumen, 2026-09-03), which supersedes `OPS-8` |
 | **ENG-74** | Pollen | M | Crash reporting (Sentry). Today only the in-app `ErrorBoundary` exists — we cannot currently see a crash at all. **Must land in the same commit as COPY-9** | COPY-9 |
 | **ENG-75** | Pollen | M | First-party product analytics. **No IDFA, no ad SDKs, no cross-app tracking — this is what keeps us out of ATT.** Event + screen telemetry only | COPY-9 |
 | **ENG-75.1** | Pollen | S | Opt-out toggle in Account settings, honored client-side (GDPR/CCPA) | ENG-75 |
@@ -263,14 +264,14 @@ lands with the Slice 2 paywall.
 |---|---|---|---|---|
 | **OPS-7** | Colin | S | **Enroll in the Apple Small Business Program — 15% instead of 30% under $1M/yr.** A form, worth a third of revenue. Do this week | — |
 | **COPY-11** | Lumen | M | **Ruling sweep.** Retired tokens: `$2.99`, `/mo`, `monthly`, `1 hive`, `lifetime`. Sweep `Pollinate_PRD.md` §5.1, `Pollinate_Strategy.md` §4, `Pollinate_Delivery_Slices.md`. Follow the `README.md` ritual — eye-read cited rows first, sweep the *retired* token, publish both yields, verdict reads "N hits, all classified legitimate" | — |
-| **ENG-76** | Fizz | L | **BLOCKED 2026-08-30 on ruling O1** — do not start until Colin rules whether individual Plus survives; recommendation on file is to retire it (`POLLINATE_COMB_ROTATION.md` §4.3). Original scope: **Paywall: meter volume delivery, and nothing else** (ruled 2026-08-25, spec §17.5.2a — review cadence, friend and seed gates all removed; seeds get a rate limit, not a paywall). Unlimited hives and entries free forever; **first delivery free forever**; every delivery after requires Plus. Annual-only IAP at $39.99 | ENG-48, ENG-49 |
+| ~~**ENG-76**~~ | ~~Fizz~~ | ~~L~~ | **CANCELLED 2026-08-30 — ruling `O1` closed (`2fff2abe…`): no, individual Plus does not survive. Pollinate is free for everything except the comb, so the delivery-metered paywall is retired.** `POLLINATE_COMB_ROTATION.md:3374` (`O1`) and `:3163` (the engineering handoff row for `ENG-76` reads **Cancelled.**); this document's §8 amendment above. **Nothing is waiting on Colin here.** ~~Original scope: **Paywall: meter volume delivery, and nothing else** (ruled 2026-08-25, spec §17.5.2a — review cadence, friend and seed gates all removed; seeds get a rate limit, not a paywall). Unlimited hives and entries free forever; first delivery free forever; every delivery after requires Plus. Annual-only IAP at $39.99~~ *(retained as the record of what was cancelled)* | ~~ENG-48, ENG-49~~ **—** |
 | **ENG-78** | Fizz | M | **Reveal→signup funnel instrumentation. The single highest-priority analytics event in the app** — it is the number the business rests on (§17.5.3). Ships with `ENG-51`, not after | ENG-51, ENG-75 |
-| **ENG-76.1** | Fizz | S | Seed rate limit (~5/week, all tiers) — abuse control, explicitly **not** a paywall surface (§17.5.2a) | ENG-76 |
-| **ENG-77** | Fizz | M | **Gifted subscription** bundled with delivery, via Apple IAP | ENG-76 |
+| **ENG-76.1** | Fizz | S | Seed rate limit (~5/week, all tiers) — abuse control, explicitly **not** a paywall surface (§17.5.2a) | ~~ENG-76~~ **STRUCK** — `ENG-76` cancelled; abuse control, not paywall mechanics (spec §17.5.2a, `:521` at `6f83a6e`: *"abuse is a rate limit (~5/week), not a price"*). No ruled prerequisite (@Sage, 2026-09-03) |
+| **ENG-77** | Fizz | M | **Gifted subscription** bundled with delivery, via Apple IAP | ~~ENG-76~~ **STRUCK** — `ENG-76` cancelled; spec `:608-609` at `6f83a6e` rules the Gifted-subscription row *"untouched … remains Slice 3"*, i.e. independent of `ENG-79`, so this does **not** repoint (@Sage, 2026-09-03) |
 | **ENG-79** | Fizz | **L+ (re-estimate)** | ~~Family / comb plan — $79/yr, up to 6 seats *(Slice 3)*~~ → **RE-SCOPED 2026-08-30: the per-user subscription — unlimited combs, up to 20 members each. The ONLY paid line.** Free is 1 comb written in / 5 members run. Carries the whole IAP layer, which does not exist in the build (no RevenueCat / `react-native-purchases` / StoreKit wrapper). **Price unruled — build the plumbing, not the number** | **ENG-58**, ENG-85, DES-30, COPY-13 |
-| **ENG-80** | Sage+Fizz | L | **Legacy tier — $199 one-time.** Escrowed delivery, verified beneficiary email, annual address-still-resolves confirmation. **Re-scope: closer to core than second-order** — per §17.5.2b this is the *only* capture point for the flagship 18-year use case, which otherwise pays $0 *(Slice 3)* | ENG-49, ENG-76 |
-| **DES-26** | Pixel | M | Paywall surfaces at the delivery moment — must not intrude on the seal/reveal emotion | ENG-76 |
-| **COPY-12** | Lumen | S | Pricing + gift copy. Never "upgrade to unlock" language at the reveal | ENG-76 |
+| **ENG-80** | Sage+Fizz | L | **Legacy tier — $199 one-time.** Escrowed delivery, verified beneficiary email, annual address-still-resolves confirmation. **Re-scope: closer to core than second-order** — per §17.5.2b this is the *only* capture point for the flagship 18-year use case, which otherwise pays $0 *(Slice 3)* | ENG-49; ~~ENG-76~~ **STRUCK** — `ENG-76` cancelled; spec `:538-539` at `6f83a6e` rules the legacy-tier answer *"unaffected … remains Slice 3"*, so this does **not** repoint to `ENG-79` (@Sage, 2026-09-03) |
+| ~~**DES-26**~~ | ~~Pixel~~ | ~~M~~ | ~~Paywall surfaces at the delivery moment — must not intrude on the seal/reveal emotion~~ | **FOLDED** per §8's amendment / `POLLINATE_COMB_ROTATION.md` §8.2 — content-lossless: `DES-30` (`:153`) carries the constraint by name (*"must not intrude on a seal or a reveal — same constraint as `DES-26`"*) (@Lumen, 2026-09-03) |
+| ~~**COPY-12**~~ | ~~Lumen~~ | ~~S~~ | ~~Pricing + gift copy. Never "upgrade to unlock" language at the reveal~~ | **FOLDED** per §8's amendment / `POLLINATE_COMB_ROTATION.md` §8.2 — clause by clause: the upgrade-to-unlock bar is carried by `DES-30` (`:153`); the retired $39.99/annual pricing copy was swept by **`COPY-13`** (closed, merged `1ab8e81`) — **do not repoint a Deps cell at it, it is finished**; the residual comb-plan pricing + gift copy cannot be written today (`ENG-79`: *"price unruled — build the plumbing, not the number"*) and **re-arms as a new Lumen row when Colin rules the price** (@Lumen, 2026-09-03) |
 
 ---
 
@@ -336,7 +337,10 @@ Parallel and independent: all of Project 16, and 19a up to `ENG-65`.
 ## 11. Do not start
 
 > **Amended 2026-08-30.** Added: **`ENG-76`** (delivery-metered $39.99 paywall) —
-> blocked on ruling O1. **A friend feed in the Hive tab** — cut by the comb
+> ~~blocked on ruling O1~~ **CANCELLED**; ruling `O1` closed 2026-08-30
+> (`2fff2abe…`). *(Amended 2026-09-03, Vector: the entry stays — this section is
+> "Do not start" and `ENG-76` still must not be started — but the reason is not a
+> pending ruling. Nothing here is waiting on Colin.)* **A friend feed in the Hive tab** — cut by the comb
 > rotation ruling; the tab is comb-first. **Any comb-plan price change before
 > `ENG-89` has C1 data** — same rationale as the `ENG-78` row below.
 > Removed: nothing. The `ENG-78` price-change row stands, with the note that
