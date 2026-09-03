@@ -67,6 +67,7 @@
     "check:des32-comb-nectar-client": "node scripts/check-des32-comb-nectar-client.mjs",
     "check:eng92-comb-rotation-fixes": "node scripts/check-eng92-comb-rotation-fixes.mjs",
     "check:perch-weight": "node scripts/check-perch-weight.mjs",
+    "check:mascot-presence": "node scripts/check-mascot-presence.mjs",
     "check:ops9-rotation-scheduler": "node scripts/check-ops9-rotation-scheduler.mjs",
     "test": "node scripts/run-checks.mjs",
     "deploy:migrations": "bash scripts/deploy-migrations.sh",

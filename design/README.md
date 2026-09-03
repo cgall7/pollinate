@@ -56,11 +56,28 @@ re-earning.
 
 ## Acceptance
 
-The repair's bar was a **round trip**, not a colour match (Lumen, 2026-08-25):
-the repaired master back through the chain must reproduce what already ships.
+The iris repair's bar was a **round trip**, not a colour match (Lumen,
+2026-08-25): the repaired master back through the chain had to reproduce what
+already shipped.
 
     mascot-wing.png   0 differing pixels, sha256 identical
     mascot-body.png   2 differing pixels of 98,880 (0.0020%), max channel diff 2,
                       both inside the iris box, dE00 max 0.5731
 
 The shipped face is the face of record. The master conforms to it, never the reverse.
+
+### Wing-outline ownership (2026-09-02)
+
+The master includes a fine charcoal construction line around the translucent
+wings. The original split assigned that dark perimeter to `body`, so rotating
+the golden wing exposed an immobile second wing behind it. The pipeline now
+assigns the narrow dark perimeter to wing ownership before cutting the body;
+the rendered wing layer itself remains byte-identical. `cut.py` pins the
+ratified 1013×1049 character box so removing an artifact cannot recrop both
+layers and silently move the hinge.
+
+Acceptance is the cream-ground body-only and wing+body recomposite plus
+`npm run check:mascot-presence`: the old body contains 959 dark near-wing
+pixels; the repaired body contains 45, all at legitimate body/hinge crossings,
+under the gate's ≤100 ceiling. The wing SHA-256 remains
+`23002baf6dcf506d545054a462e853c710f9370ee3e795633fd20546135cffe0`.

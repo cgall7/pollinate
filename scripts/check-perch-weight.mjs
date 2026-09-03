@@ -175,7 +175,10 @@ const beeCodeOnly = (beeAst.comments || [])
 // good: that the denominator in the component is the drawn height.
 {
   const DRAWN_PER_BOX = mascot.MASCOT_WIDTH_FRACTION / mascot.MASCOT_ASPECT;
-  const MOUNTS = [['hero', 132], ['chrome', 44]];
+  const MOUNTS = [
+    ['hero (132pt stage)', 132 * mascot.WELCOME_BEE_STAGE_FRACTION],
+    ['chrome', 44],
+  ];
 
   // Both interpolations must scale by `height` (the drawn height), never by
   // `size` (the box). Read off the outputRange expressions, so a refactor that
@@ -209,8 +212,8 @@ const beeCodeOnly = (beeAst.comments || [])
 
   console.log('\n  §6 row 1 — measured amplitude table, from the constants as landed:\n');
   console.log('    mount            drawn h   breath p2p   settle dip   overshoot   nadir below rest');
-  for (const [name, size] of MOUNTS) {
-    const h = size * DRAWN_PER_BOX;
+  for (const [name, characterBox] of MOUNTS) {
+    const h = characterBox * DRAWN_PER_BOX;
     const breathP2P = mascot.BREATH_RISE_FRACTION * h;
     const dip = mascot.SETTLE_DIP_FRACTION * h;
     const over = mascot.SETTLE_OVERSHOOT_FRACTION * dip;
@@ -218,16 +221,16 @@ const beeCodeOnly = (beeAst.comments || [])
     // floor the character settles onto is the same absolute point every time.
     const nadir = breathP2P / 2 + dip;
     console.log(
-      `    ${(name + ' ' + size + 'pt').padEnd(16)} ${h.toFixed(4).padStart(7)}   ${breathP2P.toFixed(4).padStart(10)}   ${dip.toFixed(4).padStart(10)}   ${over.toFixed(4).padStart(9)}   ${nadir.toFixed(4).padStart(16)}`,
+      `    ${name.padEnd(20)} ${h.toFixed(4).padStart(7)}   ${breathP2P.toFixed(4).padStart(10)}   ${dip.toFixed(4).padStart(10)}   ${over.toFixed(4).padStart(9)}   ${nadir.toFixed(4).padStart(16)}`,
     );
   }
   console.log('');
   note('P2b REPORTED, NOT GATED — the spec\'s own pt citations are computed against the BOX:');
-  note(`     §3 cites 4.224pt / 1.408pt for the breath; the ruled 3.2% OF DRAWN HEIGHT gives ${(mascot.BREATH_RISE_FRACTION * 132 * DRAWN_PER_BOX).toFixed(4)}pt / ${(mascot.BREATH_RISE_FRACTION * 44 * DRAWN_PER_BOX).toFixed(4)}pt.`);
-  note(`     §4 cites 3.96pt / 1.32pt for the dip; the ruled 3% gives ${(mascot.SETTLE_DIP_FRACTION * 132 * DRAWN_PER_BOX).toFixed(4)}pt / ${(mascot.SETTLE_DIP_FRACTION * 44 * DRAWN_PER_BOX).toFixed(4)}pt.`);
-  note('     Every citation is 1.4132x the travel its own constant produces. The FRACTION is the ruling and ships as ruled;');
-  note('     the citations are a derivation and are Lumen\'s to correct. If the intent was the pt figures rather than the');
-  note(`     fractions, the breath's advance axis is ${(mascot.BREATH_RISE_FRACTION / DRAWN_PER_BOX).toFixed(5)} — above the documented ${mascot.BREATH_RISE_CEILING} ceiling, so it needs a new ruling, not a tune.`);
+  note(`     §3 cites 4.224pt / 1.408pt for the breath; the ruled 3.2% OF DRAWN HEIGHT gives ${(mascot.BREATH_RISE_FRACTION * 132 * mascot.WELCOME_BEE_STAGE_FRACTION * DRAWN_PER_BOX).toFixed(4)}pt / ${(mascot.BREATH_RISE_FRACTION * 44 * DRAWN_PER_BOX).toFixed(4)}pt.`);
+  note(`     §4 cites 3.96pt / 1.32pt for the dip; the ruled 3% gives ${(mascot.SETTLE_DIP_FRACTION * 132 * mascot.WELCOME_BEE_STAGE_FRACTION * DRAWN_PER_BOX).toFixed(4)}pt / ${(mascot.SETTLE_DIP_FRACTION * 44 * DRAWN_PER_BOX).toFixed(4)}pt.`);
+  note(`     The hero citation is ${(1 / (mascot.WELCOME_BEE_STAGE_FRACTION * DRAWN_PER_BOX)).toFixed(4)}x the shipped travel because it omits both nested boxes; chrome is ${(1 / DRAWN_PER_BOX).toFixed(4)}x because it omits the transparent character box.`);
+  note('     The FRACTION is the ruling and ships as ruled; the citations are a derivation and are Lumen\'s to correct.');
+  note(`     Recovering the cited pt figures would require fractions ${(mascot.BREATH_RISE_FRACTION / (mascot.WELCOME_BEE_STAGE_FRACTION * DRAWN_PER_BOX)).toFixed(5)} (hero) / ${(mascot.BREATH_RISE_FRACTION / DRAWN_PER_BOX).toFixed(5)} (chrome), both above the documented ${mascot.BREATH_RISE_CEILING} ceiling — a new ruling, not a tune.`);
   console.log('');
 }
 

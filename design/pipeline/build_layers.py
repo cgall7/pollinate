@@ -88,7 +88,19 @@ wing = ndimage.binary_fill_holes(ndimage.binary_closing(wing, np.ones((11, 11)))
 wing = ndimage.binary_dilation(wing, np.ones((7, 7))) & subj
 print(f'wing region {int(wing.sum())}px')
 
-body = subj & ~wing
+# The master paints each wing with a fine charcoal construction line around
+# the translucent gold.  That line belongs to the wing pose, not to the body:
+# leaving it in `body` makes the rest pose retain a second, immobile pair of
+# wings behind the animated pair.  Own only the narrow dark perimeter here;
+# the bright wing mask above remains byte-stable and the body pixels beyond
+# the hinge stay untouched.
+yy, xx = np.indices(subj.shape)
+wing_distance = ndimage.distance_transform_edt(~wing)
+wing_outline = subj & (lum < 120) & (wing_distance <= 20) & (xx < 602)
+wing_ownership = wing | ndimage.binary_dilation(wing_outline, np.ones((5, 5)))
+print(f'wing-owned outline {int((wing_ownership & ~wing).sum())}px')
+
+body = subj & ~wing_ownership
 
 def soft(mask, sigma=0.9):
     return np.clip(ndimage.gaussian_filter(mask.astype(np.float64), sigma), 0, 1)
