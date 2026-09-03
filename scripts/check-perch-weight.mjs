@@ -3,6 +3,12 @@
 // sitting motion does not look top quality … it needs to look beautiful and
 // seamless just like the fox."*
 //
+// EXTENDED 2026-09-03 to cover R-SW (§7), Colin's second fox ruling after
+// watching R-PW ship: *"how it moves side to side and smoothly… I want you
+// to replicate that."* The same fox, a different axis. P11-P15 are that
+// term; P1-P10 are unchanged and stay pinned, which is §7 row 10's "R-SW
+// never reopens the merged terms" expressed where it can be broken.
+//
 //   npm run check:perch-weight
 //
 // WHY THIS GATE EXISTS. The diagnosis in §1 is arithmetic, not anatomy: three
@@ -52,6 +58,28 @@
 //   P10 the dip and the breath re-entry are one parallel step of EQUAL
 //       duration, both travelling DOWN — the property that makes the nadir a
 //       fixed floor and the dip's own contribution phase-independent
+//
+// AND FOR R-SW (§7):
+//
+//   P11 the ruled R-SW constants, and the relations — including the one that
+//       keeps §5's decline TRUE rather than overturned: the journey must fit
+//       inside the gap between journeys, or the gesture is the continuous
+//       term §5 refused, reached without a loop and without the word
+//   P12 §7 row 7 — the axis (translateX), the DENOMINATOR (drawn WIDTH, not
+//       the vertical terms' drawn height), structural symmetry about a rest
+//       that maps to exactly 0, and a driver that never leaves its declared
+//       domain — traced through the `side` variable, since this term is
+//       driven to a variable rather than to a literal
+//   P13 §7 row 8 — the DWELL, by construction: an explicit hold at the
+//       extreme expressed as a `delay` on the return leg, never a slow ease
+//       and never an `Animated.delay` step off the native driver
+//   P14 §7 row 9 — Reduce Motion reaches the sway: it hangs off `breathing`
+//       in both the guard and the dependency array, so P8's population gate
+//       covers it
+//   P15 §7 row 11 — the deference runs ONE WAY and both ends are asserted:
+//       neither merged conductor references the sway at all (P6 holds the
+//       other end — the sway reads the lock and never takes it), and the
+//       sway defers by re-rolling with nowhere to queue
 //
 // SCOPE OF THE CLAIM. Everything here is read from source and from the
 // constants module. **No row claims any of it has been seen on a device.**
@@ -380,13 +408,33 @@ const beeCodeOnly = (beeAst.comments || [])
   }
 }
 
-// ── P6. the collision rule, both directions ────────────────────────────────
+// ── P6. the collision rule, and who yields to whom ─────────────────────────
 //
 // §4: "simple mutual defer". A defer is only a defer if BOTH sides have one —
 // one-sided, the unguarded gesture cuts across the other and the bug looks
 // like a rendering glitch. And it must RE-ROLL rather than queue: a queued
 // gesture fires the instant the other releases, which is the one moment the
 // character has just finished moving.
+//
+// EXTENDED 2026-09-03 (R-SW §7 row 3). There are now THREE readers of the
+// lock and still exactly TWO owners of it, and the asymmetry is the ruling
+// rather than an omission — so it is asserted, not merely permitted.
+//
+// §4's symmetry between the flick and the settle is MECHANICAL: both drive
+// `own`, the wing value, so two drivers would meet on one value and that is
+// what R46/R83 forbid. Nothing binds the sway to either — it drives its own
+// value on its own axis through its own conductor — so the only thing left to
+// decide the direction is arithmetic. A 4.0s journey landing every 8-14s
+// occupies about a third of the clock; a flick that deferred to it would see
+// its effective interval stretch from ~6.5s to ~10s, which retunes R-PW-1
+// ("the first flick lands inside 9s BY CONSTRUCTION") from a term that §7 row
+// 10 says may never reopen the merged ones. So the new term yields to the old
+// ones and never the other way: it READS the lock and does not TAKE it.
+//
+// Which means this row's `= true` count is the load-bearing half. If the sway
+// ever starts taking the lock, every figure P3 reports stays green and the
+// flick quietly goes rare — the exact failure R-PW-1 was written to fix,
+// arriving through a door P3 cannot see.
 {
   const defers = [];
   walk(beeAst.program, (n) => {
@@ -394,16 +442,17 @@ const beeCodeOnly = (beeAst.comments || [])
     const test = text(n.test);
     if (!/gesture\.busy/.test(test)) return;
     const body = text(n.consequent);
-    const rearm = /\bschedule\(\)/.test(body) ? 'schedule' : (/\bscheduleSettle\(\)/.test(body) ? 'scheduleSettle' : null);
+    const rearm = /\bschedule\(\)/.test(body) ? 'schedule' : (/\bscheduleSettle\(\)/.test(body) ? 'scheduleSettle' : (/\bscheduleSway\(\)/.test(body) ? 'scheduleSway' : null));
     defers.push({ test, rearm, returns: /\breturn;/.test(body), body });
   });
   const problems = [];
-  if (defers.length !== 2) {
-    problems.push(`expected exactly 2 \`gesture.busy\` guards (one per channel), found ${defers.length} — FAILS CLOSED`);
+  if (defers.length !== 3) {
+    problems.push(`expected exactly 3 \`gesture.busy\` guards (the flick, the settle, the sway), found ${defers.length} — FAILS CLOSED`);
   }
   const armed = new Set(defers.map((d) => d.rearm).filter(Boolean));
   if (!armed.has('schedule')) problems.push('the flick\'s guard does not re-roll its own timer — that is a DROPPED gesture, not a deferred one');
   if (!armed.has('scheduleSettle')) problems.push('the settle\'s guard does not re-roll its own timer — that is a DROPPED gesture, not a deferred one');
+  if (!armed.has('scheduleSway')) problems.push('the sway\'s guard does not re-roll its own timer — that is a DROPPED gesture, not a deferred one');
   for (const d of defers) {
     if (!d.returns) problems.push(`a \`gesture.busy\` guard re-rolls but does not \`return\` — it would re-roll AND fire: \`${d.test}\``);
   }
@@ -417,7 +466,7 @@ const beeCodeOnly = (beeAst.comments || [])
   // not touch it; two writers for one bit is how a lock stops working.
   const sets = beeSrc.match(/gesture\.busy\s*=\s*true/g) || [];
   const clears = beeSrc.match(/gesture\.busy\s*=\s*false/g) || [];
-  if (sets.length !== 2) problems.push(`\`gesture.busy = true\` is written ${sets.length} times, expected 2 (one per channel)`);
+  if (sets.length !== 2) problems.push(`\`gesture.busy = true\` is written ${sets.length} times, expected 2 — the wing-sharing pair OWN the lock and the sway only reads it. A third writer is the sway taking a lock the merged terms would then wait on, which stretches the flick's ruled interval without touching a single constant P3 can see`);
   if (clears.length < 2) problems.push(`\`gesture.busy = false\` is written ${clears.length} times — every path that takes the lock must release it`);
   let absorbTouchesLock = false;
   walk(beeAst.program, (n) => {
@@ -428,9 +477,9 @@ const beeCodeOnly = (beeAst.comments || [])
   if (absorbTouchesLock) problems.push('`gesture.absorb` writes `gesture.busy` — the settle takes that lock and the settle releases it; two owners for one bit is how a lock stops working');
 
   if (problems.length === 0) {
-    ok(`P6 §4's collision rule holds in BOTH directions — ${defers.length} guards, each re-rolling its own interval and returning, no queue, one owner per side of the lock`);
+    ok(`P6 §4's collision rule holds in both directions between the wing-sharing pair, and §7's one-way deference holds for the sway — ${defers.length} guards, each re-rolling its own interval and returning, no queue, and ${sets.length} owners of the lock against ${defers.length} readers`);
   } else {
-    bad('P6 §4\'s collision rule, both directions', problems.join(' | '));
+    bad('P6 the collision rule, and who yields to whom', problems.join(' | '));
   }
 }
 
@@ -582,6 +631,424 @@ const beeCodeOnly = (beeAst.comments || [])
     ok('P10 the dip and the breath re-entry are ONE parallel step, equal duration, equal easing, both travelling DOWN — so the nadir is a fixed floor and the dip\'s own contribution is phase-independent');
   } else {
     bad('P10 the dip and the breath re-entry are one step', problems.join(' | '));
+  }
+}
+
+// ── P11. the R-SW constants, and the line between a gesture and an oscillator
+//
+// §7 (R-SW), Colin's fox re-ruling of 2026-09-03. Same split as P1: the
+// PINNED values are pinned because the ruling names them, and the RELATIONS
+// underneath are the half no single number can carry.
+//
+// The last relation is the load-bearing one and it is why this term is legal
+// at all. §5 declined "a third continuous term (lateral sway / body roll)"
+// because continuous terms blur into hover, and §7 does not overturn that
+// reason — it says this is a one-shot GESTURE rather than an oscillator, so
+// the decline never applied. That distinction is not a description: it is the
+// arithmetic fact that the journey FITS INSIDE the gap between journeys. Let
+// the journey grow past the interval's floor and the bee is displaced more
+// often than it is home, which is the smear §5 refused, arrived at without
+// anyone adding a loop or writing the word "continuous" anywhere.
+{
+  const RULED = [
+    ['SWAY_OFFSET_FRACTION', 0.033, 'R-SW-1 §7 — "±3.3% of DRAWN width"'],
+    ['SWAY_INTERVAL_MIN_MS', 8000, 'R-SW-2 §7 — "every 8-14s, re-rolled"'],
+    ['SWAY_INTERVAL_MAX_MS', 14000, 'R-SW-2 §7'],
+    ['SWAY_DIRECTION_BIAS', 0.7, 'R-SW-2 §7 — "a 70/30 bias away from the last side"'],
+  ];
+  const wrong = RULED.filter(([name, want]) => mascot[name] !== want)
+    .map(([name, want, why]) => `${name} is ${mascot[name]}, ruled ${want} (${why})`);
+  if (wrong.length === 0) {
+    ok(`P11a all ${RULED.length} ruled R-SW constants are the ruled values, read from constants/mascot.js`);
+  } else {
+    bad('P11a the R-SW constants are the ruled values', wrong.join('; '));
+  }
+
+  const journey = mascot.SWAY_OUT_MS + mascot.SWAY_DWELL_MS + mascot.SWAY_HOME_MS;
+  const relations = [
+    [mascot.SWAY_OFFSET_FRACTION < mascot.SWAY_OFFSET_CEILING,
+      'the sway ships BELOW its documented ceiling',
+      `SWAY_OFFSET_FRACTION ${mascot.SWAY_OFFSET_FRACTION} must be < SWAY_OFFSET_CEILING ${mascot.SWAY_OFFSET_CEILING} — the R-series bar, and §7 row 6's advance axis needs somewhere to advance TO`],
+    [mascot.SWAY_INTERVAL_MIN_MS < mascot.SWAY_INTERVAL_MAX_MS,
+      'the sway interval is an interval', 'MIN must be < MAX or the re-roll is a constant wearing a range\'s clothes'],
+    [mascot.SWAY_DWELL_MS >= 1000 && mascot.SWAY_DWELL_MS <= 2000,
+      'the dwell is inside the fox\'s measured hold',
+      `§7 measures "a 1-2s HOLD at the extreme"; SWAY_DWELL_MS is ${mascot.SWAY_DWELL_MS}. Below the band the hold stops being separable from the ease and the gesture reads as drift — which is the one thing row 8 exists to forbid`],
+    [journey >= 4000 && journey <= 5000,
+      'the journey is the fox\'s measured length',
+      `§7 measures "one journey per ~4-5s"; out+dwell+home is ${journey}ms`],
+    [mascot.SWAY_OUT_MS !== mascot.SWAY_HOME_MS,
+      'the journey out is not the journey home',
+      `SWAY_OUT_MS ${mascot.SWAY_OUT_MS} must differ from SWAY_HOME_MS ${mascot.SWAY_HOME_MS}. A symmetric out-and-back is a pendulum: the interval can be unlearnable and the SHAPE still read as a metronome, because the eye learns shapes`],
+    [mascot.SWAY_DIRECTION_BIAS > 0.5 && mascot.SWAY_DIRECTION_BIAS < 1,
+      'the direction is biased, not strict and not fair',
+      `SWAY_DIRECTION_BIAS ${mascot.SWAY_DIRECTION_BIAS} must be in (0.5, 1). At 1 the sequence is strict left-right-left-right — a metronome one level up from the interval, and sequences are exactly what an eye learns. At or below 0.5 the bias points at the side he just left, which is a different gesture than the one ruled`],
+    [journey < mascot.SWAY_INTERVAL_MIN_MS,
+      'THE GESTURE FITS INSIDE THE GAP — this is the line between §7 and what §5 declined',
+      `out+dwell+home is ${journey}ms and must stay under SWAY_INTERVAL_MIN_MS ${mascot.SWAY_INTERVAL_MIN_MS}. §5 declined a continuous lateral term because continuous terms blur into hover; §7 is legal because this one spends most of its life at rest. Let the journey outgrow the floor of its own interval and the bee is displaced more often than it is home — the smear §5 refused, reached with no loop and no one ever writing the word`],
+  ];
+  const broken = relations.filter(([held]) => !held).map(([, what, why]) => `${what}: ${why}`);
+  if (broken.length === 0) {
+    // The at-rest share is over the CYCLE, and a cycle is the wait PLUS the
+    // journey — the conductor re-arms from the animation's own callback
+    // (`current.start(({ finished }) => ... scheduleSway())`), so the wait
+    // begins when the journey ENDS rather than running alongside it. Reading
+    // the interval as the whole cycle understates the rest by ~10 points,
+    // which is the wrong direction for a figure whose whole job is to say
+    // this term is mostly still.
+    const cycle = (mascot.SWAY_INTERVAL_MIN_MS + mascot.SWAY_INTERVAL_MAX_MS) / 2 + journey;
+    ok(`P11b all ${relations.length} relations between the R-SW constants hold — including the one that keeps §5's decline true rather than overturned (journey ${journey}ms inside a ${mascot.SWAY_INTERVAL_MIN_MS}ms floor, at rest ${(100 * (1 - journey / cycle)).toFixed(1)}% of a median ${cycle}ms cycle)`);
+  } else {
+    bad('P11b the relations between the R-SW constants hold', broken.join(' | '));
+  }
+}
+
+// ── P12. the sway's axis, its denominator, and its symmetry ────────────────
+//
+// §7 row 7. The zero-net-translation bar (§6 row 4) reaches this term
+// unchanged, so it is asserted the same way P5 asserts the breath's: on the
+// driver range, structurally, rather than argued in a comment.
+//
+// THE DENOMINATOR IS THE OTHER HALF AND IT IS NOT THE SAME ONE. The two
+// vertical terms scale by the drawn HEIGHT (P2). This one scales by the drawn
+// WIDTH, because the fox's 6.7% was its centroid's travel over its own drawn
+// x-extent — a constant only means anything inside the frame it was measured
+// in. `height` is in scope one line away and reads as the safer choice; it
+// would silently ship 1.0356x the ruled excursion, which is the same category
+// error R-PW-2's correction block was written for, one axis over.
+{
+  const problems = [];
+  let swayR = null;
+  walk(beeAst.program, (n) => {
+    if (n.type !== 'CallExpression') return;
+    if (n.callee?.type !== 'MemberExpression' || n.callee.property?.name !== 'interpolate') return;
+    if (text(n.callee.object) !== 'sway') return;
+    const arg = n.arguments[0];
+    if (arg?.type !== 'ObjectExpression') return;
+    const out = arg.properties.find((p) => p.key?.name === 'outputRange');
+    const inp = arg.properties.find((p) => p.key?.name === 'inputRange');
+    if (!out || !inp) return;
+    swayR = { input: inp.value.elements.map(text), output: out.value.elements.map(text) };
+  });
+
+  // Which transform property it drives. On the wrong one this is a vertical
+  // term with a horizontal constant, and every figure P11 prints stays true.
+  let axis = null;
+  walk(beeAst.program, (n) => {
+    if (n.type !== 'ObjectProperty' && n.type !== 'Property') return;
+    if (!/\bsway\.interpolate\b/.test(text(n.value))) return;
+    axis = n.key?.name ?? text(n.key);
+  });
+  if (axis !== 'translateX') {
+    problems.push(`the sway drives \`${axis === null ? '<not found>' : axis}\`, not \`translateX\` — R-SW-1 is a LATERAL weight shift, and on any other property its ruled fraction is a number measured in one frame and spent in another`);
+  }
+
+  if (!swayR) {
+    problems.push('could not read the sway\'s interpolation — FAILS CLOSED: a term this row cannot see is a term whose symmetry and denominator it cannot check');
+  } else {
+    const strip = (s) => s.replace(/[()\s]/g, '');
+    // Drawn WIDTH, never the drawn height and never the box.
+    const wrongDenominator = swayR.output.filter((e) => e !== '0' && (!/\bwidth\b/.test(e) || /\bheight\b/.test(e) || /\bsize\b/.test(e)));
+    if (wrongDenominator.length) {
+      problems.push(`the sway's outputRange [${swayR.output.join(', ')}] does not scale by the drawn \`width\` — ${wrongDenominator.join('; ')}. Against \`height\` the shipped excursion is ${(1 / mascot.MASCOT_ASPECT).toFixed(4)}x the ruled one; against \`size\` it is ${(1 / mascot.MASCOT_WIDTH_FRACTION).toFixed(4)}x`);
+    }
+    // Symmetric about the perch point, STRUCTURALLY: one expression with a
+    // flipped sign, so the two ends cannot be edited apart.
+    const [lo, , hi] = swayR.output;
+    if (swayR.output.length !== 3) {
+      problems.push(`the sway's outputRange has ${swayR.output.length} stops, expected 3 (-peak, rest, +peak) — the rest stop is what makes the perch point a declared value rather than an inference`);
+    } else if (strip(lo) !== `-${strip(hi)}`) {
+      problems.push(`the sway's range [${lo}, ${hi}] is not one expression with a flipped sign — symmetry about the perch point must be structural, not two numbers that happen to agree today`);
+    }
+    const restAt = swayR.input.findIndex((e) => strip(e) === '0');
+    if (restAt < 0) {
+      problems.push(`the sway's inputRange [${swayR.input.join(', ')}] has no 0 stop — the gesture has no declared rest`);
+    } else if (strip(swayR.output[restAt]) !== '0') {
+      problems.push(`the sway's rest maps to \`${swayR.output[restAt]}\`, not 0 — a gesture whose rest is not zero walks the character sideways one journey at a time`);
+    }
+    if (swayR.input.length !== 3 || strip(swayR.input[0]) !== `-${strip(swayR.input[2])}`) {
+      problems.push(`the sway's inputRange [${swayR.input.join(', ')}] is not a signed pair about 0 — the poles must be one value with a flipped sign for the same reason the outputs are`);
+    }
+
+    // NOTHING EXTRAPOLATES. The sway is driven to a VARIABLE (`side`), not to
+    // a literal, so the domain bound cannot be read off the call the way P5
+    // reads the settle's — it has to be read off the variable's whole life.
+    // `interpolate`'s default extrapolation is `extend`, so an amplified
+    // `side` renders happily, at a excursion nobody measured and no constant
+    // records.
+    const declared = new Set(swayR.input.map(strip));
+    const writes = [];
+    walk(beeAst.program, (n) => {
+      if (n.type === 'CallExpression' && (text(n.callee) === 'Animated.timing' || text(n.callee) === 'Animated.spring')
+          && text(n.arguments[0]) === 'sway') {
+        const to = n.arguments[1]?.properties?.find((p) => p.key?.name === 'toValue');
+        writes.push(to ? strip(text(to.value)) : '<unreadable>');
+      }
+      if (n.type === 'CallExpression' && n.callee?.type === 'MemberExpression'
+          && text(n.callee.object) === 'sway' && n.callee.property?.name === 'setValue') {
+        writes.push(strip(text(n.arguments[0])));
+      }
+    });
+    if (writes.length === 0) {
+      problems.push('no writes to `sway` found — FAILS CLOSED: a gesture this row cannot see is a gesture whose domain it cannot bound');
+    }
+    const viaVariable = [...new Set(writes)].filter((w) => !declared.has(w) && w !== '0');
+    for (const name of viaVariable) {
+      if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
+        problems.push(`\`sway\` is driven to the expression \`${name}\`, which is neither a declared stop {${[...declared].join(', ')}} nor a plain variable this row can trace — FAILS CLOSED`);
+        continue;
+      }
+      // Trace the variable: it must be born at a pole and only ever flipped.
+      let init = null;
+      const assigned = [];
+      walk(beeAst.program, (n) => {
+        if (n.type === 'VariableDeclarator' && n.id?.name === name) init = n.init ? strip(text(n.init)) : '<uninitialised>';
+        if (n.type === 'AssignmentExpression' && n.left?.type === 'Identifier' && n.left.name === name) assigned.push(n.right);
+      });
+      if (init === null) {
+        problems.push(`\`sway\` is driven to \`${name}\`, whose declaration this row cannot find — FAILS CLOSED`);
+      } else if (!declared.has(init)) {
+        problems.push(`\`${name}\` is born as \`${init}\`, which is not one of the sway's declared stops {${[...declared].join(', ')}} — the driver would start its life outside its own domain`);
+      }
+      for (const rhs of assigned) {
+        // Every reachable value of the variable, whatever control flow gets
+        // there: a conditional contributes both arms, anything else itself.
+        const arms = [];
+        const collect = (node) => {
+          if (node.type === 'ConditionalExpression') { collect(node.consequent); collect(node.alternate); return; }
+          arms.push(strip(text(node)));
+        };
+        collect(rhs);
+        const bad_ = arms.filter((a) => a !== name && a !== `-${name}`);
+        if (bad_.length) {
+          problems.push(`\`${name}\` is assigned ${bad_.map((a) => `\`${a}\``).join(', ')} — the side variable may only ever be itself or its own negation. Scaling it (\`1.5 * ${name}\`) drives the interpolation past its declared stops, where \`extend\` renders an excursion no constant records and P11's table still reports the ruled one`);
+        }
+      }
+    }
+  }
+
+  if (problems.length === 0) {
+    ok('P12 §7 row 7 — the sway drives translateX, scales by the drawn WIDTH (its own measurement frame, not the vertical terms\'), is structurally symmetric about a rest that maps to exactly 0, and its driver never leaves its declared domain');
+  } else {
+    bad('P12 the sway\'s axis, denominator and symmetry', problems.join(' | '));
+  }
+
+  const MOUNTS = [['hero (132pt stage)', 132 * mascot.WELCOME_BEE_STAGE_FRACTION], ['chrome', 44]];
+  console.log('\n  §7 row 7 — measured LATERAL amplitude table, from the constants as landed:\n');
+  console.log('    mount            drawn w   each side   peak-to-peak   vs breath p2p   free space each side');
+  for (const [name, characterBox] of MOUNTS) {
+    const w = characterBox * mascot.MASCOT_WIDTH_FRACTION;
+    const h = w / mascot.MASCOT_ASPECT;
+    const each = mascot.SWAY_OFFSET_FRACTION * w;
+    const breathP2P = mascot.BREATH_RISE_FRACTION * h;
+    // What the drawing has to move into: the character occupies
+    // MASCOT_WIDTH_FRACTION of its centred box, so the slack is real layout,
+    // not a guess about an ancestor's overflow.
+    const free = (characterBox - w) / 2;
+    console.log(
+      `    ${name.padEnd(20)} ${w.toFixed(4).padStart(7)}   ${each.toFixed(4).padStart(9)}   ${(2 * each).toFixed(4).padStart(12)}   ${(2 * each / breathP2P).toFixed(2).padStart(13)}x   ${free.toFixed(4).padStart(20)}`,
+    );
+  }
+  console.log('');
+  const slackFraction = (1 - mascot.MASCOT_WIDTH_FRACTION) / 2 / mascot.MASCOT_WIDTH_FRACTION;
+  if (mascot.SWAY_OFFSET_FRACTION < slackFraction) {
+    ok(`P12b the excursion cannot clip at ANY mount, structurally: the drawing is centred in a box it fills ${(100 * mascot.MASCOT_WIDTH_FRACTION).toFixed(2)}% of, leaving ${(100 * slackFraction).toFixed(2)}% of the DRAWN width free on each side against an excursion of ${(100 * mascot.SWAY_OFFSET_FRACTION).toFixed(1)}% — both sides of that comparison are fractions of the same denominator, so it holds at every size rather than at the two this table happens to print`);
+  } else {
+    bad('P12b the excursion cannot clip at any mount',
+      `the excursion is ${(100 * mascot.SWAY_OFFSET_FRACTION).toFixed(2)}% of the drawn width against ${(100 * slackFraction).toFixed(2)}% of free space each side — the drawing would leave the rect its box already occupies, and whether that shows becomes a question about some ancestor's \`overflow\` rather than about this component`);
+  }
+}
+
+// ── P13. the dwell — §7 row 8, and it is the whole gesture ─────────────────
+//
+// "the driver's interpolation must contain an explicit hold segment at the
+// extreme, not merely a slow ease (a slow ease reads as drift; the hold is
+// what reads as weight)". The failure this row is aimed at does not look like
+// a bug: someone folds three constants into two, keeps the same 4.0s and the
+// same ±3.3%, and every figure P11 prints stays green while the thing Colin
+// asked for is gone. The hold is the only part of this term that is not also
+// true of the hover the doctrine retired.
+//
+// It is expressed as `delay:` ON THE RETURN LEG rather than as an
+// `Animated.delay` step, and that is not a style choice: `delay()` mints a
+// throwaway `new AnimatedValue(0)` and hardcodes `useNativeDriver: false`
+// (react-native/Libraries/Animated/AnimatedImplementation.js:436-442), so it
+// would drop a JS-thread animation into the middle of an otherwise native
+// sequence to accomplish nothing but the passage of time.
+{
+  const problems = [];
+  const legs = [];
+  walk(beeAst.program, (n) => {
+    if (n.type !== 'CallExpression' || text(n.callee) !== 'Animated.timing') return;
+    if (text(n.arguments[0]) !== 'sway') return;
+    const cfg = n.arguments[1];
+    const get = (k) => { const p = cfg?.properties?.find((q) => q.key?.name === k); return p ? text(p.value) : null; };
+    legs.push({ at: n.start, to: get('toValue'), dur: get('duration'), delay: get('delay'), native: get('useNativeDriver') });
+  });
+  legs.sort((a, b) => a.at - b.at);
+
+  if (legs.length !== 2) {
+    problems.push(`expected exactly 2 \`sway\` timings (out, home), found ${legs.length} — FAILS CLOSED: the shape of the journey is what this row reads the hold off`);
+  } else {
+    const [out, home] = legs;
+    if (out.delay !== null) problems.push(`the OUTWARD leg carries \`delay: ${out.delay}\` — the hold belongs at the extreme, and a delay before departure is dead time at the rest point where the character is already still`);
+    if (home.delay !== 'SWAY_DWELL_MS') {
+      problems.push(`the return leg's hold is \`${home.delay === null ? '<absent>' : home.delay}\`, not \`SWAY_DWELL_MS\`. With no delay the journey is out-and-straight-back: the same distance, the same total time if the durations absorb it, and NO HOLD — row 8's "a slow ease does not count", arrived at by deletion`);
+    }
+    if (out.dur !== 'SWAY_OUT_MS') problems.push(`the outward leg runs \`${out.dur}\`, not SWAY_OUT_MS`);
+    if (home.dur !== 'SWAY_HOME_MS') problems.push(`the return leg runs \`${home.dur}\`, not SWAY_HOME_MS`);
+    if (home.to !== '0') problems.push(`the return leg drives \`sway\` to ${home.to}, not 0 — the journey must come home to the perch point exactly, every time, or the bias is the only thing keeping the character near where it started`);
+    for (const leg of legs) {
+      if (leg.native !== 'true') problems.push(`a sway leg runs \`useNativeDriver: ${leg.native}\` — a transform this simple has no reason to be on the JS thread, where a full render tick lands inside the dwell and turns the hold into a stutter`);
+    }
+  }
+
+  // And the hold is a HOLD, not a step that happens to be slow.
+  if (!(mascot.SWAY_DWELL_MS > 0)) {
+    problems.push(`SWAY_DWELL_MS is ${mascot.SWAY_DWELL_MS} — a zero-length hold is the absent hold with a constant's name on it`);
+  }
+  let delayStep = false;
+  walk(beeAst.program, (n) => {
+    if (n.type !== 'CallExpression' || text(n.callee) !== 'Animated.delay') return;
+    if (/SWAY_/.test(text(n))) delayStep = true;
+  });
+  if (delayStep) {
+    problems.push('the hold is an `Animated.delay` step — it mints a throwaway AnimatedValue and hardcodes `useNativeDriver: false` (AnimatedImplementation.js:436-442), putting a JS-thread animation inside a native sequence to accomplish only the passage of time. `delay:` on the leg that follows holds the same value for the same duration on one driver');
+  }
+
+  if (problems.length === 0) {
+    ok(`P13 §7 row 8 — the dwell is an explicit ${mascot.SWAY_DWELL_MS}ms hold at the extreme (a \`delay\` on the return leg, one driver, native), not a slow ease: ${mascot.SWAY_OUT_MS}ms out, ${mascot.SWAY_DWELL_MS}ms held, ${mascot.SWAY_HOME_MS}ms home`);
+  } else {
+    bad('P13 the dwell exists by construction', problems.join(' | '));
+  }
+}
+
+// ── P14. Reduce Motion reaches the sway — §7 row 9 ─────────────────────────
+//
+// P8 asserts the population: every `breath=` call site is gated on `reduced`.
+// That is what makes RM a freeze for the terms that hang off `breathing` —
+// and it is only worth anything for THIS term if this term hangs off it too.
+// The row is separate because the sway's conductor is the first one that
+// could have been written without that gate and still have looked right in
+// every screenshot: `driven` does not gate it (deliberately — a bee whose
+// wing someone else is holding still has its own weight), so `breathing` is
+// the only thing standing between the sway and a character that is supposed
+// to be frozen.
+{
+  const problems = [];
+  let effect = null;
+  walk(beeAst.program, (n) => {
+    if (n.type !== 'CallExpression' || text(n.callee) !== 'useEffect') return;
+    let mine = false;
+    walk(n.arguments[0], (m) => {
+      if (m.type === 'VariableDeclarator' && m.id?.name === 'scheduleSway') mine = true;
+    });
+    if (mine) effect = n;
+  });
+  if (!effect) {
+    problems.push('could not find the sway\'s `useEffect` (no `scheduleSway` declarator inside one) — FAILS CLOSED');
+  } else {
+    let gated = false;
+    walk(effect.arguments[0], (n) => {
+      if (n.type !== 'IfStatement') return;
+      if (!/^!\s*breathing$/.test(text(n.test))) return;
+      if (/return/.test(text(n.consequent))) gated = true;
+    });
+    if (!gated) problems.push('the sway\'s conductor has no `if (!breathing) return` — under Reduce Motion the call sites stop asking for breath, and a conductor that does not read that keeps swaying a character the user asked to hold still');
+    const deps = effect.arguments[1];
+    const depNames = deps?.type === 'ArrayExpression' ? deps.elements.map(text) : null;
+    if (!depNames) {
+      problems.push('the sway\'s effect has no dependency array — it would re-arm on every render, and each re-arm re-rolls the interval from zero, which is a term that never fires under a parent that renders often');
+    } else if (!depNames.includes('breathing')) {
+      problems.push(`\`breathing\` is not in the sway effect's deps [${depNames.join(', ')}] — the guard would be read once and never again, so turning Reduce Motion ON mid-session would leave the sway running until unmount`);
+    }
+  }
+  if (problems.length === 0) {
+    ok('P14 §7 row 9 — the sway hangs off `breathing` (guard AND dependency), so P8\'s population gate reaches this term and Reduce Motion freezes it like every other idle term');
+  } else {
+    bad('P14 Reduce Motion reaches the sway', problems.join(' | '));
+  }
+}
+
+// ── P15. the deference direction, asserted rather than assumed — §7 row 11 ──
+//
+// The amended R-SW-3 rules ONE-WAY deference: the sway yields to the flick
+// and the settle, and they never yield to it. P6 holds one half of that (two
+// owners of the lock, three readers). This row holds the other half, and the
+// two are aimed at opposite mistakes.
+//
+// P6 catches the sway TAKING the lock. This catches the flick or the settle
+// GROWING one of their own — a `if (swaying) return;` added later by someone
+// tidying up an overlap they saw on a device and read as a collision. It
+// would look like symmetry, it would look like §4, and it would silently
+// convert R-PW-1's ruled ceiling into an average: a flick blocked mid-sway
+// re-rolls 4-9s later, so the worst-case first flick goes from 9s to ~18s.
+// §6 row 2 says "by construction" — that phrase is the whole ruling, and this
+// is the door it can be lost through without a single constant moving. P3
+// would stay green the entire time, because P3 reads the constants.
+{
+  const problems = [];
+  const conductors = [
+    ['schedule', 'the flick'],
+    ['scheduleSettle', 'the settle'],
+  ];
+  for (const [decl, label] of conductors) {
+    let effect = null;
+    walk(beeAst.program, (n) => {
+      if (n.type !== 'CallExpression' || text(n.callee) !== 'useEffect') return;
+      let mine = false;
+      walk(n.arguments[0], (m) => {
+        if (m.type === 'VariableDeclarator' && m.id?.name === decl) mine = true;
+      });
+      if (mine) effect = n;
+    });
+    if (!effect) {
+      problems.push(`could not find ${label}'s conductor (no \`${decl}\` declarator inside a useEffect) — FAILS CLOSED: a conductor this row cannot see is one it cannot clear of a sway guard`);
+      continue;
+    }
+    // Identifiers, not source text: the effects have prose ABOUT the sway in
+    // them (this deference is the kind of thing that has to be explained
+    // where it is relied on), and a comment naming a term is not a guard on
+    // it. Same class as P6's `beeCodeOnly` — a justification is a dependency,
+    // so it has to be readable without tripping the check it justifies.
+    const touches = new Set();
+    walk(effect.arguments[0], (n) => {
+      if (n.type === 'Identifier' && /^(sway|SWAY_)/.test(n.name)) touches.add(n.name);
+    });
+    if (touches.size) {
+      problems.push(`${label}'s conductor references ${[...touches].map((t) => `\`${t}\``).join(', ')} — the merged terms must not know the sway exists. Whatever the reference does today, the next edit to it is a guard, and a guard here stretches R-PW-1's by-construction ceiling from 9s to ~18s without touching a constant`);
+    }
+  }
+
+  // Defers, never queues: the sway's guard re-rolls (P6) and there is nowhere
+  // for a blocked gesture to be REMEMBERED. A queue is a metronome with a
+  // buffer — it fires the instant the other gesture releases, which is the
+  // single moment the character has just finished moving.
+  let swayEffect = null;
+  walk(beeAst.program, (n) => {
+    if (n.type !== 'CallExpression' || text(n.callee) !== 'useEffect') return;
+    let mine = false;
+    walk(n.arguments[0], (m) => {
+      if (m.type === 'VariableDeclarator' && m.id?.name === 'scheduleSway') mine = true;
+    });
+    if (mine) swayEffect = n;
+  });
+  if (!swayEffect) {
+    problems.push('could not find the sway\'s conductor — FAILS CLOSED');
+  } else {
+    const queueish = new Set();
+    walk(swayEffect.arguments[0], (n) => {
+      if (n.type === 'VariableDeclarator' && n.id?.name && /queue|pending|deferred|backlog/i.test(n.id.name)) queueish.add(n.id.name);
+    });
+    if (queueish.size) {
+      problems.push(`the sway's conductor declares ${[...queueish].map((q) => `\`${q}\``).join(', ')} — a deferred gesture is DROPPED and re-rolled, never remembered. A buffer fires the moment the other gesture releases, which is the one instant the character has just finished moving`);
+    }
+  }
+
+  if (problems.length === 0) {
+    ok('P15 §7 row 11 — the deference runs one way and is asserted both ends: neither merged conductor references the sway at all, and the sway defers by re-rolling with nowhere to queue');
+  } else {
+    bad('P15 the deference direction, asserted rather than assumed', problems.join(' | '));
   }
 }
 
