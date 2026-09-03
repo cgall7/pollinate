@@ -3210,7 +3210,7 @@ consequence, and learn in between.**
 
 | # | Owner | Task |
 |---|---|---|
-| 0.1 | **Lumen + Bumble** | `OPS-8` — narrow the `legalCopy.js` analytics promise. **Blocks every measurement below.** Do this first |
+| 0.1 | **Lumen + Bumble** | `OPS-8` — narrow the `legalCopy.js` analytics promise using the COPY-9 arbitrated rewrite (`OUTBOX/COPY9_LEGALCOPY_REWRITE.md`, per-sentence provenance) — never `bumble/ops8-legalcopy-analytics`'s file, which is parked pre-storage-model-rewrite and would revert ENG-84's changes if merged whole. **Blocks every measurement below, and lands in the same commit as `ENG-74`/`ENG-75` per spec §20.4 obligation 1 — never as a standalone merge.** |
 | 0.2 | **Fizz** | `ENG-84` — account deletion (App Store 5.1.1(v)) |
 | 0.3 | **Lumen** | `COPY-13` sweep + ratify this encoding (normally Lumen's step; Vector authored it at Colin's request) |
 | 0.4 | **Colin** | `OPS-7` — Apple Small Business Program. A form, worth 15% of revenue |
