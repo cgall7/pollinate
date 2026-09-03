@@ -704,15 +704,21 @@ export const TodayTab = ({ navigation, route }) => {
                   />
                 ))}
                 {/* Joined, no month open yet (COPY-6 addendum). THIS SHELF,
-                    not a new one: the pending row is the SAME row one mint
-                    earlier — when the month opens, `listPendingCombMemberships`
-                    drops the comb and `listContributingHives` picks up its
-                    hive, so the entry upgrades in place instead of a shelf
-                    appearing and disappearing around it. Below the live rows
-                    because a month already moving outranks one that hasn't
-                    started. Keyed on the comb id, which cannot collide with
-                    the hive ids above — two different tables, and a comb with
-                    a hive is never in this list. */}
+                    not a new one, for every member EXCEPT the one who becomes
+                    the new month's subject: the pending row is the SAME row
+                    one mint earlier — when the month opens,
+                    `listPendingCombMemberships` drops the comb and
+                    `listContributingHives` picks up its hive, so the entry
+                    upgrades in place instead of a shelf appearing and
+                    disappearing around it. The subject is the one exception:
+                    the roster snapshot excludes them, so their row vanishes
+                    rather than upgrading — correct, since the month is
+                    withheld from its own subject, but worth naming so the
+                    absence doesn't read as a bug. Below the live rows because
+                    a month already moving outranks one that hasn't started.
+                    Keyed on the comb id, which cannot collide with the hive
+                    ids above — two different tables, and a comb with a hive
+                    is never in this list. */}
                 {pendingCombs.map((comb) => (
                   <PendingCombRow key={comb.id} combName={comb.name} />
                 ))}
