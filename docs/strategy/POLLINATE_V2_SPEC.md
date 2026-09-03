@@ -3,6 +3,7 @@
 **Status:** Adopted as the governing V2 spec by Colin, 2026-08-25 (#CEO action
 items, event `d99dd08d…`); amended by Colin's Amendment 2026-08-25 (event
 `ad945232…`) — §6 closed, nothing left waiting on Colin.
+*[Amended 2026-09-03 (Vector) — scope of that last clause: it covers §6's **ruling list**, not the document. §20.4 obligation 4 still needs Colin for `LEGAL_ENTITY` and `CONTACT_EMAIL`.]*
 Amended 2026-08-26 (navigation ruling, event `4e4d6d3d…`): §5.2(b) honeyed-mark
 correction; tab bar 4 → 3 per `POLLINATE_V2_NAVIGATION.md` and the 2026-08-26
 amendment in `Pollinate_The_Ruling.md`.
@@ -1066,6 +1067,8 @@ whether Memory Lane gets opened, which prompts produce entries).
 ## 6. Rulings — all closed 2026-08-25
 
 **This section is empty. Nothing in this document is waiting on Colin.**
+
+*[Amended 2026-09-03 (Vector).* **This sentence is about §6's rulings and is not a general clearance for the document.** *It is contradicted, in this same document, by §20.4 obligation 4: the four `legalCopy.js` `FILL` placeholders `LEGAL_ENTITY`, `CONTACT_EMAIL`, `HOSTING_REGION` and `EFFECTIVE_DATE` "still mechanically gate the consent checkbox and still need Colin." Two of the four now have answers — `HOSTING_REGION` = `ca-central-1` (Bumble) and `EFFECTIVE_DATE` is mechanical — and `LEGAL_ENTITY` and `CONTACT_EMAIL` remain live Colin decisions; all four are still `null` in source. Cite this line for the §6 ruling list only. It was cited once as a general ground, in `POLLINATE_V2_ASSIGNMENTS.md`'s COPY-9 deps cell, and that citation has been withdrawn.]*
 
 All seven original rulings are decided and recorded in
 `Pollinate_The_Ruling.md`, Amendment 2026-08-25 (and, for pricing, the
