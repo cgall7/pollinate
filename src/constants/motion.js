@@ -40,6 +40,20 @@ export const SPRINGS = {
   // Tick — fast sequential pops for streak hexes / tapestry cells igniting
   // one-by-one (§14.2 Beat 2 "Streak," Beat 5 "Tapestry").
   tick: { friction: 6, tension: 180 },
+  // The Dive (POLLINATE_COMB_DIVE_SPEC.md R-CD-1/-2) — ONE spring drives the
+  // whole choreography (`dive` 0..1, one Animated.Value); camera, wax-shadow,
+  // backlight, paper and odometer are all derived INTERPOLATIONS of it over
+  // different input ranges (camera samples 0-0.55, paper 0.45-1), never
+  // separate timers or separate driver values. R-CD-2's "gentle-class for
+  // the camera, standard-class for the paper" describes how each term's own
+  // interpolation range reads against the one curve, not two physical
+  // springs — a single Animated.spring call per direction.
+  diveIn: { friction: 8, tension: 100 }, // arrival tuned so camera reads ~0.55 by ~550ms, paper ~0.95+ by ~800ms
+  diveExit: { friction: 16, tension: 130 }, // zero-bounce, faster — R-CD-2's ~65%-of-entrance, no overshoot
+  // R-CD-7 — paging between a cell's several papers. Own token: a page
+  // swipe is lateral, not the dive's forward/back axis, and shouldn't
+  // borrow a config tuned for a different distance.
+  divePage: { friction: 9, tension: 90 },
 };
 
 // Press-depth law (Lumen, luxury pass 2026-08-20): three depths shipped
@@ -93,6 +107,21 @@ export const DURATIONS = {
   // approximate "~150ms" for the same case (settled at Pixel's gate, logged
   // in the Review Log — don't re-open it).
   reducedMotionFade: 200,
+  // The Dive's own RM substitute (R-CD-9) — this is the one term the §14.1
+  // blanket duration above does not cover: R-CD-9 names its own asymmetric
+  // pair (fast in, faster out) rather than one flat fade both ways, because
+  // the dive's RM branch is feedback/navigation motion (skill adoption note,
+  // "two classes, two treatments"), not the idle terms §14.1 governs.
+  diveRmIn: 220,
+  diveRmOut: 150,
+};
+
+// R-CD-5 — the date odometer. Licensed only when time is the story; caps and
+// per-step timing are the spec's own numbers, not tuned here.
+export const DIVE_ODOMETER = {
+  stepMs: 90,
+  maxTotalMs: 350,
+  maxVisibleSteps: 4,
 };
 
 // Honey register (Lumen, luxury pass 2026-08-20; rescored by LP-R21, Colin

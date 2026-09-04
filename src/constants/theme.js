@@ -188,6 +188,15 @@ const colors = {
   // curve, not a number that transfers when the pigment changes.
   spotlightDim: withAlpha(mix(pigment.accentDeep, pigment.inkVeil, 0.25), 0.42),
 
+  // POLLINATE_COMB_DIVE_SPEC.md R-CD-4 — the paper's honey-tint, "a warm
+  // multiply that clears to paper-white as it rises." Derived from
+  // `accentBurst` per the spec's own citation ("no new gold surface is
+  // introduced… tokens from gradients.honey / colors.accentBurst"), the
+  // legal way to write a translucent colour. Motion-only, opacity-animated
+  // 1 -> 0 every time it appears, never held static — the X0 keepsake test
+  // ("never a static fill") is satisfied by construction, not by convention.
+  diveHoneyTint: withAlpha(pigment.accentBurst, 0.35),
+
   // --- Ink tiers ---
   // Placeholder text. DERIVED, not picked: 0.62 is the faintest alpha that still
   // clears 4.5:1 on BOTH grounds a text input actually sits on — 4.70:1 on
@@ -371,6 +380,20 @@ const gradients = {
     withAlpha(pigment.inkVeil, 0.06),
   ],
 };
+
+// ENTRY_EXPRESSION_BRIEF.md "VOICE LADDER RULING" (Lumen, 2026-08-26) — the
+// three rungs `fonts.entryDisplay`/`type.entryDisplay` scales by, keyed on
+// entry length. Lives beside `type.entryDisplay` below rather than inside
+// it: this is a selector's data, not a type style, and `entryVoice(text)` in
+// `PaperBlock.js` is the one place it is read. Length = code points of the
+// trimmed text (`Array.from(t.trim()).length` — bytes over-count emoji);
+// any entry with a paragraph break (two consecutive newlines) takes rung 3
+// regardless of length, checked ahead of the char thresholds by the reader.
+export const ENTRY_VOICE_RUNGS = [
+  { max: 80, size: 28, lineHeight: 34 }, // rung 1 — monumental, one breath, letterpress
+  { max: 220, size: 22, lineHeight: 30 }, // rung 2 — spoken, a said thing
+  { max: Infinity, size: 18, lineHeight: 27 }, // rung 3 — prose, reading copy
+];
 
 export const theme = {
   colors,
