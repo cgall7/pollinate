@@ -14,12 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
 import { tagEntry } from '../utils/themeTagger';
-import { HIVE_COVER_THEMES, REVIEW_CADENCE_OPTIONS } from '../constants/hiveThemes';
+import { HIVE_COVER_THEMES } from '../constants/hiveThemes';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
 import { GradientCard } from '../components/GradientCard';
 import { BackButton } from '../components/BackButton';
-import { LinkButton } from '../components/LinkButton';
 import { SPRINGS } from '../constants/motion';
 
 // E6 — the checkmark used to pop in with no transition, simultaneous with
@@ -38,12 +37,21 @@ const SelectedCheck = () => {
   );
 };
 
-// 8b.2 — Create Private Hive flow, one root-stack screen with four internal
+// 8b.2 — Create Private Hive flow, one root-stack screen with three internal
 // beats (Design Language §2), the same shape Onboarding.js already uses for
 // a multi-step flow. Not a nested navigator: scripts/check-nav-depth.mjs
 // asserts exactly two navigators exist app-wide, so a `createStackNavigator`
 // here would be a third and silently break every getParent() call below it.
-const STEPS = ['who', 'cover', 'cadence', 'entry'];
+//
+// R-CH-2 (Lumen, 2026-09-04) CUT THE FOURTH BEAT. The cadence step asked how
+// often to review this hive and nothing anywhere read the answer:
+// `HiveStore` persisted it and mapped it back, and no renderer or scheduler
+// ever looked. Its copy described the review ritual of the retired
+// review-then-seal arc. A question with no consequence is its own kind of
+// false claim, because it tells the person their answer matters. The column
+// keeps filling from the store's own `DEFAULT_REVIEW_CADENCE`, so no schema
+// moved and the validator survives for a future caller that means it.
+const STEPS = ['who', 'cover', 'entry'];
 
 // GUIDES/POLLINATE_MULTIWRITER_COPY_VOCAB.md §4.1 (C2) — the choice sits on
 // the same beat as the subject's name ("Choice framing (CreateHive, after
@@ -62,7 +70,6 @@ export const CreateHiveFlow = ({ navigation }) => {
   const [subjectName, setSubjectName] = useState('');
   const [isCollective, setIsCollective] = useState(false);
   const [coverTheme, setCoverTheme] = useState(HIVE_COVER_THEMES[0].id);
-  const [reviewCadence, setReviewCadence] = useState('yearly');
   const [entryText, setEntryText] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -88,13 +95,18 @@ export const CreateHiveFlow = ({ navigation }) => {
   };
   const goNext = () => setStepIndex((i) => i + 1);
 
-  const finish = async (withEntry) => {
+  // R-CH-4: one CTA, so `finish` no longer takes a "keep the entry" flag.
+  // The flag existed to serve a second button whose whole difference from the
+  // first was throwing the typed text away, and its false arm is now
+  // unreachable. An empty box is the only way to create a hive with no entry,
+  // which is what the step's title has always promised.
+  const finish = async () => {
     if (saving) return;
     setSaving(true);
     setSaveError(false);
     try {
-      const hive = await HiveStore.createHive(subjectName, { coverTheme, reviewCadence, isCollective });
-      const body = withEntry ? entryText.trim() : '';
+      const hive = await HiveStore.createHive(subjectName, { coverTheme, isCollective });
+      const body = entryText.trim();
       if (body) {
         await HiveStore.addHiveEntry(hive.id, new Date(), body, tagEntry(body));
       }
@@ -128,9 +140,10 @@ export const CreateHiveFlow = ({ navigation }) => {
         <BackButton onPress={goBack} />
       </View>
 
-      {/* E9 — four steps, no way to see how much of this you've committed
-          to. Dots, not a bar: the flow is a short fixed count of beats, not
-          a continuous fraction. */}
+      {/* E9 — no way to see how much of this you've committed to. Dots, not
+          a bar: the flow is a short fixed count of beats, not a continuous
+          fraction. The row is driven by `STEPS`, so R-CH-2's cut took a dot
+          with it rather than leaving a fourth one pointing at nothing. */}
       <View style={styles.progressRow} accessible={false} importantForAccessibility="no-hide-descendants">
         {STEPS.map((s, i) => (
           <View key={s} style={[styles.progressDot, i <= stepIndex && styles.progressDotActive]} />
@@ -149,13 +162,25 @@ export const CreateHiveFlow = ({ navigation }) => {
             autoFocus
             maxLength={100}
           />
+          {/* R-CH-1 — the sentence here used to promise the person could
+              choose to deliver this hive by hand later, which named a
+              mechanism R-SEAL-1 retired: a hive born on this screen can never
+              be sent, so the line stated something false about what the
+              person was making. The
+              replacement's second sentence is the privacy invariant that
+              survives BOTH arms of the choice below it (solo: you are the
+              writers; together: you plus whoever you invite), and it is
+              mechanism-true at this commit under contributors-only RLS with
+              no send path. */}
           <Text style={styles.helpText}>
-            You'll be the only one who sees this hive unless you choose to send it later.
+            A private place to keep what you write about them. Only its writers can ever see it.
           </Text>
 
-          {/* §4.1's choice: "Who's writing?" — reuses the cadence step's
-              exclusive-choice radio row rather than inventing a Switch, per
-              this screen's own reuse convention below. */}
+          {/* §4.1's choice: "Who's writing?" — an exclusive-choice radio row
+              rather than a Switch, per this screen's own reuse convention
+              below. The row's styles were named for the cadence step that
+              introduced them; R-CH-2 deleted that step and this is now their
+              only caller, so they are named for what they do. */}
           <Text style={styles.sectionLabel}>Who's writing?</Text>
           {WRITER_OPTIONS.map((option) => {
             const selected = option.value === isCollective;
@@ -163,13 +188,13 @@ export const CreateHiveFlow = ({ navigation }) => {
               <PressableScale
                 key={option.label}
                 onPress={() => setIsCollective(option.value)}
-                style={[styles.cadenceCard, selected && styles.cadenceCardSelected]}
+                style={[styles.choiceCard, selected && styles.choiceCardSelected]}
                 accessibilityLabel={`${option.label}${selected ? ', selected' : ''}`}
                 accessibilityState={{ selected }}
               >
                 <View style={[styles.radio, selected && styles.radioSelected]} />
-                <View style={styles.cadenceText}>
-                  <Text style={styles.cadenceTitle}>{option.label}</Text>
+                <View style={styles.choiceText}>
+                  <Text style={styles.choiceTitle}>{option.label}</Text>
                 </View>
               </PressableScale>
             );
@@ -222,29 +247,6 @@ export const CreateHiveFlow = ({ navigation }) => {
         </View>
       )}
 
-      {step === 'cadence' && (
-        <View style={styles.content}>
-          <Text style={styles.title}>How often would you like to review this hive?</Text>
-          {REVIEW_CADENCE_OPTIONS.map((option) => {
-            const selected = option.id === reviewCadence;
-            return (
-              <PressableScale
-                key={option.id}
-                onPress={() => setReviewCadence(option.id)}
-                style={[styles.cadenceCard, selected && styles.cadenceCardSelected]}
-                accessibilityLabel={`${option.label}, ${option.subtitle}${selected ? ', selected' : ''}`}
-              >
-                <View style={[styles.radio, selected && styles.radioSelected]} />
-                <View style={styles.cadenceText}>
-                  <Text style={styles.cadenceTitle}>{option.label}</Text>
-                  <Text style={styles.cadenceSubtitle}>{option.subtitle}</Text>
-                </View>
-              </PressableScale>
-            );
-          })}
-        </View>
-      )}
-
       {step === 'entry' && (
         <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Add an entry now, or start later.</Text>
@@ -276,21 +278,23 @@ export const CreateHiveFlow = ({ navigation }) => {
           </PrimaryButton>
         )}
         {step === 'cover' && <PrimaryButton onPress={goNext}>Next</PrimaryButton>}
-        {step === 'cadence' && <PrimaryButton onPress={goNext}>Create Hive</PrimaryButton>}
+        {/* R-CH-4 — one CTA, in the fused name-first register the comb flow
+            already ships ("Join as {name}", "Create the comb as {name}").
+            Two label defects died here. The cadence step's button said
+            "Create Hive" and only advanced, so it named an act performed
+            later; and this step shipped two buttons that BOTH created the
+            hive, differing only in whether the typed text survived, so
+            "Skip for Now" was a label wearing a deferral's name. A CTA names
+            the act performed at press.
+            The possessive is a plain `'s` on every name, including names
+            ending in s: one rule the reader can see is right beats a
+            grammar switch that is wrong for Ines and James in opposite
+            directions. Long names ride PrimaryButton's own text wrapping,
+            the same exposure the shipped comb CTAs already carry. */}
         {step === 'entry' && (
-          <>
-            <PrimaryButton onPress={() => finish(true)} loading={saving}>
-              Save & Start Writing
-            </PrimaryButton>
-            <LinkButton
-              onPress={() => finish(false)}
-              disabled={saving}
-              style={styles.skipLink}
-              accessibilityLabel="Skip writing an entry and open the new hive"
-            >
-              Skip for Now
-            </LinkButton>
-          </>
+          <PrimaryButton onPress={finish} loading={saving}>
+            {`Create ${subjectName.trim()}'s hive`}
+          </PrimaryButton>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -335,14 +339,22 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 20,
   },
+  // R-CH-3 (the R-RF-3 fold) — one input register per product. The ruled box
+  // ships at CombInvite.js's `input`: `surface` background, 1pt
+  // `surfaceBorderStrong`, radius 14. These two boxed themselves differently,
+  // on the weak border token and at `medium` (24). The register is THE BOX,
+  // not the type scale, so everything role-specific stays: the name input
+  // keeps `h2` because it is the hero answer of the screen, the entry area
+  // keeps `body`, its `minHeight` and its top alignment, and both keep
+  // `padding: 20`. `small` is written as the token and never as its value.
   textInput: {
     ...theme.type.h2,
     color: theme.colors.ink,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.medium,
+    borderRadius: theme.borderRadius.small,
     padding: 20,
     borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
+    borderColor: theme.colors.surfaceBorderStrong,
   },
   helpText: {
     ...theme.type.bodySm,
@@ -430,7 +442,7 @@ const styles = StyleSheet.create({
     ...theme.type.bodySm,
     textAlign: 'center',
   },
-  cadenceCard: {
+  choiceCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.surface,
@@ -440,7 +452,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.surfaceBorder,
   },
-  cadenceCardSelected: {
+  choiceCardSelected: {
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.washYellow,
   },
@@ -456,36 +468,27 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.ink,
     backgroundColor: theme.colors.ink,
   },
-  cadenceText: {
+  choiceText: {
     flexShrink: 1,
   },
-  cadenceTitle: {
+  choiceTitle: {
     ...theme.type.h3,
     color: theme.colors.ink,
-  },
-  cadenceSubtitle: {
-    ...theme.type.bodySm,
-    color: theme.colors.inkSoft,
-    marginTop: 2,
   },
   textArea: {
     ...theme.type.body,
     color: theme.colors.ink,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.medium,
+    borderRadius: theme.borderRadius.small,
     padding: 20,
     minHeight: 160,
     borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
+    borderColor: theme.colors.surfaceBorderStrong,
     textAlignVertical: 'top',
   },
   errorText: {
     ...theme.type.bodySm,
     color: theme.colors.danger,
     marginTop: 12,
-  },
-  skipLink: {
-    alignSelf: 'center',
-    marginTop: 16,
   },
 });

@@ -42,8 +42,13 @@ const BY_ID = new Map(HIVE_COVER_THEMES.map((t) => [t.id, t]));
 // schema's own column default (20260817000002).
 export const hiveCoverTheme = (id) => BY_ID.get(id) ?? HIVE_COVER_THEMES[0];
 
-export const REVIEW_CADENCE_OPTIONS = [
-  { id: 'monthly', label: 'Monthly', subtitle: 'Revisit this hive every month.' },
-  { id: 'yearly', label: 'Yearly', subtitle: 'Revisit this hive once a year.' },
-  { id: 'manual', label: 'Manual', subtitle: 'You decide when to review.' },
-];
+// RETIRED 2026-09-04, R-CH-2 (Lumen): `REVIEW_CADENCE_OPTIONS` lived here —
+// Monthly / Yearly / Manual, each with a "Revisit this hive..." subtitle.
+// `CreateHive.js` was its only consumer, and the step it filled asked a
+// question nothing read: no renderer and no scheduler ever looked at the
+// stored cadence, and its copy described the review ritual of the retired
+// review-then-seal arc. Named rather than silently deleted because the
+// COLUMN and its validator both survive — `HiveStore`'s
+// `DEFAULT_REVIEW_CADENCE` still fills the NOT NULL field and `REVIEW_CADENCES`
+// still guards a future caller that means it. What retired is the question,
+// not the field.
