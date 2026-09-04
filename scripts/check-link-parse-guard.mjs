@@ -20,19 +20,46 @@
 // imported and executed unmodified; their one dependency (`expo-linking`)
 // can't load in plain Node (it pulls in `expo-modules-core`'s native
 // bindings), so it is stubbed at RESOLVE time via the same registerHooks
-// seam check-seeds-contract.mjs already uses. The stub's `parse` models
-// `path` exactly against node_modules/expo-linking/src/createURL.ts's own
-// `parse()` — plus one hand-verified fact about the Expo Go shape (its own
-// file comments already claim this, this gate is what makes the claim
-// checkable): `Linking.parse` folds the `--/` dev-client separator away.
-// `hostname` and `queryParams` are modelled only APPROXIMATELY: the real
-// `parse()` also nulls `hostname` on the Expo-hosted branch and strips
-// anything before a `+` in `path` (Vector, thread f2c15b7d) — neither is
-// reachable by the six URL shapes this gate asserts, so no verdict here
-// depends on them, but a future case that IS in that territory needs the
-// real library, not this stub. The stub does NOT reimplement `createURL`'s
-// Expo-hosted/hostUri branching either — this gate never calls `createURL`,
-// only the parse-side guards the incident is about.
+// seam check-seeds-contract.mjs already uses.
+//
+// THE STUB'S `parse` IS A MODEL, NOT A COPY. It reproduces
+// expo-linking@57.0.8's `parse()` exactly on every URL this gate asserts —
+// differentially checked field-by-field against the real module under both
+// runtime regimes (Vector, thread f2c15b7d, 2026-09-04). `queryParams` is
+// exact everywhere (that block is character-identical to the library's).
+// `path` and `hostname` diverge in four measured places, ALL outside the
+// asserted set, none of them reachable from `Linking.getInitialURL()` or
+// the 'url' event — so no verdict below depends on one, but a future case
+// in that territory needs the real library, not this stub:
+//
+//   1. `path` — the `--/` dev-client fold is UNCONDITIONAL here. The real
+//      one is `isExpoHosted() && !hasCustomScheme() && startsWith(prefix)`,
+//      with the prefix derived from `Constants.expoConfig.hostUri`, not the
+//      literal '--/'. So A2/C2 assert the Expo Go regime's answer; the real
+//      parse in a standalone build leaves `exp://h:19000/--/x` as '--/x'.
+//      Harmless — an `exp://` URL is only ever delivered TO Expo Go — but
+//      it means THIS GATE HAS NO RUNTIME REGIME and cannot be used to
+//      reason about one.
+//   2. `hostname` — the real fold also sets it to null; this stub leaves
+//      the Metro host in place. Same verdict (path matches either way).
+//   3. `path` — the real `parse` has an `else if (path.indexOf('+') > -1)`
+//      truncation. Not modelled: real resolves `https://h/a+comb-invite` to
+//      'comb-invite' (guard TRUE), this stub to 'a+comb-invite' (FALSE).
+//   4. `path` — the real `parse` wraps `new URL(url)` in `catch { path =
+//      url }`, so a bare 'auth-callback' yields path='auth-callback' (guard
+//      TRUE). Here the TypeError escapes into each guard's own catch
+//      (FALSE).
+//
+// RESIDUAL, stated because a green run does not cover it: a gate that stubs
+// the dependency cannot see the dependency change. The bug this file exists
+// for is a property of expo-linking's `parse`; package.json pins `~57.0.8`;
+// a patch bump altering custom-scheme handling would land green here,
+// because this tests our port of the parser rather than theirs. What
+// absorbs that is the guards' own shape — `path === LITERAL || hostname ===
+// LITERAL` keeps working whichever field upstream decides to fill.
+//
+// The stub does NOT model `createURL`'s Expo-hosted/hostUri branching
+// either — this gate never calls `createURL`, only the parse-side guards.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
