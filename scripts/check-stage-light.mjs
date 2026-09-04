@@ -403,6 +403,67 @@ const orbSites = await (async () => {
   }
 }
 
+// E1b — the STAGED consumer set, asserted by identity and not by count.
+//
+// Section J's eleven rows were removed with SealHive and deliberately not
+// re-pointed at PackageOpen; that routing is now CLOSED as
+// cannot-be-re-pointed (see the note at the foot of this file). The reason it
+// closed is the reason this row exists: J read a bloom's composited core, and
+// PackageOpen mounts no bloom, so MB-D1's binding rule ("the screen's OWN
+// ground") is asserted on ONE consumer where it used to be asserted on two.
+//
+// WHAT WOULD SEE A SECOND STAGED MOUNT TODAY: nothing in this file, and that
+// is read off the sections rather than assumed. H is the only section that
+// resolves a staged call site and it opens `src/screens/TodayTab.js` by path.
+// F re-derives the colour ruling off live tokens against `background` at the
+// component's own default, so it is ground-generic and call-site-blind — it
+// would report the same four numbers with a second staged light on any ground
+// at all. E4 filters to `mode === 'static'`. So a rule with a single customer
+// is one mount away from being asserted on the wrong one, silently: a second
+// staged light would stage words over a ground no row here reads, and every
+// row would keep passing. E1b is the row that notices.
+//
+// SET, NOT COUNT, and FILE-KEYED (Lumen's two requirements, 2026-09-04). A
+// bare `=== 1` goes red on two mounts but cannot say which one is new, and a
+// red row whose repair is "bump the number" is a blanket accept. Keying on
+// the file rather than file:line means ordinary line drift inside TodayTab
+// cannot manufacture that same blanket accept.
+{
+  const STAGED_CONSUMERS = new Map([
+    [
+      'src/screens/TodayTab.js',
+      'the greeting hero\'s stage light — the one staged call site section H resolves prop by prop, over the ground H6 composites its text on',
+    ],
+  ]);
+  const staged = orbSites.filter((s) => s.mode === 'staged');
+  const found = [...new Set(staged.map((s) => s.file))].sort();
+  const added = found.filter((f) => !STAGED_CONSUMERS.has(f));
+  const gone = [...STAGED_CONSUMERS.keys()].filter((f) => !found.includes(f));
+  if (added.length) {
+    bad(
+      'E1b the staged consumer set',
+      `${added.length} screen(s) mount a staged GlowOrb that this list does not name: ${added.join(', ')}. ` +
+        'A staged light stages words on a ground, so name the file here WITH the ground it lights, and give ' +
+        'this gate a row that composites text over that ground the way H6 does for TodayTab. H is written ' +
+        'against TodayTab by path and F is ground-generic, so neither will measure the newcomer for you. ' +
+        'Do not widen the list without measuring it.',
+    );
+  } else if (gone.length) {
+    bad(
+      'E1b the staged consumer set',
+      `${gone.length} named consumer(s) no longer mount a staged GlowOrb: ${gone.join(', ')}. Either the mount ` +
+        'moved and this list has not followed it, or the staged mode lost a customer and the rows aimed at that ' +
+        'screen are now measuring a light it does not ship. Re-point or remove the entry rather than leaving it ' +
+        'to pass vacuously.',
+    );
+  } else {
+    ok(
+      `E1b the staged mode has exactly the named consumer set (${found.length}): ` +
+        `${[...STAGED_CONSUMERS].map(([f, why]) => `${path.basename(f)} = ${why}`).join('; ')}`,
+    );
+  }
+}
+
 // The declaration chain for a rendered value, walked to its LAST alternate —
 // the arm a call site reaches by passing neither prop.
 const renderArms = (name) => {
@@ -1206,7 +1267,8 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
 
 // ---------------------------------------------------------------------------
 // J. MB-D2a — REMOVED 2026-09-04 WITH ITS SUBJECT, not because it stopped
-// mattering.
+// mattering. ROUTING CLOSED the same day: cannot be re-pointed, not merely
+// not-yet-re-pointed.
 //
 // Section J measured the seal celebration beat directly off
 // `src/screens/SealHive.js`: eleven rows (J0-J10) covering the bloom's
@@ -1216,19 +1278,36 @@ console.log('\nH. P1a — the greeting adoption, measured at the props the call 
 // retired manual seal/send for private hives, so that screen no longer
 // exists and the rows have nothing to read.
 //
-// THE COVERAGE LOSS IS REAL AND IS NOT A CLEANUP: this gate drops from 45
-// assertions to 34. MB-D1's binding rule ("the screen's OWN ground", the
-// distinction J1 exists to prove against MB-D2a's #FFF7CC parenthetical) is
-// now asserted on ONE consumer — section F's TodayTab staged orb — where it
-// used to be asserted on two, and the second was the one with four grounds.
+// THE COVERAGE LOSS IS REAL AND IS NOT A CLEANUP: eleven rows went with the
+// screen. MB-D1's binding rule ("the screen's OWN ground", the distinction J1
+// exists to prove against MB-D2a's #FFF7CC parenthetical) is now asserted on
+// ONE consumer — section H's TodayTab staged orb — where it used to be
+// asserted on two, and the second was the one with four grounds. E1b holds
+// that population as a SET from here on, so the day a second staged light
+// mounts, this gate names the screen instead of quietly going on measuring
+// the first one.
 //
-// Deliberately NOT re-pointed at another screen here. J reads SealHive's own
-// internals (its `arrival` value, `memoryCountValue`, its
-// `choreographedSchedule()` chain, its KeepsakeBee); aiming it at
-// PackageOpen — the surviving delivery ceremony — is a rewrite of eleven
-// rows against different machinery, with its own calibration, not a path
-// edit. That is a routing call, and it is flagged rather than silently
-// absorbed into a deletion commit.
+// WHY PACKAGEOPEN CANNOT INHERIT THE ROWS (Lumen's ruling, 2026-09-04, and
+// the reason is sharper than the one this note used to give). It is not that
+// PackageOpen is a rewrite against different machinery — that is true and it
+// is not the binding reason. J2's subject was the composite of mounted text
+// over THE BLOOM'S OWN CORE, and PackageOpen mounts no `<GlowOrb>` at all.
+// It imports `hiveCoverTheme` and resolves a cover, so it carries the
+// grounds and NOT the light. The eleven rows do not have a different
+// referent on that screen; they have none.
+//
+// Both negatives measured at d6414a8, independently in two shells: the
+// staged-mode census returns exactly one prop consumer (TodayTab, and E1b
+// now asserts that as an identity), and PackageOpen mounts zero `<GlowOrb>`
+// while importing `hiveCoverTheme` and resolving a cover in its own body.
+//
+// What PackageOpen's four cover grounds DO still deserve is J1's other half,
+// a 4.5:1 reading of the text that sits on them. That is ruled INTO the owed
+// ROW B text-contrast sweep as a named customer, with `HIVE_COVER_THEMES`
+// enumeration in its scope by name, and deliberately not into this gate:
+// nothing here mounts a bloom for those grounds to be measured against, and
+// a row that cannot do its measurement must not imply the measurement still
+// holds.
 // ---------------------------------------------------------------------------
 
 console.log(`\ncheck-stage-light: ${pass} passed, ${failures.length} failed`);
