@@ -73,17 +73,33 @@
 // nectar it is a second, separate pass that goes through the real RPCs.
 //
 // ===========================================================================
-// THE DECORATIVE LAYER IS NOT SUPPRESSED BY ANY OF THIS
+// THIS SEED IS WHAT SUPPRESSES THE DECORATIVE LAYER
 // ===========================================================================
-// Seeding real honeycomb_connections rows does NOT turn off
-// src/constants/demoHive.js. Its only call site is
-// src/screens/HoneycombTab.js:100,
-//     const merged = DEMO_CONTENT ? weekFeed.concat(demoHiveShares(now)) : weekFeed;
-// and DEMO_CONTENT is `__DEV__ || DEMO_MODE` (src/constants/demoMode.js:46),
-// with DEMO_MODE = `process.env.EXPO_PUBLIC_DEMO_MODE === 'true'` (:20). It is
-// a build-time constant. No database row can flip it, and the real feed
-// appears only as the concat BASE, never as a condition. See the seed
-// script's preflight banner.
+// This section said the opposite until 0b6793c, and it was right when it was
+// written. The runtime dormancy gate (3c01532) inverted it, and prose does
+// not recompile, so the old text outlived the code it quoted and ended up
+// contradicting the seed script's own preflight banner, which it cites.
+//
+// demoHive.js's only call site is still src/screens/HoneycombTab.js, but the
+// expression there is nested now rather than flat (:110):
+//     const merged = DEMO_CONTENT
+//       ? (hasRealConnections ? weekFeed : weekFeed.concat(demoHiveShares(now)))
+//       : weekFeed;
+// DEMO_CONTENT is unchanged, `__DEV__ || DEMO_MODE` (demoMode.js:46, DEMO_MODE
+// at :20), and is still a build-time constant that no row can flip. What
+// changed is the gate nested inside it. `hasRealConnections` is wired at
+// HoneycombTab.js:570 to `connections.length > 0`, and `connections` is
+// HoneycombStore.listConnections(), an accepted-status read of
+// honeycomb_connections. The rows written at this file's own
+// honeycomb_connections step are exactly that population, so the real feed is
+// now a CONDITION and not merely the concat base. Seeding is what turns the
+// decorative layer off, and no build change is needed to do it.
+//
+// The doubled-person hazard the old text warned about is closed twice over:
+// by that dormancy gate, and by 94ef930, which renamed the five decorative
+// people who had been borrowing cast names. check-demo-seed's A13 holds the
+// second half forward as a disjointness assertion, A13c holds this comment
+// forward by refusing the retired flat expression anywhere under scripts/.
 
 import {
   CAST,

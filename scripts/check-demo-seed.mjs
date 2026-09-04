@@ -236,6 +236,62 @@ if (addressed.length >= 60 && STREAK.length > 0) {
   }
 }
 
+// --- the retired declaration cannot come back as a live export ------------
+// Earned by how the retirement went: DECORATIVE_NAME_COLLISIONS was twice
+// called a zero-consumer export while seed-demo-account.mjs was still
+// printing it at run time to whoever seeds prod. Both greps were honest and
+// neither reached scripts/. A stale record with a reader is a live claim, so
+// the export itself is what gets asserted absent, in both places it lived.
+{
+  const corpusSrc = fs.readFileSync(path.join(ROOT, 'scripts/lib/demo-seed-corpus.mjs'), 'utf8');
+  const seedSrc = fs.readFileSync(path.join(ROOT, 'scripts/seed-demo-account.mjs'), 'utf8');
+  const exported = /export const DECORATIVE_NAME_COLLISIONS/.test(corpusSrc);
+  const printed = /DECORATIVE_NAME_COLLISIONS/.test(seedSrc);
+  if (!exported && !printed) {
+    ok('A13b the retired collision declaration is exported nowhere and printed nowhere');
+  } else {
+    bad('A13b retired declaration', `corpus exports it: ${exported}; seed script names it: ${printed}`);
+  }
+}
+
+// --- the pre-dormancy merge expression is quoted nowhere -------------------
+// Three comments under scripts/ quoted HoneycombTab's OLD flat merge and
+// reasoned from it. Two were rewritten when the declaration retired; the
+// third, demo-seed-writer.mjs's own header, survived and spent a commit
+// telling the reader the decorative layer cannot be switched off while the
+// preflight banner it cites said the opposite. Prose does not recompile, so
+// it gets a row. The retired shape has a fingerprint the nested shape cannot
+// produce; the needle is assembled from two halves at run time because,
+// spelled whole, it would appear in this file and this row would report
+// itself.
+{
+  const dir = path.join(ROOT, 'scripts');
+  const files = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (/\.(mjs|js)$/.test(e.name)) files.push(full);
+    }
+  };
+  walk(dir);
+  const needle = ['DEMO_CONTENT ?', 'weekFeed.concat'].join(' ');
+  const stale = files.filter((f) => fs.readFileSync(f, 'utf8').includes(needle));
+  // Asserted beside the quotes, not instead of them: the screen regressing to
+  // the flat shape would make every retired quote true again, so a row that
+  // only banned the quotes could go green by the defect coming back.
+  const live = fs.readFileSync(path.join(ROOT, 'src/screens/HoneycombTab.js'), 'utf8');
+  const nested = /const merged = DEMO_CONTENT\s*\n\s*\? \(hasRealConnections \?/.test(live);
+  if (stale.length === 0 && nested && files.length > 0) {
+    ok(`A13c none of the ${files.length} scripts/ files quote the retired flat merge, and HoneycombTab is still nested`);
+  } else {
+    bad(
+      'A13c retired merge expression',
+      `${files.length} files scanned, stale quotes in [${stale.map((f) => path.relative(ROOT, f)).join(',')}], HoneycombTab nested: ${nested}`,
+    );
+  }
+}
+
 // --- streak shape ----------------------------------------------------------
 {
   const problems = [];
