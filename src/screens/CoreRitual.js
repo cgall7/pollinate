@@ -28,12 +28,36 @@ import { DEMO_CONTENT } from '../constants/demoMode';
 export const LockScreen = ({ onOpen }) => {
   const { width } = useWindowDimensions();
 
+  // Runtime dormancy (Lumen, thread b3eac928): a decorative/seeding
+  // affordance retires once the real population it imitates exists — the
+  // demoHive roster does this at zero real connections (HoneycombTab.js),
+  // and this button is the streak side of the same rule, at zero real
+  // journal entries. Starts hidden (`false`, not `null`) rather than
+  // flashing on for one frame on every genuinely-fresh account's first
+  // Lock screen: the cost of a one-tap-late appearance is smaller than a
+  // control that appears and vanishes under someone's thumb.
+  const [eligibleForDemoButton, setEligibleForDemoButton] = useState(false);
+
+  useEffect(() => {
+    if (!DEMO_CONTENT) return undefined;
+    let cancelled = false;
+    EntryStore.getFirstEntryDate()
+      .then((firstISO) => {
+        if (!cancelled) setEligibleForDemoButton(!firstISO);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Visible demo trigger (Colin, 2026-08-10: wants a real button, not the
   // old hidden 5-tap gesture) — seeds 180 days of realistic demo entries so
   // Wrapped and Recap have something worth showing.
   const handleLoadDemoData = () => {
     EntryStore.seedDemoData(180)
       .then((count) => {
+        setEligibleForDemoButton(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert('Demo data loaded', `Filled the last ${count} days with entries.`);
       })
@@ -81,9 +105,16 @@ export const LockScreen = ({ onOpen }) => {
             not raw __DEV__ (Sage's LATENT finding, thread 37fb8ef6): a
             pitch build has __DEV__ false but still wants this button. */}
         {DEMO_CONTENT && (
-          <PressableScale onPress={handleLoadDemoData} style={styles.demoDataLink}>
-            <Text style={styles.demoDataLinkText}>Load demo data</Text>
-          </PressableScale>
+          // Nested inside the DEMO_CONTENT guard, not ANDed alongside it at
+          // the top level — check-demo-content-callsites.mjs's isUnderGuard
+          // only recognises a bare `DEMO_CONTENT` as the LogicalExpression's
+          // immediate left operand, and `DEMO_CONTENT && eligibleForDemoButton
+          // && (…)` would leave the JSX reading as unguarded to that walker.
+          eligibleForDemoButton ? (
+            <PressableScale onPress={handleLoadDemoData} style={styles.demoDataLink}>
+              <Text style={styles.demoDataLinkText}>Load demo data</Text>
+            </PressableScale>
+          ) : null
         )}
       </View>
     </View>

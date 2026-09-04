@@ -47,6 +47,7 @@
     "check:demo-seed": "node scripts/check-demo-seed.mjs",
     "seed:demo-account": "node scripts/seed-demo-account.mjs",
     "check:demo-content-callsites": "node scripts/check-demo-content-callsites.mjs",
+    "check:demo-runtime-dormancy": "node scripts/check-demo-runtime-dormancy.mjs",
     "check:copy-rules": "node scripts/check-copy-rules.mjs",
     "check:onboarding-flow": "node scripts/check-onboarding-flow.mjs",
     "check:private-hives-seal": "node scripts/check-private-hives-seal.mjs",

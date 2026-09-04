@@ -90,14 +90,26 @@ const toGridMember = (share) => ({
 // now resolves its selection by looking the person up in this list and would
 // answer a duplicate with the wrong seat. Feed order is newest-first, so
 // keeping the first occurrence keeps the person's most recent share.
-const partitionHive = (weekFeed, now = new Date()) => {
+const partitionHive = (weekFeed, now = new Date(), hasRealConnections = false) => {
   // DEMO_CONTENT-gated per Lumen's design assessment (thread 37fb8ef6,
   // WP-10a): a real tester's honeycomb should show their own quiet-hive
   // door (WP-4's EmptyCell), not fabricated strangers. check:demo-hive
   // still exercises demoHiveShares directly, unaffected by this call site.
   // DEMO_CONTENT, not raw __DEV__ (Sage's LATENT finding, thread 37fb8ef6):
   // a pitch build has __DEV__ false but still wants the demo comb.
-  const merged = DEMO_CONTENT ? weekFeed.concat(demoHiveShares(now)) : weekFeed;
+  //
+  // Runtime dormancy on top of that (Lumen, thread b3eac928): the demo
+  // roster is decorative for an EMPTY graph, not a permanent overlay on a
+  // real one — once the account has a real connection, a decorative Priya
+  // beside a real Priya states something false about who's actually there.
+  // `hasRealConnections` nests INSIDE the DEMO_CONTENT branch rather than
+  // ANDed at the top (`DEMO_CONTENT && hasRealConnections ? … `) on purpose:
+  // check-demo-content-callsites.mjs's isUnderGuard only recognises a bare
+  // `DEMO_CONTENT` identifier as a `? x : y` conditional's test, and a
+  // compound test would read `demoHiveShares` as unguarded to that walker.
+  const merged = DEMO_CONTENT
+    ? (hasRealConnections ? weekFeed : weekFeed.concat(demoHiveShares(now)))
+    : weekFeed;
   const todayISO = toISODate(now);
   const seen = new Set();
   return {
@@ -552,8 +564,10 @@ const HoneycombFeed = () => {
 
   // Cheap enough to run per render (≤ WEEK_FEED_LIMIT + 19 items), and
   // running it here means the comb's "today" moves with every refresh
-  // rather than freezing at mount.
-  const { todayMembers, weekSections } = partitionHive(weekFeed);
+  // rather than freezing at mount. `connections` is the same real-data-only
+  // signal the empty-state copy below already gates on (§23.9.1) — reused,
+  // not reinvented, so "real population" means one thing in this file.
+  const { todayMembers, weekSections } = partitionHive(weekFeed, undefined, connections.length > 0);
 
   // ENG-65: the rung lands on the OWN seat and only there.
   //
