@@ -33,6 +33,21 @@
 // "blessing" carries it identically. That is wider than the word Colin said,
 // and is stated here rather than smuggled into a regex.
 //
+// `sats` (COPY-7, `POLLINATE_COMB_ROTATION.md` §8.6 row 2.6 / V2 spec:803):
+// "Denominate in nectar drops, not sats, in all default UI." Spelled out as
+// the exact plural, not a `\bsat` prefix — `sat` is the ordinary-English past
+// tense of "sit" and appears throughout this codebase's own comments (e.g.
+// "the header sat 12pt lower"); a prefix match would eventually fire on real
+// copy the same way an unscoped `sin` would. `bitcoin` is NOT in this list:
+// `NectarConsentSheet.js` renders "simulated Bitcoin network" by a standing
+// ruling that carves the opt-in consent screen out of the default-UI ban
+// (component header, "amended for Colin's bitcoin... 1") — a flat word ban
+// has no way to except one file, and Section C below has zero tolerance for
+// a hit, so adding it here would turn the gate red on a string that is
+// correct. `crypto` was never actually part of the ruling (only "bitcoin"
+// and "sats" are) and would misfire on "cryptographic hash" in
+// `legalCopy.js`'s existing account-security copy.
+//
 // `check-copy-rules` asserts this list's recall AND its precision on fixtures
 // before it is trusted with a verdict. If you tighten a pattern, that is where
 // it fails.
@@ -49,6 +64,7 @@ export const FORBIDDEN = [
   { word: 'sin', re: /\bsin(s|ful|ner|ners|ning)?\b/i },
   { word: 'hallelujah', re: /\bhallelujah/i },
   { word: 'ritual', re: /\britual/i },
+  { word: 'sats', re: /\bsats\b/i },
 ];
 
 // The bare words, for a consumer testing a set it controls end to end.
