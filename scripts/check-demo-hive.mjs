@@ -115,17 +115,24 @@ check('every tint in the rotation appears in the day-0 comb',
 check('the minority tint holds >= 2 of the day-0 cells',
   Math.min(...HEX_TINTS.map((t) => day0Tints[t] ?? 0)) >= 2, true);
 
-// --- 2b. §21.9.1 (R59): blooming/seeded are authored, not invisible ---
-// Both states are decorative-only (no notes/seeds rows back a demo member),
-// but a fresh 0-2-connection tester's ONLY comb is this one, so an
-// un-authored set ships 6.4 invisible to the round meant to validate it.
-const day0Shares = shares.filter((s) => daysAgoOf(s) === 0);
-const bloomingCount = day0Shares.filter((s) => s.blooming).length;
-console.log(`     day-0 blooming/seeded: ${day0Shares.map((s) => `${s.author.display_name}${s.blooming ? ' B' : ''}${s.seeded ? ' S' : ''}`).join(', ')}`);
-check('day 0 has at least one blooming member (states are not invisible)', bloomingCount >= 1, true);
-check('§21.9 readable-band invariant: at most 3 of the day-0 seven blooming', bloomingCount <= 3, true);
-check('at least one day-0 member carries BOTH states (§21.10 composition case on screen)',
-  day0Shares.some((s) => s.blooming && s.seeded), true);
+// --- 2b. R-CL-3: the sample demos NO states ---
+// SUCCESSOR to §21.9.1 (R59), which asserted the opposite — that day 0
+// authored at least one blooming member, at most three, and one carrying
+// both. R59's reason was real (an un-authored set shipped 6.4 invisible to
+// the tester meant to validate it) and it was outweighed: Colin opened the
+// empty-state comb on three of seven cells wearing marks he had never earned
+// and could not decode. A sample's job is the shape of a full comb, not the
+// state legend. The rows are inverted rather than deleted, so a future
+// re-authoring has to argue with a gate instead of slipping back in.
+const stateBearing = shares.filter((s) => s.blooming || s.seeded);
+console.log(`     sample seats carrying a state: ${stateBearing.length === 0 ? 'none' : stateBearing.map((s) => s.author.display_name).join(', ')}`);
+check('no sample seat is authored blooming (R-CL-3)', shares.filter((s) => s.blooming).length, 0);
+check('no sample seat is authored seeded (R-CL-3)', shares.filter((s) => s.seeded).length, 0);
+// The keys stay on the row even at false: HoneycombTab merges real blooming
+// into a demo-shaped object, and a missing key makes the state `undefined`
+// rather than off. Absent and off are different rows to a `??`.
+check('every sample row still declares both state keys (the shape is the contract)',
+  shares.every((s) => 'blooming' in s && 'seeded' in s), true);
 
 // --- 3. Dates are live, not frozen at import ---
 const todayCountOf = (set) => set.filter((s) => s.entryDate === set[0].entryDate).length;

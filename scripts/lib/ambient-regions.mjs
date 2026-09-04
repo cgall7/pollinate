@@ -1,7 +1,8 @@
 // The declared-ambient registry (Lumen's ruling, thread 8d2c9a5d, msg
 // 2c01adf3, replying to Pixel's errand-clip finding that "still except one
 // breathing wing" is a property of Today, not of the app — the Hive's own
-// BloomRing marks are ratified ambient too, §21/6.4 R61, and a tripwire
+// The blooming light is ratified ambient too (R-CL-2, formerly the ring's
+// marks under §21/6.4 R61), and a tripwire
 // scoped to "idle Today" would hide that question rather than answer it).
 //
 // Each screen DECLARES the regions it permits motion in, every entry
@@ -12,12 +13,12 @@
 // always meant to name, not a percentage on a codec.
 //
 // This module only ever assembles regions another module derived from
-// source (`bee-breath-region.mjs`, `bloom-ring-region.mjs`) plus the
+// source (`bee-breath-region.mjs`, `bloom-light-region.mjs`) plus the
 // caller-supplied live state (anchor rects, the blooming set) each of those
 // needs — it does not compute geometry itself, so there is exactly one
 // place each region's shape can go wrong.
 import { breathSweepFractionBBox, fractionBBoxToPx } from './bee-breath-region.mjs';
-import { bloomMarkRegionsPx } from './bloom-ring-region.mjs';
+import { bloomLightRegionsPx } from './bloom-light-region.mjs';
 import { BREATH_BEAT_DEG } from '../../src/constants/mascot.js';
 
 /** The wing's swept bbox, in px, given the character box's live on-screen rect. */
@@ -47,9 +48,13 @@ export const AMBIENT_REGIONS = {
     declare: (state) => [
       { name: 'wing', citation: 'Bee Doctrine §State-2', rects: wingRegionPx(state.wing) },
       {
-        name: 'bloom-rings',
-        citation: '§21/6.4, R61',
-        rects: bloomMarkRegionsPx(state.bloom),
+        // R-CL-2 renamed this region with the state it describes. It is no
+        // longer six mark strips per cell but one box per lit cell, and the
+        // citation moves with it — the ruling that licenses this patch of
+        // screen to move is the one that put the light there.
+        name: 'bloom-light',
+        citation: 'R-CL-2',
+        rects: bloomLightRegionsPx(state.bloom),
       },
     ],
   },

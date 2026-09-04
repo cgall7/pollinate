@@ -95,7 +95,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { decodePNG, encodePNG } from './lib/png-codec.mjs';
 import { breathSweepFractionBBox } from './lib/bee-breath-region.mjs';
-import { bloomMarkRegionsPx } from './lib/bloom-ring-region.mjs';
+import { bloomLightRegionsPx } from './lib/bloom-light-region.mjs';
 import { declaredRectsFor, declaredRegionsFor, SCREENS } from './lib/ambient-regions.mjs';
 import { BREATH_BEAT_DEG, MASCOT_ASPECT, MASCOT_WIDTH_FRACTION } from '../src/constants/mascot.js';
 
@@ -388,34 +388,38 @@ const selfTest = () => {
     closeEnough(bbox11.maxY, bbox41.maxY);
   check('breathSweepFractionBBox: bbox stable from 11 to 41 samples', stable, true);
 
-  // --- bloomMarkRegionsPx: geometry derived from the SAME source the ring
-  // draws from (HexShape's hexEdgeMarks + HoneycombGrid's own constants),
+  // --- bloomLightRegionsPx: geometry derived from the SAME source the light
+  // draws from (hexGeometry's hexPoints + the cell's own stroke constant),
   // not a second copy of either.
-  check('bloomMarkRegionsPx: no blooming cells -> no regions', bloomMarkRegionsPx({ size: 44, bloomingIndices: [], combOriginPx: { x: 0, y: 0 } }).length, 0);
+  check('bloomLightRegionsPx: no blooming cells -> no regions', bloomLightRegionsPx({ size: 44, bloomingIndices: [], combOriginPx: { x: 0, y: 0 } }).length, 0);
 
-  const oneCellRegions = bloomMarkRegionsPx({ size: 44, bloomingIndices: [0], combOriginPx: { x: 0, y: 0 } });
-  check('bloomMarkRegionsPx: one blooming cell -> its six edge marks, each a valid rect', [
+  const oneCellRegions = bloomLightRegionsPx({ size: 44, bloomingIndices: [0], combOriginPx: { x: 0, y: 0 } });
+  check('bloomLightRegionsPx: one blooming cell -> one valid rect covering the whole cell', [
     oneCellRegions.length,
     oneCellRegions.every((r) => r.minX <= r.maxX && r.minY <= r.maxY),
-  ], [6, true]);
+    oneCellRegions[0].maxX - oneCellRegions[0].minX >= 88,
+  ], [1, true, true]);
 
-  // Pixel's device measurement (errand-clip finding, thread 8d2c9a5d): "12
-  // BloomRing edge-marks, six on each of the two blooming cells." Two
-  // blooming cells -> twelve independent regions, not two merged boxes —
-  // the ring's own visual unit is the mark.
-  const twoCellRegions = bloomMarkRegionsPx({ size: 44, bloomingIndices: [0, 3], combOriginPx: { x: 100, y: 200 } });
-  check('bloomMarkRegionsPx: two blooming cells -> twelve regions', twoCellRegions.length, 12);
+  // R-CL-2 INVERTED THE COUNT THIS ROW ASSERTS, and the reason is the point.
+  // It used to read "two blooming cells -> twelve regions, not two merged
+  // boxes — the ring's own visual unit is the mark" (Pixel's errand-clip
+  // device measurement: "12 BloomRing edge-marks, six on each of the two
+  // blooming cells"). The light has no marks and no gaps between them; the
+  // lit cell is the unit, so two lit cells are two regions. Six boxes per
+  // cell here would now leave the breathing interior undeclared.
+  const twoCellRegions = bloomLightRegionsPx({ size: 44, bloomingIndices: [0, 3], combOriginPx: { x: 100, y: 200 } });
+  check('bloomLightRegionsPx: two blooming cells -> two regions (R-CL-2: the cell is the unit, not the mark)', twoCellRegions.length, 2);
 
   let outOfRangeThrew = false;
   try {
-    bloomMarkRegionsPx({ size: 44, bloomingIndices: [99], combOriginPx: { x: 0, y: 0 } });
+    bloomLightRegionsPx({ size: 44, bloomingIndices: [99], combOriginPx: { x: 0, y: 0 } });
   } catch {
     outOfRangeThrew = true;
   }
-  check('bloomMarkRegionsPx: an out-of-range spiral index throws rather than silently skipping', outOfRangeThrew, true);
+  check('bloomLightRegionsPx: an out-of-range spiral index throws rather than silently skipping', outOfRangeThrew, true);
 
   // --- ambient-regions: the declared-ambient registry itself (Lumen's
-  // ruling) — Today declares one region, Hive declares wing + bloom-rings,
+  // ruling) — Today declares one region, Hive declares wing + bloom-light,
   // and every declaration carries the citation that licenses it.
   const wingState = { anchorX: 0, anchorY: 0, anchorW: 44, anchorH: 44 };
   const todayRegions = declaredRegionsFor('today', { wing: wingState });
@@ -424,8 +428,8 @@ const selfTest = () => {
 
   const hiveState = { wing: wingState, bloom: { size: 44, bloomingIndices: [0, 3], combOriginPx: { x: 0, y: 0 } } };
   const hiveRegions = declaredRegionsFor('hive', hiveState);
-  check('ambient-regions: hive declares wing + bloom-rings, in order', hiveRegions.map((r) => r.name), ['wing', 'bloom-rings']);
-  check('ambient-regions: hive\'s bloom-rings cite R61', hiveRegions.find((r) => r.name === 'bloom-rings').citation, '§21/6.4, R61');
+  check('ambient-regions: hive declares wing + bloom-light, in order', hiveRegions.map((r) => r.name), ['wing', 'bloom-light']);
+  check('ambient-regions: hive\'s bloom-light cites R-CL-2', hiveRegions.find((r) => r.name === 'bloom-light').citation, 'R-CL-2');
 
   const hiveRects = declaredRectsFor('hive', hiveState);
   check('ambient-regions: hive\'s flattened rects total wing(1) + bloom-marks(12)', hiveRects.length, 13);

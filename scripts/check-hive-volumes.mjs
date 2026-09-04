@@ -21,10 +21,15 @@
 //   and a new entry into the now-open hive lands there and succeeds.
 //
 // Also covers the compatibility seam this migration deliberately keeps:
-// seal_hive() (the RPC the shipped client still calls) delegates to
-// seal_volume() and still mirrors private_hives.sealed_at, with the same
-// "already sealed" exception message SealHive.js/SendHive.js string-match
-// on -- a regression here breaks those screens' error copy, not just data.
+// seal_hive() delegates to seal_volume() and still mirrors
+// private_hives.sealed_at, raising the same "already sealed" exception.
+//
+// R-SEAL-1 (2026-09-04) REMOVED THE CLIENT CALLERS, NOT THE RPC. SealHive.js
+// and SendHive.js are gone and nothing in src/ calls seal_hive/send_hive any
+// more, so this row no longer protects any screen's error copy -- but it
+// still protects the FUNCTION, which stays defined, callable, and the thing
+// a future client would reach for. The reason to keep asserting it changed;
+// the assertion did not.
 //
 // Modeled on check-private-hives-seal.mjs for the harness shape: real
 // migrations off disk, mutations run as `authenticated` (never the table
@@ -334,8 +339,10 @@ async function main() {
       bad('an entry in the now-sealed Volume 1 is still immutable', firstLine(e));
     }
 
-    // 8. seal_hive() called twice raises the same exception SealHive.js
-    // string-matches on — a second call must not silently seal Volume 2.
+    // 8. seal_hive() called twice raises "already been sealed" — a second
+    // call must not silently seal Volume 2. (The screen that string-matched
+    // this message is retired per R-SEAL-1; the invariant is about the
+    // function, and it outlives its former caller.)
     try {
       await asUser(OWNER, () => client.query('select public.seal_hive($1)', [hiveId]));
       bad('seal_hive() a second time raises "already been sealed"', 'second call succeeded');

@@ -119,7 +119,20 @@ function propDefault(propsText, propName) {
 
 function localConst(text, ident) {
   const m = text.match(new RegExp(`\\bconst\\s+${ident}\\s*=\\s*(-?\\d+(?:\\.\\d+)?)\\s*;`));
-  return m ? Number(m[1]) : null;
+  if (m) return Number(m[1]);
+  // A CLAMPED size still has a knowable minimum, and that is the only thing
+  // this gate ever wanted from it. `const x = Math.max(FLOOR, <anything>)`
+  // cannot produce a value below FLOOR whatever the second argument does at
+  // runtime, so a floor spelled this way is readable where a bare product
+  // (`CELL_SIZE * fit`) genuinely is not. The floor itself must be a numeric
+  // literal or another local const that resolves to one — an unreadable floor
+  // resolves to null and the site stays unverified, as it should.
+  const clamp = text.match(new RegExp(`\\bconst\\s+${ident}\\s*=\\s*Math\\.max\\(\\s*([A-Za-z_$][\\w$]*|-?\\d+(?:\\.\\d+)?)\\s*,`));
+  if (!clamp) return null;
+  const floorTok = clamp[1];
+  if (/^-?\d+(?:\.\d+)?$/.test(floorTok)) return Number(floorTok);
+  const m2 = text.match(new RegExp(`\\bconst\\s+${floorTok}\\s*=\\s*(-?\\d+(?:\\.\\d+)?)\\s*;`));
+  return m2 ? Number(m2[1]) : null;
 }
 
 // Every self-closing JSX use of `componentName` across the whole tree,

@@ -1,10 +1,9 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
-import { HoneycombStore } from '../services/HoneycombStore';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -13,12 +12,22 @@ import { EntryCombGrid, DIVE_CHROME_DIM, CELL_SIZE } from '../components/EntryCo
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
 import { FlyingBee } from '../components/FlyingBee';
 import { ringStepFor } from '../components/combLattice';
+import { initialsFor } from '../utils/initials';
+import { useAuth } from '../contexts/AuthContext';
 
 // R-CD-12 — the home-bound flight needs the same staging-offset geometry as
 // the outbound one; the outbound leg gets its ringStep from EntryCombGrid's
 // own tap measurement (it owns CELL_SIZE), this is the return leg's copy of
 // the identical derivation so the two legs read as one grammar.
 const HOME_RING_STEP = ringStepFor(CELL_SIZE);
+
+// Distance from the bottom of the comb's stage to the top of the floating
+// footer. `styles.footer` is absolutely positioned, so it takes no layout
+// room the stage could see on its own — the comb would centre itself
+// underneath it. The footer's HEIGHT is measured rather than assumed (it
+// holds a 56pt button on an open hive and a short caption on a sealed one),
+// and only its `bottom` offset is a constant here, because this file owns it.
+const FOOTER_BOTTOM = 32;
 
 const joinNames = (names) => {
   if (names.length === 1) return names[0];
@@ -65,12 +74,8 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   // extra round trips. GUIDES/POLLINATE_MULTIWRITER_COPY_VOCAB.md §4.3:
   // "presence, not count" — this list exists to render who, never a tally.
   const [contributors, setContributors] = useState([]);
-  // §11 "Send only works for connected friends" — the subject may be a
-  // registered profile who has since unfriended, or was never one to begin
-  // with. Only fetched when it could matter (sealed, has a subject, not
-  // sent yet) so an unsealed hive's screen never pays for a connections
-  // round trip it can't use.
-  const [subjectIsFriend, setSubjectIsFriend] = useState(false);
+  const [footerHeight, setFooterHeight] = useState(0);
+  const { session } = useAuth();
   // Shared with EntryCombGrid (POLLINATE_COMB_DIVE_SPEC.md R-CD-1) — one
   // driver for the whole dive, so the chrome above the card and the
   // camera/paper inside it read off the exact same value rather than a
@@ -117,6 +122,42 @@ export const HiveDetailScreen = ({ navigation, route }) => {
     }
   }, [perches]);
 
+  // WHO WROTE THIS SEAT, resolved here rather than in the grid: this screen
+  // is where the viewer's identity and the roster both already live, and it
+  // already owns this hive's other naming rule (`rosterLabel` above).
+  //
+  // THE SNAPSHOT IS NOT AVAILABLE YET FOR AN UNSEALED HIVE, which is the
+  // whole period this screen is writable in. `entries.author_name_at_seal` is
+  // stamped by the seal paths only — its own column comment says so in as
+  // many words ("Null for entries never sealed"), and no insert-time trigger
+  // fills it. A cell labelled off that field alone would therefore render
+  // blank for exactly the hive Colin is looking at while it is being written,
+  // and only acquire names once it was too late to matter. So the snapshot is
+  // PREFERRED where it exists (a sealed keepsake's signature must never come
+  // from a live read — that ban is the reason the column exists) and the live
+  // roster fills the pre-seal gap underneath it.
+  //
+  // Absence, never a stand-in. `getHiveContributors` answers 'Someone' for a
+  // profile the read never reached (an authorization word, §1B.38.12) and
+  // null for a placeholder-class name — neither is a person whose initials
+  // this reader has been shown, and 'S' or 'NU' rendered confidently in a
+  // seat is worse than an unlabelled one. Both fall through to no label.
+  const contributorNames = useMemo(
+    () => new Map(contributors.map((c) => [c.profileId, c.name])),
+    [contributors]
+  );
+  const viewerId = session?.user?.id ?? null;
+  const authorLabelFor = useCallback(
+    (entry) => {
+      if (!entry || !hive?.isCollective) return null;
+      if (viewerId && entry.authorId === viewerId) return 'You';
+      const name = entry.authorName ?? contributorNames.get(entry.authorId) ?? null;
+      if (!name || name === 'Someone') return null;
+      return initialsFor(name);
+    },
+    [hive?.isCollective, viewerId, contributorNames]
+  );
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -148,14 +189,6 @@ export const HiveDetailScreen = ({ navigation, route }) => {
             }
           } else {
             setContributors([]);
-          }
-
-          if (hiveData?.sealedAt && hiveData?.subjectProfileId && !hiveData?.sentAt) {
-            const connections = await HoneycombStore.listConnections();
-            if (cancelled) return;
-            setSubjectIsFriend(connections.some((c) => c.id === hiveData.subjectProfileId));
-          } else {
-            setSubjectIsFriend(false);
           }
         } catch (err) {
           if (cancelled) return;
@@ -265,54 +298,6 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         </PressableScale>
       )}
 
-      {/* ENG-101: a comb rotation seals itself automatically when the
-          window closes (seal_and_send_rotation) and never opens a
-          successor volume, unlike a manual seal_volume() call -- tapping
-          this on a rotation-linked hive wedges the comb permanently
-          (comb_rotations_one_open_per_comb never clears). The server
-          refuses it either way; this guard just keeps the button off a
-          hive it can never work on. */}
-      {!hive.sealedAt && !hive.isRotationLinked && entries.length > 0 && (
-        <PressableScale
-          onPress={() =>
-            navigation.navigate('SealHive', {
-              hiveId,
-              subjectName: hive.subjectName,
-              coverTheme: hive.coverTheme,
-            })
-          }
-          style={styles.memoryLaneRow}
-          containerStyle={styles.memoryLaneContainer}
-          accessibilityLabel="Seal this keepsake"
-        >
-          <View style={styles.memoryLaneContent}>
-            <Ionicons name="lock-closed" size={18} color={theme.colors.accentDeep} />
-            <Text style={styles.memoryLaneText}>Seal This Keepsake</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
-        </PressableScale>
-      )}
-
-      {hive.sealedAt && !hive.sentAt && !hive.isRotationLinked && subjectIsFriend && (
-        <PressableScale
-          onPress={() =>
-            navigation.navigate('SendHive', {
-              hiveId,
-              subjectName: hive.subjectName,
-              coverTheme: hive.coverTheme,
-            })
-          }
-          style={styles.memoryLaneRow}
-          containerStyle={styles.memoryLaneContainer}
-          accessibilityLabel={`Send to ${hive.subjectName}`}
-        >
-          <View style={styles.memoryLaneContent}>
-            <Ionicons name="paper-plane" size={18} color={theme.colors.accentDeep} />
-            <Text style={styles.memoryLaneText}>Send to {hive.subjectName}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
-        </PressableScale>
-      )}
       </Animated.View>
 
       {entries.length > 0 ? (
@@ -323,18 +308,28 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         // box, so anchoring one would move with it; the comb reads as a place,
         // its cells as seats). `home` here because this screen's only anchor
         // is the comb itself.
-        <PerchField perches={perches}>
-          <PerchAnchor id="memory-comb" on="right" at={0.4} home>
-            <EntryCombGrid
-              entries={entries}
-              writable={!hive.sealedAt}
-              onWriteEntry={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
-              diveValue={dive}
-              onCellFlight={handleCellFlight}
-              onFlightHome={handleFlightHome}
-            />
-          </PerchAnchor>
-        </PerchField>
+        // THREE explicit `flex: 1` touches, and every one is load-bearing.
+        // `PerchField` renders no box at all — it is a bare context provider
+        // (PerchAnchor.js) — so the chain from this stage down to the card
+        // runs stage -> PerchAnchor's own View -> card. Without the anchor's
+        // own flex the card would be a `flex: 1` child of an auto-height
+        // parent, resolve flexBasis 0, and collapse to nothing (Lumen's C1).
+        <View style={styles.stage}>
+          <PerchField perches={perches}>
+            <PerchAnchor id="memory-comb" on="right" at={0.4} home style={styles.stage}>
+              <EntryCombGrid
+                entries={entries}
+                writable={!hive.sealedAt}
+                onWriteEntry={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
+                diveValue={dive}
+                onCellFlight={handleCellFlight}
+                onFlightHome={handleFlightHome}
+                bottomInset={footerHeight ? footerHeight + FOOTER_BOTTOM : 0}
+                authorLabelFor={authorLabelFor}
+              />
+            </PerchAnchor>
+          </PerchField>
+        </View>
       ) : (
         <View style={styles.emptyList}>
           <Text style={styles.emptyTitle}>No memories yet.</Text>
@@ -353,14 +348,34 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         canceledPollination={canceledPollination}
       />
 
+      {/* R-SEAL-1 (Colin 2026-09-04, scoped by Lumen): manual seal/send is
+          retired for private hives — the comb rotation is the product's only
+          delivery mechanism, and the 1:1 noun stops carrying a hand-run copy
+          of it. The "Seal This Keepsake" and "Send to {name}" rows are gone,
+          and with them the connections lookup that only existed to decide
+          whether to draw the second one.
+
+          THIS BRANCH SURVIVES, and deliberately against the letter of the
+          scoping note ("footer branch collapses to '+ Add Entry' always").
+          `sealedAt` is still reachable on this screen: `listHives` filters
+          out comb-rotation hives and NOTHING ELSE — it selects `sealed_at`
+          and hands sealed hives straight to Today's shelf, which routes here.
+          Every legacy sealed hive in prod therefore still lands on this
+          screen, and the same ruling says those become read-only stores and
+          that sealed-state RENDERING stands. Collapsing the branch would put
+          a compose CTA on a hive whose own note one line below says entries
+          are read-only, over an RPC that would refuse the write.
+
+          What was retired is the affordance to CREATE a seal. The ability to
+          READ one is what this branch is. */}
       {hive.sealedAt ? (
-        <View style={styles.footer}>
+        <View style={styles.footer} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}>
           <Text style={styles.sealedNote}>
             {hive.sentAt ? `Sent to ${hive.subjectName}.` : 'This hive is sealed — entries are read-only.'}
           </Text>
         </View>
       ) : (
-        <View style={styles.footer}>
+        <View style={styles.footer} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}>
           <PrimaryButton
             onPress={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
           >
@@ -458,6 +473,13 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     fontFamily: theme.fonts.bodySemiBold,
   },
+  // The room the comb lives in. Named rather than inlined because the same
+  // value has to land on two nodes (this wrapper and the PerchAnchor between
+  // it and the card) and a chain that only holds if all of it holds should
+  // read as one decision, not two coincidences.
+  stage: {
+    flex: 1,
+  },
   emptyList: {
     alignItems: 'center',
     paddingTop: 48,
@@ -473,6 +495,18 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     textAlign: 'center',
   },
+  // NO SHADOW HERE, DELIBERATELY — the composition spec asked for the footer
+  // to be re-graded to `theme.shadows.floating` now that it floats over the
+  // hive surface instead of sitting beside it on raw cream. That requirement
+  // is already discharged one level down: `PrimaryButton` has carried
+  // `...theme.shadows.floating` since C7, on the button itself, with its own
+  // note saying why ("this is the button, not a resting surface"). Adding it
+  // again here would stack a second shadow behind the same CTA — and this
+  // wrapper is also the sealed hive's branch, where the only child is a line
+  // of text, so a `floating` drop shadow would land behind bare copy.
+  //
+  // This box stays a transparent positioner. It is measured (`onLayout`
+  // above) so the comb can keep clear of it; it paints nothing.
   footer: {
     position: 'absolute',
     left: 24,

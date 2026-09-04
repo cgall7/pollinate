@@ -154,10 +154,15 @@ export const NECTAR_SURFACES = [
     deliverable: 'DES-28 D1 / DES-24 / ENG-65',
     preConsent: 'No honeyed mark anywhere in the hive; only blooming and seeded.',
     host: 'src/components/HoneycombGrid.js',
-    anchor: 'hexEdgeMarks',
+    anchor: 'HoneyFill',
     note:
-      'Container exists, renderer does not. DES-24 owns the design (ink surface ' +
-      'line, five rungs); ENG-65 builds it together with the BloomRing ink change.',
+      'Re-anchored 2026-09-04 (R-CL-2). This row read "container exists, renderer ' +
+      'does not" and pointed at `hexEdgeMarks`, the blooming ring\'s generator — ' +
+      'true when it was written, wrong twice over now. R-N2 gave the honeyed mark ' +
+      'a real renderer (`HoneyFill`, DES-24\'s surface line, continuous rather ' +
+      'than five rungs), and R-CL-2 retired the ring and its generator. The anchor ' +
+      'is the renderer itself, so this row can no longer read as filled while ' +
+      'pointing at geometry that draws nothing.',
   },
   {
     id: 'packageopen-slot',

@@ -453,11 +453,20 @@ export const HiveStore = {
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
-    // ENG-101 (§1B.38.31-.39): the seal/send CTAs and the invite affordance
-    // must not render on a hive that belongs to a comb rotation -- the
-    // server refuses seal_volume/send_hive/hive_contributors_insert_owner
-    // on one, but a client guard that fails open (an unselected column, a
-    // discarded error) reproduces the exact bug it's meant to close. Own
+    // ENG-101 (§1B.38.31-.39): the invite affordance must not render on a
+    // hive that belongs to a comb rotation -- the server refuses
+    // hive_contributors_insert_owner on one, but a client guard that fails
+    // open (an unselected column, a discarded error) reproduces the exact
+    // bug it's meant to close.
+    //
+    // ENG-101 wrote this for THREE surfaces: the seal CTA, the send CTA and
+    // the invite row. R-SEAL-1 deleted the first two the same day, which
+    // superseded their client guards rather than this field -- `hive.
+    // isRotationLinked` still has exactly one live consumer (HiveDetail's
+    // invite suppression) and the server-side refusals ENG-101 added on
+    // seal_volume/send_hive stand on their own, now as the ONLY defense
+    // against a future client rather than as a belt beside a guarded button.
+    // Own
     // query, own `throw`, matching `data`/`error` above rather than the
     // enrichment-path discard `resolveCombOwnerNames` uses for a name that
     // can legitimately degrade to absent -- this is a guard, not an
@@ -483,26 +492,20 @@ export const HiveStore = {
     };
   },
 
-  // §5 Screen 3's "Seal This Keepsake" CTA. SECURITY DEFINER RPC
-  // (20260819000003) does the sealed_at set + private->packaged entry flip
-  // in one transaction — see that migration for why a client-side pair of
-  // writes can't be trusted to do the same thing atomically. Postgres error
-  // text (owner/already-sealed) passes through `error.message` unchanged;
-  // callers show it as-is rather than re-deriving the same two cases.
-  async sealHive(hiveId) {
-    const client = requireSupabase();
-    const { error } = await client.rpc('seal_hive', { p_hive_id: hiveId });
-    if (error) throw error;
-  },
-
-  // §6 Screen 2's "Send Keepsake" CTA. `send_hive` (20260819000001) is the
-  // one existing RPC this wraps — was already live and correct, just never
-  // had a caller (the gap this whole thread's Slice 1 review found).
-  async sendHive(hiveId) {
-    const client = requireSupabase();
-    const { error } = await client.rpc('send_hive', { p_hive_id: hiveId });
-    if (error) throw error;
-  },
+  // R-SEAL-1 (2026-09-04) — `sealHive`/`sendHive` lived here as the client
+  // half of the manual keepsake flow (§5 Screen 3's "Seal This Keepsake",
+  // §6 Screen 2's "Send Keepsake"). Both are removed: the comb rotation is
+  // the only delivery mechanism now, and it seals server-side on the clock
+  // via `comb_seal_and_send_rotation`, never through these.
+  //
+  // THE RPCs THEMSELVES STAY. No migration, no dropped function, no dropped
+  // policy — `seal_hive`/`send_hive` remain defined and callable, and
+  // already-sealed rows in prod stay readable exactly as they are. What went
+  // to zero is the set of CLIENT CALLERS. That is deliberate: 20260830000003
+  // notes that `seal_hive` has no `is_collective` guard and would open a
+  // successor volume on a comb rotation, which is why the belt-and-braces
+  // server-side refusal is being added separately rather than being assumed
+  // unnecessary because the button is gone.
 
   // Chronological entry list for one hive, most recent first (Design
   // Language §3's Entry List Screen). Scoped to `hive_id = $1` — never

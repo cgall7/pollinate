@@ -56,6 +56,15 @@ const pigment = {
   // Warmth on a numeral is this token BEHIND the ink, as fill. Replaces `gold`.
   accentDeep: '#FF7A00',
   accentBurst: '#FFEA00', // Hottest yellow on the board. Motion only — bursts, pops, bee trail. Never a static fill, text, or background.
+  // ONE EXCEPTION, R-CL-2 (2026-09-04), stated here rather than left for the
+  // next reader to find as a contradiction. `BloomLight` paints this token as
+  // a breathing overlay on a comb cell, which is a motion use — and freezes it
+  // at the peak under Reduce Motion, which is not. The freeze is how every
+  // motion element in this app answers Reduce Motion (the ring it replaced did
+  // the same at the same value), and the alternative is deleting a state for
+  // exactly the people who cannot see it move. It stays an exception, not a
+  // widening: the token is still barred from a resting surface, and the only
+  // way to sit still in it is to be motion that a preference stopped.
   // Golden Honey — the adaptive icon's locked gold (§13.1), and the KEEPSAKE
   // REGISTER: the field a finished, kept thing stands on. Today that is the
   // Seal that opens Wrapped, the Year Card that closes it, and the month-theme
