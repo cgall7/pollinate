@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { theme } from '../constants/theme';
+import { theme, ENTRY_VOICE_RUNGS } from '../constants/theme';
 
 // R-EXT (ENTRY_EXPRESSION_BRIEF.md hardened spec) — the paper paints a
 // contained inset region behind the entry's OWN TEXT BLOCK only (quote +
@@ -29,6 +29,23 @@ export const PaperBlock = ({ paper, style, children, blockRef }) => (
 export const paperInk = (paper) => (paper === 'evening' ? theme.colors.paperEveningInk : theme.colors.ink);
 export const paperInkSoft = (paper) =>
   paper === 'evening' ? theme.colors.paperEveningInkSoft : theme.colors.inkSoft;
+
+// VOICE LADDER RULING (ENTRY_EXPRESSION_BRIEF.md, Lumen 2026-08-26) — the
+// entry-expression module's other channel, selector beside the ground one
+// above. Paragraph-break override checked first: an author who structured
+// the entry into paragraphs takes rung 3 regardless of length, ahead of the
+// char thresholds. Returns a `theme.type.entryDisplay`-shaped style object,
+// ready to spread.
+export const entryVoice = (text) => {
+  const trimmed = String(text ?? '').trim();
+  if (/\n\s*\n/.test(trimmed)) {
+    const prose = ENTRY_VOICE_RUNGS[ENTRY_VOICE_RUNGS.length - 1];
+    return { fontFamily: theme.fonts.entryDisplay, fontSize: prose.size, lineHeight: prose.lineHeight };
+  }
+  const length = Array.from(trimmed).length;
+  const rung = ENTRY_VOICE_RUNGS.find((r) => length <= r.max) ?? ENTRY_VOICE_RUNGS[ENTRY_VOICE_RUNGS.length - 1];
+  return { fontFamily: theme.fonts.entryDisplay, fontSize: rung.size, lineHeight: rung.lineHeight };
+};
 
 const styles = StyleSheet.create({
   evening: {

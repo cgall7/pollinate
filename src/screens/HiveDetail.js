@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, FlatList } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
@@ -9,19 +9,7 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
-import { PaperBlock, paperInk } from '../components/PaperBlock';
-
-const longDate = (isoDate) => {
-  // entry_date is a plain 'YYYY-MM-DD' — parsing it as local midnight
-  // (matching dateRanges.js's own convention) avoids the off-by-one a bare
-  // `new Date(isoDate)` gets from parsing it as UTC midnight instead.
-  const [y, m, d] = isoDate.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-};
+import { EntryCombGrid, DIVE_CHROME_DIM } from '../components/EntryCombGrid';
 
 const joinNames = (names) => {
   if (names.length === 1) return names[0];
@@ -74,6 +62,11 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   // sent yet) so an unsealed hive's screen never pays for a connections
   // round trip it can't use.
   const [subjectIsFriend, setSubjectIsFriend] = useState(false);
+  // Shared with EntryCombGrid (POLLINATE_COMB_DIVE_SPEC.md R-CD-1) — one
+  // driver for the whole dive, so the chrome above the card and the
+  // camera/paper inside it read off the exact same value rather than a
+  // second copy kept in step by hand.
+  const dive = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
@@ -150,8 +143,29 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   const cover = hiveCoverTheme(hive.coverTheme);
   const memoryLabel = entries.length === 1 ? '1 memory' : `${entries.length} memories`;
 
+  // R-CD-3 — "header/chrome above the card dim to 0.35 opacity and return."
+  // One interpolation of the same `dive` EntryCombGrid drives; the dim
+  // completes before the camera is halfway (DIVE_CHROME_DIM.end).
+  const chromeStyle = {
+    opacity: dive.interpolate({
+      inputRange: [0, DIVE_CHROME_DIM.end, 1],
+      outputRange: [1, DIVE_CHROME_DIM.opacity, DIVE_CHROME_DIM.opacity],
+      extrapolate: 'clamp',
+    }),
+    transform: [
+      {
+        translateY: dive.interpolate({
+          inputRange: [0, DIVE_CHROME_DIM.end, 1],
+          outputRange: [0, DIVE_CHROME_DIM.drift, DIVE_CHROME_DIM.drift],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+  };
+
   return (
     <View style={styles.container}>
+      <Animated.View style={chromeStyle}>
       <View style={[styles.banner, { backgroundColor: cover.base }]}>
         <BackButton onPress={() => navigation.goBack()} variant="glass" color={cover.textColor} style={styles.backButton} />
         <Text style={[styles.bannerName, { color: cover.textColor }]}>{hive.subjectName}</Text>
@@ -243,28 +257,21 @@ export const HiveDetailScreen = ({ navigation, route }) => {
           <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
         </PressableScale>
       )}
+      </Animated.View>
 
-      <FlatList
-        data={entries}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <View style={styles.emptyList}>
-            <Text style={styles.emptyTitle}>No memories yet.</Text>
-            <Text style={styles.emptyBody}>Add the first one whenever you're ready.</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.entryCard}>
-            <Text style={styles.entryDate}>{longDate(item.date)}</Text>
-            <PaperBlock paper={item.paper}>
-              <Text style={[styles.entryText, { color: paperInk(item.paper) }]} numberOfLines={4}>
-                {item.text}
-              </Text>
-            </PaperBlock>
-          </View>
-        )}
-      />
+      {entries.length > 0 ? (
+        <EntryCombGrid
+          entries={entries}
+          writable={!hive.sealedAt}
+          onWriteEntry={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
+          diveValue={dive}
+        />
+      ) : (
+        <View style={styles.emptyList}>
+          <Text style={styles.emptyTitle}>No memories yet.</Text>
+          <Text style={styles.emptyBody}>Add the first one whenever you're ready.</Text>
+        </View>
+      )}
 
       {hive.sealedAt ? (
         <View style={styles.footer}>
@@ -371,10 +378,6 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     fontFamily: theme.fonts.bodySemiBold,
   },
-  list: {
-    padding: 24,
-    paddingBottom: 120,
-  },
   emptyList: {
     alignItems: 'center',
     paddingTop: 48,
@@ -389,23 +392,6 @@ const styles = StyleSheet.create({
     ...theme.type.body,
     color: theme.colors.inkSoft,
     textAlign: 'center',
-  },
-  entryCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.medium,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-  },
-  entryDate: {
-    ...theme.type.label,
-    color: theme.colors.inkSoft,
-    marginBottom: 8,
-  },
-  entryText: {
-    ...theme.type.body,
-    color: theme.colors.ink,
   },
   footer: {
     position: 'absolute',
