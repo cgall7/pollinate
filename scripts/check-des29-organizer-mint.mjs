@@ -69,6 +69,26 @@ const checks = [
   // SQLSTATE+message, and folds not-owner/not-found into the same generic
   // bucket as unknown (never a cause sentence).
   ['classifier distinguishes subjectGone from emptyRoster', store.includes("if (/subject is gone/.test(error.message ?? '')) return 'subjectGone'") && store.includes("return 'emptyRoster'")],
+  // Lumen's DES-29 §8 ratification finding (2026-09-04): 23514 alone
+  // aliases six native CHECK producers on comb_open_rotation's write path
+  // (migration `…0010:59`), and PostgREST never forwards the `constraint`
+  // name the server attaches to disambiguate them. A bare
+  // `error.code === '23514'` disjunct would misclassify any other CHECK
+  // violation on this path as emptyRoster, rendering a false "This comb has
+  // one member" count claim. The message match is the only signal
+  // reachable from the client — pinned to the exact line, not just an
+  // absence check, so a future edit that reintroduces a bare-code disjunct
+  // (even reworded) reds here.
+  ["emptyRoster keys on the message alone, not a bare error.code === '23514'", (() => {
+    const start = store.indexOf('export const classifyMintRefusal');
+    const body = store.slice(start, store.indexOf('\n};', start));
+    const emptyRosterLine = body.split('\n').find((line) => line.includes("return 'emptyRoster'"));
+    return (
+      !!emptyRosterLine &&
+      emptyRosterLine.trim() === "if (/enrollable contributors/.test(error.message ?? '')) return 'emptyRoster';" &&
+      !body.includes("error.code === '23514'")
+    );
+  })()],
   ['notOwner and unknown share one generic sentence', (() => {
     const notOwner = card.match(/notOwner: (.+),/)?.[1];
     const unknown = card.match(/unknown: (.+),/)?.[1];

@@ -13,13 +13,24 @@ const requireUserId = async (client) => {
 };
 
 // DES-29 §5 — comb_open_rotation's three refusal shapes are distinguished by
-// SQLSTATE/message alone (unlike COPY-14's entries_insert_own, which shares
-// one 42501 across two causes and needs a refetch to tell them apart). Pure
-// and network-free on purpose: the caller already has the thrown error.
+// SQLSTATE/message (unlike COPY-14's entries_insert_own, which shares one
+// 42501 across two causes and needs a refetch to tell them apart). Pure and
+// network-free on purpose: the caller already has the thrown error.
+//
+// 23514 alone is NOT the emptyRoster test (Lumen's finding, DES-29 §8
+// ratification, 2026-09-04): the migration's own comment (`…0010:59`) says
+// 23514 aliases six native CHECK producers on this write path, which is
+// exactly why the server attaches `constraint =
+// 'comb_open_rotation_enrollable_floor'` rather than trusting the bare
+// SQLSTATE — PostgREST does not forward that constraint name to the client,
+// so the message is the only distinguishing signal actually reachable here.
+// A bare `error.code === '23514'` branch would have rendered "This comb has
+// one member" — a false count claim — for any other CHECK violation this
+// RPC's write path can raise.
 export const classifyMintRefusal = (error) => {
   if (!error) return 'unknown';
   if (error.code === '42501') return 'notOwner';
-  if (error.code === '23514' || /enrollable contributors/.test(error.message ?? '')) return 'emptyRoster';
+  if (/enrollable contributors/.test(error.message ?? '')) return 'emptyRoster';
   if (/subject is gone/.test(error.message ?? '')) return 'subjectGone';
   return 'unknown';
 };
