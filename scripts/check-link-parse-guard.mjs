@@ -23,14 +23,13 @@
 // seam check-seeds-contract.mjs already uses.
 //
 // THE STUB'S `parse` IS A MODEL, NOT A COPY. It reproduces
-// expo-linking@57.0.8's `parse()` exactly on every URL this gate asserts —
-// differentially checked field-by-field against the real module under both
-// runtime regimes (Vector, thread f2c15b7d, 2026-09-04). `queryParams` is
-// exact everywhere (that block is character-identical to the library's).
-// `path` and `hostname` diverge in four measured places, ALL outside the
-// asserted set, none of them reachable from `Linking.getInitialURL()` or
-// the 'url' event — so no verdict below depends on one, but a future case
-// in that territory needs the real library, not this stub:
+// expo-linking@57.0.8's `parse()` exactly on every URL this gate asserts.
+// `queryParams` is exact everywhere (that block is character-identical to
+// the library's). `path` and `hostname` diverge in four measured places,
+// ALL outside the asserted set, none of them reachable from
+// `Linking.getInitialURL()` or the 'url' event — so no verdict below
+// depends on one, but a future case in that territory needs the real
+// library, not this stub:
 //
 //   1. `path` — the `--/` dev-client fold is UNCONDITIONAL here. The real
 //      one is `isExpoHosted() && !hasCustomScheme() && startsWith(prefix)`,
@@ -40,23 +39,39 @@
 //      Harmless — an `exp://` URL is only ever delivered TO Expo Go — but
 //      it means THIS GATE HAS NO RUNTIME REGIME and cannot be used to
 //      reason about one.
-//   2. `hostname` — the real fold also sets it to null; this stub leaves
-//      the Metro host in place. Same verdict (path matches either way).
+//   2. `hostname` — the real fold also sets it to null (Vector, thread
+//      f2c15b7d, 2026-09-04, read off createURL.ts). Same verdict either
+//      way — path matches regardless of what hostname holds.
 //   3. `path` — the real `parse` has an `else if (path.indexOf('+') > -1)`
-//      truncation. Not modelled: real resolves `https://h/a+comb-invite` to
-//      'comb-invite' (guard TRUE), this stub to 'a+comb-invite' (FALSE).
+//      truncation (Vector, same source read). Not modelled: real resolves
+//      `https://h/a+comb-invite` to 'comb-invite' (guard TRUE), this stub to
+//      'a+comb-invite' (FALSE).
 //   4. `path` — the real `parse` wraps `new URL(url)` in `catch { path =
 //      url }`, so a bare 'auth-callback' yields path='auth-callback' (guard
 //      TRUE). Here the TypeError escapes into each guard's own catch
 //      (FALSE).
 //
+// EXHAUSTIVENESS — checked for real, not assumed. Vector built a second
+// harness (thread f2c15b7d, 2026-09-04) that stubs only
+// `expo-constants`/`expo-modules-core`/`invariant` — not `parse` itself —
+// and imports the ACTUAL `expo-linking@57.0.8` `build/createURL.js`, then
+// diffs its `parse()` against this stub's, field-by-field, across 19 URL
+// shapes under both runtime regimes (StoreClient/Expo Go and Standalone).
+// 12 of 38 compared pairs diverge; every one collapses into the four
+// classes above. There is no fifth. (An earlier version of this comment
+// credited items 1 and 4 to that same differential run before it existed —
+// they were a source read, like 2 and 3, just not one Vector did herself.
+// Left unattributed here rather than re-guessed.)
+//
 // RESIDUAL, stated because a green run does not cover it: a gate that stubs
-// the dependency cannot see the dependency change. The bug this file exists
-// for is a property of expo-linking's `parse`; package.json pins `~57.0.8`;
-// a patch bump altering custom-scheme handling would land green here,
-// because this tests our port of the parser rather than theirs. What
-// absorbs that is the guards' own shape — `path === LITERAL || hostname ===
-// LITERAL` keeps working whichever field upstream decides to fill.
+// the dependency cannot see the dependency change. `package.json` pins
+// `~57.0.8`, and a `package-lock.json` exists, so `npm ci` cannot silently
+// drift onto a `parse()` this file hasn't seen — the real exposure is a
+// deliberate `npm update` or lockfile refresh past a version whose
+// custom-scheme handling changed, not an ordinary patch bump landing
+// unnoticed. What absorbs even that: the guards' own shape — `path ===
+// LITERAL || hostname === LITERAL` keeps working whichever field upstream
+// decides to fill.
 //
 // The stub does NOT model `createURL`'s Expo-hosted/hostUri branching
 // either — this gate never calls `createURL`, only the parse-side guards.
