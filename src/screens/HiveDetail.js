@@ -9,7 +9,16 @@ import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
-import { EntryCombGrid, DIVE_CHROME_DIM } from '../components/EntryCombGrid';
+import { EntryCombGrid, DIVE_CHROME_DIM, CELL_SIZE } from '../components/EntryCombGrid';
+import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
+import { FlyingBee } from '../components/FlyingBee';
+import { ringStepFor } from '../components/combLattice';
+
+// R-CD-12 — the home-bound flight needs the same staging-offset geometry as
+// the outbound one; the outbound leg gets its ringStep from EntryCombGrid's
+// own tap measurement (it owns CELL_SIZE), this is the return leg's copy of
+// the identical derivation so the two legs read as one grammar.
+const HOME_RING_STEP = ringStepFor(CELL_SIZE);
 
 const joinNames = (names) => {
   if (names.length === 1) return names[0];
@@ -67,6 +76,46 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   // camera/paper inside it read off the exact same value rather than a
   // second copy kept in step by hand.
   const dive = useRef(new Animated.Value(0)).current;
+
+  // R-CD-12 — the memory comb's own perch set. §32.2's split: the screen
+  // declares WHERE the bee may stand (PerchAnchor) and hands the reader
+  // across to FlyingBee; EntryCombGrid never touches perches directly, it
+  // only reports when to launch and when to come home (see below).
+  const perches = usePerchSet();
+  const [pollinate, setPollinate] = useState(null);
+  const [canceledPollination, setCanceledPollination] = useState(null);
+  const pollinateKeyRef = useRef(0);
+  // The key of the most recently launched CELL-target flight, so a close
+  // arriving while he's still airborne can cancel that specific errand (see
+  // handleFlightHome). Canceling a key that already landed is a documented
+  // no-op in FlyingBee's own cancel-plan-effect — safe to fire unconditionally.
+  const lastCellFlightKeyRef = useRef(null);
+
+  const handleCellFlight = useCallback(({ x, y, ringStep }) => {
+    pollinateKeyRef.current += 1;
+    const key = pollinateKeyRef.current;
+    lastCellFlightKeyRef.current = key;
+    setPollinate({ key, x, y, ringStep });
+  }, []);
+
+  // R-CD-12.4 — "he breaks off and returns by flight, never a teleport."
+  // Retargeting `pollinate` to the perch's own point covers the common case
+  // (he already landed at the cell — the new target launches immediately,
+  // R-CD-12.2's "landing causes nothing" holds, nothing to break off from).
+  // Canceling `lastCellFlightKeyRef` alongside it covers the early-exit case
+  // (he is still mid-flight to the cell): FlyingBee's own posRef tracks his
+  // true on-screen position every frame, so the cancel freezes him exactly
+  // there and the queued home target launches the return leg from that real
+  // point — a genuine break-off, never a jump.
+  const handleFlightHome = useCallback(() => {
+    const home = perches.read(perches.homeKey);
+    if (!home) return;
+    pollinateKeyRef.current += 1;
+    setPollinate({ key: pollinateKeyRef.current, x: home.x, y: home.y, ringStep: HOME_RING_STEP });
+    if (lastCellFlightKeyRef.current != null) {
+      setCanceledPollination({ key: lastCellFlightKeyRef.current, at: Date.now() });
+    }
+  }, [perches]);
 
   useFocusEffect(
     useCallback(() => {
@@ -260,18 +309,42 @@ export const HiveDetailScreen = ({ navigation, route }) => {
       </Animated.View>
 
       {entries.length > 0 ? (
-        <EntryCombGrid
-          entries={entries}
-          writable={!hive.sealedAt}
-          onWriteEntry={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
-          diveValue={dive}
-        />
+        // R-CD-12.1 — "perches on the memory comb host exactly as on
+        // HoneycombTab": same anchor shape as HoneycombTab's own `<PerchAnchor
+        // id="comb" on="right" at={0.4}>` around HoneycombGrid — the comb
+        // wrapped whole (a cell is absolutely positioned inside the grid's own
+        // box, so anchoring one would move with it; the comb reads as a place,
+        // its cells as seats). `home` here because this screen's only anchor
+        // is the comb itself.
+        <PerchField perches={perches}>
+          <PerchAnchor id="memory-comb" on="right" at={0.4} home>
+            <EntryCombGrid
+              entries={entries}
+              writable={!hive.sealedAt}
+              onWriteEntry={() => navigation.navigate('ComposeHiveEntry', { hiveId, subjectName: hive.subjectName })}
+              diveValue={dive}
+              onCellFlight={handleCellFlight}
+              onFlightHome={handleFlightHome}
+            />
+          </PerchAnchor>
+        </PerchField>
       ) : (
         <View style={styles.emptyList}>
           <Text style={styles.emptyTitle}>No memories yet.</Text>
           <Text style={styles.emptyBody}>Add the first one whenever you're ready.</Text>
         </View>
       )}
+
+      {/* Mounted unconditionally, same idiom as TodayTab's own suppression
+          (`perches={error ? null : perches}`) — a hive with no entries has
+          no comb and no home anchor, so `perches` goes null rather than the
+          whole mount going conditional: `homeKey` resolves null,
+          `sequenceHalted` follows, and the screen renders no bee at all. */}
+      <FlyingBee
+        perches={entries.length > 0 ? perches : null}
+        pollinate={pollinate}
+        canceledPollination={canceledPollination}
+      />
 
       {hive.sealedAt ? (
         <View style={styles.footer}>

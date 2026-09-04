@@ -4,7 +4,7 @@ import Svg, { Polygon, G } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { SPRINGS, DURATIONS, useReducedMotionState } from '../constants/motion';
-import { hexSpiral, buildCombLayout, cellCentre } from './combLattice';
+import { hexSpiral, buildCombLayout, cellCentre, ringStepFor } from './combLattice';
 import { hexPoints, HEX_HEIGHT_RATIO, hexHoneyPoints, honeyHeightForLevel } from './hexGeometry';
 import { PressableScale } from './PressableScale';
 import { CombDivePaper } from './CombDivePaper';
@@ -17,6 +17,13 @@ const AnimatedG = Animated.createAnimatedComponent(G);
 // hexGeometry.js/combLattice.js unchanged (Lumen's build-contract ruling:
 // "hexGeometry.js and combLattice.js are already extracted pure modules —
 // reuse them, don't fork the lattice").
+//
+// R-CD-12 addendum (2026-09-04) — this component does not mount the bee
+// itself. `onCellFlight`/`onFlightHome` are the wire: the host screen owns
+// `usePerchSet`/`PerchField`/`FlyingBee` (same split HoneycombTab already
+// uses for its own comb), this file only measures the tapped cell and tells
+// the host when to launch and when to come home. R-CD-13 addendum, same
+// date — the rest-state cell paint, in `EntryCell` below.
 export const CELL_SIZE = 44;
 const CARD_INSET = theme.spacing.lg; // 24 — the card's own padding
 const PAPER_INSET = 18; // R-CD-4 — the paper settles to the card's 18pt inset
@@ -37,12 +44,19 @@ const radiusForCount = (count) => {
   return r;
 };
 
-export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) => {
+export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue, onCellFlight, onFlightHome }) => {
   const { reduced } = useReducedMotionState();
   const dive = diveValue;
   const [cardSize, setCardSize] = useState(null);
   const [openCell, setOpenCell] = useState(null); // { key, entries } | null
   const rimCrossedRef = useRef(false);
+  // R-CD-12.2 — the tap that opens a cell also measures it, so the host
+  // screen's FlyingBee can be aimed at the exact point R-CD-3's backlight is
+  // already igniting. Read at the moment of the tap, before any camera
+  // transform exists (openCell is still null here), same technique as
+  // HoneycombGrid's own `pollinateOwnCell`/`requestPollination`: the
+  // cluster's window origin plus the cell's cluster-local centre.
+  const clusterRef = useRef(null);
   // R-CD-5 "reverse dive never rolls" — the odometer's own chain (licensed
   // exception, R-CD-1) must stop the moment dismissal COMMITS, not wait for
   // the paper to unmount at the end of the close spring. Set true at the top
@@ -90,9 +104,20 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
         Animated.timing(dive, { toValue: 1, duration: DURATIONS.diveRmIn, useNativeDriver: true }).start();
       } else {
         springDive(1);
+        // R-CD-12.2/.3 — the bee's launch is a second response to the same
+        // tap, concurrent with the descent, never gating it. RM gets none of
+        // it (R-CD-12.1's freeze doctrine), same guard HoneycombGrid's own
+        // requestPollination/pollinateOwnCell take before calling onPollinate.
+        if (onCellFlight) {
+          const centre = cellCentre(cell, CELL_SIZE);
+          clusterRef.current?.measureInWindow?.((x, y) => {
+            if (![x, y].every((n) => typeof n === 'number' && Number.isFinite(n))) return;
+            onCellFlight({ x: x + centre.x, y: y + centre.y, ringStep: ringStepFor(CELL_SIZE) });
+          });
+        }
       }
     },
-    [reduced, springDive, writable, onWriteEntry, dive]
+    [reduced, springDive, writable, onWriteEntry, dive, onCellFlight]
   );
 
   const close = useCallback(
@@ -104,9 +129,14 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
         Animated.timing(dive, { toValue: 0, duration: DURATIONS.diveRmOut, useNativeDriver: true }).start(finish);
       } else {
         springDive(0, velocity, finish);
+        // R-CD-12.4 — close is the single commit point every dismiss path
+        // funnels through (closingRef's own doctrine, D11); the bee's return
+        // rides the same funnel rather than a second exit path per dismiss
+        // gesture.
+        onFlightHome?.();
       }
     },
-    [reduced, springDive, dive]
+    [reduced, springDive, dive, onFlightHome]
   );
 
   // R-CD-1 — "Input never disabled": a tap anywhere on the comb while a
@@ -164,6 +194,7 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
       onLayout={(e) => setCardSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
     >
       <Animated.View
+        ref={clusterRef}
         style={[
           styles.cluster,
           { width: layout.width, height: layout.height },
@@ -258,11 +289,21 @@ const EntryCell = ({ cell, size, dolly, waxOpacity, backlightOpacity, writable, 
       >
         <View style={{ width: size * 2, height: size * 2 }}>
           <Svg width={size * 2} height={size * 2}>
+            {/* R-CD-13 — rest-state paint drops from full-saturation `accent`
+                to `washYellow` (the existing warm-ground wash, "a role, not a
+                screen" per its own token comment — no new literal). Stroke
+                drops to hairline: `glassHairline` (ink at 0.18) at
+                borderWidth-equivalent 1, GlassRim's precedent that
+                StyleSheet.hairlineWidth (0.333pt @3x) reads as a conformance
+                miss, not this file's own convention. The honey band below
+                keeps `accentDeep` untouched — it stays the loudest, and
+                highest-chroma, thing in the cell (scripts/check-comb-dive.mjs
+                D13 asserts the ordering numerically). */}
             <Polygon
               points={hexPoints(size)}
-              fill={filled ? theme.colors.accent : 'transparent'}
-              stroke={theme.colors.ink}
-              strokeWidth={1.5}
+              fill={filled ? theme.colors.washYellow : 'transparent'}
+              stroke={theme.colors.glassHairline}
+              strokeWidth={1}
             />
             {filled ? (
               <Polygon points={hexHoneyPoints(size, honeyHeightForLevel(size, 1))} fill={theme.colors.accentDeep} />

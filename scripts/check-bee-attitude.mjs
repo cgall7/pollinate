@@ -255,6 +255,13 @@ const CALL_SITES = [
     anchorStyle: 'wordmarkArcAnchor',
     containers: [{ label: 'wordmarkArcAnchor 220x100', width: 220, height: 100 }],
   },
+  {
+    file: 'src/screens/HiveDetail.js',
+    preset: null,
+    reason:
+      'R-CD-12 (POLLINATE_COMB_DIVE_SPEC.md) — mounted as a PerchField sibling nested inside the entries.length > 0 branch, but PerchField and that branch both render no View of their own, so the nearest real ancestor View is styles.container (flex:1, same as TodayTab/HoneycombTab): the mount is screen-sized, not comb-card-sized.',
+    containers: DEVICES,
+  },
 ];
 
 // =========================================================================
@@ -3561,6 +3568,18 @@ const PERCH_HOSTS = [
     file: 'src/screens/HoneycombTab.js',
     sidesOnly: false,
     paddingStyle: 'content',
+  },
+  {
+    file: 'src/screens/HiveDetail.js',
+    // R-CD-12 — one anchor only (the comb, wrapped whole, `home`), same
+    // shape as HoneycombTab's own single "comb" anchor.
+    sidesOnly: true,
+    // No separate padded content column on this screen — EntryCombGrid.js
+    // sets the comb card's own marginHorizontal, not a HiveDetail.js style.
+    // `container` is the nearest real stylesheet key (flex:1, no horizontal
+    // padding of its own); readPaddingH resolving null here is correct, not
+    // a missing reference.
+    paddingStyle: 'container',
   },
 ];
 

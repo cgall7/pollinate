@@ -54,16 +54,42 @@
 //       vertical-down capture branch is gated on `scrollYRef.current <= 0` —
 //       so a downward drag only claims the responder when the entry text is
 //       scrolled to its top
+//
+// R-CD-12/-13 addendum rows (2026-09-04) — same no-device scope: what a
+// source probe can see of the bee-on-the-comb rider and the wax-tone repaint.
+//
+//   D13 `onCellFlight` (the tap-triggered flight launch) is positioned after
+//       `openAt`'s empty-cell early return — unreachable when a tap resolves
+//       to no stored entry (R-CD-12.5)
+//   D14 `onFlightHome` is called from `close()` — the bee's return rides the
+//       same single-commit funnel every dismiss path already goes through
+//       (R-CD-12.4)
+//   D15 both `onCellFlight` and `onFlightHome` are only reachable from the
+//       `!reduced` branch of their respective functions — RM freeze doctrine
+//       extends to the flight, not just the dive (R-CD-12.1)
+//   D16 rest-state cell paint: fill is `washYellow` (not `accent`), stroke is
+//       `glassHairline` at width 1 (not `ink` at 1.5), and the honey band
+//       (`accentDeep`) is untouched — plus a Lab-chroma measurement proving
+//       the honey band outranks the wax fill numerically, not just by name
+//       (R-CD-13, acceptance row 13)
+//   D17 `HiveDetail.js`'s `handleFlightHome` sets BOTH a new home `pollinate`
+//       target AND a `canceledPollination` for the prior flight key — the
+//       actual break-off mechanism early exit depends on (R-CD-12.4,
+//       acceptance row 12), not just a queued retarget that would let an
+//       in-flight errand finish first
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from '@babel/parser';
 import { computeDiveDateRoll, MAX_VISIBLE_STEPS } from '../src/utils/combDiveDate.js';
+import { theme } from '../src/constants/theme.js';
+import { rgbToLab } from './lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
 const GRID = path.join(SRC, 'components/EntryCombGrid.js');
 const PAPER = path.join(SRC, 'components/CombDivePaper.js');
+const HOST = path.join(SRC, 'screens/HiveDetail.js');
 
 let pass = 0;
 const failures = [];
@@ -137,8 +163,10 @@ const findAncestors = (root, target) => {
 
 const gridSrc = fs.readFileSync(GRID, 'utf8');
 const paperSrc = fs.readFileSync(PAPER, 'utf8');
+const hostSrc = fs.readFileSync(HOST, 'utf8');
 const gridAst = parseJs(gridSrc);
 const paperAst = parseJs(paperSrc);
+const hostAst = parseJs(hostSrc);
 const gridCode = codeOnly(gridSrc, gridAst);
 const paperCode = codeOnly(paperSrc, paperAst);
 
@@ -493,6 +521,148 @@ const paperCode = codeOnly(paperSrc, paperAst);
       ok('D12b the vertical-down capture branch returns scrollYRef.current <= 0 — dismiss only claims from scroll-top');
     } else {
       bad('D12b vertical-down gate', `expected the vertical-down branch to return scrollYRef.current <= 0, body: ${bodySrc}`);
+    }
+  }
+}
+
+// ── D13. onCellFlight is unreachable for an empty cell ──────────────────
+{
+  let openAtFn = null;
+  walk(gridAst.program, (n) => {
+    if (openAtFn) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'openAt') openAtFn = unwrapCallback(n.init);
+  });
+  if (!openAtFn) {
+    bad('D13 onCellFlight unreachable for an empty cell', 'no `const openAt = (...) => {...}` found in EntryCombGrid.js — FAILS CLOSED');
+  } else {
+    const bodySrc = gridSrc.slice(openAtFn.body.start, openAtFn.body.end);
+    const guardIdx = bodySrc.search(/if\s*\(\s*!cell\.member\s*\)/);
+    const flightIdx = bodySrc.indexOf('onCellFlight({');
+    if (guardIdx === -1 || flightIdx === -1) {
+      bad('D13 onCellFlight unreachable for an empty cell', `guardIdx=${guardIdx} flightIdx=${flightIdx} — FAILS CLOSED`);
+    } else if (flightIdx > guardIdx) {
+      ok("D13 onCellFlight is positioned after openAt's empty-cell early return — unreachable for an empty tap");
+    } else {
+      bad('D13 onCellFlight unreachable for an empty cell', 'onCellFlight appears before (or inside) the empty-cell early return');
+    }
+  }
+}
+
+// ── D14. onFlightHome fires from close() — the single dismiss funnel ────
+{
+  let closeFn = null;
+  walk(gridAst.program, (n) => {
+    if (closeFn) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'close') closeFn = unwrapCallback(n.init);
+  });
+  if (!closeFn) {
+    bad('D14 onFlightHome fires from close()', 'no `const close = (...) => {...}` found — FAILS CLOSED');
+  } else {
+    const bodySrc = gridSrc.slice(closeFn.body.start, closeFn.body.end);
+    if (bodySrc.includes('onFlightHome?.(')) {
+      ok('D14 close() calls onFlightHome?.() — the bee rides the same commit point every dismiss path funnels through');
+    } else {
+      bad('D14 onFlightHome fires from close()', 'no `onFlightHome?.(` call found inside close()');
+    }
+  }
+}
+
+// ── D15. onCellFlight/onFlightHome only reachable when !reduced ─────────
+{
+  let openAtFn = null;
+  let closeFn = null;
+  walk(gridAst.program, (n) => {
+    if (n.type !== 'VariableDeclarator') return;
+    if (n.id?.name === 'openAt') openAtFn = unwrapCallback(n.init);
+    if (n.id?.name === 'close') closeFn = unwrapCallback(n.init);
+  });
+  // Present in the alternate (else) AND absent from the consequent (if) —
+  // presence-in-else alone doesn't rule out a SECOND, mistaken call sitting
+  // in the reduced branch too (a regex over the whole body can't tell the
+  // difference; the branches have to be sliced apart to check both halves).
+  const reducedElseGated = (fn, token) => {
+    if (!fn) return false;
+    let ifStmt = null;
+    walk(fn.body, (n) => {
+      if (ifStmt) return;
+      if (n.type === 'IfStatement' && /^reduced$/.test(gridSrc.slice(n.test.start, n.test.end))) ifStmt = n;
+    });
+    if (!ifStmt?.alternate) return false;
+    const consequentSrc = gridSrc.slice(ifStmt.consequent.start, ifStmt.consequent.end);
+    const alternateSrc = gridSrc.slice(ifStmt.alternate.start, ifStmt.alternate.end);
+    return !consequentSrc.includes(token) && alternateSrc.includes(token);
+  };
+  const openOk = reducedElseGated(openAtFn, 'onCellFlight({');
+  const closeOk = reducedElseGated(closeFn, 'onFlightHome?.(');
+  if (openOk && closeOk) {
+    ok('D15 both onCellFlight and onFlightHome sit in the `!reduced` else-branch of their functions — RM freeze extends to the flight');
+  } else {
+    bad(
+      'D15 RM guards onCellFlight/onFlightHome',
+      `openAt's else-branch gates onCellFlight=${openOk}; close()'s else-branch gates onFlightHome=${closeOk}`
+    );
+  }
+}
+
+// ── D16. R-CD-13 rest-state paint — wax fill, hairline stroke, honey untouched ─
+{
+  const fillOk = /fill=\{filled \? theme\.colors\.washYellow : 'transparent'\}/.test(gridCode);
+  const strokeOk = /stroke=\{theme\.colors\.glassHairline\}/.test(gridCode);
+  const widthOk = /strokeWidth=\{1\}/.test(gridCode) && !/strokeWidth=\{1\.5\}/.test(gridCode);
+  const honeyOk = /hexHoneyPoints\(size, honeyHeightForLevel\(size, 1\)\)\}\s*fill=\{theme\.colors\.accentDeep\}/.test(
+    gridCode.replace(/\s+/g, ' ')
+  );
+  if (fillOk && strokeOk && widthOk && honeyOk) {
+    ok('D16a cell fill is washYellow, stroke is glassHairline at width 1, honey band (accentDeep) untouched');
+  } else {
+    bad(
+      'D16a rest-state paint tokens',
+      `fillOk=${fillOk} strokeOk=${strokeOk} widthOk=${widthOk} honeyOk=${honeyOk}`
+    );
+  }
+
+  // Acceptance row 13's literal criterion: honey band chroma > wax fill
+  // chroma, measured (CIE Lab, C* = sqrt(a*a + b*b)), not just asserted by
+  // token name — the two tokens could both be renamed without this failing
+  // unless the actual pigments are compared.
+  const chroma = (hex) => {
+    const { a, b } = rgbToLab(hex);
+    return Math.sqrt(a * a + b * b);
+  };
+  const honeyChroma = chroma(theme.colors.accentDeep);
+  const waxChroma = chroma(theme.colors.washYellow);
+  if (honeyChroma > waxChroma) {
+    ok(`D16b honey band out-chromas the wax fill numerically (accentDeep C*=${honeyChroma.toFixed(2)} > washYellow C*=${waxChroma.toFixed(2)})`);
+  } else {
+    bad(
+      'D16b honey band chroma > wax fill chroma',
+      `accentDeep C*=${honeyChroma.toFixed(2)}, washYellow C*=${waxChroma.toFixed(2)} — the honey band no longer reads as the loudest thing in the cell`
+    );
+  }
+}
+
+// ── D17. HiveDetail's handleFlightHome performs a genuine break-off ─────
+// R-CD-12.4's "he breaks off and returns by flight" needs BOTH halves: a new
+// pollinate target (so he launches home) AND a cancel of the prior flight key
+// (so an in-flight errand is interrupted rather than left to land first). One
+// without the other is a documented weaker behaviour (see EntryCombGrid.js's
+// onFlightHome comment) — this row asserts the stronger one shipped.
+{
+  let handleFlightHomeFn = null;
+  walk(hostAst.program, (n) => {
+    if (handleFlightHomeFn) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'handleFlightHome') handleFlightHomeFn = unwrapCallback(n.init);
+  });
+  if (!handleFlightHomeFn) {
+    bad('D17 handleFlightHome performs a genuine break-off', 'no `const handleFlightHome = (...) => {...}` found in HiveDetail.js — FAILS CLOSED');
+  } else {
+    const bodySrc = hostSrc.slice(handleFlightHomeFn.body.start, handleFlightHomeFn.body.end);
+    const setsHome = /setPollinate\(/.test(bodySrc);
+    const cancelsPrior = /setCanceledPollination\(/.test(bodySrc);
+    if (setsHome && cancelsPrior) {
+      ok('D17 handleFlightHome both retargets pollinate home AND cancels the prior flight key — a real break-off, not a queued retarget');
+    } else {
+      bad('D17 handleFlightHome performs a genuine break-off', `setsHome=${setsHome} cancelsPrior=${cancelsPrior}`);
     }
   }
 }
