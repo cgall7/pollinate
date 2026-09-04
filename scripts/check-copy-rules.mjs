@@ -332,7 +332,7 @@ for (const position of POSITIONS) {
 // so these two are constrained by a gate that knows what they are.
 const NOT_COPY_ATTRS = new Set([
   // RN / component API enums and identifiers
-  'accessibilityLiveRegion', 'accessibilityRole', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
+  'accessibilityLiveRegion', 'accessibilityRole', 'animationType', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
   'importantForAccessibility', 'key', 'keyboardShouldPersistTaps', 'keyboardType',
   'countKind', 'mode', 'name', 'on', 'pointerEvents', 'preset', 'resizeMode',
   'returnKeyType', 'role', 'size', 'stage', 'textContentType', 'tint', 'tone', 'variant',

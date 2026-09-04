@@ -239,6 +239,24 @@ export const TodayTab = ({ navigation, route }) => {
   // failure here must not blank the hives beside it.
   const [pendingCombs, setPendingCombs] = useState([]);
 
+  // DES-29 §8.5 — a successful mint from the pre-launch card's own
+  // affordance flips that card to `RotationFold` by refetching, the same
+  // read the focus effect below already runs. Extracted so
+  // `OrganizerCombCard`'s `onMinted` can call it on demand without waiting
+  // for the next focus event.
+  const reloadOrganizerCombs = useCallback(() => {
+    HiveStore.listOrganizerCombs()
+      .then((list) => {
+        setOrganizerCombsError(false);
+        setOrganizerCombs(list);
+      })
+      .catch((err) => {
+        console.warn('TodayTab: failed to load organizer combs', err);
+        setOrganizerCombsError(true);
+        setOrganizerCombs([]);
+      });
+  }, []);
+
   // ELIGIBILITY. Runs only when the signal is present, so an ordinary Today
   // mount, a tab switch, a resume and a later save all cost nothing here.
   //
@@ -339,19 +357,7 @@ export const TodayTab = ({ navigation, route }) => {
           setHives([]);
         }
       })();
-      (async () => {
-        try {
-          const list = await HiveStore.listOrganizerCombs();
-          if (cancelled) return;
-          setOrganizerCombsError(false);
-          setOrganizerCombs(list);
-        } catch (err) {
-          if (cancelled) return;
-          console.warn('TodayTab: failed to load organizer combs', err);
-          setOrganizerCombsError(true);
-          setOrganizerCombs([]);
-        }
-      })();
+      reloadOrganizerCombs();
       // Independent try/catch, not folded into the block above — a failed
       // contributing-hives read must not blank the owner's own shelf (or
       // vice versa), same reasoning as this effect's own comment for why it
@@ -674,6 +680,7 @@ export const TodayTab = ({ navigation, route }) => {
                       onNectar={(comb) =>
                         navigation.getParent()?.navigate('CombNectarCompose', { combId: comb.id })
                       }
+                      onMinted={reloadOrganizerCombs}
                     />
                   ))}
                 </ScrollView>

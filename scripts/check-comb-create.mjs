@@ -6,10 +6,18 @@ const checks = [
   ['cadence persists into comb insert', store.includes('.insert({ owner_id: ownerId, name: label, cadence })')],
   ['no client clock argument', !store.includes('p_closes_at')],
   ['organizer name commits before create', screen.includes('await CombStore.saveOrganizerName(organizerName)')],
-  ['self exclusion exists', store.includes('subjectProfileId === ownerId')],
-  ['same comb retries mint', screen.includes('openFirstRotation({ combId: createdCombId')],
   ['uses the shared placeholder class', screen.includes("import { isPlaceholderName } from '../utils/placeholderName'" )],
   ['success returns to the organizer card on Today', screen.includes("navigation.replace('Main', { screen: 'Today' })")],
+  // DES-29 §4 amendment (2026-09-04): createComb is insert-only now — the
+  // subject question and the mint call both left this screen entirely.
+  ['createComb takes no subject', !screen.includes('subjectProfileId')],
+  ['createComb never calls the mint RPC', !screen.includes('openFirstRotation')],
+  ['no connections read on this screen', !screen.includes('HoneycombStore')],
+  ['createComb is insert-only, no mint call inside it', (() => {
+    const start = store.indexOf('async createComb(');
+    const body = store.slice(start, store.indexOf('\n};', start));
+    return start !== -1 && !body.includes('openFirstRotation') && !body.includes('subjectProfileId');
+  })()],
 ];
 let failed = 0;
 for (const [label, ok] of checks) {

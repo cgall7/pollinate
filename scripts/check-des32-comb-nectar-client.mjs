@@ -18,8 +18,11 @@ const baseSources = {
 const checks = [];
 const check = (name, predicate) => checks.push({ name, pass: Boolean(predicate) });
 
+// DES-29 §8: OrganizerCombCard gained `onMinted` (the pre-launch mint
+// affordance's reload callback) alongside the pre-existing nectar/write
+// props — the signature itself moved, not the nectar route this gate pins.
 const hasOrganizerRoute = ({ card, today }) =>
-  /export const OrganizerCombCard = \(\{ comb, expanded, onPress, onWrite, onNectar \}\)/.test(card) &&
+  /export const OrganizerCombCard = \(\{ comb, expanded, onPress, onWrite, onNectar, onMinted \}\)/.test(card) &&
   /expanded && \([\s\S]*?onPress=\{\(\) => onNectar\?\.\(comb\)\}[\s\S]*?Send a little thanks/.test(card) &&
   /onNectar=\{\(comb\) =>\s*navigation\.getParent\(\)\?\.navigate\('CombNectarCompose', \{ combId: comb\.id \}\)/s.test(today);
 

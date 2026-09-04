@@ -1,19 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { GradientCard } from './GradientCard';
 import { PressableScale } from './PressableScale';
 import { RotationFold } from './RotationFold';
+import { MintRotationSheet } from './MintRotationSheet';
 import { useDaysLeft } from './useDaysLeft';
 import { getCombInviteUrl } from '../services/combInviteLinking';
 import { isPlaceholderName } from '../utils/placeholderName';
+import { CombStore, classifyMintRefusal } from '../services/CombStore';
 
 const ROTATION_WRITER_COUNT_KIND = 'writers';
 
+// DES-29 §5 — subject-gone and empty-roster get their ruled sentences;
+// not-owner/not-found and anything unclassified share one generic,
+// connection-shaped line (never a cause sentence, per the spec's own rule
+// that an owner on this card should never see a "not owner" claim).
+const MINT_REFUSAL_COPY = {
+  subjectGone: "That person's account is gone — choose someone else to write for.",
+  emptyRoster:
+    'A comb needs two people to be a comb. This comb has one member — invite someone, and the month can open.',
+  notOwner: "Couldn't open this month. Check your connection and try again.",
+  unknown: "Couldn't open this month. Check your connection and try again.",
+};
+
 export const organizerChapterSubjectName = (name) => (isPlaceholderName(name) ? 'someone' : name);
 
-export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar }) => {
+export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, onMinted }) => {
   const rotation = comb.openRotation;
   const daysLeft = useDaysLeft(rotation?.closesAt);
   const inviteUrl = getCombInviteUrl(comb.inviteCode);
@@ -28,7 +42,59 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar }
         ? 'One person is in this comb.'
         : `${comb.memberCount} people are in this comb.`;
 
+  // DES-29 §8.1 — pre-launch (no open rotation, no chapters — waiting on
+  // people) is a different state from dormant (no open rotation, chapters
+  // exist — waiting on time, OPS-9's territory), not the same "No open
+  // month right now." line for both.
+  const isPreLaunch = !rotation && chapterCount === 0;
+
+  // DES-29 §8.2/§8.3 — the mint picker's own state. `candidates === null`
+  // is "still loading" (§8.3's empty-picker pre-empt only fires once the
+  // read has actually come back empty, not before).
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [candidates, setCandidates] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [minting, setMinting] = useState(false);
+  const [mintErrorText, setMintErrorText] = useState('');
+
+  const openMintSheet = () => {
+    setSheetOpen(true);
+    setCandidates(null);
+    setLoadError(false);
+    setSelected(null);
+    setMintErrorText('');
+    CombStore.listMintCandidates(comb.id)
+      .then((rows) => setCandidates(rows))
+      .catch((err) => {
+        console.warn('OrganizerCombCard: failed to load mint candidates', err);
+        setLoadError(true);
+      });
+  };
+
+  const closeMintSheet = () => {
+    if (minting) return;
+    setSheetOpen(false);
+  };
+
+  const submitMint = async () => {
+    if (!selected || minting) return;
+    setMinting(true);
+    setMintErrorText('');
+    try {
+      await CombStore.openFirstRotation({ combId: comb.id, subjectProfileId: selected.id });
+      setSheetOpen(false);
+      onMinted?.(comb.id);
+    } catch (err) {
+      console.warn('OrganizerCombCard: mint failed', err);
+      setMintErrorText(MINT_REFUSAL_COPY[classifyMintRefusal(err)]);
+    } finally {
+      setMinting(false);
+    }
+  };
+
   return (
+    <>
     <PressableScale
       onPress={onPress}
       style={styles.card}
@@ -52,11 +118,27 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar }
             countKind={ROTATION_WRITER_COUNT_KIND}
           />
         ) : (
-          <Text style={styles.emptyLine}>No open month right now.</Text>
+          <Text style={styles.emptyLine}>{isPreLaunch ? 'Invite people to get started.' : 'No open month right now.'}</Text>
         )}
         {chapterCount > 0 && (
           <View style={styles.historySignal}>
             <Text style={styles.metaLine}>{chapterSignalLabel}</Text>
+          </View>
+        )}
+        {/* DES-29 §8.1/§8.2 — pre-launch only, un-gated by `expanded`: the
+            share row and the mint affordance are the whole reason this
+            card exists in this state, so neither waits on a tap that reads
+            as "more" on a card with nothing collapsed to reveal. */}
+        {isPreLaunch && (
+          <View style={styles.preLaunchPanel}>
+            <PressableScale onPress={shareInvite} style={styles.actionRow} accessibilityLabel={`Share invite link for ${comb.name}`}>
+              <Ionicons name="link" size={16} color={theme.colors.ink} />
+              <Text style={styles.actionText}>Share invite link</Text>
+            </PressableScale>
+            <PressableScale onPress={openMintSheet} style={styles.actionRow} accessibilityLabel={`Pick who this month is for in ${comb.name}`}>
+              <Ionicons name="person-add" size={16} color={theme.colors.ink} />
+              <Text style={styles.actionText}>Pick who this month is for</Text>
+            </PressableScale>
           </View>
         )}
         {expanded && (
@@ -72,10 +154,12 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar }
                 ))}
               </View>
             )}
-            <PressableScale onPress={shareInvite} style={styles.actionRow} accessibilityLabel={`Share invite link for ${comb.name}`}>
-              <Ionicons name="link" size={16} color={theme.colors.ink} />
-              <Text style={styles.actionText}>Share invite link</Text>
-            </PressableScale>
+            {!isPreLaunch && (
+              <PressableScale onPress={shareInvite} style={styles.actionRow} accessibilityLabel={`Share invite link for ${comb.name}`}>
+                <Ionicons name="link" size={16} color={theme.colors.ink} />
+                <Text style={styles.actionText}>Share invite link</Text>
+              </PressableScale>
+            )}
             {rotation && (
               <PressableScale
                 onPress={() => onNectar?.(comb)}
@@ -100,6 +184,20 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar }
         )}
       </GradientCard>
     </PressableScale>
+    <MintRotationSheet
+      visible={sheetOpen}
+      combName={comb.name}
+      inviteUrl={inviteUrl}
+      candidates={candidates}
+      loadError={loadError}
+      selectedId={selected?.id ?? null}
+      onSelect={setSelected}
+      submitting={minting}
+      errorText={mintErrorText}
+      onSubmit={submitMint}
+      onDismiss={closeMintSheet}
+    />
+    </>
   );
 };
 
@@ -149,6 +247,9 @@ const styles = StyleSheet.create({
   emptyLine: {
     ...theme.type.bodySm,
     color: theme.colors.inkSoft,
+  },
+  preLaunchPanel: {
+    gap: 6,
   },
   expandedPanel: {
     borderTopWidth: 1,

@@ -63,6 +63,7 @@
     "check:comb-join-current-rotation": "node scripts/check-comb-join-current-rotation.mjs",
     "check:comb-open-rotation": "node scripts/check-comb-open-rotation.mjs",
     "check:comb-create": "node scripts/check-comb-create.mjs",
+    "check:des29-organizer-mint": "node scripts/check-des29-organizer-mint.mjs",
     "check:comb-advance-rotation": "node scripts/check-comb-advance-rotation.mjs",
     "check:comb-invite-client": "node scripts/check-comb-invite-client.mjs",
     "check:comb-collect": "node scripts/check-comb-collect.mjs",
