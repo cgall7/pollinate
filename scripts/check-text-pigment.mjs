@@ -30,8 +30,10 @@
 //      are excluded: those are props on their way to an SVG stop or an icon.
 //   2. `placeholderTextColor` — a JSX attribute, not a style key. Placeholder
 //      text is text, so R127 binds it, and the first draft of this gate was
-//      completely blind to it (Lumen's mutation: `SealHive.js:151` set to
-//      `accentDeep`, gate stayed green).
+//      completely blind to it (Lumen's mutation, made against `SealHive.js`
+//      before R-SEAL-1 retired that screen: a `placeholderTextColor` set to
+//      `accentDeep`, gate stayed green). The file is gone; the hole it
+//      exposed is why the `placeholderTextColor` transport is read at all.
 //
 // T5 exists because of how that hole was shaped. The `color:` half failed
 // closed on anything it could not resolve, and the attribute half did not exist

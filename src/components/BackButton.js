@@ -6,7 +6,9 @@ import { PressableScale } from './PressableScale';
 import { GlassRim } from './GlassRim';
 
 // C2 — one back-button affordance. It shipped as four: a surface card with
-// shadow (CreateHive), raw glass with no shadow (SendHive/SealHive), the
+// shadow (CreateHive), raw glass with no shadow (SendHive/SealHive, both
+// since retired by R-SEAL-1 — kept in this history because they are half of
+// why the rule exists, not because the files are still there), the
 // same raw glass duplicated three more times (HiveDetail/MemoryLane/
 // PackageOpen), and a bare TouchableOpacity with no scale or haptic at all
 // (Account/Legal/Onboarding). Two materials are legitimate — a circle on a

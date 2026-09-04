@@ -4,7 +4,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { HiveStore } from '../services/HiveStore';
-import { HoneycombStore } from '../services/HoneycombStore';
 import { hiveCoverTheme } from '../constants/hiveThemes';
 import { PressableScale } from '../components/PressableScale';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -75,12 +74,6 @@ export const HiveDetailScreen = ({ navigation, route }) => {
   // extra round trips. GUIDES/POLLINATE_MULTIWRITER_COPY_VOCAB.md §4.3:
   // "presence, not count" — this list exists to render who, never a tally.
   const [contributors, setContributors] = useState([]);
-  // §11 "Send only works for connected friends" — the subject may be a
-  // registered profile who has since unfriended, or was never one to begin
-  // with. Only fetched when it could matter (sealed, has a subject, not
-  // sent yet) so an unsealed hive's screen never pays for a connections
-  // round trip it can't use.
-  const [subjectIsFriend, setSubjectIsFriend] = useState(false);
   const [footerHeight, setFooterHeight] = useState(0);
   const { session } = useAuth();
   // Shared with EntryCombGrid (POLLINATE_COMB_DIVE_SPEC.md R-CD-1) — one
@@ -197,14 +190,6 @@ export const HiveDetailScreen = ({ navigation, route }) => {
           } else {
             setContributors([]);
           }
-
-          if (hiveData?.sealedAt && hiveData?.subjectProfileId && !hiveData?.sentAt) {
-            const connections = await HoneycombStore.listConnections();
-            if (cancelled) return;
-            setSubjectIsFriend(connections.some((c) => c.id === hiveData.subjectProfileId));
-          } else {
-            setSubjectIsFriend(false);
-          }
         } catch (err) {
           if (cancelled) return;
           console.warn('HiveDetailScreen: failed to load hive', err);
@@ -313,54 +298,6 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         </PressableScale>
       )}
 
-      {/* ENG-101: a comb rotation seals itself automatically when the
-          window closes (seal_and_send_rotation) and never opens a
-          successor volume, unlike a manual seal_volume() call -- tapping
-          this on a rotation-linked hive wedges the comb permanently
-          (comb_rotations_one_open_per_comb never clears). The server
-          refuses it either way; this guard just keeps the button off a
-          hive it can never work on. */}
-      {!hive.sealedAt && !hive.isRotationLinked && entries.length > 0 && (
-        <PressableScale
-          onPress={() =>
-            navigation.navigate('SealHive', {
-              hiveId,
-              subjectName: hive.subjectName,
-              coverTheme: hive.coverTheme,
-            })
-          }
-          style={styles.memoryLaneRow}
-          containerStyle={styles.memoryLaneContainer}
-          accessibilityLabel="Seal this keepsake"
-        >
-          <View style={styles.memoryLaneContent}>
-            <Ionicons name="lock-closed" size={18} color={theme.colors.accentDeep} />
-            <Text style={styles.memoryLaneText}>Seal This Keepsake</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
-        </PressableScale>
-      )}
-
-      {hive.sealedAt && !hive.sentAt && !hive.isRotationLinked && subjectIsFriend && (
-        <PressableScale
-          onPress={() =>
-            navigation.navigate('SendHive', {
-              hiveId,
-              subjectName: hive.subjectName,
-              coverTheme: hive.coverTheme,
-            })
-          }
-          style={styles.memoryLaneRow}
-          containerStyle={styles.memoryLaneContainer}
-          accessibilityLabel={`Send to ${hive.subjectName}`}
-        >
-          <View style={styles.memoryLaneContent}>
-            <Ionicons name="paper-plane" size={18} color={theme.colors.accentDeep} />
-            <Text style={styles.memoryLaneText}>Send to {hive.subjectName}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSoft} />
-        </PressableScale>
-      )}
       </Animated.View>
 
       {entries.length > 0 ? (
@@ -411,6 +348,26 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         canceledPollination={canceledPollination}
       />
 
+      {/* R-SEAL-1 (Colin 2026-09-04, scoped by Lumen): manual seal/send is
+          retired for private hives — the comb rotation is the product's only
+          delivery mechanism, and the 1:1 noun stops carrying a hand-run copy
+          of it. The "Seal This Keepsake" and "Send to {name}" rows are gone,
+          and with them the connections lookup that only existed to decide
+          whether to draw the second one.
+
+          THIS BRANCH SURVIVES, and deliberately against the letter of the
+          scoping note ("footer branch collapses to '+ Add Entry' always").
+          `sealedAt` is still reachable on this screen: `listHives` filters
+          out comb-rotation hives and NOTHING ELSE — it selects `sealed_at`
+          and hands sealed hives straight to Today's shelf, which routes here.
+          Every legacy sealed hive in prod therefore still lands on this
+          screen, and the same ruling says those become read-only stores and
+          that sealed-state RENDERING stands. Collapsing the branch would put
+          a compose CTA on a hive whose own note one line below says entries
+          are read-only, over an RPC that would refuse the write.
+
+          What was retired is the affordance to CREATE a seal. The ability to
+          READ one is what this branch is. */}
       {hive.sealedAt ? (
         <View style={styles.footer} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}>
           <Text style={styles.sealedNote}>

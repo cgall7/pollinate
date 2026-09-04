@@ -23,8 +23,6 @@ import { CreateCombScreen } from './src/screens/CreateComb';
 import { HiveDetailScreen } from './src/screens/HiveDetail';
 import { ComposeHiveEntryScreen } from './src/screens/ComposeHiveEntry';
 import { CombNectarComposeScreen } from './src/screens/CombNectarCompose';
-import { SealHiveScreen } from './src/screens/SealHive';
-import { SendHiveScreen } from './src/screens/SendHive';
 import { InviteContributor } from './src/screens/InviteContributor';
 import { ContributingHiveScreen } from './src/screens/ContributingHive';
 import { MemoryLaneScreen } from './src/screens/MemoryLane';
@@ -330,8 +328,6 @@ export default function App() {
                 button anywhere to trigger it). Design Language §5-6, condensed
                 per Lumen's ruling same thread. Both plain pushes, same
                 reasoning as their HiveDetail siblings. */}
-            <Stack.Screen name="SealHive" component={SealHiveScreen} />
-            <Stack.Screen name="SendHive" component={SendHiveScreen} />
             {/* 8b.4 Trip Down Memory Lane — the author's bloom moment, first of
                 the reveal engine's two mount points (`revealSequencer.js`
                 header). Pushed from HiveDetail, not modal, for the same
