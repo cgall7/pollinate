@@ -125,17 +125,18 @@ work instead of an SDK integration, an Org enrollment and an App Review fight.
 > `20260827000001_multi_writer_hives.sql` (+ `20260828000001`), with
 > `src/screens/InviteContributor.js` and `ContributingHive.js` (verified at
 > `github/main@080edd5`).
-> **Still unbuilt — this is the gap:** `ENG-58`. No `combs` / `comb_members` /
-> `comb_rotations` migration exists, and no `invite_code` or rotation path exists
-> in `src/` (both searched). `ENG-60` needs a scheduler — `pg_cron`, Bumble's lane.
+> **`ENG-58` landed `e99936d` (2026-08-30, merging `ae39cf1`):**
+> `combs`/`comb_members`/`comb_rotations` + RLS at `…0002`, `invite_code` default
+> at `:150`. Roster-read half built too — `comb_co_member_names` (`…0002:391`,
+> updated `…0007:235`). `ENG-60` needs a scheduler — `pg_cron`, Bumble's lane.
 
 
 | ID | Owner | Est | Issue | Deps |
 |---|---|---|---|---|
 | **ENG-56** | Sage | XL | **RLS design ruling + migration:** `hive_contributors`, `is_hive_contributor()` as `security definer` (recursion-safe, `owns_entry()` shape). This reverses `20260815000001`'s explicit owner-only stance — **Sage ratifies the shape before code**. Spec §18.1 | **Colin ruling #4** |
 | **ENG-57** | Sage | M | Contributor entry policies: a contributor sees **only their own** entries until the volume is sealed; owner alone can seal and deliver | ENG-56, ENG-46 |
-| **ENG-58** | Sage | L | Migration: `combs`, `comb_members` (cap 20), `comb_rotations` + RLS | — |
-| **ENG-59** | Fizz | M | Comb invite-link join flow (code generation, cap enforcement, membership) | ENG-58 |
+| **ENG-58** | Sage | L | **Landed `e99936d` (2026-08-30, merging `ae39cf1`):** `combs`/`comb_members`/`comb_rotations` + RLS at `…0002`, `invite_code` default at `:150`. Roster-read half built too — `comb_co_member_names` (`…0002:391`, updated `…0007:235`) | — |
+| **ENG-59** | Fizz | M | **Landed `9bc6d04`/`0f898ce`/`4972e97` (2026-08-30–31):** `comb_preview_by_invite_code` + `comb_join_by_invite_code` RPCs, `CombInviteLandingScreen`/`CombInviteNameScreen` wired in `App.js`. All four ordered items built: (a) the preview is its own `security definer`, returning zero rows on a bad code, not `comb_member_count`; (b) `invite_code` defaults to a stripped `gen_random_uuid()`; (c) `CombInviteNameScreen` gates on a placeholder `display_name` between auth and join; (d) §1B.16 holds — the join writes `comb_members` and `hive_contributors`, never `honeycomb_connections` | ENG-58 |
 | **ENG-60** | Fizz | L | Rotation ritual: open a rotation, notify the comb, collect entries, seal on `closes_at`, reveal to the subject | ENG-57, ENG-58 |
 | **ENG-61** | Fizz | M | Contributor invite + co-authored hive UI | ENG-56, DES-21 |
 | **DES-21** | Deezine | L | Collective reveal — N authors' entries blooming in one sequence. Attribution must be visible without turning it into a feed | — |
@@ -150,10 +151,10 @@ Detail in `POLLINATE_COMB_ROTATION.md` §7 (design) and §8.3 (engineering).
 
 | ID | Owner | Est | Issue | Deps |
 |---|---|---|---|---|
-| **DES-29** | Deezine | L | **Comb-first first run.** The app opens on `TodayTab`, a solo journal (`src/navigation/MainTabs.js:115`), and `Onboarding` ends in a personal entry — teaching "journal app" in three seconds and hiding the pillar we sell. Two doors, **comb primary**: *"Start a comb with your people"* / *"Write for one person."* Comb happy path: person → occasion → date → invite by link → write. **Sequence with `ONBOARDING_ZERO_DOOR_SPEC.md`** — same `App.js` region | — |
+| **DES-29** | Deezine | L | **Comb-first first run.** The app opens on `TodayTab`, a solo journal (the first `Tab.Screen` in `src/navigation/MainTabs.js`), and `Onboarding` ends in a personal entry — teaching "journal app" in three seconds and hiding the pillar we sell. Two doors, **comb primary**: *"Start a comb with your people"* / *"Write for one person."* Comb happy path: person → occasion → date → invite by link → write. **Sequence with `ONBOARDING_ZERO_DOOR_SPEC.md`** — same `App.js` region | — |
 | **DES-30** | Pixel | M | **Comb-plan paywall surface**, shown when the *second* rotation opens (first rotation is free). Must not intrude on a seal or a reveal — same constraint as `DES-26`. Never "upgrade to unlock" | ENG-79, COPY-13 |
 | **DES-31** | Pixel | M | **Rotation state on the Hive tab**: subject, days remaining, contributor **count**. **Never contributor content** — blind-until-seal (spec §18.1) is a privacy boundary, not a nicety. Extends `DES-22` | DES-22 |
-| **ENG-83** | Fizz | M | **Magic-link and/or Sign in with Apple.** Auth is email + password only (`src/services/HoneycombStore.js:32-45`). A comb arrives as a *group through one link*; today each member hits a password form individually. Spec §18.2: *"friend-by-friend email matching is not how a real friend group arrives."* **Critical path for the pillar we sell** | — |
+| **ENG-83** | Fizz | M | **Magic-link and/or Sign in with Apple.** **Landed `0d71d24` (2026-08-29):** magic-link via `HoneycombStore.signInWithOtp`, Sign in with Apple via `HoneycombStore.signInWithApple`, both routed from `Onboarding`'s account gate | — |
 | **ENG-84** | Fizz | S | **In-app account deletion.** No `deleteAccount` path in `src/`. **App Store 5.1.1(v) — hard rejection.** Release blocker, independent of this ruling | — |
 | **ENG-89** | Fizz | M | **Instrument conditions C1–C4** (ruling §6): rotation participation, reveal→install, comb survival, organizer conversion. Extends `ENG-78` | OPS-8, ENG-75 |
 | **ENG-85** | Sage | M | **Entitlement model.** Where a user's plan lives and how the two caps read it: `combs_written_in ≤ 1`, `comb_members ≤ 5` on free. Single server-side source of truth the client cannot spoof; **both limits tunable constants.** **Ships with caps DISABLED** — see the trap below | ENG-58 |

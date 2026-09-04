@@ -3056,9 +3056,9 @@ the daily register makes the case stronger rather than weaker.
   same defect cut for MVP1.
 - **It discards the differentiator** §5.2(b) calls the best argument the bitcoin
   layer is native.
-- Three tabs shipped via `ENG-81`/`ENG-82`; `MainTabs.js:115-122` carries exactly
-  Today, Hive, Garden. Reversing re-opens capsule geometry, the nav-depth gate and
-  the account-door anchor.
+- Three tabs shipped via `ENG-81`/`ENG-82`; the three `Tab.Screen` registrations
+  in `src/navigation/MainTabs.js` carry exactly Today, Hive, Garden. Reversing
+  re-opens capsule geometry, the nav-depth gate and the account-door anchor.
 
 The principle in one line: **tabs are for verbs, and "wallet" is a noun.** Venmo
 earns a wallet tab because its verb is *pay*. Pollinate's verb is *thank*.
@@ -3131,7 +3131,7 @@ New rows:
 
 | ID | Owner | Est | Issue |
 |---|---|---|---|
-| **DES-29** | Deezine | L | **Comb-first first run.** The app opens on `TodayTab`, a solo journal (`src/navigation/MainTabs.js:115`), and `Onboarding` ends in a personal entry — teaching "journal app" in three seconds and hiding the pillar we sell. Two doors, **comb primary**: *"Start a comb with your people"* / *"Write for one person."* Comb happy path: **person → occasion → date → invite by link → write.** Sequence with `ONBOARDING_ZERO_DOOR_SPEC.md` — same `App.js` region |
+| **DES-29** | Deezine | L | **Comb-first first run.** The app opens on `TodayTab`, a solo journal (the first `Tab.Screen` in `src/navigation/MainTabs.js`), and `Onboarding` ends in a personal entry — teaching "journal app" in three seconds and hiding the pillar we sell. Two doors, **comb primary**: *"Start a comb with your people"* / *"Write for one person."* Comb happy path: **person → occasion → date → invite by link → write.** Sequence with `ONBOARDING_ZERO_DOOR_SPEC.md` — same `App.js` region |
 | **DES-30** | Pixel | M | **Paywall surfaces, at two moments and no others.** (1) **Adding the 6th member** to a comb you run. (2) **Creating or joining a second comb** to write in. Both are private, organizer-side, high-intent. **Never at a seal or a reveal**, never "upgrade to unlock" (`COPY-13`). Copy must never imply a friend is being excluded — the message is *"add more people,"* never *"they can't come"* |
 | **DES-31** | Pixel | M | **Rotation state on the Hive tab**: subject, days remaining, contributor **count**. **Never contributor content** — blind-until-seal (§18.1) is a privacy boundary, not a nicety. **AMENDED 2026-08-30 (§1B.9): the count is the MEMBER's view only. The subject sees NO count before the seal — not live, not snapshot, not "some people have written."** The subject sees who it is for and how long, and nothing countable. Two views of one rotation. Blind-until-seal covers the number, or the number becomes the spoiler — and a subject-visible share contaminates `C1` |
 | **DES-32** | Deezine | M | **Short-note + nectar compose surface** (§5.2a). Eight words and a nectar amount, sent to a comb member from the comb, any time — not only at a reveal. Fast, one-handed, closer to a reaction than to composing an entry. Reuses the `DES-23` zap flight |
@@ -3150,8 +3150,8 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 
 | ID | Owner | Est | Status |
 |---|---|---|---|
-| **ENG-58** | Sage | L | Migration: `combs`, `comb_members`, `comb_rotations` + RLS. **Not built** — no such migration exists, and no `invite_code` or rotation path exists in `src/` (both searched). **Also owns the definer-backed roster read** (§1B.17): `profiles` RLS admits only your own row and your connections, so in a comb formed by invite link every member renders as `'Someone'` |
-| **ENG-59** | Fizz | M | Comb invite-link join flow. Deep-link scheme `pollinate` already registered (`app.json`); `AuthContext.js:93-101` already listens and drops non-auth URLs (§1B.28.3). **Three additions:** (a) the anon landing preview is a **new** definer, not `comb_member_count`, whose WHERE-clause auth returns `0` rather than refusing (§1B.28.4); (b) its invite code carries the access control, so it needs enumeration-resistant entropy (§1B.28.4); (c) a **name-collection step between auth and join** — without it every account `ENG-83` creates is `'New user'` and the comb roster is a column of placeholders (§1B.28.2). **Must not mint friend connections on join** (§1B.16) |
+| **ENG-58** | Sage | L | **Landed `e99936d` (2026-08-30, merging `ae39cf1`):** `combs`/`comb_members`/`comb_rotations` + RLS at `…0002`, `invite_code` default at `:150`. Roster-read half built too — `comb_co_member_names` (`…0002:391`, updated `…0007:235`) |
+| **ENG-59** | Fizz | M | **Landed `9bc6d04`/`0f898ce`/`4972e97` (2026-08-30–31):** `comb_preview_by_invite_code` + `comb_join_by_invite_code` RPCs, `CombInviteLandingScreen`/`CombInviteNameScreen` wired in `App.js`. All four ordered items built: (a) the preview is its own `security definer`, returning zero rows on a bad code, not `comb_member_count`; (b) `invite_code` defaults to a stripped `gen_random_uuid()`; (c) `CombInviteNameScreen` gates on a placeholder `display_name` between auth and join; (d) §1B.16 holds — the join writes `comb_members` and `hive_contributors`, never `honeycomb_connections` |
 | **ENG-60** | Fizz | L | The rotation loop: open, notify, collect, seal on `closes_at`, reveal. Needs a scheduler — `pg_cron`, `OPS-9`. **§1B.31.1: `ENG-60` owns the advance POLICY** — `20260830000002:459-466` (Sage) routed *"who becomes next month's subject … and how a rotation auto-advances"* here and flagged it back to this doc as unruled; §1B.31's Rulings 1 and 2 plus Lumen's downtime rider are that answer. **The `open` half is carved out to row 1.9a** so `OPS-9` can depend on it without a cycle |
 | **ENG-62** | Sage | L | Land the nectar ledger with `rails_mode='simulated'` |
 | **ENG-66** | Fizz | M | Comb pot. **G2 binding:** direct-to-recipient, never pooled |
@@ -3172,7 +3172,7 @@ two new surfaces — not invention. Verified against `github/main@080edd5`, 2026
 
 | ID | Owner | Est | Issue |
 |---|---|---|---|
-| **ENG-83** | Fizz | M | **Magic-link and/or Sign in with Apple.** Auth is email + password only (`src/services/HoneycombStore.js:32-45`). **A comb arrives as a group through one link**; today each member meets a password form individually. §18.2: *"friend-by-friend email matching is not how a real friend group arrives."* Critical path |
+| **ENG-83** | Fizz | M | **Magic-link and/or Sign in with Apple.** **Landed `0d71d24` (2026-08-29):** magic-link via `HoneycombStore.signInWithOtp`, Sign in with Apple via `HoneycombStore.signInWithApple`, both routed from `Onboarding`'s account gate |
 | **ENG-84** | Fizz | S | **In-app account deletion.** No `deleteAccount` path in `src/`. **App Store 5.1.1(v) — hard rejection.** Release blocker, independent of this ruling |
 | **ENG-85** | Sage | M | **Entitlement model.** Where a user's plan lives and how the two caps read it: `combs_written_in ≤ 1` and `comb_members ≤ 5` on free. Must be **a single server-side source of truth** the client cannot spoof, and **both limits must be tunable constants** (§4.2). Ships with the caps **disabled** — see §8.5 |
 | **ENG-90** | Fizz | M | **Short note + nectar, unscoped from the reveal** (§5.2a). One migration: append-only `comb_nectar_notes`, a client-revoked shared sender→recipient ledger-transfer helper extracted from `record_zap`, and authenticated `send_comb_nectar_note(...)`; client: `NectarStore.sendCombNectarNote` + `listCombNectarNotes`; acceptance: mutation-capable database/client gate over authorization, `comb_members.removed_at is null`, atomicity, idempotency, stable refusal classes, and sender/recipient-only reads. Accepted API contract: thread event `1442770c…`; visible-state ruling: `bc7c7b06…`. Send a short note plus simulated nectar to a comb member at any time. Rides `ENG-62`'s ledger and the `DES-23` flight |
