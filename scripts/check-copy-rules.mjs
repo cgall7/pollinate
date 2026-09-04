@@ -421,16 +421,14 @@ const MUST_CATCH = {
   sin: ['sin', 'sins', 'sinful', 'a sinner'],
   hallelujah: ['hallelujah', 'Hallelujah!'],
   ritual: ['ritual', 'rituals', 'your daily ritual'],
-  sats: ['sats', '500 sats', 'Sats'],
-  bitcoin: ['bitcoin', 'Bitcoin', 'bitcoins'],
   crypto: ['crypto', 'cryptocurrency', 'cryptographic'],
 };
 
 // Real sentences, drawn from copy that ships. Every one of these is a string
 // a naive matcher flags: the four `sin` lines are the exact false positives
 // the raw-substring arm produces on src/constants/legalCopy.js today. "She
-// sat down" is `sats`'s own analogue — the ordinary-English past tense of
-// "sit" that a `\bsat` prefix would have caught instead of the exact plural.
+// sat down" is retained even though `sats` is no longer banned — it is
+// still real copy-adjacent English no pattern here should ever fire on.
 const MUST_NOT_CATCH = [
   'a single line a day',
   'since you started',
@@ -443,9 +441,11 @@ const MUST_NOT_CATCH = [
   'a good day',
   'This is the whole thing.',
   'the header sat 12pt lower',
+  '500 sats',
+  'Bitcoin-backed, self-custodial wallet',
 ];
 
-check('every forbidden word has a pattern', FORBIDDEN.length, 15);
+check('every forbidden word has a pattern', FORBIDDEN.length, 13);
 check(
   'every pattern has recall fixtures',
   FORBIDDEN.filter((f) => !MUST_CATCH[f.word]?.length).map((f) => f.word),
@@ -477,19 +477,22 @@ check(
 
 // --- C. The rule -------------------------------------------------------
 //
-// `bitcoin` / `sats` / `crypto` carry an exemption the other nine words do
-// not: `DESIGN_BRIEF_V2_NAVIGATION.md` Part C rule 1 bans them in "any
-// user-facing string" EXCEPT "the consent screen, Settings, legal copy, and
-// App Review Notes." Same shape as section E's reserved-word allowlist, on
-// purpose, and for the same reason stated there — an EXACT-STRING allowlist,
-// not a per-file exemption, so a future edit to the one permitted sentence
-// (Deezine rewording the consent screen, say) reds here instead of silently
-// widening what the whole file is allowed to say. "App Review Notes" has no
-// entry because it is an App Store Connect field, not a `src/` string this
-// collector ever sees.
-const BITCOIN_WORDS_ALLOW = {
-  bitcoin: new Set(['Drops are units on a simulated Bitcoin network.']),
-  sats: new Set(),
+// `crypto` carries an exemption the other eleven words do not:
+// `DESIGN_BRIEF_V2_NAVIGATION.md` Part C rule 1 bans it in "any user-facing
+// string" EXCEPT "the consent screen, Settings, legal copy, and App Review
+// Notes." Same shape as section E's reserved-word allowlist, on purpose, and
+// for the same reason stated there — an EXACT-STRING allowlist, not a
+// per-file exemption, so a future edit to the one permitted sentence reds
+// here instead of silently widening what the whole file is allowed to say.
+// "App Review Notes" has no entry because it is an App Store Connect field,
+// not a `src/` string this collector ever sees.
+//
+// `bitcoin` / `sats` used to share this mechanism (COPY-7, `3269ceb`) until
+// Colin lifted the ban on both outright (2026-09-04, #Collab thread
+// `00b55e2`) — removed from `FORBIDDEN` entirely in `forbidden-words.mjs`,
+// so there is nothing left for this section to exempt them from. Only
+// `crypto` remains, which nobody has ruled on.
+const WORD_EXEMPT_ALLOW = {
   crypto: new Set([
     'Some older accounts were made with a password. If yours was, it is handled by our authentication provider and stored only as a cryptographic hash. We cannot read it, and neither can anyone who works on this app.',
   ]),
@@ -500,7 +503,7 @@ const texts = new Set(copy.map((c) => c.text));
 console.log(`\n--- C. no forbidden word in copy a user reads ---`);
 const hits = [];
 for (const { word, re } of FORBIDDEN) {
-  const allow = BITCOIN_WORDS_ALLOW[word];
+  const allow = WORD_EXEMPT_ALLOW[word];
   for (const c of copy) {
     if (!re.test(c.text)) continue;
     if (allow?.has(c.text)) continue;
@@ -512,11 +515,11 @@ check('no forbidden word in rendered copy', hits, []);
 // The mirror check: an allowlisted string that no longer renders is a stale
 // exemption sitting in front of the ban it was carved out of, not a passing
 // gate. Same property section E asserts for its own allowlist.
-const staleBitcoinAllowEntries = [];
-for (const word of Object.keys(BITCOIN_WORDS_ALLOW)) {
-  for (const s of BITCOIN_WORDS_ALLOW[word]) if (!texts.has(s)) staleBitcoinAllowEntries.push(`${word}: ${JSON.stringify(s)}`);
+const staleWordExemptEntries = [];
+for (const word of Object.keys(WORD_EXEMPT_ALLOW)) {
+  for (const s of WORD_EXEMPT_ALLOW[word]) if (!texts.has(s)) staleWordExemptEntries.push(`${word}: ${JSON.stringify(s)}`);
 }
-check('every bitcoin/sats/crypto allowlist entry is still rendered', staleBitcoinAllowEntries, []);
+check('every crypto allowlist entry is still rendered', staleWordExemptEntries, []);
 
 // An import path is not a string in text position, so `import { LockScreen }
 // from './CoreRitual'` is outside the collected set BY CONSTRUCTION rather
