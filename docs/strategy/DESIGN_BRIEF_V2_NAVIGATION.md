@@ -192,9 +192,15 @@ the animation does.
 
 ## PART C — Rules that override taste
 
-1. **Never the word "bitcoin," "sats," or "crypto" in any user-facing string.**
-   The unit is **nectar**, counted in **drops**. (Those words appear only in the
-   consent screen, Settings, legal copy, and App Review Notes.)
+1. **Never the word "crypto" in any user-facing string.** The unit is
+   **nectar**, counted in **drops**. ("Crypto" appears only in the consent
+   screen, Settings, legal copy, and App Review Notes.)
+   *Amended 2026-09-04 by Colin (Collab-on-projects thread `00b55e23`, event
+   `00f8aef5`): "bitcoin" and "sats" are no longer banned — "i do want us to
+   use the words sats and bitcoin, we need to update the banned list." The
+   original rule banned all three with the same four-surface exemption. The
+   nectar/drops register remains the default vocabulary; this amendment lifts
+   the word ban, it does not re-denominate the UI.*
 2. **Zapping is always optional and unlocks nothing.** No gating, no "unlock with
    nectar," no rewards for streaks or journaling. (Apple 3.1.1 and 3.1.5(v) —
    both are rejections, not preferences.)
