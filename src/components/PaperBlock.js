@@ -23,6 +23,19 @@ export const PaperBlock = ({ paper, style, children, blockRef }) => (
   </View>
 );
 
+// The ground each paper is painted on, and the ONE place that mapping
+// lives — `styles.evening` below reads it too, so "what colour is evening
+// paper" has a single writer, the same way `paperInk`/`paperInkSoft` are
+// the single writer for what ink goes on it (Lumen's A2, 2026-09-04).
+//
+// Returns null for cream rather than a token: cream is not one colour
+// across the app. This component's cream IS `surface`/`backgroundWriting`
+// and needs no wrapper fill at all (see the header), while EntryCombGrid's
+// cell renders its cream on `washYellow` (R-CD-13). A null lets each
+// surface keep its own cream and still share the one evening answer.
+const PAPER_GROUND = { evening: theme.colors.paperEvening };
+export const paperGround = (paper) => PAPER_GROUND[paper] ?? null;
+
 // The only two ink tokens ever painted inside a `paper === 'evening'`
 // region (dark-paper ink gate, R-EXT) — no alpha-of-ink token
 // (`surfaceBorder`, `trackDim`, `pressedOnLight`, the family) belongs here.
@@ -49,7 +62,7 @@ export const entryVoice = (text) => {
 
 const styles = StyleSheet.create({
   evening: {
-    backgroundColor: theme.colors.paperEvening,
+    backgroundColor: PAPER_GROUND.evening,
     borderRadius: theme.borderRadius.small,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,

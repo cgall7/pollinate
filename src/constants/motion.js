@@ -48,8 +48,44 @@ export const SPRINGS = {
   // the camera, standard-class for the paper" describes how each term's own
   // interpolation range reads against the one curve, not two physical
   // springs — a single Animated.spring call per direction.
-  diveIn: { friction: 8, tension: 100 }, // arrival tuned so camera reads ~0.55 by ~550ms, paper ~0.95+ by ~800ms
-  diveExit: { friction: 16, tension: 130 }, // zero-bounce, faster — R-CD-2's ~65%-of-entrance, no overshoot
+  //
+  // EVERY NUMBER BELOW IS MEASURED, not intended. The previous config carried
+  // the note "camera reads ~0.55 by ~550ms, paper ~0.95+ by ~800ms" — that
+  // was never true of the spring it sat on, and nothing checked it. RN maps
+  // origami tension/friction through SpringConfig.js
+  // (stiffness = (t-30)*3.62+194, damping = (f-8)*3+25, mass 1) and then
+  // integrates the closed-form damped oscillator in SpringAnimation.onUpdate.
+  // Run through that exact pipeline, `{friction: 8, tension: 100}` reached
+  // dive 0.52 — the value at which `paperOpacity` finishes, i.e. the last
+  // frame of the zoom anyone can actually see — at 66ms, and finished the
+  // paper's 0.5->1 growth at 127ms. The whole dive was over in an eighth of
+  // a second. That is Colin's "way too fast" (2026-09-04), and it was a
+  // stated duration that had drifted 8x from the shipped one.
+  //
+  // Retuned against the same pipeline, and the milestones are the ones the
+  // EYE reads rather than the driver's own 0..1:
+  //
+  //             chrome dim   paper opaque   paper full   entrance overshoot
+  //   was            35ms           66ms        127ms    +9.1% of full size
+  //   now            62ms          125ms        354ms    +0.5%
+  //
+  // Tension carries the slowdown; friction drops one step to 7 to KEEP the
+  // entrance overshoot alive rather than damping it away. That overshoot is
+  // load-bearing prose elsewhere — CombDivePaper's `paperScale` deliberately
+  // leaves `extrapolateRight` open "so a spring overshoot past 1 reads as
+  // R-CD-2's entrance overshoot, for free" — so a config that settled it to
+  // exactly 1.000 would have quietly made that comment false. It survives,
+  // an order of magnitude quieter: a 0.5% bloom instead of a 9% bounce,
+  // which is the direction "more immersive" points for a letter unfolding.
+  diveIn: { friction: 7, tension: 22 },
+  // Unchanged, and now correct for the first time. "~65%-of-entrance" was
+  // false against the old entrance — the exit takes 282ms to reach rest, so
+  // it was 222% of a 127ms entrance, i.e. slower, not faster. Against the
+  // retuned entrance it is 282/354 = 80%: the exit is quicker than the
+  // arrival, which is what the doctrine is actually about. Left alone
+  // deliberately rather than re-tuned to hit ~65% on the nose — its own
+  // character (zero-bounce, zeta 1.04) was never the thing that was wrong.
+  diveExit: { friction: 16, tension: 130 },
   // R-CD-7 — paging between a cell's several papers. Own token: a page
   // swipe is lateral, not the dive's forward/back axis, and shouldn't
   // borrow a config tuned for a different distance.

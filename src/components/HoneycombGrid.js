@@ -10,6 +10,7 @@ import {
   BLOOM_FLOOR_OPACITY,
 } from '../constants/bloomRing';
 import { hexTintFor } from './Avatar';
+import { initialsFor } from '../utils/initials';
 import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_MENISCUS_STROKE, honeyHeightForLevel, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
 import { useSvgId } from '../utils/svgId';
 import { DURATIONS, HONEY, HONEY_EASING, NECTAR, PRESS, STAGGER_MS, useReducedMotion } from '../constants/motion';
@@ -57,13 +58,6 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 // another gate reads off this file did not.
 export const HIVE_SLOTS = 7;
 const SPIRAL = hexSpiral(1);
-
-const initialsFor = (name) => {
-  const parts = (name || '?').trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : '';
-  return (first + last).toUpperCase();
-};
 
 // The cell IS the portrait. Before this the grid drew a hexagon and then
 // dropped a fully opaque circle on top of it, so the honeycomb read as

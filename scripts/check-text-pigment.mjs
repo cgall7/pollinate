@@ -215,6 +215,22 @@ for (const file of files) {
   let ast;
   try { ast = parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] }); }
   catch (err) { unresolved.push(`${path.relative(ROOT, file)} — parse failed: ${err.message}`); continue; }
+  // ONE LEVEL OF ALIASING, resolved rather than refused. A file that reads the
+  // paper's ink once and reuses it (`const ink = paperInk(paper)`) is doing the
+  // house-correct thing — PaperBlock is meant to be the single writer, and
+  // calling it once per render beats calling it per glyph — but it moved the
+  // indirection off the `color:` site, where this resolver was looking. The
+  // alias is required to be declared IN THIS FILE and initialised by a literal
+  // `paperInk`/`paperInkSoft` call, so this widens what can be READ without
+  // widening what counts as resolved: anything else still lands in `unresolved`
+  // and still reds T2.
+  const paperInkAliases = new Set();
+  walk(ast, (node) => {
+    if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') return;
+    if (node.init?.type === 'CallExpression' && /^paperInk(Soft)?$/.test(node.init.callee?.name ?? '')) {
+      paperInkAliases.add(node.id.name);
+    }
+  });
   walk(ast, (node, parent) => {
     // Two transports, one resolver. `node` is either a style `color:` property
     // or a `placeholderTextColor` JSX attribute; both hand a pigment to a glyph.
@@ -253,6 +269,7 @@ for (const file of files) {
     else if (literal) push([literal[1]], 'raw hex literal', [literal[1]]);
     else if (COVER_TEXT.test(text)) push(coverTextTokens, 'cover.textColor');
     else if (PAPER_INK.test(text)) push(paperInkTokens, 'paperInk()');
+    else if (paperInkAliases.has(text)) push(paperInkTokens, 'paperInk() via local alias');
     else unresolved.push(`${rel}:${node_.loc.start.line} — \`${transport} ${text}\` resolves to no token this gate can name`);
   });
 }

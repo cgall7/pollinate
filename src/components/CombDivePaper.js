@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, PanResponder, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 import { SPRINGS, DURATIONS, DIVE_ODOMETER } from '../constants/motion';
 import { PaperBlock, paperInk, paperInkSoft, entryVoice } from './PaperBlock';
+import { PressableScale } from './PressableScale';
 import { computeDiveDateRoll, longDate } from '../utils/combDiveDate';
 
 // The memory paper — R-CD-4/-5/-6/-7. Absolutely positioned inside
@@ -13,6 +15,12 @@ import { computeDiveDateRoll, longDate } from '../utils/combDiveDate';
 const DISMISS_DRAG_PX = 220; // full-strength drag distance to pull `dive` 1 -> 0
 const DISMISS_COMMIT_PX = 90;
 const DISMISS_COMMIT_VELOCITY = 0.8; // px/ms — RN gestureState units
+// The dismiss affordance. 36pt is the drawn disc (Deezine); the hit target is
+// taken to 44pt with slop rather than by inflating the circle, so the tap area
+// meets the floor without the chrome getting louder (Lumen's A4b).
+const CLOSE_SIZE = 36;
+const CLOSE_SLOP = (44 - CLOSE_SIZE) / 2;
+const CLOSE_HIT_SLOP = { top: CLOSE_SLOP, bottom: CLOSE_SLOP, left: CLOSE_SLOP, right: CLOSE_SLOP };
 
 export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, paperStart, closingRef, onDismiss }) => {
   const [pageIndex, setPageIndex] = useState(0);
@@ -164,6 +172,13 @@ export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, pa
         ]}
         onLayout={(e) => setPageWidth(e.nativeEvent.layout.width)}
       >
+      {/* The clip moved off the shadowed node. `styles.paper` carried both
+          `overflow: 'hidden'` and `...theme.shadows.card`, and on iOS the
+          first sets `masksToBounds`, which clips the layer's own drop shadow
+          away — so the paper has been rendering flat against the comb since
+          it shipped, the shadow present in the stylesheet and absent on the
+          screen. Same split, same reason, as EntryCombGrid's card. */}
+      <View style={styles.paperClip}>
         {!reduced && (
           <Animated.View
             pointerEvents="none"
@@ -221,6 +236,47 @@ export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, pa
             ))}
           </View>
         )}
+
+        {/* THE WAY OUT. Until this shipped the dive had no visible exit at
+            all: tapping the comb is the documented dismiss but the paper
+            covers every cell it asks you to tap (an 18pt margin is not a
+            target), the swipe only arms from the entry's own scroll-top, and
+            the header's back button leaves the whole hive rather than the
+            letter. Three paths, none of them findable, one of them silently
+            unavailable to anyone reading a long entry — a dead end, and
+            Colin's report of it was right.
+
+            The scroll gate STAYS, and that is deliberate: pull-from-the-top
+            is the standard grammar for a sheet over scrollable content, and
+            un-gating it would mean a downward swipe through a letter fights
+            the letter. The defect was never that the gesture is conditional,
+            it is that a conditional gesture was the only door. This is the
+            unconditional one.
+
+            Geometrically outside both traps by construction — a sibling of
+            the pager rather than a child of the ScrollView (so scrolling can
+            never eat it) and part of the paper itself rather than an
+            uncovered cell (so it is always on top, at a fixed place, whatever
+            the camera is doing underneath). Deezine's surface: a 36pt disc
+            with a chevron that folds the letter away, not an app-chrome X.
+            Fully inside the paper's bounds, since the clip above would shear
+            an overhanging corner (Lumen's A4a). `hitSlop` takes the 36pt
+            visual to a 44pt+ target without inflating the drawing (A4b).
+            Routed through `onDismiss` — the same commit point the swipe
+            already funnels through, so `closingRef`, the odometer stop and
+            the bee's break-off all fire exactly as they do today. One more
+            path in, not a second exit mechanism. */}
+        <PressableScale
+          onPress={() => onDismiss(0)}
+          containerStyle={styles.closeSlot}
+          style={styles.close}
+          hitSlop={CLOSE_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Ionicons name="chevron-down" size={18} color={theme.colors.ink} />
+        </PressableScale>
+      </View>
       </Animated.View>
     </View>
   );
@@ -294,8 +350,15 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: theme.borderRadius.medium,
     backgroundColor: theme.colors.surface,
-    overflow: 'hidden',
     ...theme.shadows.card,
+  },
+  // The clipping node, separated from the shadowed one above so the shadow
+  // survives (see the render's note). Radius repeated here on purpose: this
+  // is the view that actually masks the corners now.
+  paperClip: {
+    flex: 1,
+    borderRadius: theme.borderRadius.medium,
+    overflow: 'hidden',
   },
   singlePage: {
     flex: 1,
@@ -330,6 +393,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: theme.spacing.xs,
+  },
+  closeSlot: {
+    position: 'absolute',
+    top: theme.spacing.sm,
+    right: theme.spacing.sm,
+  },
+  close: {
+    width: CLOSE_SIZE,
+    height: CLOSE_SIZE,
+    borderRadius: CLOSE_SIZE / 2,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    // `surfaceBorderStrong`, NOT the `glassHairline` the spec named. Two
+    // reasons, and the first is binding: the glass hairline is declared in
+    // exactly one file on purpose (GlassRim.js — check-glass-definition E1),
+    // because it exists only as the substrate the specular rim gleams
+    // against, and a second declaration is how one material quietly becomes
+    // two. This disc is not glass; it is an opaque paper-surface control, so
+    // borrowing that token would have claimed a material it isn't made of.
+    // Second, `surfaceBorderStrong` is this system's own answer for the case
+    // ("filled/selected card states need more than a hairline") — the disc
+    // sits on `surface` paper, so on a cream entry it is white on white and
+    // the ring is the only thing separating them. The affordance itself is
+    // carried by the ink chevron, per R127.1: weight and position, never hue.
+    borderColor: theme.colors.surfaceBorderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dot: {
     width: 6,

@@ -77,6 +77,31 @@
 //       actual break-off mechanism early exit depends on (R-CD-12.4,
 //       acceptance row 12), not just a queued retarget that would let an
 //       in-flight errand finish first
+//
+// ── added 2026-09-04, Colin's private-hive pass ────────────────────────────
+//
+//   D18 the dive has an exit that is reachable in EVERY state: a control
+//       labelled "Close", role=button, hit target >=44pt, NOT a descendant
+//       of the ScrollView, routed through the same `onDismiss` funnel as the
+//       swipe. Colin: "after zoom in there is no way to click out of it?"
+//   D19 Android's hardware back closes the LETTER, not the hive —
+//       subscribed only while a cell is open, routed through `close()`,
+//       consumed, and torn down
+//   D20 no raw `CELL_SIZE` survives in a geometry call now that the seat
+//       size is fitted to the room; the unfitted reference layout is the one
+//       licensed exception. (This row found a live scale-mixing bug in the
+//       wax dolly the moment it was written.)
+//   D21 the focus stroke is `paperInk(paper)` @2.5pt — `ink` measures 1.31:1
+//       on evening paper — and fades with the chrome under motion while
+//       holding static under RM, where there is no camera to get out of
+//   D22 no style object carries BOTH `overflow: 'hidden'` and a
+//       `theme.shadows.*` spread: on iOS `masksToBounds` clips the layer's
+//       own drop shadow, so such a style declares a shadow that never draws
+//   D23 THE DIVE IS SLOW ENOUGH TO READ. Runs `SPRINGS.diveIn` through RN's
+//       own SpringConfig + SpringAnimation arithmetic and asserts the two
+//       milestones the eye reads. The token used to carry a prose claim of
+//       "~550ms" while the shipped spring finished the whole dive in 127ms;
+//       a sentence about timing is not a timing check.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -245,9 +270,39 @@ const paperCode = codeOnly(paperSrc, paperAst);
 // ── D4. honey fill only renders inside a filled/cell.member branch ─────
 {
   let leaked = false;
+  // KEYED ON THE PAINT, NOT ON THE GEOMETRY CALL. This row used to require
+  // the `hexHoneyPoints()` CALL to sit inside the `filled` guard, which was a
+  // locator standing in for the claim: the call is pure arithmetic and paints
+  // nothing, so hoisting it above the guard (as the vessel build does, to
+  // share one height between three layers) reddened the row without changing
+  // the behaviour by one pixel — while a genuinely leaked <Polygon> would
+  // have been just as invisible to it in the other direction. What the row is
+  // actually FOR is "an empty cell paints no honey", so it now walks the JSX
+  // elements that carry the honey geometry and requires each of THOSE to be
+  // inside a `filled` branch. Strictly stronger than the old shape: it covers
+  // all three layers of the vessel plus the meniscus, not one call.
+  const honeyGeomNames = new Set();
+  walk(gridAst.program, (n) => {
+    if (n.type !== 'VariableDeclarator' || !n.id?.name || n.init?.type !== 'CallExpression') return;
+    if (['hexHoneyPoints', 'hexHoneyMeniscus'].includes(n.init.callee?.name)) honeyGeomNames.add(n.id.name);
+  });
+  const referencesHoney = (node) => {
+    let hit = false;
+    walk(node, (m) => {
+      if (m.type === 'Identifier' && honeyGeomNames.has(m.name)) hit = true;
+      if (m.type === 'CallExpression' && ['hexHoneyPoints', 'hexHoneyMeniscus'].includes(m.callee?.name)) hit = true;
+    });
+    return hit;
+  };
   let found = false;
   walk(gridAst.program, (n) => {
-    if (n.type !== 'CallExpression' || n.callee?.name !== 'hexHoneyPoints') return;
+    if (n.type !== 'JSXElement') return;
+    const tag = n.openingElement?.name?.name;
+    if (!['Polygon', 'Line'].includes(tag)) return;
+    // Only the elements that actually carry honey geometry — the cell's own
+    // hexPoints() outline and the focus stroke are not honey and must NOT be
+    // required to sit under `filled`.
+    if (!n.openingElement.attributes.some((a) => a.value && referencesHoney(a.value))) return;
     found = true;
     // True ancestry, not brace-counting: a JSX prop like `points={...}`
     // opens its own `{`, which sits textually closer to the call than the
@@ -273,11 +328,11 @@ const paperCode = codeOnly(paperSrc, paperAst);
     if (!/\bfilled\b/.test(testSrc) || !inGuardedBranch) leaked = true;
   });
   if (!found) {
-    bad('D4 honey fill guarded by filled', 'no hexHoneyPoints() call found in EntryCombGrid.js — FAILS CLOSED (expected the rest-state honey fill)');
+    bad('D4 honey fill guarded by filled', 'no honey-bearing <Polygon>/<Line> found in EntryCombGrid.js — FAILS CLOSED (expected the rest-state honey vessel)');
   } else if (leaked) {
-    bad('D4 honey fill guarded by filled', 'a hexHoneyPoints() call is not the nearest thing inside a `{filled …}` guard — an empty cell could paint honey');
+    bad('D4 honey fill guarded by filled', 'a honey-bearing element is not inside a `{filled …}` guard — an empty cell could paint honey');
   } else {
-    ok('D4 hexHoneyPoints() only renders inside a `{filled …}` guard — an empty cell paints no honey');
+    ok('D4 every honey-bearing element renders only inside a `{filled …}` guard — an empty cell paints no honey');
   }
 }
 
@@ -606,14 +661,19 @@ const paperCode = codeOnly(paperSrc, paperAst);
 
 // ── D16. R-CD-13 rest-state paint — wax fill, hairline stroke, honey untouched ─
 {
-  const fillOk = /fill=\{filled \? theme\.colors\.washYellow : 'transparent'\}/.test(gridCode);
-  const strokeOk = /stroke=\{theme\.colors\.glassHairline\}/.test(gridCode);
-  const widthOk = /strokeWidth=\{1\}/.test(gridCode) && !/strokeWidth=\{1\.5\}/.test(gridCode);
-  const honeyOk = /hexHoneyPoints\(size, honeyHeightForLevel\(size, 1\)\)\}\s*fill=\{theme\.colors\.accentDeep\}/.test(
-    gridCode.replace(/\s+/g, ' ')
-  );
+  // R-CD-13's tokens, read through the indirection the parity pass added
+  // (2026-09-04): the seat's ground is now the entry's own paper, so cream is
+  // `paperGround(paper) ?? theme.colors.washYellow` rather than a literal
+  // `washYellow` in the JSX. The CLAIM is unchanged and is what is asserted —
+  // a cream seat still rests on washYellow, the rest stroke is still the
+  // hairline at 1pt, and the honey still spends accentDeep.
+  const flat = gridCode.replace(/\s+/g, ' ');
+  const fillOk = /paperGround\(paper\) \?\? theme\.colors\.washYellow/.test(flat);
+  const strokeOk = /theme\.colors\.surfaceBorderStrong : theme\.colors\.glassHairline/.test(flat);
+  const widthOk = /strokeWidth=\{seatOpen \? 1\.5 : 1\}/.test(flat);
+  const honeyOk = /honeyHeightForLevel\(size, 1\)/.test(flat) && /fill=\{theme\.colors\.accentDeep\}/.test(flat);
   if (fillOk && strokeOk && widthOk && honeyOk) {
-    ok('D16a cell fill is washYellow, stroke is glassHairline at width 1, honey band (accentDeep) untouched');
+    ok('D16a cream seat rests on washYellow, rest stroke is glassHairline at width 1, honey spends accentDeep');
   } else {
     bad(
       'D16a rest-state paint tokens',
@@ -663,6 +723,253 @@ const paperCode = codeOnly(paperSrc, paperAst);
       ok('D17 handleFlightHome both retargets pollinate home AND cancels the prior flight key — a real break-off, not a queued retarget');
     } else {
       bad('D17 handleFlightHome performs a genuine break-off', `setsHome=${setsHome} cancelsPrior=${cancelsPrior}`);
+    }
+  }
+}
+
+// ── D18. the dive has an exit that is always reachable ──────────────────
+{
+  // Colin, 2026-09-04: "after zoom in there is no way to click out of it?"
+  // The three paths that existed were a tap-out onto cells the paper covers,
+  // a swipe armed only from the entry's own scroll-top, and a header button
+  // that leaves the whole hive. This row is about the fourth: a visible
+  // control that is reachable in EVERY state, which means it must not be a
+  // descendant of the ScrollView (scrolling would eat it) and must route
+  // through the same `onDismiss` funnel as the swipe rather than opening a
+  // second exit mechanism.
+  let closeEl = null;
+  walk(paperAst.program, (n) => {
+    if (n.type !== 'JSXElement') return;
+    const attrs = n.openingElement?.attributes ?? [];
+    const label = attrs.find(
+      (a) => a.name?.name === 'accessibilityLabel' && a.value?.type === 'StringLiteral' && a.value.value === 'Close'
+    );
+    if (label) closeEl = n;
+  });
+  if (!closeEl) {
+    bad('D18 dive has an always-reachable exit', 'no element with accessibilityLabel="Close" in CombDivePaper.js — FAILS CLOSED (the dive would have no visible way out)');
+  } else {
+    const attrs = closeEl.openingElement.attributes;
+    const attrSrc = (name) => {
+      const a = attrs.find((x) => x.name?.name === name);
+      return a?.value ? paperSrc.slice(a.value.start, a.value.end) : null;
+    };
+    const roleOk = /button/.test(attrSrc('accessibilityRole') ?? '');
+    const dismissOk = /onDismiss\s*\(/.test(attrSrc('onPress') ?? '');
+    const slopRaw = attrSrc('hitSlop');
+    // The hit target must reach 44pt however the slop is spelled — a literal
+    // object, or (as here) a named constant. Resolve one level of identifier
+    // back to its declaration so the row reads the NUMBER, not the spelling.
+    let slopOk = false;
+    if (slopRaw) {
+      let slopSrc = slopRaw;
+      const ident = slopRaw.replace(/[{}\s]/g, '');
+      if (/^[A-Za-z_$][\w$]*$/.test(ident)) {
+        const decl = paperSrc.match(new RegExp(`\\bconst\\s+${ident}\\s*=\\s*([^;]+);`));
+        if (decl) slopSrc = decl[1];
+      }
+      // Slop is symmetric here; resolve the size constant the same way.
+      const sizeM = paperSrc.match(/\bconst\s+CLOSE_SIZE\s*=\s*(\d+(?:\.\d+)?)\s*;/);
+      const slopM = paperSrc.match(/\bconst\s+CLOSE_SLOP\s*=\s*\(\s*(\d+(?:\.\d+)?)\s*-\s*CLOSE_SIZE\s*\)\s*\/\s*2\s*;/);
+      if (sizeM && slopM && /CLOSE_SLOP/.test(slopSrc)) slopOk = Number(slopM[1]) >= 44;
+      else {
+        const nums = (slopSrc.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+        const size = sizeM ? Number(sizeM[1]) : 0;
+        slopOk = nums.length > 0 && size + 2 * Math.min(...nums) >= 44;
+      }
+    }
+    // Not inside a ScrollView — the gate Fizz traced, checked structurally.
+    const ancestors = findAncestors(paperAst.program, closeEl);
+    const inScroll = ancestors.some(
+      (a) => a.type === 'JSXElement' && a.openingElement?.name?.name === 'ScrollView'
+    );
+    if (roleOk && dismissOk && slopOk && !inScroll) {
+      ok('D18 the dive exposes a "Close" button, role=button, hit target >=44pt, outside the ScrollView, routed through onDismiss');
+    } else {
+      bad(
+        'D18 dive has an always-reachable exit',
+        `role=${roleOk} routesThroughOnDismiss=${dismissOk} hitTarget44=${slopOk} insideScrollView=${inScroll}`
+      );
+    }
+  }
+}
+
+// ── D19. Android back closes the LETTER, not the hive ───────────────────
+{
+  // Without this the system back gesture fell through to the navigator and
+  // popped the whole screen — the same wrong-scope exit as the header
+  // button, except a gesture gives the user nothing to look at first.
+  let effect = null;
+  walk(gridAst.program, (n) => {
+    if (n.type !== 'CallExpression') return;
+    const callee = n.callee;
+    const isEffect =
+      callee?.name === 'useEffect' || (callee?.object?.name === 'React' && callee?.property?.name === 'useEffect');
+    if (!isEffect) return;
+    const body = n.arguments[0];
+    if (!body) return;
+    const src = gridSrc.slice(body.start, body.end);
+    if (/hardwareBackPress/.test(src)) effect = { node: n, src, deps: n.arguments[1] };
+  });
+  if (!effect) {
+    bad('D19 Android back closes the dive', 'no useEffect subscribing to hardwareBackPress in EntryCombGrid.js — FAILS CLOSED');
+  } else {
+    // Gated on an open cell (so back means what it always meant elsewhere),
+    // routed through close() (the single dismiss funnel D14 also guards),
+    // handled (returns true) and torn down.
+    const gated = /if\s*\(\s*!openCell\s*\)\s*return/.test(effect.src);
+    const routed = /\bclose\s*\(\s*\)/.test(effect.src);
+    const handled = /return\s+true/.test(effect.src);
+    const removed = /\.remove\s*\(\s*\)/.test(effect.src);
+    const depsSrc = effect.deps ? gridSrc.slice(effect.deps.start, effect.deps.end) : '';
+    const depsOk = /\bopenCell\b/.test(depsSrc) && /\bclose\b/.test(depsSrc);
+    if (gated && routed && handled && removed && depsOk) {
+      ok('D19 hardwareBackPress is subscribed only while a cell is open, routed through close(), consumed, and torn down');
+    } else {
+      bad(
+        'D19 Android back closes the dive',
+        `gatedOnOpenCell=${gated} routesThroughClose=${routed} consumesEvent=${handled} unsubscribes=${removed} deps=${depsOk}`
+      );
+    }
+  }
+}
+
+// ── D20. no raw CELL_SIZE survives in the fitted geometry ───────────────
+{
+  // The comb's seat size stopped being the constant and became a value
+  // fitted to the room. Every geometry consumer therefore has to read the
+  // FITTED size — a single surviving `CELL_SIZE` in a geometry call is a
+  // lattice drawn at one scale and measured at another, which is exactly the
+  // clipping bug this pass exists to fix, reintroduced silently.
+  const GEOMETRY_FNS = ['buildCombLayout', 'cellCentre', 'ringStepFor', 'hexPoints', 'hexHoneyPoints', 'hexHoneyMeniscus', 'honeyHeightForLevel'];
+  const offenders = [];
+  walk(gridAst.program, (n) => {
+    if (n.type !== 'CallExpression' || !GEOMETRY_FNS.includes(n.callee?.name)) return;
+    for (const arg of n.arguments) {
+      walk(arg, (m) => {
+        if (m.type === 'Identifier' && m.name === 'CELL_SIZE') {
+          offenders.push(`${n.callee.name}() at line ${n.loc.start.line}`);
+        }
+      });
+    }
+  });
+  // The nominal layout is the ONE licensed use: it is the unfitted reference
+  // the ratio is computed FROM, so it must be measured at CELL_SIZE.
+  const licensed = offenders.filter((o) => {
+    const line = Number(o.match(/line (\d+)/)[1]);
+    const text = gridSrc.split('\n')[line - 1] ?? '';
+    return /\bnominal\b/.test(text);
+  });
+  const leaked = offenders.filter((o) => !licensed.includes(o));
+  if (leaked.length === 0) {
+    ok(`D20 every geometry call reads the fitted cell size (${licensed.length} licensed CELL_SIZE use for the unfitted reference layout)`);
+  } else {
+    bad('D20 fitted cell size reaches all geometry', `raw CELL_SIZE still reaches: ${leaked.join(', ')}`);
+  }
+}
+
+// ── D21. the focus stroke is paper-aware and leaves with the chrome ─────
+{
+  // Lumen measured `ink` on `paperEvening` at 1.31:1 — invisible. A flat ink
+  // focus stroke would leave the dived-into seat unmarked on exactly the
+  // moodiest entries, so the colour is the paper's own ink. And it FADES
+  // rather than riding the camera to ~6pt, except under reduced motion where
+  // there is no camera and the stroke is the only thing naming the seat.
+  const flat = gridCode.replace(/\s+/g, ' ');
+  const strokeDecl = /stroke=\{ink\}\s*strokeWidth=\{2\.5\}/.test(flat);
+  const inkFromPaper = /const ink = paperInk\(paper\)/.test(flat);
+  const fadesOnChromeDim = /focusStrokeOpacity =\s*openCell && !reduced\s*\?\s*dive\.interpolate\(\{ inputRange: \[0, CHROME_DIM_END\]/.test(flat);
+  const holdsUnderRm = /focusStrokeOpacity \?[\s\S]{0,400}?: \(\s*<Polygon points=\{hexPoints\(size\)\} fill="none" stroke=\{ink\} strokeWidth=\{2\.5\} \/>/.test(flat);
+  if (strokeDecl && inkFromPaper && fadesOnChromeDim && holdsUnderRm) {
+    ok('D21 focus stroke is paperInk(paper) @2.5pt, fades with the chrome under motion, and holds as a static stroke under RM');
+  } else {
+    bad(
+      'D21 focus stroke paper-aware and chrome-timed',
+      `stroke=${strokeDecl} inkFromPaper=${inkFromPaper} fades=${fadesOnChromeDim} rmStatic=${holdsUnderRm}`
+    );
+  }
+}
+
+// ── D22. no style both clips and casts a shadow ─────────────────────────
+{
+  // On iOS `overflow: 'hidden'` sets the layer's `masksToBounds`, which
+  // clips the layer's OWN drop shadow away. A style carrying both is a
+  // shadow that is declared and never drawn — which is what `styles.paper`
+  // had been doing since it shipped. Structural, both files, so the next
+  // person to merge the two nodes back together gets told.
+  const offenders = [];
+  for (const [file, ast, src] of [['EntryCombGrid.js', gridAst, gridSrc], ['CombDivePaper.js', paperAst, paperSrc]]) {
+    walk(ast.program, (n) => {
+      if (n.type !== 'ObjectProperty' || n.value?.type !== 'ObjectExpression') return;
+      const body = src.slice(n.value.start, n.value.end);
+      const clips = /overflow:\s*'hidden'/.test(body);
+      const shadows = /\.\.\.theme\.shadows\./.test(body);
+      if (clips && shadows) offenders.push(`${file}: styles.${n.key?.name ?? '?'}`);
+    });
+  }
+  if (offenders.length === 0) {
+    ok('D22 no style object carries both `overflow: hidden` and a theme.shadows.* spread — every declared shadow can actually render');
+  } else {
+    bad('D22 clip and shadow are on separate nodes', `masksToBounds would erase the shadow on: ${offenders.join(', ')}`);
+  }
+}
+
+// ── D23. the dive is slow enough to read ────────────────────────────────
+{
+  // THE ROW COLIN'S COMPLAINT EARNED. `SPRINGS.diveIn` carried the note
+  // "camera reads ~0.55 by ~550ms" and the shipped spring finished the whole
+  // dive in 127ms — a stated duration that had drifted 8x with nothing
+  // watching it. A prose claim about timing is not a timing check, so this
+  // row runs the token through RN's own pipeline and asserts the number.
+  //
+  // Replicates react-native/Libraries/Animated/SpringConfig.js
+  // (stiffness = (t-30)*3.62+194, damping = (f-8)*3+25, mass 1) and the
+  // closed-form solution in SpringAnimation.onUpdate — not an approximation
+  // of a spring, the same arithmetic the device runs.
+  const motionSrc = fs.readFileSync(path.join(ROOT, 'src/constants/motion.js'), 'utf8');
+  const m = motionSrc.match(/\bdiveIn:\s*\{\s*friction:\s*(\d+(?:\.\d+)?)\s*,\s*tension:\s*(\d+(?:\.\d+)?)\s*\}/);
+  if (!m) {
+    bad('D23 the dive is slow enough to read', 'could not read SPRINGS.diveIn from motion.js — FAILS CLOSED');
+  } else {
+    const friction = Number(m[1]);
+    const tension = Number(m[2]);
+    const k = (tension - 30) * 3.62 + 194;
+    const c = (friction - 8) * 3 + 25;
+    const zeta = c / (2 * Math.sqrt(k));
+    const w0 = Math.sqrt(k);
+    const w1 = w0 * Math.sqrt(Math.max(0, 1 - zeta * zeta));
+    const at = (t) => {
+      if (zeta < 1) {
+        const e = Math.exp(-zeta * w0 * t);
+        return 1 - e * ((zeta * w0 / w1) * Math.sin(w1 * t) + Math.cos(w1 * t));
+      }
+      const e = Math.exp(-w0 * t);
+      return 1 - e * (1 + w0 * t);
+    };
+    const cross = (v) => {
+      for (let ms = 0; ms <= 6000; ms += 0.5) if (at(ms / 1000) >= v) return ms;
+      return null;
+    };
+    // The two milestones the EYE reads, both derived from the shipped
+    // interpolations rather than from the driver's own 0..1:
+    //   paper opaque = PAPER_START + 0.07, where `paperOpacity` reaches 1 —
+    //     the last frame of the zoom anyone can see;
+    //   paper full   = dive 0.99, where `paperScale`'s 0.5->1 growth lands.
+    const opaque = cross(0.52);
+    const full = cross(0.99);
+    // Floors, not targets. A band rather than a pinned number so a future
+    // taste change can move the feel without editing the gate — but a
+    // regression to the 66ms/127ms cut reds it, which is the point.
+    const OPAQUE_FLOOR = 100;
+    const FULL_FLOOR = 250;
+    const FULL_CEILING = 900;
+    if (opaque !== null && full !== null && opaque >= OPAQUE_FLOOR && full >= FULL_FLOOR && full <= FULL_CEILING) {
+      ok(`D23 dive reads at human speed — zoom visible for ${Math.round(opaque)}ms (floor ${OPAQUE_FLOOR}), paper settles at ${Math.round(full)}ms (band ${FULL_FLOOR}-${FULL_CEILING})`);
+    } else {
+      bad(
+        'D23 the dive is slow enough to read',
+        `SPRINGS.diveIn {friction:${friction}, tension:${tension}} -> zoom visible ${opaque === null ? 'never' : Math.round(opaque) + 'ms'} (floor ${OPAQUE_FLOOR}ms), paper settles ${full === null ? 'never' : Math.round(full) + 'ms'} (band ${FULL_FLOOR}-${FULL_CEILING}ms)`
+      );
     }
   }
 }
