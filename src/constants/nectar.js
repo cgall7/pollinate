@@ -127,8 +127,9 @@ export const NECTAR_CONSENT_SHEET_GUARD = 'nectarConsentSheetOpen';
 // door in it is worth less than the rule it dilutes. `\b\d+\s+drop\b` closes
 // the singular quantity ("1 drop") without reopening the verb.
 //
-// Part C of the V2 brief bans "bitcoin"/"sats"/"crypto" from all UX. Those
-// are NOT in this reserve, because this reserve is about CONSENT, not
+// Part C of the V2 brief bans "crypto" from all UX (it banned "bitcoin" and
+// "sats" too until Colin's 2026-09-04 amendment lifted those two). Banned
+// words are NOT in this reserve, because this reserve is about CONSENT, not
 // vocabulary — a banned word is wrong on both sides of the gate, and belongs
 // with the other forbidden words in scripts/forbidden-words.mjs if anyone
 // wants it enforced. Keeping the two rules apart keeps each one's failure

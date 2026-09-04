@@ -198,7 +198,7 @@ Detail in `POLLINATE_COMB_ROTATION.md` §7 (design) and §8.3 (engineering).
 | **ENG-66** | Fizz | M | Comb pot — nectar riding along with a collective hive. **G2: never a pooled balance.** Contributions settle direct-to-recipient; the pot is a display over ledger rows | ENG-62, ENG-60 |
 | **DES-23** | Deezine | L | **Zap flight choreography** — honey drop along the existing pollination path. Reuse `FlyingBee`, `pollinationFlight`, `flightSequencer`, `HoneyDropProgress` | — |
 | **DES-24** | Pixel | M | `honeyed` hexagon state + fill levels, alongside blooming / seeded / dormant | — |
-| **COPY-7** | Lumen | S | Nectar vocabulary. **"Drops," not "sats." No "bitcoin" anywhere in default UI.** Spec §5.5.2 | — |
+| **COPY-7** | Lumen | S | Nectar vocabulary. Default register stays "drops"; "crypto" banned outside the four exempt surfaces. *(Amended 2026-09-04 by Colin, event `00f8aef5`: "sats"/"bitcoin" un-banned.)* Spec §5.5.2 | — |
 
 ### 19b/c/d — Real sats (Cycle 13+, gated)
 
@@ -377,8 +377,9 @@ Every project below ships with at least one `scripts/check-*.mjs`, per house rul
 - `check:contributor-rls` — a contributor cannot read a co-contributor's entries
   pre-seal
 - `check:ledger-invariants` — I1–I4 hold under simulated rails
-- `check:no-crypto-copy` — the word "bitcoin"/"sats" never reaches default UI
-  strings (spec §5.5.2 as an enforced rule, not a convention)
+- `check:no-crypto-copy` — the word "crypto" never reaches default UI strings
+  (spec §5.5.2 as an enforced rule, not a convention; "bitcoin"/"sats" were
+  un-banned by Colin's 2026-09-04 amendment, event `00f8aef5`)
 - `check:no-pooled-custody` — no code path credits a Pollinate-controlled wallet
   from one user and debits it to another (G2/G3 as an enforced rule)
 - `check:no-content-telemetry` — entry/reflection text never reaches an

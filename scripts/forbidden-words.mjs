@@ -33,25 +33,23 @@
 // "blessing" carries it identically. That is wider than the word Colin said,
 // and is stated here rather than smuggled into a regex.
 //
-// `bitcoin` / `sats` / `crypto` (COPY-7, `DESIGN_BRIEF_V2_NAVIGATION.md` Part
-// C rule 1): "Never the word 'bitcoin,' 'sats,' or 'crypto' in any
-// user-facing string. The unit is nectar, counted in drops. (Those words
-// appear only in the consent screen, Settings, legal copy, and App Review
-// Notes.)" The parenthetical is the rule, not an aside (Vector, thread
-// `1edf5be8`) — all three words share the same four-surface exemption, so
-// none of them can be a flat, zero-tolerance ban here. This leaf module has
-// no file or render-position context to check an exemption against (and
-// `check-demo-hive`'s raw-substring consumer has no file context at all), so
-// the exemption is encoded as an exact-string allowlist local to
+// `crypto` (COPY-7, `DESIGN_BRIEF_V2_NAVIGATION.md` Part C rule 1, as amended
+// 2026-09-04): the rule originally banned "bitcoin"/"sats"/"crypto" together.
+// Colin lifted the ban on "bitcoin" and "sats" (Collab-on-projects thread
+// `00b55e23`, event `00f8aef5`, 2026-09-04: "i do want us to use the words
+// sats and bitcoin, we need to update the banned list") — those two are now
+// ordinary vocabulary and have no rows below. `crypto` stays banned with the
+// original four-surface exemption (consent screen, Settings, legal copy, App
+// Review Notes). The parenthetical is the rule, not an aside (Vector, thread
+// `1edf5be8`), so `crypto` cannot be a flat, zero-tolerance ban here. This
+// leaf module has no file or render-position context to check an exemption
+// against (and `check-demo-hive`'s raw-substring consumer has no file context
+// at all), so the exemption is encoded as an exact-string allowlist local to
 // `check-copy-rules.mjs`'s Section C, the same mechanism Section E already
-// uses for reserved words — not here. `sats` is spelled out as the exact
-// plural, not a `\bsat` prefix: `sat` is the ordinary-English past tense of
-// "sit" and appears throughout this codebase's own comments (e.g. "the
-// header sat 12pt lower"); a prefix match would eventually fire on real copy
-// the same way an unscoped `sin` would. `bitcoin` and `crypto` are ordinary
-// prefix-at-boundary patterns, same as the eleven religious words above —
-// `crypto`'s only current collision, "cryptographic hash" in
-// `legalCopy.js`, sits on the exempted "legal copy" surface already.
+// uses for reserved words — not here. `crypto` is an ordinary
+// prefix-at-boundary pattern, same as the eleven religious words above —
+// its only current collision, "cryptographic hash" in `legalCopy.js`, sits
+// on the exempted "legal copy" surface already.
 //
 // `check-copy-rules` asserts this list's recall AND its precision on fixtures
 // before it is trusted with a verdict. If you tighten a pattern, that is where
@@ -69,8 +67,6 @@ export const FORBIDDEN = [
   { word: 'sin', re: /\bsin(s|ful|ner|ners|ning)?\b/i },
   { word: 'hallelujah', re: /\bhallelujah/i },
   { word: 'ritual', re: /\britual/i },
-  { word: 'sats', re: /\bsats\b/i },
-  { word: 'bitcoin', re: /\bbitcoin/i },
   { word: 'crypto', re: /\bcrypto/i },
 ];
 
