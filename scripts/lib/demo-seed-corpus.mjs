@@ -450,19 +450,13 @@ export const COMB_A = {
           text: 'You are the only person who has never asked me whether I am tired.',
         },
         {
-          // Calibration exemplar, ratified, used verbatim.
-          //
-          // FLAGGED FOR LUMEN, one line I did not silently correct: the sign
-          // in this exemplar reads KEEP GOING, ALEX while Priya is the one
-          // running, so as written the sign carries the sign-holder's name.
-          // It reads as an in-joke about Alex making a sign with his own name
-          // on it, which is funny and very much in register, and the exemplar
-          // is ratified text, so it is reproduced verbatim rather than
-          // amended. If it was meant to read KEEP GOING, PRIYA, this is the
-          // one string to change and nothing downstream depends on it.
+          // Calibration exemplar. Amended per Lumen's ratification (thread
+          // b3eac928, 2026-09-04): the sign carried the sign-holder's own
+          // name, which reads as a typo rather than the intended in-joke.
+          // Ruled fix: drop the name.
           writer: 'priya',
           daysBeforeClose: 21,
-          text: 'You showed up at mile nineteen with a sign that just said KEEP GOING, ALEX. You had a meeting that morning. You came anyway, and I finished because of it.',
+          text: 'You showed up at mile nineteen with a sign that just said KEEP GOING. You had a meeting that morning. You came anyway, and I finished because of it.',
         },
         {
           writer: 'priya',
@@ -883,7 +877,7 @@ export const STREAK = [
   { text: 'I am grateful the frost came and the whole street looked new.', theme: 'Nature' },
   { text: 'I am thankful for a boss who said the quiet part out loud.', theme: 'Career' },
   { text: 'I laughed at my own handwriting on a note from last year.', theme: 'Joy' },
-  { text: 'I am grateful for warm socks, which is not a small thing in November.', theme: 'Joy' },
+  { text: 'I am grateful for warm socks on a floor that never warms up.', theme: 'Joy' },
   { text: 'I am glad Rosa posted a recipe card in an actual envelope.', theme: 'Family' },
   { text: 'I am grateful the pain in my knee went where it came from.', theme: 'Health' },
   { text: 'I am thankful for an argument that ended with both of us fine.', theme: 'Growth' },
@@ -962,7 +956,7 @@ export const STREAK = [
   { text: 'I am grateful the physio said the word discharged this afternoon.', theme: 'Health' },
   { text: 'I am thankful for one email that was three lines instead of thirty.', theme: 'Career' },
   { text: 'I sang in the car with the windows shut, badly.', theme: 'Joy' },
-  { text: 'I am grateful for frost on the inside of the greenhouse glass.', theme: 'Nature' },
+  { text: 'I am grateful for condensation on the inside of the greenhouse glass.', theme: 'Nature' },
   { text: "I am glad Priya's marathon photograph has me in the background looking appalled.", theme: 'Friendship' },
   { text: 'I am grateful my notes from a year ago were legible and right.', theme: 'Creativity' },
   { text: 'I am thankful for the ten minutes before anybody else was awake.', theme: 'Faith' },
@@ -991,7 +985,7 @@ export const STREAK = [
   { text: 'I am glad Omar has stopped apologising for the state of the flat.', theme: 'Friendship' },
   { text: 'I am grateful my sleep sorted itself out without me interfering.', theme: 'Health' },
   { text: "I am thankful for one line of somebody else's writing today.", theme: 'Creativity' },
-  { text: 'I walked into the sea in September, briefly, and shouted.', theme: 'Joy' },
+  { text: 'I walked into the sea before breakfast, briefly, and shouted.', theme: 'Joy' },
   { text: 'I am grateful for the tree outside the window doing its annual thing.', theme: 'Nature' },
   { text: "I am glad Priya keeps a list of everybody's birthdays in a paper diary.", theme: 'Friendship' },
   { text: 'I am grateful an old habit finally lost its grip this month.', theme: 'Growth' },
