@@ -421,11 +421,14 @@ const MUST_CATCH = {
   sin: ['sin', 'sins', 'sinful', 'a sinner'],
   hallelujah: ['hallelujah', 'Hallelujah!'],
   ritual: ['ritual', 'rituals', 'your daily ritual'],
+  sats: ['sats', '500 sats', 'Sats'],
 };
 
 // Real sentences, drawn from copy that ships. Every one of these is a string
 // a naive matcher flags: the four `sin` lines are the exact false positives
-// the raw-substring arm produces on src/constants/legalCopy.js today.
+// the raw-substring arm produces on src/constants/legalCopy.js today. "She
+// sat down" is `sats`'s own analogue — the ordinary-English past tense of
+// "sit" that a `\bsat` prefix would have caught instead of the exact plural.
 const MUST_NOT_CATCH = [
   'a single line a day',
   'since you started',
@@ -437,9 +440,10 @@ const MUST_NOT_CATCH = [
   'good morning',
   'a good day',
   'This is the whole thing.',
+  'the header sat 12pt lower',
 ];
 
-check('every forbidden word has a pattern', FORBIDDEN.length, 12);
+check('every forbidden word has a pattern', FORBIDDEN.length, 13);
 check(
   'every pattern has recall fixtures',
   FORBIDDEN.filter((f) => !MUST_CATCH[f.word]?.length).map((f) => f.word),
