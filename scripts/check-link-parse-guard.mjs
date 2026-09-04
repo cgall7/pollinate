@@ -51,27 +51,36 @@
 //      TRUE). Here the TypeError escapes into each guard's own catch
 //      (FALSE).
 //
-// EXHAUSTIVENESS — checked for real, not assumed. Vector built a second
-// harness (thread f2c15b7d, 2026-09-04) that stubs only
-// `expo-constants`/`expo-modules-core`/`invariant` — not `parse` itself —
-// and imports the ACTUAL `expo-linking@57.0.8` `build/createURL.js`, then
-// diffs its `parse()` against this stub's, field-by-field, across 19 URL
-// shapes under both runtime regimes (StoreClient/Expo Go and Standalone).
-// 12 of 38 compared pairs diverge; every one collapses into the four
-// classes above. There is no fifth. (An earlier version of this comment
-// credited items 1 and 4 to that same differential run before it existed —
-// they were a source read, like 2 and 3, just not one Vector did herself.
-// Left unattributed here rather than re-guessed.)
+// EXHAUSTIVENESS IS GATED, not just claimed here — by
+// `scripts/check-link-parse-differential.mjs` (`npm run
+// check:link-parse-differential`), not by this file. It imports the ACTUAL
+// `expo-linking@57.0.8` `build/createURL.js`, extracts this file's
+// `STUB_SOURCE` at run time (so an edit here is compared as edited, never a
+// stale copy), and asserts — under both runtime regimes, as SET EQUALITY in
+// both directions — that the model/real divergence set is exactly the four
+// classes above. An extra divergence there is an undisclosed fifth class; a
+// missing one is its positive control (proof the real library, not another
+// copy of the model, is on the other side). Read that file for the current
+// corpus and counts rather than trusting a number restated here, which would
+// just be a second place for it to go stale. (An earlier version of this
+// comment credited items 1 and 4 to a differential run that hadn't happened
+// yet at the time it was written — they were a source read, like 2 and 3,
+// just not one Vector had done herself yet. Left unattributed here rather
+// than re-guessed; she has since run the real thing, which is what turned
+// into the gate this paragraph now points to.)
 //
-// RESIDUAL, stated because a green run does not cover it: a gate that stubs
-// the dependency cannot see the dependency change. `package.json` pins
-// `~57.0.8`, and a `package-lock.json` exists, so `npm ci` cannot silently
-// drift onto a `parse()` this file hasn't seen — the real exposure is a
-// deliberate `npm update` or lockfile refresh past a version whose
-// custom-scheme handling changed, not an ordinary patch bump landing
-// unnoticed. What absorbs even that: the guards' own shape — `path ===
-// LITERAL || hostname === LITERAL` keeps working whichever field upstream
-// decides to fill.
+// RESIDUAL, stated because a green run of THIS gate does not cover it: a
+// gate that stubs the dependency cannot see the dependency change.
+// `package.json` pins `~57.0.8`, and a `package-lock.json` exists, so `npm
+// ci` cannot silently drift onto a `parse()` this file hasn't seen — the
+// real exposure is a deliberate `npm update` or lockfile refresh past a
+// version whose custom-scheme handling changed. That specific exposure is
+// what `check-link-parse-differential.mjs`'s own `V1` assertion closes: it
+// asserts the installed version against the one these four classes were
+// measured on and reds with re-measurement instructions on a mismatch,
+// rather than silently re-baselining. What absorbs everything else: the
+// guards' own shape — `path === LITERAL || hostname === LITERAL` keeps
+// working whichever field upstream decides to fill.
 //
 // The stub does NOT model `createURL`'s Expo-hosted/hostUri branching
 // either — this gate never calls `createURL`, only the parse-side guards.
