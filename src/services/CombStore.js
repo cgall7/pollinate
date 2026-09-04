@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { Analytics } from './Analytics';
 
 const requireSupabase = () => {
   if (!supabase) throw new Error('Supabase is not configured — check .env');
@@ -60,12 +61,37 @@ export const CombStore = {
     if (!subjectProfileId) throw new Error('Choose who this month is for');
     if (subjectProfileId === ownerId) throw new Error('Choose someone else for the first month');
 
+    // ENG-89 C4 — "willingness to pay at ... the second-comb moment," §6.
+    // ENG-85's entitlement trigger (enforce_comb_entitlements, on
+    // comb_members insert) already ships the mechanism for this exact
+    // boundary — it counts the writer's OTHER active comb_members rows
+    // (any comb they write in, not just ones they own) against
+    // max_active_combs_written_in — but that plan limit ships NULL
+    // (unlimited) per §8.5, so the trigger never actually raises. This
+    // mirrors its count precisely (not `combs.owner_id`, which would miss
+    // someone who is a plain contributor elsewhere becoming an owner for
+    // the first time) so the shadow event fires at the same boundary the
+    // real cap will once §4.3 flips the limit on. Read BEFORE the insert
+    // below — the new comb's own comb_members row (inserted by the
+    // combs-insert trigger) does not exist yet at read time, so it can
+    // never count itself.
+    const { count: priorWriterCombCount, error: priorWriterError } = await client
+      .from('comb_members')
+      .select('comb_id', { count: 'exact', head: true })
+      .eq('profile_id', ownerId)
+      .is('removed_at', null);
+    if (priorWriterError) throw priorWriterError;
+
     const { data: comb, error: createError } = await client
       .from('combs')
       .insert({ owner_id: ownerId, name: label, cadence })
       .select('id')
       .single();
     if (createError) throw createError;
+
+    if ((priorWriterCombCount ?? 0) >= 1) {
+      Analytics.track('comb_second_created', { combId: comb.id });
+    }
 
     try {
       return await this.openFirstRotation({ combId: comb.id, subjectProfileId });

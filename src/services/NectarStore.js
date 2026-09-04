@@ -111,6 +111,13 @@ export const NectarStore = {
       p_amount_drops: amountDrops,
     });
     if (error) throw error;
+    // ENG-89 C5 — "note + nectar frequency," §6, is instrumented server-side
+    // by comb_c5_note_frequency() (20260904000001), which reads this send's
+    // own permanent row in comb_nectar_notes. No client event needed here:
+    // unlike C4 (no real gate exists to fire at), C5's raw material is
+    // already durably persisted by this very RPC — a redundant client-side
+    // count would be strictly weaker (drop-on-crash, no server truth, no
+    // active-member denominator) than the ledger it would be duplicating.
     return data?.[0] ?? null;
   },
 

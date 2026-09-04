@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { Analytics } from './Analytics';
 
 const requireSupabase = () => {
   if (!supabase) throw new Error('Supabase is not configured — check .env');
@@ -50,6 +51,26 @@ export const CombInviteStore = {
       p_invite_code: inviteCode,
     });
     if (joinError) throw joinError;
+
+    // ENG-89 C4 — "willingness to pay at the member cap," §6. ENG-85's
+    // entitlement trigger (enforce_comb_entitlements) already ships the
+    // mechanism that would enforce a 5-member free cap via
+    // comb_entitlement_plans.max_comb_members / combs.member_limit_override
+    // — but both plan limits ship NULL (unlimited) per §8.5, so the trigger
+    // never actually raises today. This is the shadow event for the same
+    // boundary: the moment the comb crosses the size the cap would sit at,
+    // fired off the join that produced it, so it can never fire more than
+    // once per comb (comb_member_count only equals 5 on the join that
+    // takes it from 4 to 5). Best-effort: a count RPC failure here must not
+    // fail the join itself, which already succeeded.
+    try {
+      const { data: memberCount } = await client.rpc('comb_member_count', { p_comb_id: combId });
+      if (memberCount === 5) {
+        Analytics.track('comb_member_cap_reached', { combId });
+      }
+    } catch {
+      // best-effort instrumentation only — see comment above
+    }
 
     const { data: rotation, error: rotationError } = await client
       .from('comb_rotations')

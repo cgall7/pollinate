@@ -420,6 +420,10 @@ async function main() {
     // -- service_role only: internal/cron, no client role needs direct EXECUTE --
     ['comb_advance_rotation(uuid)', { roles: ['service_role'], why: 'ENG-60 row 1.9a, advance policy wrapper called by the clock (OPS-9) — an authenticated grant would be an unruled organizer force-advance, §1B.31.2' }],
     ['advance_due_rotations()', { roles: ['service_role'], why: 'OPS-9 cron-only tick advance, explicit anon+authenticated revoke' }],
+    ['comb_c1_sustained(uuid)', { roles: ['service_role'], why: 'ENG-89 C1 business-review instrument, internal reporting only — no RLS-shaped authorization question, explicit anon+authenticated revoke' }],
+    ['comb_c3_survival_report()', { roles: ['service_role'], why: 'ENG-89 C3 business-review instrument, internal reporting only — no RLS-shaped authorization question, explicit anon+authenticated revoke' }],
+    ['comb_c5_note_frequency()', { roles: ['service_role'], why: 'ENG-89 C5 business-review instrument, internal reporting only — no RLS-shaped authorization question, explicit anon+authenticated revoke' }],
+    ['comb_rotation_participation(uuid)', { roles: ['service_role'], why: 'ENG-89 C1 per-rotation instrument underlying comb_c1_sustained, internal reporting only, explicit anon+authenticated revoke' }],
     ['comb_subject_gone(uuid,uuid)', { roles: ['service_role'], why: 'ENG-95 shared predicate, called only from other definers — a definer body bypasses the caller EXECUTE check on what it calls' }],
     ['seal_and_send_rotation(uuid)', { roles: ['service_role'], why: 'ENG-91 cron-only seal-and-send, explicit anon+authenticated revoke' }],
     ['seal_volume(uuid)', { roles: ['service_role'], why: 'cron/service-only volume seal, explicit anon+authenticated revoke' }],

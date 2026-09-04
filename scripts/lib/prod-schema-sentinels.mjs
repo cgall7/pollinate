@@ -350,4 +350,12 @@ export const SENTINELS = {
     table: 'comb_nectar_notes',
     column: 'note_text',
   },
+  // ENG-89 (Fizz). All four new functions are service_role-only internal
+  // reporting (C1/C3/C5 instruments) — revoked from anon and authenticated,
+  // same posture as advance_due_rotations (20260830000012). No anon-visible
+  // surface for a preflight to probe.
+  '20260904000001_eng89_c1_c3_c5_instruments': {
+    kind: 'order',
+    reason: 'service_role-only reporting functions, no anon-visible surface',
+  },
 };
