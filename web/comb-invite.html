@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Join a Comb on Pollinate</title>
+<meta name="robots" content="noindex" />
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #FFFBEF;
+    color: #1A1A1A;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 420px;
+    text-align: center;
+  }
+  h1 { font-size: 22px; margin: 0 0 12px; }
+  p { font-size: 16px; line-height: 1.5; margin: 0 0 20px; }
+  .step { text-align: left; margin: 0 0 24px; padding-left: 20px; }
+  .step li { margin-bottom: 10px; }
+  a.button {
+    display: inline-block;
+    padding: 14px 28px;
+    border-radius: 999px;
+    background: #F0C023;
+    color: #1A1A1A;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .fine-print { margin-top: 24px; font-size: 13px; color: #6B6B6B; }
+</style>
+</head>
+<body>
+<main>
+  <h1>You've been invited to a Comb</h1>
+  <p>Someone on Pollinate wants you to join their comb. Two steps to get in:</p>
+  <ol class="step">
+    <li>Install Pollinate from the App Store.</li>
+    <li>Come back and <strong>tap this invite link again</strong> — it'll open straight into your comb.</li>
+  </ol>
+  <a class="button" id="install-link" href="#" rel="noopener">Get Pollinate</a>
+  <p class="fine-print">This page doesn't track you or share your invite code with anyone. It just holds this link until you're ready for step two.</p>
+</main>
+<script>
+  // No analytics, no third-party SDK — this is a static re-tap landing page,
+  // not a deferred-deep-link attribution service. See ENG-78 link-substrate
+  // notes: a device-fingerprint SDK here would contradict legalCopy.js's
+  // no-tracking commitment.
+  //
+  // PENDING: App Store URL is not filled in yet — the app has no public App
+  // Store listing at time of writing. Replace before this page goes live.
+  var APP_STORE_URL = 'PENDING_APP_STORE_URL';
+  document.getElementById('install-link').href = APP_STORE_URL;
+</script>
+</body>
+</html>

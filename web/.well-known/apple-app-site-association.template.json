@@ -1,0 +1,13 @@
+{
+  "_template_note": "TEMPLATE — not the deployed file. Replace PENDING_APPLE_TEAM_ID with the 10-character Apple Developer Team ID (Colin's Apple Developer account), then delete this _template_note key and save the result as web/.well-known/apple-app-site-association (no extension). Must be served over HTTPS at https://pollinateapp.xyz/.well-known/apple-app-site-association with Content-Type: application/json and no redirects.",
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["PENDING_APPLE_TEAM_ID.xyz.pollinateapp.ios"],
+        "components": [
+          { "/": "/comb-invite", "?": { "code": "*" }, "comment": "Comb invite deep link — must match COMB_INVITE_PATH in src/services/combInviteLinking.js exactly" }
+        ]
+      }
+    ]
+  }
+}

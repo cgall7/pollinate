@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "icon": "./assets/icon.png",
       "bundleIdentifier": "xyz.pollinateapp.ios",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": ["applinks:pollinateapp.xyz"]
     },
     "android": {
       "adaptiveIcon": {
