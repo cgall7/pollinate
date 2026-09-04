@@ -50,7 +50,7 @@ export const avatarColorFor = (name) => AVATAR_WASHES[hashName(name || '') % AVA
 //
 // Same `hashName`, so a name always yields the same circle/hex pair. That is
 // DETERMINISM, not correlation — mod 5 and mod 2 of one hash have no visible
-// relationship (Sam's circle is `accentDeep`, his hex `washSky`; Maya's are
+// relationship (Zoya's circle is `accentDeep`, the hex `washSky`; Maya's are
 // `washSky` and `washYellow`). Determinism is the property worth having; the
 // word "correlated" promises a color match that was never there.
 //

@@ -32,7 +32,7 @@ import { toISODate } from '../utils/dateRanges';
 //     fresh demo user ever sees. Nothing distributes them — a name list can
 //     hash all one way by accident, and a 7/0 split is a one-color comb with
 //     no error anywhere. Today it is 3 washYellow / 4 washSky at day 0 and
-//     9 / 10 across all 19, which is luck, not design — changing one name is
+//     10 / 9 across all 19, which is luck, not design — changing one name is
 //     enough to move it. The gate holds the minority tint at >= 2 of the
 //     seven: a single odd cell in a ring reads as an accident, not a rotation.
 //   * R-CL-3 (Lumen, 2026-09-04) RETIRES R59's authored state band. §21.9.1
@@ -46,14 +46,25 @@ import { toISODate } from '../utils/dateRanges';
 //     below still emits both fields, always false: the row SHAPE is the
 //     contract HoneycombTab merges real state into, and dropping the keys
 //     would make `blooming` undefined rather than off.
+//   * NO DECORATIVE NAME MAY MATCH A SEEDED ONE (Lumen, 2026-09-04, as the
+//     belt under the runtime dormancy gate). The demo account seeds six real
+//     people plus its owner, and five of these names used to be five of
+//     theirs, so any build with a real Priya rendered a decorative Priya
+//     beside her: two cells, one name, a false claim about the person's
+//     graph. Renamed here to Zoya, Otis, Amara, Kofi and Nadia. The rule is
+//     asserted rather than remembered: `check-demo-hive` imports CAST and
+//     DEMO_ACCOUNT_NAME out of the seed corpus that owns them, so a future
+//     name added on EITHER side reds the gate. Dormancy retires this whole
+//     list once one real person exists, and this is what keeps the window
+//     before that honest.
 //
 // Day 0 first, then ascending — the pre-partition call site still takes the
 // first `HIVE_SLOTS` of this list, so today's people have to come first.
 const RAW_MEMBERS = [
   { name: 'Maya', gratitude: 'A friend who checked in on me for no reason at all.', daysAgo: 0 },
   { name: 'Theo', gratitude: 'The quiet five minutes before everyone else woke up.', daysAgo: 0 },
-  { name: 'Sam', gratitude: 'A walk that cleared my head when nothing else could.', daysAgo: 0 },
-  { name: 'Dev', gratitude: 'A problem I finally solved after three days stuck.', daysAgo: 0 },
+  { name: 'Zoya', gratitude: 'A walk that cleared my head when nothing else could.', daysAgo: 0 },
+  { name: 'Otis', gratitude: 'A problem I finally solved after three days stuck.', daysAgo: 0 },
   { name: 'Jonah', gratitude: 'Coffee that hit exactly right this morning.', daysAgo: 0 },
   { name: 'Kai', gratitude: 'Rain that waited until I was already inside.', daysAgo: 0 },
   { name: 'Ines', gratitude: "My sister's laugh on the phone, three states away.", daysAgo: 0 },
@@ -61,10 +72,10 @@ const RAW_MEMBERS = [
   { name: 'Nora', gratitude: 'The way the light looked coming home tonight.', daysAgo: 1 },
   { name: 'Ava', gratitude: "Something I'm actually looking forward to tomorrow.", daysAgo: 1 },
 
-  { name: 'Elena', gratitude: 'A stranger who held the door and meant it.', daysAgo: 2 },
-  { name: 'Omar', gratitude: 'Bread still warm from the shop on the corner.', daysAgo: 2 },
+  { name: 'Amara', gratitude: 'A stranger who held the door and meant it.', daysAgo: 2 },
+  { name: 'Kofi', gratitude: 'Bread still warm from the shop on the corner.', daysAgo: 2 },
 
-  { name: 'Priya', gratitude: 'My body carrying me through a long day without complaint.', daysAgo: 3 },
+  { name: 'Nadia', gratitude: 'My body carrying me through a long day without complaint.', daysAgo: 3 },
   { name: 'Ruth', gratitude: 'A seat by the window, and nobody took it.', daysAgo: 3 },
 
   { name: 'Lena', gratitude: 'The song that came on right when I needed it.', daysAgo: 4 },
