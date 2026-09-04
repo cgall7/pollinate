@@ -65,6 +65,7 @@
     "check:comb-advance-rotation": "node scripts/check-comb-advance-rotation.mjs",
     "check:comb-invite-client": "node scripts/check-comb-invite-client.mjs",
     "check:comb-collect": "node scripts/check-comb-collect.mjs",
+    "check:link-parse-guard": "node scripts/check-link-parse-guard.mjs",
     "check:usedaysleft": "node scripts/check-usedaysleft.mjs",
     "check:des39-organizer-comb": "node scripts/check-des39-organizer-comb.mjs",
     "check:des32-comb-nectar-client": "node scripts/check-des32-comb-nectar-client.mjs",

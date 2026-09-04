@@ -1,0 +1,158 @@
+// Gate for the two deep-link guards Vector found dark in a real build
+// (thread f2c15b7d, 2026-09-04): `src/services/authLinking.js`'s
+// `isAuthCallbackUrl` and `src/services/combInviteLinking.js`'s
+// `parseCombInviteUrl`.
+//
+//   npm run check:link-parse-guard
+//
+// THE BUG, in one fact: WHATWG `URL` parsing treats a non-special (custom)
+// scheme's `//xyz` as an opaque HOST, not a path. `new
+// URL('pollinate://auth-callback').pathname` is `''`; the value lands in
+// `.hostname` instead. `expo-linking`'s own `parse()` copies that straight
+// through (`path = parsed.pathname || null`), so on a real device build —
+// where the app opens via `pollinate://...`, never `exp://` or `https://` —
+// both guards compared `parsed.path` against a literal that was always
+// `null`. Neither is reachable from Expo Go, which resolves through
+// `exp://host:port/--/...` instead and puts the value in `path` correctly —
+// exactly why nothing caught it before a real build existed.
+//
+// RUN THE REAL MODULES. `authLinking.js` and `combInviteLinking.js` are
+// imported and executed unmodified; their one dependency (`expo-linking`)
+// can't load in plain Node (it pulls in `expo-modules-core`'s native
+// bindings), so it is stubbed at RESOLVE time via the same registerHooks
+// seam check-seeds-contract.mjs already uses. The stub's `parse` is a
+// direct port of expo-linking's own algorithm for the fields these two
+// files read (`path`, `hostname`, `queryParams`) — verified line-for-line
+// against node_modules/expo-linking/src/createURL.ts's `parse()` — plus one
+// hand-verified fact about the Expo Go shape (its own file comments already
+// claim this, this gate is what makes the claim checkable): `Linking.parse`
+// folds the `--/` dev-client separator away. The stub does NOT reimplement
+// `createURL`'s Expo-hosted/hostUri branching — this gate never calls
+// `createURL`, only the parse-side guards the incident is about.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { registerHooks } from 'node:module';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+if (typeof registerHooks !== 'function') {
+  console.error('Needs Node >= 22.15 for module.registerHooks(). Found ' + process.version);
+  process.exit(1);
+}
+
+const STUB_SOURCE = `
+export const parse = (url) => {
+  const parsed = new URL(url);
+  const queryParams = {};
+  parsed.searchParams.forEach((value, key) => {
+    queryParams[key] = decodeURIComponent(value);
+  });
+  let path = parsed.pathname || null;
+  if (path) {
+    path = path.replace(/^\\//, '');
+    // The Expo Go dev-client shape (exp://host:port/--/<path>) folds its
+    // '--/' separator away — see authLinking.js's own header comment.
+    if (path.startsWith('--/')) path = path.slice(3);
+  }
+  const hostname = parsed.hostname || null;
+  let scheme = parsed.protocol || null;
+  if (scheme) scheme = scheme.substring(0, scheme.length - 1);
+  return { path, hostname, queryParams, scheme };
+};
+export const createURL = () => {
+  throw new Error('link-parse-stub: createURL is not modelled — this gate only exercises the parse-side guards');
+};
+`;
+
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec === 'expo-linking') return { url: 'link-parse-stub:expo-linking', shortCircuit: true };
+    return next(spec, ctx);
+  },
+  load(url, ctx, next) {
+    if (url === 'link-parse-stub:expo-linking') {
+      return { format: 'module', source: STUB_SOURCE, shortCircuit: true };
+    }
+    return next(url, ctx);
+  },
+});
+
+const { isAuthCallbackUrl, parseAuthCallbackParams } = await import(
+  pathToFileURL(path.join(ROOT, 'src/services/authLinking.js')).href
+);
+const { parseCombInviteUrl } = await import(
+  pathToFileURL(path.join(ROOT, 'src/services/combInviteLinking.js')).href
+);
+
+let pass = 0;
+let fail = 0;
+const check = (label, got, want) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  ok ? (pass += 1) : (fail += 1);
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${ok ? '' : ` — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`);
+};
+
+// ── isAuthCallbackUrl — the magic-link / account-creation guard ─────────
+// The production shape: this is the ONE that was silently false before the
+// fix, on every real build, for every magic-link tap.
+check(
+  'A1 pollinate:// production shape is recognised as the auth callback',
+  isAuthCallbackUrl('pollinate://auth-callback?code=abc123'),
+  true
+);
+check(
+  'A2 exp://.../--/ Expo Go dev-client shape is still recognised',
+  isAuthCallbackUrl('exp://192.168.1.5:19000/--/auth-callback?code=abc123'),
+  true
+);
+check(
+  'A3 https:// web-reveal shape is still recognised',
+  isAuthCallbackUrl('https://pollinateapp.xyz/auth-callback?code=abc123'),
+  true
+);
+check(
+  'A4 a different pollinate:// path (comb-invite) is NOT the auth callback',
+  isAuthCallbackUrl('pollinate://comb-invite?code=abc123'),
+  false
+);
+check('A5 empty/undefined url is false, not a throw', isAuthCallbackUrl(''), false);
+
+// ── parseAuthCallbackParams — must actually read `code` off the shape
+//    isAuthCallbackUrl just certified ─────────────────────────────────────
+check(
+  'A6 pollinate:// production shape yields the PKCE code',
+  parseAuthCallbackParams('pollinate://auth-callback?code=abc123'),
+  { code: 'abc123' }
+);
+
+// ── parseCombInviteUrl — the invite-link guard ───────────────────────────
+check(
+  'C1 pollinate:// production shape resolves the invite code',
+  parseCombInviteUrl('pollinate://comb-invite?code=xyz789'),
+  'xyz789'
+);
+check(
+  'C2 exp://.../--/ Expo Go dev-client shape still resolves the invite code',
+  parseCombInviteUrl('exp://192.168.1.5:19000/--/comb-invite?code=xyz789'),
+  'xyz789'
+);
+check(
+  'C3 https:// shape still resolves the invite code',
+  parseCombInviteUrl('https://pollinateapp.xyz/comb-invite?code=xyz789'),
+  'xyz789'
+);
+check(
+  'C4 a different pollinate:// path (auth-callback) yields no invite code',
+  parseCombInviteUrl('pollinate://auth-callback?code=xyz789'),
+  null
+);
+check('C5 empty/undefined url is null, not a throw', parseCombInviteUrl(''), null);
+check(
+  'C6 a code that is only whitespace still fails closed to null',
+  parseCombInviteUrl('pollinate://comb-invite?code=%20%20'),
+  null
+);
+
+console.log(`\ncheck-link-parse-guard: ${pass} passed, ${fail} failed`);
+if (fail) process.exit(1);

@@ -15,13 +15,19 @@ export const AUTH_CALLBACK_PATH = 'auth-callback';
 
 export const getAuthRedirectUrl = () => Linking.createURL(AUTH_CALLBACK_PATH);
 
-// True for both the `pollinate://auth-callback?...` production shape and the
-// `exp://.../--/auth-callback?...` dev-client shape — `Linking.parse` folds
-// the `--/` Expo Go separator away, so `path` is `auth-callback` either way.
+// True for the `exp://.../--/auth-callback?...` dev-client shape (`Linking.parse`
+// folds the `--/` Expo Go separator away, so `path` is `auth-callback`) AND the
+// `pollinate://auth-callback?...` production shape. The two shapes land the
+// value in different fields: WHATWG `URL` parsing treats a custom scheme's
+// `//xyz` as an opaque host, not a path, so `new URL('pollinate://auth-callback')`
+// yields `hostname: 'auth-callback'` and an EMPTY `pathname` — `path` alone is
+// only ever populated by the `exp://`/`https://` shapes. Checking `path` alone
+// silently no-ops on every real (non-Expo-Go) build.
 export const isAuthCallbackUrl = (url) => {
   if (!url) return false;
   try {
-    return Linking.parse(url).path === AUTH_CALLBACK_PATH;
+    const parsed = Linking.parse(url);
+    return parsed.path === AUTH_CALLBACK_PATH || parsed.hostname === AUTH_CALLBACK_PATH;
   } catch {
     return false;
   }
