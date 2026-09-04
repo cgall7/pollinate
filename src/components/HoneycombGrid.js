@@ -9,6 +9,7 @@ import {
   BLOOM_MARK_STROKE_WIDTH,
   BLOOM_FLOOR_OPACITY,
 } from '../constants/bloomRing';
+import { CELL_CANVAS_PAD, CELL_STROKE_WIDTH } from '../constants/combCell';
 import { hexTintFor } from './Avatar';
 import { initialsFor } from '../utils/initials';
 import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_MENISCUS_STROKE, honeyHeightForLevel, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
@@ -323,7 +324,19 @@ const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => 
 
   return (
     <View>
-      <Svg width={size * 2} height={size * 2}>
+      {/* R-CL-1: the canvas is padded and the geometry is NOT moved. The
+          viewBox starts at -PAD so user space still has the hexagon's left
+          vertex at x = 0 and its right at 2·size — every number in
+          `hexGeometry` keeps meaning what it meant — while the rendered box
+          gains PAD on all four sides for the stroke to finish inside. Scale
+          stays 1: the alternative (same box, bigger viewBox) shrinks the
+          whole cell by ~2.8% and renders a "2.5pt" stroke at 2.43pt, which
+          would make the ruled width a lie about the pixels. */}
+      <Svg
+        width={size * 2 + CELL_CANVAS_PAD * 2}
+        height={size * 2 + CELL_CANVAS_PAD * 2}
+        viewBox={`${-CELL_CANVAS_PAD} ${-CELL_CANVAS_PAD} ${size * 2 + CELL_CANVAS_PAD * 2} ${size * 2 + CELL_CANVAS_PAD * 2}`}
+      >
         <Defs>
           <ClipPath id={clipId}>
             <Polygon points={points} />
@@ -375,7 +388,7 @@ const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => 
           points={points}
           fill="none"
           stroke={selected ? theme.colors.ink : theme.colors.surface}
-          strokeWidth={2.5}
+          strokeWidth={CELL_STROKE_WIDTH}
         />
       </Svg>
       {!member.avatarUrl && (
@@ -398,7 +411,11 @@ const EmptyCell = ({ size }) => {
 
   return (
     <View accessibilityLabel="a seat for someone">
-      <Svg width={size * 2} height={size * 2}>
+      <Svg
+        width={size * 2 + CELL_CANVAS_PAD * 2}
+        height={size * 2 + CELL_CANVAS_PAD * 2}
+        viewBox={`${-CELL_CANVAS_PAD} ${-CELL_CANVAS_PAD} ${size * 2 + CELL_CANVAS_PAD * 2} ${size * 2 + CELL_CANVAS_PAD * 2}`}
+      >
         <Polygon
           points={points}
           fill={theme.colors.surface}
@@ -439,10 +456,17 @@ const HexCell = ({ member, size, x, y, delay, selected, held, reduced, pressDept
       style={[
         styles.cellWrap,
         {
-          left: x,
-          top: y,
-          width: size * 2,
-          height: size * 2,
+          // R-CL-1: the box grows by the canvas pad and its origin moves back
+          // by the same amount, so the hexagon's centre stays at
+          // (x + size, y + size) in cluster space. That point is what
+          // `combLattice.cellCentre` returns and what the bee's flight and the
+          // tap scrim's punch-out both aim at — padding a canvas must not move
+          // a target, and this is why the compensation is here and not in the
+          // shared util.
+          left: x - CELL_CANVAS_PAD,
+          top: y - CELL_CANVAS_PAD,
+          width: size * 2 + CELL_CANVAS_PAD * 2,
+          height: size * 2 + CELL_CANVAS_PAD * 2,
           transform: [{ scale: cellScale }],
           opacity: progress,
         },
@@ -1077,6 +1101,12 @@ export const HoneycombGrid = forwardRef(({
           style={{
             width: layout.width,
             height: layout.height,
+            // R-CL-1: the outermost cells' padded canvases reach CELL_CANVAS_PAD
+            // past the cluster box on every side. Stated rather than left to a
+            // platform default — iOS does not clip an overflowing child and
+            // Android does, and a fix for a clipped outline that survives only
+            // on one platform is half a fix.
+            overflow: 'visible',
             alignSelf: 'center',
             transform: [{ scale: cameraScale }],
             opacity: cameraProgress,
