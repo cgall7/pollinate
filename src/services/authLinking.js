@@ -15,13 +15,21 @@ export const AUTH_CALLBACK_PATH = 'auth-callback';
 
 export const getAuthRedirectUrl = () => Linking.createURL(AUTH_CALLBACK_PATH);
 
-// True for both the `pollinate://auth-callback?...` production shape and the
-// `exp://.../--/auth-callback?...` dev-client shape — `Linking.parse` folds
-// the `--/` Expo Go separator away, so `path` is `auth-callback` either way.
+// True for the `exp://.../--/auth-callback?...` dev-client shape (Linking.parse
+// folds the `--/` Expo Go separator away, so `path` is `auth-callback`) AND for
+// the `pollinate://auth-callback?...` production shape. That second one does
+// NOT arrive as `path`: pollinate:// is a non-special scheme, so WHATWG URL
+// puts the first segment in `hostname`, and only a standalone/EAS build ever
+// emits this shape (Expo Go always emits the exp:// form above). Falling back
+// to hostname is what makes a magic link or invite-comb-open account-creation
+// email actually complete sign-in outside of Expo Go — without it, the guard
+// silently refuses the one URL shape a real build produces.
 export const isAuthCallbackUrl = (url) => {
   if (!url) return false;
   try {
-    return Linking.parse(url).path === AUTH_CALLBACK_PATH;
+    const parsed = Linking.parse(url);
+    const path = parsed.path ?? (parsed.hostname || null);
+    return path === AUTH_CALLBACK_PATH;
   } catch {
     return false;
   }

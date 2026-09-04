@@ -9,7 +9,13 @@ export const parseCombInviteUrl = (url) => {
   if (!url) return null;
   try {
     const parsed = Linking.parse(url);
-    if (parsed.path !== COMB_INVITE_PATH) return null;
+    // pollinate:// is a non-special scheme, so WHATWG URL puts the first
+    // segment in hostname, not pathname — only https:// (and a triple-slash
+    // pollinate:///... link) populates `path` here. Falling back to hostname
+    // is what makes a standalone-build invite link resolve at all; without
+    // it every `pollinate://comb-invite?...` link silently fails to match.
+    const path = parsed.path ?? (parsed.hostname || null);
+    if (path !== COMB_INVITE_PATH) return null;
     const code = Array.isArray(parsed.queryParams?.code)
       ? parsed.queryParams.code[0]
       : parsed.queryParams?.code;

@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
+    "check:standalone-link-guards": "node scripts/check-standalone-link-guards.mjs",
     "check:demo-hive": "node scripts/check-demo-hive.mjs",
     "check:comb-identity": "node scripts/check-comb-identity.mjs",
     "check:comb-pending-shelf": "node scripts/check-comb-pending-shelf.mjs",
