@@ -588,7 +588,7 @@ const RESERVED_ALLOW = {
   page: new Set([
     "Today's page is blank.",
     'The rest of this page is the same thing said precisely.',
-    'This app is published by . We are responsible for the information described on this page — in data-protection terms, its controller.',
+    'This app is published by . We are responsible for the information described on this page. In data-protection terms, we are its controller.',
     'If we change how any of this works, we will change this page and the date at the top of it. For anything that meaningfully affects your privacy, we will tell you in the app rather than expecting you to re-read this.',
     NUDGE_ASK_LABEL,
   ]),

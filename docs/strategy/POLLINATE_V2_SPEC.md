@@ -1008,7 +1008,7 @@ mandatory. The specific promise in `legalCopy.js` was not.** Two sentences went
 further than any rule requires:
 
 - `The short version`: *"There is no analytics, crash-reporting or tracking code
-  in it either — nothing here reports what you do back to us or to anyone else."*
+  in it either. Nothing here reports what you do back to us or to anyone else."*
 - `What we do not do`: *"We do not include analytics, attribution or
   crash-reporting tools."*
 
