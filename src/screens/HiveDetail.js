@@ -221,7 +221,7 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         <Text style={[styles.bannerCount, { color: cover.textColor }]}>{memoryLabel}</Text>
       </View>
 
-      {hive.isCollective && (
+      {hive.isCollective && !hive.isRotationLinked && (
         <View style={styles.memoryLaneContainer}>
           <View style={styles.rosterRow}>
             <View style={styles.rosterText}>
@@ -265,7 +265,14 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         </PressableScale>
       )}
 
-      {!hive.sealedAt && entries.length > 0 && (
+      {/* ENG-101: a comb rotation seals itself automatically when the
+          window closes (seal_and_send_rotation) and never opens a
+          successor volume, unlike a manual seal_volume() call -- tapping
+          this on a rotation-linked hive wedges the comb permanently
+          (comb_rotations_one_open_per_comb never clears). The server
+          refuses it either way; this guard just keeps the button off a
+          hive it can never work on. */}
+      {!hive.sealedAt && !hive.isRotationLinked && entries.length > 0 && (
         <PressableScale
           onPress={() =>
             navigation.navigate('SealHive', {
@@ -286,7 +293,7 @@ export const HiveDetailScreen = ({ navigation, route }) => {
         </PressableScale>
       )}
 
-      {hive.sealedAt && subjectIsFriend && (
+      {hive.sealedAt && !hive.sentAt && !hive.isRotationLinked && subjectIsFriend && (
         <PressableScale
           onPress={() =>
             navigation.navigate('SendHive', {

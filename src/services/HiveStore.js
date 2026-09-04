@@ -453,6 +453,22 @@ export const HiveStore = {
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
+    // ENG-101 (§1B.38.31-.39): the seal/send CTAs and the invite affordance
+    // must not render on a hive that belongs to a comb rotation -- the
+    // server refuses seal_volume/send_hive/hive_contributors_insert_owner
+    // on one, but a client guard that fails open (an unselected column, a
+    // discarded error) reproduces the exact bug it's meant to close. Own
+    // query, own `throw`, matching `data`/`error` above rather than the
+    // enrichment-path discard `resolveCombOwnerNames` uses for a name that
+    // can legitimately degrade to absent -- this is a guard, not an
+    // enrichment, and comb_rotations_select already grants the organizer
+    // this read (`combs.owner_id = auth.uid()`).
+    const { data: rotationRow, error: rotationError } = await client
+      .from('comb_rotations')
+      .select('hive_id')
+      .eq('hive_id', hiveId)
+      .maybeSingle();
+    if (rotationError) throw rotationError;
     return {
       id: data.id,
       subjectName: data.subject_name,
@@ -463,6 +479,7 @@ export const HiveStore = {
       sentAt: data.sent_at,
       createdAt: data.created_at,
       isCollective: data.is_collective,
+      isRotationLinked: !!rotationRow,
     };
   },
 

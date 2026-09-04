@@ -360,4 +360,15 @@ export const SENTINELS = {
     table: 'comb_rotations',
     column: 'seal_dead_lettered_at',
   },
+  // ENG-101, wedge-arc PR (Fizz). `create or replace` on `seal_volume`/
+  // `send_hive` (both already `authenticated`-grantable, unchanged here)
+  // plus a `hive_contributors_insert_owner` policy replace -- no new
+  // column, table, or grant boundary for prod-schema-check to probe from
+  // outside. `seal_volume` already has its own 42501-from-anon sentinel at
+  // 20260826000004; this migration doesn't touch its grants, so that probe
+  // stays the accurate outside signal for the function's existence.
+  '20260904000002_eng101_rotation_linked_refusals': {
+    kind: 'order',
+    reason: 'function replace (unchanged grants) + policy replace only',
+  },
 };

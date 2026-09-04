@@ -297,9 +297,12 @@ export const SealHiveScreen = ({ navigation, route }) => {
       setPhase('complete');
     } catch (err) {
       console.warn('SealHiveScreen: seal_hive failed', err);
+      const msg = err?.message ?? '';
       setError(
-        /already been sealed/.test(err?.message ?? '')
+        /already been sealed/.test(msg)
           ? 'This hive is already sealed.'
+          : /comb rotation/.test(msg)
+          ? "This month's keepsake seals itself when the rotation closes — there's nothing to do here."
           : "Couldn't seal this hive. Check your connection and try again."
       );
       setPhase('preview');
