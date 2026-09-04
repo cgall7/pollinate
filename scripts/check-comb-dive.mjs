@@ -41,6 +41,19 @@
 //       three fixtures: this-month (no roll), a same-year 3-months-ago case
 //       (month roll, no elision), and an 8-year-old letter (elided to
 //       exactly `[currentYear, '…', entryYear]`, ≤ MAX_VISIBLE_STEPS)
+//   D11 the odometer's `closingRef` gate (Lumen's must-fix, 2026-09-04:
+//       "reverse dive never rolls" means the setTimeout chain must stop the
+//       moment dismissal COMMITS, not at unmount) — `close()` in
+//       EntryCombGrid.js sets `closingRef.current = true` as its first
+//       statement, and DiveDateEyebrow's `advance()` guard AND its
+//       setTimeout body both check `closingRef?.current` before doing
+//       anything observable
+//   D12 the scroll/dismiss gesture grammar (Lumen's must-fix): the
+//       PanResponder never claims at touch-start
+//       (`onStartShouldSetPanResponder` is a literal `false`), and its
+//       vertical-down capture branch is gated on `scrollYRef.current <= 0` —
+//       so a downward drag only claims the responder when the entry text is
+//       scrolled to its top
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -398,6 +411,89 @@ const paperCode = codeOnly(paperSrc, paperAst);
     ok("D10c an 8-year-old letter elides to exactly ['2026', '…', '2019'], within MAX_VISIBLE_STEPS");
   } else {
     bad('D10c year elision', `withinCap=${withinCap} elidedCorrectly=${elidedCorrectly} got ${JSON.stringify(eightYears)}`);
+  }
+}
+
+// ── D11. closingRef gates the odometer chain at both checkpoints ────────
+{
+  let closeFn = null;
+  walk(gridAst.program, (n) => {
+    if (closeFn) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'close') closeFn = unwrapCallback(n.init);
+  });
+  const closeFirstStatement = closeFn?.body?.body?.[0];
+  const closeSetsClosingRefFirst =
+    closeFirstStatement?.type === 'ExpressionStatement' &&
+    /closingRef\.current\s*=\s*true/.test(gridSrc.slice(closeFirstStatement.start, closeFirstStatement.end));
+  if (closeSetsClosingRefFirst) {
+    ok('D11a close() sets closingRef.current = true as its first statement');
+  } else {
+    bad(
+      'D11a close() closingRef ordering',
+      `expected close()'s first statement to set closingRef.current = true, got: ${closeFn ? gridSrc.slice(closeFirstStatement?.start ?? closeFn.start, closeFirstStatement?.end ?? closeFn.start + 60) : 'close() not found — FAILS CLOSED'}`
+    );
+  }
+
+  let advanceFn = null;
+  walk(paperAst.program, (n) => {
+    if (advanceFn) return;
+    if (n.type === 'VariableDeclarator' && n.id?.name === 'advance' && n.init?.type === 'ArrowFunctionExpression') {
+      advanceFn = n.init;
+    }
+  });
+  if (!advanceFn) {
+    bad('D11b advance() guard', 'no `const advance = (...) => {...}` found in CombDivePaper.js — FAILS CLOSED');
+  } else {
+    const bodySrc = paperSrc.slice(advanceFn.body.start, advanceFn.body.end);
+    // Two checkpoints: the guard clause at the top of advance(), and the
+    // setTimeout callback's own early-return — a chain that only checks one
+    // can still fire once more than it should (the guard stops the NEXT
+    // schedule, the callback guard stops the CURRENT firing from doing
+    // anything observable if closingRef flipped true while it was pending).
+    const guardCount = (bodySrc.match(/closingRef\?\.\s*current/g) || []).length;
+    if (guardCount >= 2) {
+      ok('D11b advance() checks closingRef?.current at both the schedule guard and the setTimeout callback body');
+    } else {
+      bad('D11b advance() guard', `expected closingRef?.current checked at 2+ sites inside advance(), found ${guardCount}`);
+    }
+  }
+}
+
+// ── D12. scroll/dismiss gesture grammar ─────────────────────────────────
+{
+  let startShould = null;
+  walk(paperAst.program, (n) => {
+    if (startShould) return;
+    if (n.type === 'ObjectProperty' && n.key?.name === 'onStartShouldSetPanResponder') startShould = n.value;
+  });
+  const isBareFalse =
+    startShould?.type === 'ArrowFunctionExpression' &&
+    startShould.body?.type === 'BooleanLiteral' &&
+    startShould.body.value === false;
+  if (isBareFalse) {
+    ok('D12a onStartShouldSetPanResponder is a literal `() => false` — never claims at touch-start');
+  } else {
+    bad(
+      'D12a onStartShouldSetPanResponder',
+      `expected a literal \`() => false\`, found: ${startShould ? paperSrc.slice(startShould.start, startShould.end) : 'not found — FAILS CLOSED'}`
+    );
+  }
+
+  let captureFn = null;
+  walk(paperAst.program, (n) => {
+    if (captureFn) return;
+    if (n.type === 'ObjectProperty' && n.key?.name === 'onMoveShouldSetPanResponderCapture') captureFn = n.value;
+  });
+  if (!captureFn) {
+    bad('D12b onMoveShouldSetPanResponderCapture', 'not found — FAILS CLOSED');
+  } else {
+    const bodySrc = paperSrc.slice(captureFn.body.start, captureFn.body.end);
+    const verticalDownGated = /g\.dy\s*>\s*6[\s\S]{0,80}return\s+scrollYRef\.current\s*<=\s*0/.test(bodySrc);
+    if (verticalDownGated) {
+      ok('D12b the vertical-down capture branch returns scrollYRef.current <= 0 — dismiss only claims from scroll-top');
+    } else {
+      bad('D12b vertical-down gate', `expected the vertical-down branch to return scrollYRef.current <= 0, body: ${bodySrc}`);
+    }
   }
 }
 

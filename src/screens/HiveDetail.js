@@ -11,20 +11,6 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { BackButton } from '../components/BackButton';
 import { EntryCombGrid, DIVE_CHROME_DIM } from '../components/EntryCombGrid';
 
-// Exported for CombDivePaper.js (R-CD-4's static eyebrow date, the
-// non-rolled case of R-CD-5) — one implementation, not a second copy.
-export const longDate = (isoDate) => {
-  // entry_date is a plain 'YYYY-MM-DD' — parsing it as local midnight
-  // (matching dateRanges.js's own convention) avoids the off-by-one a bare
-  // `new Date(isoDate)` gets from parsing it as UTC midnight instead.
-  const [y, m, d] = isoDate.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-};
-
 const joinNames = (names) => {
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} and ${names[1]}`;

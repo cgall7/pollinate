@@ -43,6 +43,12 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
   const [cardSize, setCardSize] = useState(null);
   const [openCell, setOpenCell] = useState(null); // { key, entries } | null
   const rimCrossedRef = useRef(false);
+  // R-CD-5 "reverse dive never rolls" — the odometer's own chain (licensed
+  // exception, R-CD-1) must stop the moment dismissal COMMITS, not wait for
+  // the paper to unmount at the end of the close spring. Set true at the top
+  // of `close()`, the single commit point every dismiss path (swipe-commit,
+  // tap-elsewhere, RM) already funnels through; reset on the next open.
+  const closingRef = useRef(false);
 
   // One entry, one seat — R-CD-7's multi-entry-per-cell case is left for a
   // future seating rule (grouping key TBD, a content question like the
@@ -77,6 +83,7 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       rimCrossedRef.current = false;
+      closingRef.current = false;
       setOpenCell({ key: cell.key, entries: cell.member.group });
       if (reduced) {
         dive.stopAnimation();
@@ -90,6 +97,7 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
 
   const close = useCallback(
     (velocity) => {
+      closingRef.current = true;
       const finish = () => setOpenCell(null);
       if (reduced) {
         dive.stopAnimation();
@@ -206,6 +214,7 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
               dolly={dolly}
               waxOpacity={waxOpacity}
               backlightOpacity={backlightOpacity}
+              writable={writable}
               onPress={() => handleCellPress(cell)}
             />
           );
@@ -220,6 +229,7 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
           cellSize={CELL_SIZE}
           paperInset={PAPER_INSET}
           paperStart={PAPER_START}
+          closingRef={closingRef}
           onDismiss={(velocity) => close(velocity)}
         />
       ) : null}
@@ -227,7 +237,7 @@ export const EntryCombGrid = ({ entries, writable, onWriteEntry, diveValue }) =>
   );
 };
 
-const EntryCell = ({ cell, size, dolly, waxOpacity, backlightOpacity, onPress }) => {
+const EntryCell = ({ cell, size, dolly, waxOpacity, backlightOpacity, writable, onPress }) => {
   const filled = !!cell.member;
   const outerStyle = [
     styles.cellSlot,
@@ -240,7 +250,11 @@ const EntryCell = ({ cell, size, dolly, waxOpacity, backlightOpacity, onPress })
     <Wrapper style={wrapperStyle}>
       <PressableScale
         onPress={onPress}
-        accessibilityLabel={filled ? 'Open this memory' : 'Write a memory'}
+        // An empty cell on a sealed hive (writable: false) does nothing on
+        // tap — "Write a memory" there is a promise the press doesn't keep
+        // (Lumen's rider, 2026-09-04). No label at all in that case, same
+        // as any other inert affordance.
+        accessibilityLabel={filled ? 'Open this memory' : writable ? 'Write a memory' : undefined}
       >
         <View style={{ width: size * 2, height: size * 2 }}>
           <Svg width={size * 2} height={size * 2}>

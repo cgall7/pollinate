@@ -10,13 +10,25 @@ const MAX_VISIBLE_STEPS = 4;
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// entry_date is 'YYYY-MM-DD' — parsed as local midnight, matching
-// HiveDetail.js's `longDate` convention (avoids the UTC off-by-one a bare
-// `new Date(isoDate)` gets from parsing it as UTC midnight instead).
+// entry_date is 'YYYY-MM-DD' — parsed as local midnight (avoids the UTC
+// off-by-one a bare `new Date(isoDate)` gets from parsing it as UTC midnight
+// instead).
 const parseLocalDate = (isoDate) => {
   const [y, m, d] = isoDate.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
+
+// The one implementation of "entry_date -> a reader-facing date string" —
+// originally HiveDetail.js's `longDate`, homed here (Lumen's rider,
+// 2026-09-04) so HiveDetail.js and CombDivePaper.js can both import it
+// without a module cycle (they'd otherwise import each other indirectly via
+// EntryCombGrid.js), and so the local-midnight parse isn't kept twice.
+export const longDate = (isoDate) =>
+  parseLocalDate(isoDate).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
 
 // -> { active, unit: 'year' | 'month' | null, steps: string[] }
 //

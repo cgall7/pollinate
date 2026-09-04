@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, Animated, PanResponder, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../constants/theme';
 import { SPRINGS, DURATIONS, DIVE_ODOMETER } from '../constants/motion';
 import { PaperBlock, paperInk, paperInkSoft, entryVoice } from './PaperBlock';
-import { computeDiveDateRoll } from '../utils/combDiveDate';
-import { longDate } from '../screens/HiveDetail';
+import { computeDiveDateRoll, longDate } from '../utils/combDiveDate';
 
 // The memory paper — R-CD-4/-5/-6/-7. Absolutely positioned inside
 // EntryCombGrid's card, inset PAPER_INSET on every side, riding the same
@@ -15,7 +14,7 @@ const DISMISS_DRAG_PX = 220; // full-strength drag distance to pull `dive` 1 -> 
 const DISMISS_COMMIT_PX = 90;
 const DISMISS_COMMIT_VELOCITY = 0.8; // px/ms — RN gestureState units
 
-export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, paperStart, onDismiss }) => {
+export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, paperStart, closingRef, onDismiss }) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageWidth, setPageWidth] = useState(0);
   const pageOffset = useRef(new Animated.Value(0)).current;
@@ -24,12 +23,30 @@ export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, pa
   const diveStartRef = useRef(0);
   const pageStartRef = useRef(0);
   const dismissArmedRef = useRef(false); // R-CD-6 "dismiss threshold crossed — soft tick, re-arms on crossing back"
+  // Lumen's must-fix (2026-09-04): a long letter scrolls inside its own
+  // ScrollView; the dismiss drag must not fight it for the gesture. Tracks
+  // the ACTIVE page's scrollY only (reset on page change, wired below).
+  const scrollYRef = useRef(0);
+
+  useEffect(() => {
+    scrollYRef.current = 0;
+  }, [pageIndex]);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
+        // Never claim at touch-start (that would steal every scroll touch
+        // before the ScrollView gets a look). Claim during MOVE only, and
+        // only for gestures that are unambiguously ours: horizontal paging,
+        // or a downward drag that starts from the entry text's scroll-top —
+        // any other vertical move (scrolling through the letter) returns
+        // false so the native ScrollView underneath handles it.
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponderCapture: (_, g) => {
+          if (Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy)) return true; // paging — unchanged
+          if (g.dy > 6 && g.dy > Math.abs(g.dx)) return scrollYRef.current <= 0; // dismiss — only from scroll-top
+          return false;
+        },
         onPanResponderGrant: () => {
           dragAxisRef.current = null;
           dismissArmedRef.current = false;
@@ -154,16 +171,38 @@ export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, pa
           />
         )}
 
-        <Animated.View style={entries.length > 1 ? { flexDirection: 'row', width: pageWidth * entries.length, transform: [{ translateX: pageOffset }] } : styles.singlePage}>
+        <Animated.View
+          style={
+            entries.length > 1
+              ? { flex: 1, flexDirection: 'row', width: pageWidth * entries.length, transform: [{ translateX: pageOffset }] }
+              : styles.singlePage
+          }
+        >
           {entries.map((entry, index) => (
-            <View key={entry.id} style={{ width: pageWidth || '100%' }}>
+            <View key={entry.id} style={{ width: pageWidth || '100%', flex: 1 }}>
               <PaperBlock paper={entry.paper} style={styles.entryBlock}>
                 {!reduced && index === 0 ? (
-                  <DiveDateEyebrow entry={entry} />
+                  <DiveDateEyebrow entry={entry} closingRef={closingRef} />
                 ) : (
                   <Text style={[styles.eyebrow, { color: paperInkSoft(entry.paper) }]}>{longDate(entry.date)}</Text>
                 )}
-                <Text style={[entryVoice(entry.text), { color: paperInk(entry.paper) }]}>{entry.text}</Text>
+                {/* Lumen's must-fix (2026-09-04): the FlatList this replaced
+                    clamped previews to 4 lines; this paper renders the FULL
+                    entry, so a rung-3 letter (>220 chars — the surface's own
+                    reason to exist) needs somewhere for the overflow to go.
+                    Scroll claimed only from scroll-top by the PanResponder
+                    above — see scrollYRef. */}
+                <ScrollView
+                  style={styles.entryScroll}
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                  scrollEventThrottle={16}
+                  onScroll={
+                    index === pageIndex ? (e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; } : undefined
+                  }
+                >
+                  <Text style={[entryVoice(entry.text), { color: paperInk(entry.paper) }]}>{entry.text}</Text>
+                </ScrollView>
               </PaperBlock>
               {!reduced && (
                 <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.entryBlock, { backgroundColor: theme.colors.diveHoneyTint, opacity: honeyTintOpacity }]} />
@@ -191,17 +230,20 @@ export const CombDivePaper = ({ dive, reduced, entries, cellSize, paperInset, pa
 // 0); R-CD-7 rules paging never re-runs the date beat, so every other page
 // renders its static date via `longDate` in the parent instead.
 //
-// A fixed-cadence tick sequence (`setInterval`), not a phase machine: R-CD-1
-// bans a *scripted, branching, sequential* choreography built from
-// `setTimeout` (camera -> through -> open); this is one repeating identical
-// unit with its own explicit, bounded budget stated independently in R-CD-5
-// ("~90ms per step, total ≤350ms") — the same distinction a real odometer's
-// digit roll makes. It cannot drive the paper's own arrival (a spring has no
-// clean way to land on N discrete stops in step with real elapsed time), and
-// it is fully torn down on unmount, so it can never fire after a reverse
-// dive closes the paper. Flagged for Lumen's read at ratification (R-CD-11
-// row 8) rather than silently decided.
-const DiveDateEyebrow = ({ entry }) => {
+// A recursive `setTimeout` chain, not a phase machine: R-CD-1 bans a
+// *scripted, branching, sequential* choreography (camera -> through -> open);
+// this is one repeating identical unit with its own explicit, bounded budget
+// stated independently in R-CD-5 ("~90ms per step, total ≤350ms") — the same
+// distinction a real odometer's digit roll makes. It cannot drive the
+// paper's own arrival (a spring has no clean way to land on N discrete stops
+// in step with real elapsed time). Lumen's ratification (2026-09-04) accepts
+// this as licensed, with one condition: "reverse dive never rolls" (R-CD-5)
+// means the chain must stop the moment dismissal COMMITS
+// (`closingRef.current`, set by EntryCombGrid's `close()`), not merely at
+// unmount — the paper stays mounted through the whole close spring, so an
+// unmount-only teardown would still let several steps fire (and buzz) on an
+// exiting, invisible eyebrow.
+const DiveDateEyebrow = ({ entry, closingRef }) => {
   const roll = useMemo(() => computeDiveDateRoll(entry.date), [entry.date]);
   const [stepIndex, setStepIndex] = useState(0);
   const stepOpacity = useRef(new Animated.Value(1)).current;
@@ -214,11 +256,11 @@ const DiveDateEyebrow = ({ entry }) => {
     const totalSteps = Math.min(roll.steps.length - 1, Math.floor(DIVE_ODOMETER.maxTotalMs / DIVE_ODOMETER.stepMs));
     const timers = [];
     const advance = () => {
-      if (cancelled || i >= totalSteps) return;
+      if (cancelled || closingRef?.current || i >= totalSteps) return;
       i += 1;
       timers.push(
         setTimeout(() => {
-          if (cancelled) return;
+          if (cancelled || closingRef?.current) return;
           setStepIndex(i);
           if (roll.unit === 'year') Haptics.selectionAsync().catch(() => {});
           Animated.sequence([
@@ -234,7 +276,7 @@ const DiveDateEyebrow = ({ entry }) => {
       cancelled = true;
       timers.forEach(clearTimeout);
     };
-  }, [roll, stepOpacity]);
+  }, [roll, stepOpacity, closingRef]);
 
   if (!roll.active) {
     return <Text style={[styles.eyebrow, { color: paperInkSoft(entry.paper) }]}>{longDate(entry.date)}</Text>;
@@ -259,7 +301,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   entryBlock: {
+    flex: 1,
     padding: theme.spacing.lg,
+  },
+  entryScroll: {
+    flex: 1,
   },
   eyebrow: {
     ...theme.type.label,
