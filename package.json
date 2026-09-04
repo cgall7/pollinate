@@ -44,6 +44,8 @@
     "check:type-floor-derived": "node scripts/check-type-floor-derived.mjs",
     "check:reexport-bindings": "node scripts/check-reexport-bindings.mjs",
     "check:demo-mode-env": "node scripts/check-demo-mode-env.mjs",
+    "check:demo-seed": "node scripts/check-demo-seed.mjs",
+    "seed:demo-account": "node scripts/seed-demo-account.mjs",
     "check:demo-content-callsites": "node scripts/check-demo-content-callsites.mjs",
     "check:copy-rules": "node scripts/check-copy-rules.mjs",
     "check:onboarding-flow": "node scripts/check-onboarding-flow.mjs",
