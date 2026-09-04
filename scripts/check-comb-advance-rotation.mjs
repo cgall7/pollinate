@@ -346,6 +346,61 @@ async function main() {
     }
 
     // ---------------------------------------------------------------
+    // Roster snapshot on B's ADVANCED rotation (DoD clause 8's actual
+    // claim): this row's own header cites check-comb-open-rotation.mjs for
+    // the roster-snapshot shape but, until now, nothing had ever asserted
+    // that comb_advance_rotation's call into comb_open_rotation actually
+    // carries it — every prior assertion here stops at comb_rotations
+    // (row count, subject_profile_id). §1B.38.19's "month 2's hive arrives
+    // on the same shelf by the same mechanism" is a claim about
+    // hive_contributors, and hive_contributors is untouched by this file
+    // above this point. Two things a subject-only check cannot catch: the
+    // roster snapshot silently landing empty (would raise, not silently
+    // pass — but an empty catch here would still not prove the POSITIVE
+    // case), or landing on the WRONG hive (e.g. the advance re-using B's
+    // first hive_id instead of minting a second one, which would still
+    // pass every assertion above since none of them read hive_id at all).
+    {
+      const { rows: month1Rows } = await asPostgres(() =>
+        client.query('select hive_id from public.comb_rotations where id = $1', [rotBInit[0].id])
+      );
+      const month1HiveId = month1Rows[0].hive_id;
+
+      const { rows } = await asPostgres(() =>
+        client.query(
+          `select r.id, r.hive_id from public.comb_rotations r
+           where r.comb_id = $1 and r.voided_at is null and r.sealed_at is null`,
+          [combB]
+        )
+      );
+      const advancedHiveId = rows[0]?.hive_id;
+      if (rows.length === 1 && advancedHiveId && advancedHiveId !== month1HiveId) {
+        ok('B: the advanced rotation points at a NEW hive, not a re-use of month 1\'s');
+      } else {
+        bad(
+          'B: the advanced rotation points at a NEW hive, not a re-use of month 1\'s',
+          `advanced hive=${advancedHiveId}, month-1 hive=${month1HiveId}`
+        );
+      }
+
+      const { rows: contribRows } = await asPostgres(() =>
+        client.query('select profile_id from public.hive_contributors where hive_id = $1 order by profile_id', [
+          advancedHiveId,
+        ])
+      );
+      const seated = contribRows.map((r) => r.profile_id).sort();
+      const expected = [OWNER_B].sort();
+      if (JSON.stringify(seated) === JSON.stringify(expected)) {
+        ok('B: the advanced rotation\'s hive seats the OTHER enrollable member (previous subject) as its contributor');
+      } else {
+        bad(
+          'B: the advanced rotation\'s hive seats the OTHER enrollable member (previous subject) as its contributor',
+          `seated=${JSON.stringify(seated)}, expected=${JSON.stringify(expected)}`
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------
     // C: 2 enrollable, NO prior resolved rotation -> PRE-LAUNCH. No new
     // row, no raise — differs from A on the OTHER axis (enrollable count
     // is fine here; it's the missing resolved rotation that refuses).
