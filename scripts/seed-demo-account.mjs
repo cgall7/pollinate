@@ -47,7 +47,6 @@ import process from 'node:process';
 import { buildPlan, seedDemoAccount, supabaseAdapter } from './lib/demo-seed-writer.mjs';
 import {
   CAST,
-  DECORATIVE_NAME_COLLISIONS,
   DEMO_ACCOUNT_KEY,
   DEMO_ACCOUNT_NAME,
 } from './lib/demo-seed-corpus.mjs';
@@ -126,17 +125,14 @@ console.log(`  project:      ${SUPABASE_URL}`);
 console.log(`  demo account: ${DEMO_EMAIL} (${DEMO_ACCOUNT_NAME})`);
 console.log(`  cast:         ${CAST.map((c) => c.name).join(', ')}`);
 console.log('');
-console.log('  WARNING, and no database row can fix it: the decorative demo layer');
-console.log('  (src/constants/demoHive.js) is gated on DEMO_CONTENT, which is');
-console.log("  `__DEV__ || process.env.EXPO_PUBLIC_DEMO_MODE === 'true'`");
-console.log('  (src/constants/demoMode.js:20,46) and merged unconditionally at');
-console.log('  src/screens/HoneycombTab.js:100. Seeding real rows does NOT switch it off.');
-console.log(`  It ships decorative people already called ${DECORATIVE_NAME_COLLISIONS.join(', ')},`);
-console.log('  which collide with five of the six ratified cast names. To demo this');
-console.log("  seeded account without doubles, build a profile where EXPO_PUBLIC_DEMO_MODE");
-console.log('  is not "true" and __DEV__ is false (eas.json\'s `internal` profile). Note');
-console.log('  that also hides the one-tap "Continue as demo" login, which is gated on');
-console.log('  the same constant (src/screens/Onboarding.js:429-431).');
+console.log('  The decorative demo layer (src/constants/demoHive.js) is gated on');
+console.log('  DEMO_CONTENT, which is `__DEV__ || process.env.EXPO_PUBLIC_DEMO_MODE ===');
+console.log("  'true'` (src/constants/demoMode.js:20,46). It retires at runtime the moment");
+console.log('  a real connection exists (HoneycombTab.js, the dormancy gate), so seeding');
+console.log('  this account switches it off without a build change. It also shares no');
+console.log(`  names with the cast above (${CAST.map((c) => c.name).join(', ')}) — asserted`);
+console.log("  forward by check-demo-seed.mjs's A13. The one-tap \"Continue as demo\" login");
+console.log('  (src/screens/Onboarding.js:429-431) is on the same DEMO_CONTENT constant.');
 console.log('');
 console.log('  NOT WRITTEN, deliberately: ledger_transactions, ledger_postings and every');
 console.log('  other nectar/ledger table. Pass one is rotations, hives and the journal.');

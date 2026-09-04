@@ -150,21 +150,30 @@ export const CAST = [
 ];
 
 // ---------------------------------------------------------------------------
-// KNOWN COLLISION with the decorative layer, flagged not silently accepted
+// RETIRED, 2026-09-04 — the collision this used to declare no longer exists
 // ---------------------------------------------------------------------------
-// src/constants/demoHive.js's RAW_MEMBERS already contains decorative people
-// called Sam, Dev, Elena, Omar and Priya. Five of the six ratified cast names
-// collide. That decorative list renders whenever DEMO_CONTENT is true
-// (src/constants/demoMode.js:46, `__DEV__ || DEMO_MODE`), and no database row
-// can turn it off — see the writer's own header and the seed script's
-// preflight warning. On a build where DEMO_CONTENT is true, a viewer sees a
-// real Priya and a decorative Priya in the same honeycomb.
+// This block used to export DECORATIVE_NAME_COLLISIONS = ['Sam', 'Dev',
+// 'Elena', 'Omar', 'Priya'], declaring that five of the six ratified cast
+// names above collided with decorative people of the same names in
+// src/constants/demoHive.js's RAW_MEMBERS.
 //
-// NOT fixed by renaming the cast: the register ratified these six names and
-// this file does not get to overrule it. The fix is a build choice
-// (EXPO_PUBLIC_DEMO_MODE unset or "false", non-__DEV__ binary), and the seed
-// script says so at run time.
-export const DECORATIVE_NAME_COLLISIONS = ['Sam', 'Dev', 'Elena', 'Omar', 'Priya'];
+// It was RIGHT that the register's six cast names could not move — this file
+// does not get to overrule that ratification. It was WRONG to conclude that
+// meant no rename could fix the collision: the decorative roster was never
+// part of the register, and that is the list R-CL-3 (Pixel, 94ef930) moved,
+// renaming the five collisions to Zoya, Otis, Amara, Kofi and Nadia. Zero
+// intersection now, asserted forward by check-demo-seed.mjs's A13, which
+// reads CAST and DEMO_ACCOUNT_NAME out of this file and the names out of
+// demoHive.js, so a name added back on either side reds it instead of
+// silently reopening the doubles bug this rename fixed.
+//
+// The claim "no database row can turn it off" is also superseded, by the
+// runtime dormancy gate (Fizz, 3c01532): the decorative layer now retires at
+// runtime the moment the first real connection exists, which is exactly a
+// database row turning it off.
+//
+// Both consumers (check-demo-seed.mjs's A13, seed-demo-account.mjs's
+// preflight warning) were updated in the same commit this note was written.
 
 // ---------------------------------------------------------------------------
 // COMB A — the family comb

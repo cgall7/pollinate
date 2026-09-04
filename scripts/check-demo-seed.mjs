@@ -32,7 +32,6 @@ import {
   CAST,
   COMB_A,
   COMB_B,
-  DECORATIVE_NAME_COLLISIONS,
   DEMO_ACCOUNT_KEY,
   DEMO_ACCOUNT_NAME,
   PRIVATE_HIVES,
@@ -217,20 +216,23 @@ if (addressed.length >= 60 && STREAK.length > 0) {
   }
 }
 
-// --- the decorative-layer collision is declared ---------------------------
-// A source-level guard, not decoration: the collision is the single most
-// surprising fact about this seed, and a future edit that quietly drops the
-// declaration would remove the only warning anybody gets.
+// --- the decorative layer never collides with the ratified register -------
+// R-CL-3 (Pixel, 2026-09-04) renamed demoHive.js's decorative roster so it no
+// longer borrows any of the six ratified names. This row used to assert the
+// opposite — that a collision existed and was declared — which the rename
+// made false at its premise, not just its data: a corpus-side edit alone
+// could never have turned it green again. Inverted in place (same row id)
+// rather than deleted, so a name added back on either side reds this instead
+// of silently reopening the doubles bug the rename fixed.
 {
-  const castNames = new Set(CAST.map((c) => c.name));
-  const declared = new Set(DECORATIVE_NAME_COLLISIONS);
+  const register = new Set([DEMO_ACCOUNT_NAME, ...CAST.map((c) => c.name)]);
   const demoHiveSrc = fs.readFileSync(path.join(ROOT, 'src/constants/demoHive.js'), 'utf8');
-  const actual = [...castNames].filter((n) => new RegExp(`name: '${n}'`).test(demoHiveSrc));
-  const agree = actual.length === declared.size && actual.every((n) => declared.has(n));
-  if (agree && actual.length > 0) {
-    ok(`A13 the ${actual.length} cast names that collide with demoHive.js's decorative roster are declared`);
+  const decorative = [...demoHiveSrc.matchAll(/name: '([^']+)'/g)].map((m) => m[1]);
+  const collisions = decorative.filter((n) => register.has(n));
+  if (decorative.length > 0 && collisions.length === 0) {
+    ok(`A13 none of demoHive.js's ${decorative.length} decorative names collide with the ratified register`);
   } else {
-    bad('A13 decorative collision declaration', `demoHive.js collides on [${actual.join(',')}], corpus declares [${[...declared].join(',')}]`);
+    bad('A13 decorative/register disjointness', `demoHive.js collides on [${collisions.join(',')}] (register: [${[...register].join(',')}])`);
   }
 }
 
