@@ -20,15 +20,19 @@
 // imported and executed unmodified; their one dependency (`expo-linking`)
 // can't load in plain Node (it pulls in `expo-modules-core`'s native
 // bindings), so it is stubbed at RESOLVE time via the same registerHooks
-// seam check-seeds-contract.mjs already uses. The stub's `parse` is a
-// direct port of expo-linking's own algorithm for the fields these two
-// files read (`path`, `hostname`, `queryParams`) — verified line-for-line
-// against node_modules/expo-linking/src/createURL.ts's `parse()` — plus one
-// hand-verified fact about the Expo Go shape (its own file comments already
-// claim this, this gate is what makes the claim checkable): `Linking.parse`
-// folds the `--/` dev-client separator away. The stub does NOT reimplement
-// `createURL`'s Expo-hosted/hostUri branching — this gate never calls
-// `createURL`, only the parse-side guards the incident is about.
+// seam check-seeds-contract.mjs already uses. The stub's `parse` models
+// `path` exactly against node_modules/expo-linking/src/createURL.ts's own
+// `parse()` — plus one hand-verified fact about the Expo Go shape (its own
+// file comments already claim this, this gate is what makes the claim
+// checkable): `Linking.parse` folds the `--/` dev-client separator away.
+// `hostname` and `queryParams` are modelled only APPROXIMATELY: the real
+// `parse()` also nulls `hostname` on the Expo-hosted branch and strips
+// anything before a `+` in `path` (Vector, thread f2c15b7d) — neither is
+// reachable by the six URL shapes this gate asserts, so no verdict here
+// depends on them, but a future case that IS in that territory needs the
+// real library, not this stub. The stub does NOT reimplement `createURL`'s
+// Expo-hosted/hostUri branching either — this gate never calls `createURL`,
+// only the parse-side guards the incident is about.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
