@@ -398,26 +398,32 @@ if (uniqueTints.length >= 2) {
   bad('C5', `read ${uniqueTints.length} tint token(s) out of Avatar.js — the probe cannot see HEX_TINTS, so C5 would pass vacuously`);
 }
 
-// C6: draw order. §6.4's ruling is contingent on the ring being drawn OVER
-// its ground; the held fill is a second ground, so it has to land in the
-// same slot the honey body does — above the identity paint, below the seal,
-// the ring and the stroke. Read as indices in FilledCell's own JSX.
+// C6: draw order. The held fill is a second ground for whatever is painted
+// above it, so it has to land in the same slot the honey body does — above
+// the identity paint, below the seal, the light and the stroke. Read as
+// indices in FilledCell's own JSX.
+//
+// R-CL-2 renamed the last member of this list (`BloomRing` -> `BloomLight`)
+// and its position is unchanged, which is the substance rather than a
+// rename: §6.4's ruling was contingent on the ring being drawn over its
+// ground, and check-honey-fill's successor row measures the meniscus seen
+// THROUGH the light on the same contingency.
 const idx = (needle) => gridSrc.indexOf(needle);
 const order = [
   ['identity paint', idx('member.avatarUrl ?')],
   ['HoneyFill', idx('<HoneyFill')],
   ['SelectionFill', idx('<SelectionFill')],
   ['seeded seal', idx('member.seeded &&')],
-  ['BloomRing', idx('<BloomRing')],
+  ['BloomLight', idx('<BloomLight')],
 ];
 const missing = order.filter(([, i]) => i < 0).map(([n]) => n);
 const ascending = order.every(([, i], k) => k === 0 || i > order[k - 1][1]);
 if (missing.length === 0 && ascending) {
-  ok(`C6 FilledCell paints ${order.map(([n]) => n).join(' -> ')} — the held fill lands in the honey body's own slot, so §6.4's "the ring is drawn after the honey body" stays true of the new ground too`);
+  ok(`C6 FilledCell paints ${order.map(([n]) => n).join(' -> ')} — the held fill lands in the honey body's own slot, so "drawn after the honey body" stays true of the new ground too`);
 } else if (missing.length) {
   bad('C6', `could not find ${missing.join(', ')} in FilledCell — the draw order is unverified, which is not the same as correct`);
 } else {
-  bad('C6', `FilledCell's paint order is ${order.sort((a, b) => a[1] - b[1]).map(([n]) => n).join(' -> ')} — expected identity paint -> HoneyFill -> SelectionFill -> seeded seal -> BloomRing`);
+  bad('C6', `FilledCell's paint order is ${order.sort((a, b) => a[1] - b[1]).map(([n]) => n).join(' -> ')} — expected identity paint -> HoneyFill -> SelectionFill -> seeded seal -> BloomLight`);
 }
 
 // ====================================================== D. THE STILL SCREEN
@@ -483,7 +489,7 @@ if (unexpected.length === 0) {
 console.log('\nE. Reduced motion — a held state is not an animation');
 
 // Brace-MATCH the branch out of `handleSelect` specifically. A lazy
-// `[\s\S]*?` from the first `if (reduced) {` walks past BloomRing's own
+// `[\s\S]*?` from the first `if (reduced) {` walks past BloomLight's own
 // reduced branch and swallows `releaseHeld` on the way to the next
 // `} else {` — which made this row red on correct code the moment the
 // release beat landed. Same failure as a lazy `[...]` bracket regex reading

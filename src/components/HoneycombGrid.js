@@ -3,16 +3,11 @@ import { View, Text, Animated, StyleSheet, Pressable, Easing } from 'react-nativ
 import * as Haptics from 'expo-haptics';
 import Svg, { Polygon, Path, Line, Circle, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
 import { theme } from '../constants/theme';
-import {
-  BLOOM_RING_INSET,
-  BLOOM_MARK_EDGE_FRACTION,
-  BLOOM_MARK_STROKE_WIDTH,
-  BLOOM_FLOOR_OPACITY,
-} from '../constants/bloomRing';
+import { BLOOM_BREATHE_MS, BLOOM_FLOOR_OPACITY, BLOOM_LIGHT_ALPHA } from '../constants/bloomLight';
 import { CELL_CANVAS_PAD, CELL_STROKE_WIDTH } from '../constants/combCell';
 import { hexTintFor } from './Avatar';
 import { initialsFor } from '../utils/initials';
-import { hexPoints, hexEdgeMarks, hexSealPath, honeyHMax, HONEY_MENISCUS_STROKE, honeyHeightForLevel, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
+import { hexPoints, hexSealPath, honeyHMax, HONEY_MENISCUS_STROKE, honeyHeightForLevel, hexHoneyPoints, hexHoneyMeniscus } from './HexShape';
 import { useSvgId } from '../utils/svgId';
 import { DURATIONS, HONEY, HONEY_EASING, NECTAR, PRESS, STAGGER_MS, useReducedMotion } from '../constants/motion';
 import { hexTap as hexTapHaptics } from '../constants/haptics';
@@ -78,65 +73,50 @@ const SPIRAL = hexSpiral(1);
 // of demo/real, and 0.45 is restored as R55's device-measured fill value.
 const DEMO_OPACITY = 0.45;
 
-// The ring's geometry constants live in `src/constants/bloomRing.js`, not
-// here (imported below) — `scripts/lib/bloom-ring-region.mjs` needs them
-// with a bare `node` import to derive the tripwire's Hive ambient region,
-// and this file's JSX only Metro/Babel can parse.
-
-// Breathing cadence: no `DURATIONS.breathe` constant exists yet (motion.js
-// still lists honeycomb breathing loops as unextracted §14.1 follow-up), so
-// this reuses GlowOrb's ratified 2400ms half-cycle rather than inventing a
-// new number — same anchor the rest of the app's "breathe" treatments use.
+// R-CL-2 (Lumen, 2026-09-04, off Colin's screenshot). THE RING RETIRED AND THE
+// STATE DID NOT. The six dashed edge marks read as an outline that failed to
+// draw — "a feature wearing a bug's clothes" — so blooming moved out of the
+// outline channel entirely and into the cell's own LIGHT. The outline now
+// carries selection and nothing else.
 //
-// §12.5.1b (R61, Pixel's catch): the anchor only covers CADENCE. The floor
-// (below) is a separate number and was NOT borrowed from GlowOrb — its
-// 25% swing is not this ring's 55%. Citing the anchor for the whole
-// animation is what let an invented depth pass as ratified. The floor is
-// now measured against the contrast bar it has to clear, not against
-// GlowOrb's.
-const BLOOM_BREATHE_MS = 2400;
-// BLOOM_FLOOR_OPACITY now lives in constants/bloomRing.js, alongside the
-// ring's other geometry — DES-24 §6.4 row 10 needs the real number in a
-// check gate, not a second copy of it.
-
-// The blooming state: a segmented ring, not a wash, because fill is spent
-// on identity (`hexTintFor`) and its range is capped by whichever tint a
-// member's name hashed to — a washSky member's full fill range measured at
-// less than half of washYellow's, so state can't live there without some
-// friends permanently reading quieter than others. Marks are tint-
-// independent and stack with `seeded` for free (a cell can be both).
-// Static under Reduce Motion — the ring itself never disappears (R46); only
-// the breathe does.
+// The light's constants live in `src/constants/bloomLight.js`, not here — a
+// bare-`node` check script cannot parse this file's JSX, and that file carries
+// the whole retirement ledger (which of the ring's numbers survived, which
+// have no successor, and why 0.18).
 //
-// DES-24 §6.4 row 10 (device-measured): on a honeyed cell, three of the six
-// edge marks sit inside the honey body, where `inkSoft` floors at 2.609
-// against the 3.0 bar for 2022ms of every 4800ms breathe. The ground swaps
-// the mark colour to `ink` (5.644 at the same floor) — a strength change,
-// not a hue change (LCh: `ink`/`inkSoft` are h 90.94°/91.44°, half a degree
-// apart). Requires the honey body drawn first — see draw order in
-// `FilledCell` below (§6.4: "the blooming ring is drawn after the honey body").
+// WHAT THE LIGHT IS MADE OF, and why it is two layers rather than one overlay.
+// Lumen ruled "the lit-variant material the dive already uses"; measured, that
+// material is a PAIR, not a single paint. `accentBurst` composited straight
+// onto a cell brightens nothing (L* 91.73 against `washYellow` 95.73 and
+// `washSky` 94.72 — the light token is DARKER than both grounds it would sit
+// on), and on `washSky` every register legible on `washYellow` lands
+// green-dominant: at α 0.12, rgb(231,241,221), G the max channel. A green cell
+// in a honey comb is the one thing this palette rules out, and it is the same
+// defect the dim register's own note already names one layer down. So:
 //
-// The prop is `honeyGround`, not `honeyed`, because MB-D2b gave the same
-// defect a SECOND ground and this one is reachable today. A selected cell
-// holds an opaque `accent` fill under all six marks (not three), and
-// `inkSoft` at the ring's own `BLOOM_FLOOR_OPACITY` measures **2.8399:1**
-// there — under the same 3:1 bar, by the same mechanism, on a pair
-// (`blooming` + `selected`) that has a live producer on both sides
-// (`HoneycombTab.js:378` sets `blooming` off `last_note_received_at`; any
-// tap sets `selected`). `honeyed` was still latent when this was written —
-// nothing wrote `honeyRung` — so naming the prop after it would have named
-// the case that CANNOT happen while missing the one that can. `ink` measures
-// 6.0937 at the same floor. The condition is "is my ground an accent-family
-// fill", and it now has two writers.
+//   1. a blooming cell's identity tint is replaced by `washYellow`, the app's
+//      warm ground and the dive's own filled-cell ground (R-CD-13), drawn at
+//      the tint's own place in the stack so the honey and the seal stay above
+//      it; and
+//   2. `accentBurst` rides on top at `BLOOM_LIGHT_ALPHA`, breathing.
 //
-// R-N2 UPDATE 2026-08-29: `honeyed` is no longer latent —
-// `HoneycombTab.honeyLevel` writes `member.honeyLevel` off the real balance,
-// so the third writer arrived. The ruling is unaffected and the reason it is
-// unaffected is the point: the prop was named after the CONDITION rather
-// than after one of its cases, so a new writer joins it without a rename.
-const BloomRing = ({ size, reduced, honeyGround }) => {
+// Together those two ARE the dive's backlit filled cell, ported whole. No new
+// gold surface, per R-CD-3.
+//
+// AVATAR-BACKED CELLS TAKE LAYER 2 ONLY (§6.5(a): the same overlay, above the
+// photo). The base swap is deliberately not applied there, because an opaque
+// wash over a photograph deletes the person. Warm light landing on a
+// photograph can push a cool photo's local hue around, and that is allowed
+// where the flat token case is not: `washSky` is a BRAND SURFACE and turning
+// it mint is a palette failure, while a photograph already contains every hue
+// and warm light falling across one is what warm light does.
+//
+// STATIC UNDER REDUCE MOTION AT THE PEAK, not at the floor and not absent —
+// R46's rule, inherited from the ring unchanged: the state never disappears,
+// only the breathe does.
+const BloomLight = ({ size, reduced }) => {
   const pulse = useRef(new Animated.Value(1)).current;
-  const marks = useMemo(() => hexEdgeMarks(size, BLOOM_RING_INSET, BLOOM_MARK_EDGE_FRACTION), [size]);
+  const points = useMemo(() => hexPoints(size), [size]);
 
   useEffect(() => {
     if (reduced) {
@@ -155,18 +135,7 @@ const BloomRing = ({ size, reduced, honeyGround }) => {
 
   return (
     <AnimatedG opacity={pulse}>
-      {marks.map(([x1, y1, x2, y2], i) => (
-        <Line
-          key={i}
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          stroke={honeyGround ? theme.colors.ink : theme.colors.inkSoft}
-          strokeWidth={BLOOM_MARK_STROKE_WIDTH}
-          strokeLinecap="round"
-        />
-      ))}
+      <Polygon points={points} fill={theme.colors.accentBurst} fillOpacity={BLOOM_LIGHT_ALPHA} />
     </AnimatedG>
   );
 };
@@ -364,7 +333,13 @@ const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => 
             opacity={register}
           />
         ) : (
-          <Polygon points={points} fill={tint} fillOpacity={register} />
+          /* R-CL-2 layer 1: a blooming cell's ground IS the lit ground. The
+             swap happens HERE, at the identity layer, rather than as another
+             overlay near the top of the stack, so the honey body, the seal and
+             the selection fill all stay above it and keep their own grounds.
+             Avatar-backed cells never reach this branch, which is exactly the
+             §6.5(a) split: they take the light and keep the photograph. */
+          <Polygon points={points} fill={member.blooming ? theme.colors.washYellow : tint} fillOpacity={register} />
         )}
         {/* Honey enters above the tint/avatar and below the seal (§6.4: the
             blooming ring's ink-vs-inkSoft ruling measures the ring drawn
@@ -379,15 +354,25 @@ const FilledCell = ({ member, size, selected, held, reduced, fillProgress }) => 
             avatar/tint), not a second colour — R51's register rule. Drawn
             in this same Svg so the hole shows that fill, not a blank gap. */}
         {member.seeded && <Path d={sealPath} fill={theme.colors.ink} fillRule="evenodd" />}
-        {member.blooming && <BloomRing size={size} reduced={reduced} honeyGround={honeyed || held} />}
-        {/* Beat 1 (Lane D): surface -> ink on tap, width held constant at
-            2.5pt — "no width change, the luxury is restraint here." Width
+        {/* The light is last before the outline — above the honey, the
+            selection fill and the seal, because it is light falling on the
+            cell rather than another thing inside it. It takes no ground prop:
+            the ring needed one (ink marks had to swap strength over a honey
+            body, §6.4 row 10) and a warm wash over a warm ground has no such
+            case. */}
+        {member.blooming && <BloomLight size={size} reduced={reduced} />}
+        {/* Beat 1 (Lane D): the rest tone -> ink on tap, width held constant
+            at 2.5pt — "no width change, the luxury is restraint here." Width
             used to jump 2 -> 2.5 with the colour; that's the one part of
-            this line the spec explicitly rules out. */}
+            this line the spec explicitly rules out.
+            R-CL-2: the rest tone is `glassHairline`, one wax hairline on
+            every cell in both combs, and it is no longer `surface` — see
+            `CELL_REST_STROKE_TOKEN` in combCell.js for the four grounds it
+            was measured on. */}
         <Polygon
           points={points}
           fill="none"
-          stroke={selected ? theme.colors.ink : theme.colors.surface}
+          stroke={selected ? theme.colors.ink : theme.colors.glassHairline}
           strokeWidth={CELL_STROKE_WIDTH}
         />
       </Svg>
@@ -416,12 +401,20 @@ const EmptyCell = ({ size }) => {
         height={size * 2 + CELL_CANVAS_PAD * 2}
         viewBox={`${-CELL_CANVAS_PAD} ${-CELL_CANVAS_PAD} ${size * 2 + CELL_CANVAS_PAD * 2} ${size * 2 + CELL_CANVAS_PAD * 2}`}
       >
+        {/* R-CL-2's "one uniform wax-tone hairline on every cell at the
+            constant 2.5pt" is read to include the empty seats, and
+            deliberately: a lattice whose filled cells are outlined in one
+            grey at 2.5pt and whose open seats are outlined in a different
+            grey at 1.5pt is the inconsistency Colin's screenshot reads as
+            broken, not a hierarchy anyone can decode. The seat's quietness is
+            carried by what it is missing — a 0.45 fill, no face, no name —
+            not by owning a second outline tone. */}
         <Polygon
           points={points}
           fill={theme.colors.surface}
           fillOpacity={0.45}
-          stroke={theme.colors.surfaceBorderStrong}
-          strokeWidth={1.5}
+          stroke={theme.colors.glassHairline}
+          strokeWidth={CELL_STROKE_WIDTH}
         />
       </Svg>
       <View style={styles.cellOverlay} pointerEvents="none">

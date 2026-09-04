@@ -34,31 +34,15 @@ const hexVertex = (size, i) => {
   return { x: size + size * Math.cos(angle), y: size + size * Math.sin(angle) };
 };
 
-// One mark centred on each of the six edges, inset toward the center — the
-// segmented "blooming" ring (§21/6.4, Pixel-ruled 2026-08-13: cell fill is
-// identity, marks and rings are state — fill can only ever hold one value
-// and its range is capped by whichever tint the member's name hashed to,
-// so it can't carry a second signal). Built off the same vertex formula as
-// `hexPoints` so a mark and the cell it sits on always agree about where
-// the edges are. Returns six `[x1, y1, x2, y2]` pairs for direct use as SVG
-// `Line` endpoints.
-export const hexEdgeMarks = (size, inset, edgeFraction) => {
-  const center = { x: size, y: size };
-  const marks = [];
-  for (let i = 0; i < 6; i += 1) {
-    const v0 = hexVertex(size, i);
-    const v1 = hexVertex(size, (i + 1) % 6);
-    const mid = { x: (v0.x + v1.x) / 2, y: (v0.y + v1.y) / 2 };
-    const outLen = Math.hypot(mid.x - center.x, mid.y - center.y);
-    const inward = { x: (mid.x - center.x) / outLen, y: (mid.y - center.y) / outLen };
-    const p = { x: mid.x - inward.x * inset, y: mid.y - inward.y * inset };
-    const edgeLen = Math.hypot(v1.x - v0.x, v1.y - v0.y);
-    const along = { x: (v1.x - v0.x) / edgeLen, y: (v1.y - v0.y) / edgeLen };
-    const half = (size * edgeFraction) / 2;
-    marks.push([p.x - along.x * half, p.y - along.y * half, p.x + along.x * half, p.y + along.y * half]);
-  }
-  return marks;
-};
+// RETIRED 2026-09-04, R-CL-2 (Lumen): `hexEdgeMarks` lived here — one mark
+// centred on each of the six edges, the segmented "blooming" ring. The ring
+// retired when blooming moved into the cell's own light, and the generator
+// retired with it because nothing else drew marks on an edge. Named rather
+// than silently deleted, because two comments below still reason about where
+// it used to sit (the §21.10 seal move) and a reader needs to know that
+// reasoning describes a mark that is no longer painted. Its last non-comment
+// reference outside the ring, the nectar surface registry's honeyed-mark
+// anchor, now points at `HoneyFill`, which draws that mark since R-N2.
 
 // The "seeded" badge: a small hexagon seal on the cell's lower-right VERTEX
 // ray (60° from centre), figure knocked out to whatever painted beneath it

@@ -29,13 +29,19 @@
 //      against the shipped body actually clears 3:1 (~3.83). Build to spec
 //      (`ink`) regardless; see check 5 for the ring's real, breathing-floor
 //      reason `inkSoft` genuinely fails on a honeyed cell.
-//   5. DES-24 §6.4 row 10 — the BloomRing's ink/inkSoft swap on a honeyed
-//      cell — checked at the ring's own breathe floor (`BLOOM_FLOOR_OPACITY`,
-//      imported live from `constants/bloomRing.js`, not re-typed here):
-//      `ink` at the floor clears 3:1 over the honey body; `inkSoft` at the
-//      same floor does not. This is the exact defect §6.4 found (three of
-//      six edge marks sit inside the honey and `inkSoft` dips under the bar
-//      for 2022ms of every 4800ms cycle) and the exact fix's contrast math.
+//   5. R-CL-2 RETIRED DES-24 §6.4 ROW 10 AND THIS IS ITS SUCCESSOR. Row 10
+//      was the BloomRing's ink/inkSoft swap on a honeyed cell: three of the
+//      six edge marks sat inside the honey body, and `inkSoft` at the ring's
+//      breathe floor dipped under the 3:1 non-text bar for 2022ms of every
+//      4800ms cycle, so the mark colour swapped to `ink` on that ground. The
+//      ring retired, and with it every ink mark drawn on this cell — there is
+//      nothing left on the honey to measure a swap for, so the row has no
+//      successor in its own terms and is not resurrected.
+//      What replaces it is the question the light actually raises: the light
+//      is drawn OVER the honey body, so the meniscus and the body are both
+//      seen through it, and the row asserts the meniscus survives that. It is
+//      the same instrument (a contrast pair on this cell's honey) pointed at
+//      the layer that is really there now.
 //   6. Source-level: `HoneycombGrid.js` gates the honey renderer on
 //      `member.isOwn` (§6.2/§6.4 row 4 — resolves the seeded+honeyed
 //      collision by constraint AND keeps a descending initial like "Q" out
@@ -43,8 +49,7 @@
 //      "You"). A gate silently dropped in a future edit is the one failure
 //      mode none of the above numeric checks can see.
 //   7. Source-level: the honey fill renders before `seeded` and before
-//      `BloomRing` in `FilledCell`, and `BloomRing` receives a
-//      `honeyGround=` naming BOTH accent-family grounds. §6.4's ruling is
+//      `BloomLight` in `FilledCell`, and `BloomLight` takes NO ground prop. §6.4's ruling is
 //      contingent on this exact draw order — the ring drawn first is a
 //      different, unmeasured picture. MB-D2b (2026-08-28) added the second
 //      ground: a selected cell's held `accent` fill sits under all six
@@ -90,9 +95,9 @@ import {
   honeyLevelForDrops,
 } from '../src/constants/nectar.js';
 import { parse } from '@babel/parser';
-import { BLOOM_FLOOR_OPACITY } from '../src/constants/bloomRing.js';
+import { BLOOM_FLOOR_OPACITY, BLOOM_LIGHT_ALPHA } from '../src/constants/bloomLight.js';
 import { theme } from '../src/constants/theme.js';
-import { parseColor, over, contrastRatio } from './lib/color.mjs';
+import { parseColor, over, contrastRatio, deltaE00 } from './lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -188,21 +193,23 @@ if (near(inkOnBody, 10.437, 0.02)) {
   bad('meniscus contrast (ink)', `${inkOnBody.toFixed(3)}:1, expected ~10.437 (§3) — ink, accentDeep, or the 0.50 opacity moved`);
 }
 
-// --- 5. BloomRing on a honeyed cell: ink clears the floor, inkSoft doesn't
-const ringInkAtFloor = { ...parseColor(theme.colors.ink), a: BLOOM_FLOOR_OPACITY };
-const ringInkSoftAtFloor = { ...parseColor(theme.colors.inkSoft), a: BLOOM_FLOOR_OPACITY };
-// Contrast needs an opaque background; composite the translucent ring mark over the honey body itself.
-const inkFloorOnHoney = contrastRatio(over(ringInkAtFloor, body), body);
-const inkSoftFloorOnHoney = contrastRatio(over(ringInkSoftAtFloor, body), body);
-if (inkFloorOnHoney >= 3.0) {
-  ok(`BloomRing ink at floor opacity (${BLOOM_FLOOR_OPACITY}) vs honey body: ${inkFloorOnHoney.toFixed(3)}:1, clears 3:1 — §6.4 row 10's fix`);
+// --- 5. The blooming light over the honey body (R-CL-2's successor to §6.4
+// row 10). The light is one polygon over the whole cell, so a lit honeyed
+// cell shows its meniscus and its body BOTH through `accentBurst` at
+// BLOOM_LIGHT_ALPHA. Measured at the breathe's floor as well as its peak,
+// because the floor is where a contrast pair is weakest and the floor is a
+// state the cell rests in for real time, not a transient.
+const litOver = (colour, alpha) => over({ ...parseColor(theme.colors.accentBurst), a: alpha }, colour);
+const litBodyPeak = litOver(body, BLOOM_LIGHT_ALPHA);
+const litBodyFloor = litOver(body, BLOOM_LIGHT_ALPHA * BLOOM_FLOOR_OPACITY);
+const litMeniscusPeak = litOver(parseColor(theme.colors.ink), BLOOM_LIGHT_ALPHA);
+const litMeniscusFloor = litOver(parseColor(theme.colors.ink), BLOOM_LIGHT_ALPHA * BLOOM_FLOOR_OPACITY);
+const litPeakRatio = contrastRatio(litMeniscusPeak, litBodyPeak);
+const litFloorRatio = contrastRatio(litMeniscusFloor, litBodyFloor);
+if (litPeakRatio >= 3.0 && litFloorRatio >= 3.0) {
+  ok(`ink meniscus through the blooming light: ${litPeakRatio.toFixed(3)}:1 at the light's peak and ${litFloorRatio.toFixed(3)}:1 at its floor, both clear 3:1 — a lit honeyed cell still shows the level it holds`);
 } else {
-  bad('BloomRing honeyed floor (ink)', `${inkFloorOnHoney.toFixed(3)}:1 fails 3:1 — the honeyed-cell ink swap no longer clears the bar at the ring's breathe floor`);
-}
-if (inkSoftFloorOnHoney < 3.0) {
-  ok(`BloomRing inkSoft at floor opacity vs honey body: ${inkSoftFloorOnHoney.toFixed(3)}:1, correctly fails 3:1 — reproduces §6.4 row 10's original defect`);
-} else {
-  bad('BloomRing honeyed floor (inkSoft)', `${inkSoftFloorOnHoney.toFixed(3)}:1 unexpectedly clears 3:1 — §6.4 row 10's ink-vs-inkSoft reasoning may no longer hold`);
+  bad('meniscus under the blooming light', `${litPeakRatio.toFixed(3)}:1 at peak / ${litFloorRatio.toFixed(3)}:1 at floor — the light is washing out the honey's own surface line, which is the level itself`);
 }
 
 // --- 6 & 7. Source-level: the isOwn gate and the draw order ------------
@@ -221,24 +228,7 @@ if (gateMatch) {
 
 const honeyIdx = gridSrc.indexOf('<HoneyFill');
 const seededIdx = gridSrc.indexOf('member.seeded &&');
-const bloomRingIdx = gridSrc.indexOf('<BloomRing');
-// The prop was `honeyed={honeyed}` until MB-D2b (2026-08-28) gave the same
-// ink/inkSoft defect a second ground: a cell holding the selection's opaque
-// `accent` fill puts that fill under all six marks, where `inkSoft` at the
-// ring's breathe floor measures 2.8399:1 — the same bar, the same mechanism,
-// and unlike `honeyed` it is reachable today.
-//
-// The row does NOT pin the second flag's NAME. What it asserts is the
-// invariant: **whatever condition draws an accent-family body under the ring
-// must also appear in the ring's ground condition.** So it reads the flag
-// `<SelectionFill>` actually renders under, out of the same file, and
-// requires it. Pinning the literal `selected` would have gone red on the
-// correct build the moment the fill moved onto its own `held` flag for the
-// release beat — a gate reporting a defect that is really a rename.
-const bloomRingPropMatch = /<BloomRing[^>]*honeyGround=\{([^}]*)\}/.exec(gridSrc);
-const bloomRingGroundInputs = bloomRingPropMatch
-  ? bloomRingPropMatch[1].split('||').map((t) => t.trim())
-  : [];
+const bloomLightIdx = gridSrc.indexOf('<BloomLight');
 const selectionFillFlag = /\{(\w+) && <SelectionFill/.exec(gridSrc)?.[1] ?? null;
 
 if (honeyIdx > -1 && seededIdx > -1 && honeyIdx < seededIdx) {
@@ -246,30 +236,73 @@ if (honeyIdx > -1 && seededIdx > -1 && honeyIdx < seededIdx) {
 } else {
   bad('draw order (honey before seeded)', `honey at index ${honeyIdx}, seeded at index ${seededIdx} — expected honey first`);
 }
-if (honeyIdx > -1 && bloomRingIdx > -1 && honeyIdx < bloomRingIdx) {
-  ok('honey fill renders before BloomRing in FilledCell (§6.4: the ring is measured drawn OVER the honey)');
+if (honeyIdx > -1 && bloomLightIdx > -1 && honeyIdx < bloomLightIdx) {
+  ok('honey fill renders before BloomLight in FilledCell — check 5 measures the meniscus seen THROUGH the light, and the other order is a different, unmeasured picture');
 } else {
-  bad('draw order (honey before BloomRing)', `honey at index ${honeyIdx}, BloomRing at index ${bloomRingIdx} — expected honey first`);
-}
-if (!selectionFillFlag) {
-  bad('BloomRing honeyGround prop', 'could not find the flag <SelectionFill> renders under in FilledCell — the ring-ground invariant cannot be checked, which is not the same as it holding');
-} else if (bloomRingGroundInputs.includes('honeyed') && bloomRingGroundInputs.includes(selectionFillFlag)) {
-  ok(`BloomRing receives honeyGround={${bloomRingGroundInputs.join(' || ')}} — both accent-family grounds are in the condition: §6.4 row 10's honey, and the flag <SelectionFill> itself renders under (\`${selectionFillFlag}\`)`);
-} else if (bloomRingPropMatch) {
-  bad('BloomRing honeyGround prop', `FilledCell passes honeyGround={${bloomRingGroundInputs.join(' || ')}} — expected \`honeyed\` (§6.4 row 10) and \`${selectionFillFlag}\`, the flag that draws the selection fill under the same marks (2.8399:1 at the ring's floor)`);
-} else {
-  bad('BloomRing honeyGround prop', 'FilledCell no longer passes honeyGround={...} to <BloomRing> — the §6.4 row 10 fix may be disconnected');
+  bad('draw order (honey before BloomLight)', `honey at index ${honeyIdx}, BloomLight at index ${bloomLightIdx} — expected honey first`);
 }
 
-// The second ground's own contrast pair, measured here rather than quoted
-// from MB-D2b's message — same instrument as check 5, different ground.
-const selectionBody = theme.colors.accent;
-const inkFloorOnSelection = contrastRatio(over(ringInkAtFloor, selectionBody), selectionBody);
-const inkSoftFloorOnSelection = contrastRatio(over(ringInkSoftAtFloor, selectionBody), selectionBody);
-if (inkFloorOnSelection >= 3.0 && inkSoftFloorOnSelection < 3.0) {
-  ok(`BloomRing over the held selection fill: ink ${inkFloorOnSelection.toFixed(4)}:1 clears 3:1, inkSoft ${inkSoftFloorOnSelection.toFixed(4)}:1 does not — the same swap, on the ground MB-D2b added`);
+// R-CL-2 RETIRED THE `honeyGround` PROP AND THIS ROW IS WHAT REPLACED IT.
+// The ring took a ground condition because ink marks had to swap strength
+// over an accent-family body — `honeyed` for §6.4 row 10's honey, and
+// (MB-D2b) the flag `<SelectionFill>` renders under, since a selected cell
+// puts an opaque `accent` fill under all six marks at 2.8399:1. Neither case
+// exists for a warm wash over a warm ground: the light is one uniform
+// polygon and every body beneath it is warmed by the same amount.
+//
+// So the invariant inverts, and it is asserted rather than dropped: the light
+// takes NO ground prop. A future edit that reintroduces one is reintroducing a
+// per-ground register on this cell, which is a design change that needs its own
+// measurement — this row makes it stop here rather than ship quietly.
+const bloomLightPropMatch = /<BloomLight([^>]*)\/>/.exec(gridSrc);
+const bloomLightProps = bloomLightPropMatch
+  ? [...bloomLightPropMatch[1].matchAll(/(\w+)=/g)].map((m) => m[1]).sort()
+  : null;
+if (!selectionFillFlag) {
+  bad('BloomLight props', 'could not find the flag <SelectionFill> renders under in FilledCell — the selection body this cell can hold is no longer identifiable, which is not the same as it being absent');
+} else if (bloomLightProps && bloomLightProps.join(',') === 'reduced,size') {
+  ok(`BloomLight receives exactly {${bloomLightProps.join(', ')}} — no ground condition, which is R-CL-2's own claim: one uniform light over whatever the cell is holding (its honey, or the \`${selectionFillFlag}\` selection fill)`);
+} else if (bloomLightPropMatch) {
+  bad('BloomLight props', `<BloomLight> takes {${bloomLightProps.join(', ')}} — expected exactly {reduced, size}. A ground prop here means the light has a per-ground register again, and §6.4 row 10's kind of measurement has to come back with it`);
 } else {
-  bad('BloomRing selection floor', `ink ${inkFloorOnSelection.toFixed(4)}:1 / inkSoft ${inkSoftFloorOnSelection.toFixed(4)}:1 over \`accent\` — expected ink to clear 3:1 and inkSoft to fail it; if inkSoft now clears, the \`selected\` half of the honeyGround condition should be re-ruled, not silently kept`);
+  bad('BloomLight props', 'FilledCell no longer renders <BloomLight ... /> — the blooming state may have lost its renderer entirely');
+}
+
+// R-CL-2's successor to MB-D2b's second-ground row. MB-D2b measured the ring's
+// marks over the held selection fill (`ink` 6.0937:1 clears, `inkSoft`
+// 2.8399:1 does not) because a selected cell put an opaque `accent` body under
+// all six marks. There are no marks now, so that pair has nothing to measure.
+//
+// The collision the light creates in its place is a DIFFERENT one and it is
+// the one worth a row: selection and blooming are now both fills. A selected
+// cell is `accent` under the light; a blooming unselected cell is `washYellow`
+// under the same light. If those two converged, a tap would stop reading as a
+// tap on any cell that happened to be lit.
+//
+// The blooming ground is READ OUT OF THE FILE, not named here. A row that
+// measures two tokens it chose itself would stay green through an edit that
+// pointed the swap at `accent` — it would be measuring a pair nobody paints.
+const bloomGroundToken = /fill=\{member\.blooming \? theme\.colors\.(\w+) : tint\}/.exec(gridSrc)?.[1] ?? null;
+if (!bloomGroundToken) {
+  bad('blooming ground', 'FilledCell no longer swaps the identity tint on `member.blooming` — the lit ground cannot be read, which is not the same as it being correct');
+}
+const selectionBody = theme.colors.accent;
+const litSelected = litOver(parseColor(selectionBody), BLOOM_LIGHT_ALPHA);
+const litBlooming = litOver(parseColor(theme.colors[bloomGroundToken] ?? selectionBody), BLOOM_LIGHT_ALPHA);
+//
+// The bar is RELATIVE, not an invented absolute: the light's cost is measured
+// against the same pair unlit, in the same run, so a retune of `accent` or
+// `washYellow` moves the reference too. Shipped today at ΔE00 13.86 lit
+// against 19.25 unlit — the light costs 28% of selection's separation and
+// keeps 72% of it, which is still four times the threshold at which two
+// non-adjacent fields read as different colours at all.
+const selectionVsBloom = deltaE00(litSelected, litBlooming);
+const selectionVsBloomUnlit = deltaE00(parseColor(selectionBody), parseColor(theme.colors[bloomGroundToken] ?? selectionBody));
+const retained = selectionVsBloom / selectionVsBloomUnlit;
+if (selectionVsBloom >= 10 && retained >= 0.65) {
+  ok(`selected vs blooming (\`${bloomGroundToken}\`), both seen under the light: ΔE00 ${selectionVsBloom.toFixed(2)}, ${(retained * 100).toFixed(1)}% of the same pair's ${selectionVsBloomUnlit.toFixed(2)} unlit — the light costs selection some separation and nowhere near enough to blur it`);
+} else {
+  bad('selection vs blooming fill', `ΔE00 ${selectionVsBloom.toFixed(2)} lit vs ${selectionVsBloomUnlit.toFixed(2)} unlit (${(retained * 100).toFixed(1)}% retained) — R-CL-2 put both states in the fill channel and they are converging; selection is the one that must win`);
 }
 
 // --- 8. R-N2: the continuous ladder, its floor, and its resolution -----
