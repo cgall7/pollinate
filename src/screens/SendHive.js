@@ -94,7 +94,7 @@ export const SendHiveScreen = ({ navigation, route }) => {
           : /not a connected friend/.test(msg)
           ? `You and ${subjectName} aren't connected friends right now.`
           : /comb rotation/.test(msg)
-          ? "This rotation delivers automatically and can't be sent by hand."
+          ? "This keepsake is part of a comb rotation and can't be sent by hand."
           : "Couldn't send this keepsake. Check your connection and try again."
       );
       setPhase('review');
