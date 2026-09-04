@@ -82,9 +82,10 @@ const AuthError = ({ children }) => (children ? <Text style={styles.errorText}>{
 const LegalLinks = ({ navigation }) => {
   // No consent checkbox yet. The copy in legalCopy.js is now a real
   // draft, but four values in it are still unfilled, so it renders
-  // "[the publisher of this app]" and is not publishable — and
-  // requiring agreement to an unpublished document is worse than no
-  // checkbox at all. Links stay reachable so the gap is visible.
+  // "[our legal name — to be named before launch]" and is not
+  // publishable — and requiring agreement to an unpublished document
+  // is worse than no checkbox at all. Links stay reachable so the gap
+  // is visible.
   //
   // To re-add: import { LEGAL_COPY_READY } from '../constants/legalCopy'
   // and render the checkbox only when it is true. Gate on that symbol,

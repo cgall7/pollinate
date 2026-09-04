@@ -82,8 +82,8 @@
 // '   ' all rendered as an unfilled placeholder while flipping the gate to
 // ready, which is the one outcome this whole mechanism exists to prevent:
 // forcing someone to tick "I agree" against a document that still says
-// "[the publisher of this app]". A derived flag is only as good as the
-// predicate it derives through. (Caught by Sage.)
+// "[our legal name — to be named before launch]". A derived flag is only as
+// good as the predicate it derives through. (Caught by Sage.)
 const FILL = {
   LEGAL_ENTITY: {
     // Still null on purpose after the Pollinate rebrand (§19.4): "Pollinate"
