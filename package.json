@@ -13,6 +13,7 @@
     "check:comb-identity": "node scripts/check-comb-identity.mjs",
     "check:comb-pending-shelf": "node scripts/check-comb-pending-shelf.mjs",
     "check:comb-outline": "node scripts/check-comb-outline.mjs",
+    "check:createhive-recut": "node scripts/check-createhive-recut.mjs",
     "check:eng85-entitlements": "node scripts/check-eng85-entitlements.mjs",
     "check:placeholder-name": "node scripts/check-placeholder-name.mjs",
     "check:type-choreography": "node scripts/check-type-choreography.mjs",
