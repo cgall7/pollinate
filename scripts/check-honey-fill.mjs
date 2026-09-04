@@ -1,5 +1,10 @@
 // Gate for ENG-65 — the `honeyed` hexagon fill level (DES-24,
-// `GUIDES/POLLINATE_V2_DES24_HONEYED_HEXAGON.md`).
+// `POLLINATE_V2_DES24_HONEYED_HEXAGON.md`, design workspace).
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 //   npm run check:honey-fill
 //

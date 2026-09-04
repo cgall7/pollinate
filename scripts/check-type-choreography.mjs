@@ -26,7 +26,13 @@
 // (§0): it has not rendered a frame. Flex-wrap's break decisions at word
 // grain, the rise's readability on a real panel, and whether the beat looks
 // like a performance rather than a stutter are device rows, listed in
-// GUIDES/POLLINATE_MB_P1_TYPE_CHOREOGRAPHY.md §6 and unrun here.
+// POLLINATE_MB_P1_TYPE_CHOREOGRAPHY.md §6 (design workspace) and unrun
+// here.
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

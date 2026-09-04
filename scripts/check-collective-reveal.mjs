@@ -1,5 +1,10 @@
 // Gate for DES-21 — The Collective Reveal
-// (GUIDES/POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md).
+// (POLLINATE_V2_DES21_COLLECTIVE_REVEAL.md, design workspace).
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 //   npm run check:collective-reveal
 //

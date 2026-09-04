@@ -1,7 +1,12 @@
-// R-PW — the perch's weight. `GUIDES/POLLINATE_PERCH_WEIGHT_SPEC.md`
-// (Lumen, 2026-08-30), built on Colin's device-pass ruling: *"the mascot
-// sitting motion does not look top quality … it needs to look beautiful and
-// seamless just like the fox."*
+// R-PW — the perch's weight. `POLLINATE_PERCH_WEIGHT_SPEC.md`
+// (Lumen, 2026-08-30, design workspace), built on Colin's device-pass
+// ruling: *"the mascot sitting motion does not look top quality … it needs
+// to look beautiful and seamless just like the fox."*
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 // EXTENDED 2026-09-03 to cover R-SW (§7), Colin's second fox ruling after
 // watching R-PW ship: *"how it moves side to side and smoothly… I want you

@@ -4,7 +4,13 @@
 // R-N4's CROSSING is not gated here because it is not built: it is held
 // pending Lumen's ruling on the population with no seat. Section F covers
 // everything the crossing would be wrong without.
-// GUIDES/POLLINATE_NECTAR_LIVING_EXCHANGE.md (Lumen, 2026-08-29).
+// POLLINATE_NECTAR_LIVING_EXCHANGE.md (Lumen, 2026-08-29, design
+// workspace).
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 //   npm run check:nectar-exchange
 //
@@ -1764,10 +1770,11 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // G9 — R-N4.3's PRECONDITION: DOCUMENT ORDER IS ONLY THE MECHANISM WHILE
   // NOTHING ON THE PAIR OVERRIDES IT.
   //
-  // Lumen's ruling (R-N4.3, `GUIDES/POLLINATE_NECTAR_LIVING_EXCHANGE.md`,
-  // 2026-08-29) is about a RELATION — "the carrier's body occludes the cargo
-  // at the attachment point" — and names document order as TODAY'S MECHANISM
-  // for it rather than as the relation itself. G6 asserts the mechanism. So
+  // Lumen's ruling (R-N4.3, `POLLINATE_NECTAR_LIVING_EXCHANGE.md`,
+  // 2026-08-29, design workspace) is about a RELATION — "the carrier's body
+  // occludes the cargo at the attachment point" — and names document order
+  // as TODAY'S MECHANISM for it rather than as the relation itself. G6
+  // asserts the mechanism. So
   // a `zIndex` or an `elevation` on either member takes the relation away
   // from source order WITHOUT TOUCHING SOURCE ORDER, and G6 stays green
   // while the picture inverts. Measured, not supposed: adding `zIndex: 1` to

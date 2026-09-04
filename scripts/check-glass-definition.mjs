@@ -8,11 +8,16 @@
 // with equal widths the rim covers the hairline exactly and the hairline is
 // attenuated to its transmission through the rim (a factor of 1 - rimAlpha).
 // That transmission model is what
-// `GUIDES/POLLINATE_GL1_HAIRLINE_DERIVATION.md` solves the hairline's alpha
-// against, and it is true only while the two widths are equal. If they ever
-// differ, the hairline stops being *under* the rim and becomes a second
-// visible ring outboard of it — a different edge treatment entirely, reached
-// without anyone editing a colour.
+// `POLLINATE_GL1_HAIRLINE_DERIVATION.md` (design workspace) solves the
+// hairline's alpha against, and it is true only while the two widths are
+// equal. If they ever differ, the hairline stops being *under* the rim and
+// becomes a second visible ring outboard of it — a different edge treatment
+// entirely, reached without anyone editing a colour.
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 // Both halves of GL7(a) were defects of exactly this shape — quantities that
 // went unexamined because nothing could see them:
@@ -88,11 +93,11 @@
 //
 // THE BOUND IS EXTERNAL, ON PURPOSE. D5/D6 compare against the BlurView
 // rung's own measured rim — ΔE00 2.88 / 1.67 / 3.19, from
-// `GUIDES/GL1_GL2_DESIGN_INTEGRATION.md` § Rim Treatment. Those figures are a
-// property of the OTHER material, measured elsewhere, so this gate is not
-// reading its own bound out of the tokens it is testing. The stated design
-// goal is that the two rungs read as one material; the band is that goal
-// written as an interval.
+// `GL1_GL2_DESIGN_INTEGRATION.md` § Rim Treatment (design workspace). Those
+// figures are a property of the OTHER material, measured elsewhere, so this
+// gate is not reading its own bound out of the tokens it is testing. The
+// stated design goal is that the two rungs read as one material; the band is
+// that goal written as an interval.
 //
 // SCOPE OF THE CLAIM. Every figure here is computed from source — theme.js's
 // tokens composited in the order GlassBackground renders them, on a carrier
@@ -138,7 +143,7 @@ const BAND_MAX = 3.19;
 //
 // Both endpoints are MEASURED, on device, not derived: the capsule photographed
 // over a calibrated target at the ruled veil, sampled inside the capsule.
-// `GUIDES/POLLINATE_GL7_MATERIAL_TRANSMISSION.md` §3b; frames in
+// `POLLINATE_GL7_MATERIAL_TRANSMISSION.md` §3b (design workspace); frames in
 // `.scratch/gl7-material/`. The dark end is the pure-black bound and the light
 // end is any of `surface`/`washSky`/`backgroundWriting`, which all clip to
 // white through the veil.
@@ -774,7 +779,7 @@ if (fillStyles.length === 0) {
       `darkest column clears 3:1 AND does not regress against the rung it replaced — so ` +
       `moving either half re-opens that solve. Re-sweep, re-measure the carrier range D5 ` +
       `reads, and update all three together ` +
-      `(GUIDES/POLLINATE_GL7_MATERIAL_TRANSMISSION.md §3b)`);
+      `(POLLINATE_GL7_MATERIAL_TRANSMISSION.md §3b, design workspace)`);
   }
 }
 

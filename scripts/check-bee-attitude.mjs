@@ -4352,9 +4352,14 @@ console.log('\nL. Reduce Motion moves nothing, including the bee');
   }
 }
 
-// --- M. Living Flight (GUIDES/POLLINATE_LIVING_FLIGHT_SPEC.md, Lumen's
-//     ruling against github/main@d0fb847, Colin's "90 degree robot-like
-//     ways" — 2026-08-29) -----------------------------------------------
+// --- M. Living Flight (POLLINATE_LIVING_FLIGHT_SPEC.md, design workspace,
+//     Lumen's ruling against github/main@d0fb847, Colin's "90 degree
+//     robot-like ways" — 2026-08-29) -----------------------------------
+//
+//     Every spec cited in this file lives in the design workspace, not at
+//     any path in this repo; nothing under `GUIDES/` is in this tree, so a
+//     bare `GUIDES/...` address opens nothing for whoever reads this file
+//     next.
 //
 // Section F already samples `pollinationFlight.js` as a pure function
 // (R81). These rows extend that to the ruling's six acceptance tests:
@@ -5044,10 +5049,11 @@ if (!APPROACH_SPEED_PXS || !RING_STEP_PX) {
   // N. R-LF-7 / R-LF-8 — the turn, and the envelope that closes its join
   // ======================================================================
   //
-  // §7 of GUIDES/POLLINATE_LIVING_FLIGHT_SPEC.md, nine numbered rows, four of
-  // which the ruling itself marks REPORT and not BOUND. M1 and M1b retire into
-  // N1: they measured the interior angle of a SAMPLED POLYLINE, and under a
-  // tangential turn that measures the sampler's step rather than the geometry.
+  // §7 of POLLINATE_LIVING_FLIGHT_SPEC.md (design workspace), nine numbered
+  // rows, four of which the ruling itself marks REPORT and not BOUND. M1 and
+  // M1b retire into N1: they measured the interior angle of a SAMPLED
+  // POLYLINE, and under a tangential turn that measures the sampler's step
+  // rather than the geometry.
   //
   // THE INSTRUMENT IS THE WHOLE QUESTION HERE, and that is Lumen's ruling of
   // 2026-08-29 rather than a preference of mine. `u = 1` is the domain edge of

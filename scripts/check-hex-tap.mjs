@@ -3,8 +3,14 @@
 //
 //   npm run check:hex-tap
 //
-// Sources: GUIDES/MB_D2_FLAGSHIP_BEAT_SCORES.md (MB-D2b) and
-// GUIDES/HEX_TAP_SPEC_LUXURY_PASS.md (LP-R21 + its five guardrails).
+// Sources: MB_D2_FLAGSHIP_BEAT_SCORES.md (MB-D2b, design workspace) and
+// HEX_TAP_SPEC_LUXURY_PASS.md (LP-R21 + its five guardrails, design
+// workspace).
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 // THE HALF OF THIS GATE THAT MATTERS MOST IS SECTION A, AND IT IS AN
 // ABSENCE. LP-R21 retired four beats, four drivers, two easings, three
