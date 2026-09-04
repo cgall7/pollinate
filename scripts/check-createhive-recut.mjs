@@ -6,10 +6,13 @@
 // a whole step retired, and not one assertion in the suite moved with
 // them — because nothing anywhere pinned this screen. A ruling whose
 // assertion count does not move is a ruling with no instrument. The
-// acceptance rows in GUIDES/POLLINATE_CREATEHIVE_RECUT_SPEC.md §R-CH-6
-// were run by hand three times (builder, ratifier, merger) and that is
-// the only reason they held; this file is so the fourth reading is a
-// machine's.
+// ruling is POLLINATE_CREATEHIVE_RECUT_SPEC.md (Lumen, 2026-09-04) in the
+// design workspace, NOT a path in this repo — nothing under GUIDES/ is in
+// this tree, so a bare `GUIDES/...` address here opens nothing for whoever
+// reads this file next. Its §R-CH-6 acceptance rows were hand-run TWICE,
+// by the builder and by the ratifier; the merge added the suite figure and
+// the diff scope, not the ten rows. Twice is what held them, and this file
+// is so the next reading is a machine's.
 //
 // Scope note, disclosed rather than assumed: the owed debt named
 // R-CH-1's two sentences and the fused CTA shape. The rows below cover
