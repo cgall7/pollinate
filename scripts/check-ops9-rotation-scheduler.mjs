@@ -280,7 +280,8 @@ async function main() {
 
     async function rotationState(id) {
       const { rows } = await client.query(
-        'select sealed_at, sent_at, voided_at, voided_reason from public.comb_rotations where id = $1',
+        'select sealed_at, sent_at, voided_at, voided_reason, seal_attempts, seal_dead_lettered_at ' +
+          'from public.comb_rotations where id = $1',
         [id]
       );
       return rows[0];
@@ -406,6 +407,93 @@ async function main() {
         bad(
           "sweep: the broken rotation's failure is surfaced as a WARNING (not swallowed silently)",
           `captured notices: ${JSON.stringify(warnings)}`
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 5b. Terminal exit (20260904000001, filed against Vector's finding —
+    // any permanently-failing seal re-matches the tick's own WHERE clause
+    // forever). Reuses `broken` from section 5 above: its underlying hive
+    // has no open volume, so seal_and_send_rotation raises identically on
+    // every sweep — the exact "same failure class nobody has imagined
+    // yet" shape the ruling asked this row to survive, not the
+    // now-withdrawn null-subject one. `broken` already carries one failed
+    // attempt from section 5's sweep; four more reach the cap of 5.
+    for (let i = 0; i < 4; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await asService(() => client.query('select public.advance_due_rotations()'));
+    }
+    {
+      const r = await rotationState(broken.rotationId);
+      if (r.seal_attempts === 5 && r.seal_dead_lettered_at && !r.sealed_at && !r.voided_at) {
+        ok('dead letter: cap reached at attempt 5 — seal_dead_lettered_at set, still genuinely unresolved (not voided, not sealed)');
+      } else {
+        bad(
+          'dead letter: cap reached at attempt 5 — seal_dead_lettered_at set, still genuinely unresolved (not voided, not sealed)',
+          JSON.stringify(r)
+        );
+      }
+    }
+    {
+      const surfaced = warnings.some(
+        (w) => /advance_due_rotations/.test(w) && /rotation .* dead-lettered after 5 attempts/.test(w) && /no open volume/.test(w)
+      );
+      if (surfaced) {
+        ok('dead letter: the attempt that crosses the cap is logged with "dead-lettered" and still carries sqlerrm');
+      } else {
+        bad(
+          'dead letter: the attempt that crosses the cap is logged with "dead-lettered" and still carries sqlerrm',
+          `captured notices: ${JSON.stringify(warnings)}`
+        );
+      }
+    }
+    {
+      // Positive control: comb_rotations_one_open_per_comb still counts
+      // the dead-lettered row as open — a human has to clear it, the
+      // schema must not let the comb quietly grow a second rotation
+      // around it. A genuinely DISTINCT hive (not `broken.hiveId` again)
+      // so the failure is the partial unique index this row is actually
+      // testing, not comb_rotations' separate `unique (hive_id)`.
+      const { rows: secondHiveRows } = await asUser(OWNER2, () =>
+        client.query(
+          "insert into public.private_hives (owner_id, subject_name, subject_profile_id, is_collective) " +
+            "values ($1, 'Second Hive', $2, true) returning id",
+          [OWNER2, SUBJECT_BROKEN]
+        )
+      );
+      let blocked = false;
+      try {
+        await asPostgres(() =>
+          client.query(
+            "insert into public.comb_rotations (comb_id, ordinal, hive_id, subject_profile_id, closes_at) " +
+              "values ($1, 2, $2, $3, now() + interval '1 day')",
+            [broken.combId, secondHiveRows[0].id, SUBJECT_BROKEN]
+          )
+        );
+      } catch (e) {
+        blocked = /comb_rotations_one_open_per_comb/i.test(e.message);
+      }
+      if (blocked) {
+        ok('dead letter: a dead-lettered rotation still counts as "open" — the comb cannot mint a second one around it');
+      } else {
+        bad('dead letter: a dead-lettered rotation still counts as "open" — the comb cannot mint a second one around it', 'insert unexpectedly succeeded or wrong constraint');
+      }
+    }
+    {
+      // One more sweep: the dead-lettered row must never be attempted
+      // again — no new warning naming it, attempts/timestamp unchanged.
+      const before = await rotationState(broken.rotationId);
+      warnings.length = 0;
+      await asService(() => client.query('select public.advance_due_rotations()'));
+      const after = await rotationState(broken.rotationId);
+      const mentionedAgain = warnings.some((w) => w.includes(broken.rotationId));
+      if (JSON.stringify(before) === JSON.stringify(after) && !mentionedAgain) {
+        ok('dead letter: excluded from every later sweep — the tick stops re-arming on it entirely');
+      } else {
+        bad(
+          'dead letter: excluded from every later sweep — the tick stops re-arming on it entirely',
+          `before=${JSON.stringify(before)} after=${JSON.stringify(after)} warnings=${JSON.stringify(warnings)}`
         );
       }
     }

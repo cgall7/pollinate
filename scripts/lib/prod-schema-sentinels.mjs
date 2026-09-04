@@ -350,4 +350,14 @@ export const SENTINELS = {
     table: 'comb_nectar_notes',
     column: 'note_text',
   },
+  // Terminal exit for advance_due_rotations (Fizz, filed against Vector's
+  // finding, UX Design 2026-09-04). Same posture as 20260830000012 itself:
+  // the replaced function stays service_role-only, no anon-visible surface
+  // changes shape. new_column proves the two new comb_rotations columns
+  // exist while the table itself stays behind is_comb_member/owner RLS.
+  '20260904000001_advance_due_rotations_dead_letter': {
+    kind: 'column',
+    table: 'comb_rotations',
+    column: 'seal_dead_lettered_at',
+  },
 };
