@@ -263,7 +263,7 @@ export const CreateHiveFlow = ({ navigation }) => {
       )}
 
       {/* E10 — this footer sits outside every step's content container
-          (a plain View for the first three steps, a ScrollView for
+          (a plain View for the first two steps, a ScrollView for
           'entry'), so it's the one CTA anchor point that's never asked to
           pin itself inside a ScrollView, where `marginTop: 'auto'` is a
           no-op. Every step renders through this same footer instead of
@@ -304,10 +304,11 @@ export const CreateHiveFlow = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // E8 — one ground for all four steps. `washYellow` is `theme.js`'s own
+    // E8 — one ground for all three steps. `washYellow` is `theme.js`'s own
     // "activation staging included" wash; a creation flow is exactly that.
-    // The old per-step swap (`background` on steps 2-4) was too small a
-    // shift to read as intent and just large enough to read as a glitch.
+    // The old per-step swap, which painted `background` on every step after
+    // the first, was too small a shift to read as intent and just large
+    // enough to read as a glitch.
     backgroundColor: theme.colors.washYellow,
   },
   header: {
