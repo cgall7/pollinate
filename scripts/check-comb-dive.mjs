@@ -102,6 +102,15 @@
 //       milestones the eye reads. The token used to carry a prose claim of
 //       "~550ms" while the shipped spring finished the whole dive in 127ms;
 //       a sentence about timing is not a timing check.
+//   D23b D23 REPLICATES a dependency, so the replication itself gets
+//       watched. Asserts the installed react-native version is the one the
+//       arithmetic was transcribed from, lifts RN's own two origami
+//       mappings out of SpringConfig.js and EVALUATES them against D23's
+//       transcription, and holds the two onUpdate properties D23 leans on
+//       silently: mass 1 on the tension/friction path, and a clock in
+//       seconds. Without it an RN upgrade could move the mapping and D23
+//       would keep printing confident milliseconds for a spring the device
+//       no longer runs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -971,6 +980,180 @@ const paperCode = codeOnly(paperSrc, paperAst);
         `SPRINGS.diveIn {friction:${friction}, tension:${tension}} -> zoom visible ${opaque === null ? 'never' : Math.round(opaque) + 'ms'} (floor ${OPAQUE_FLOOR}ms), paper settles ${full === null ? 'never' : Math.round(full) + 'ms'} (band ${FULL_FLOOR}-${FULL_CEILING}ms)`
       );
     }
+  }
+}
+
+// ── D23b. the arithmetic D23 transcribed is still the arithmetic RN runs ──
+// Lumen's rider on the hive-room ratification. D23 does not observe a
+// spring, it REPLICATES one: it re-implements
+// react-native/Libraries/Animated/SpringConfig.js and the closed form in
+// SpringAnimation.onUpdate. That makes the row's verdict a claim about a
+// dependency's internals, and a dependency's internals move on someone
+// else's schedule. Without this row an RN upgrade could change the mapping
+// and D23 would keep printing confident millisecond figures for a spring
+// the device no longer runs.
+//
+// Three things are asserted, in increasing strength:
+//   1. the INSTALLED react-native version is the one D23 was measured
+//      against, read out of node_modules rather than out of the root
+//      package.json, because the root file states an intent and
+//      node_modules states what actually ran. Same instrument as
+//      check-link-parse-differential's V1.
+//   2. RN's own two origami mappings, lifted out of SpringConfig.js and
+//      EVALUATED, agree with D23's transcription at the shipped token and
+//      at a spread of probe values. Behaviour rather than text, so a
+//      rename or a reformat stays green and a changed coefficient reds.
+//   3. the two properties of SpringAnimation.onUpdate that D23's `at(t)`
+//      silently depends on: mass is 1 on the tension/friction path, and
+//      the integrator's clock is in seconds. D23 calls `at(ms / 1000)`.
+//      If RN ever switched that division the milestone numbers would be
+//      wrong by three orders of magnitude and every floor here would pass.
+//
+// FAILS CLOSED. If node_modules is absent this row reports a failed
+// assertion rather than skipping: a gate that cannot do the measurement
+// must not imply the measurement still holds.
+{
+  const RN_DIR = path.join(ROOT, 'node_modules/react-native');
+  const MEASURED_VERSION = '0.86.2';
+  const problems = [];
+  let evaluated = 0;
+
+  const springConfigPath = path.join(RN_DIR, 'Libraries/Animated/SpringConfig.js');
+  const springAnimPath = path.join(RN_DIR, 'Libraries/Animated/animations/SpringAnimation.js');
+  const pkgPath = path.join(RN_DIR, 'package.json');
+
+  if (!fs.existsSync(pkgPath) || !fs.existsSync(springConfigPath) || !fs.existsSync(springAnimPath)) {
+    problems.push(
+      `react-native is not installed under ${path.relative(ROOT, RN_DIR)}. Run \`npm ci\` first. ` +
+        'This row compares D23 against the real module and has nothing to compare without it.'
+    );
+  } else {
+    const installed = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
+    if (installed !== MEASURED_VERSION) {
+      problems.push(
+        `installed react-native is ${installed}, D23's arithmetic was transcribed from ${MEASURED_VERSION}. ` +
+          'Not automatically a defect: re-read SpringConfig.js and SpringAnimation.onUpdate, ' +
+          'confirm or fix D23, and bump MEASURED_VERSION in the same commit.'
+      );
+    }
+
+    // Lift a named function out of the Flow source and make it callable.
+    // The bodies of the two origami mappings are plain arithmetic with no
+    // annotations inside them, so only the signature has to be parsed.
+    const lift = (src, name) => {
+      const at = src.indexOf(`function ${name}(`);
+      if (at < 0) return null;
+      const open = src.indexOf('{', at);
+      if (open < 0) return null;
+      const param = /\(\s*([A-Za-z_$][\w$]*)/.exec(src.slice(at + `function `.length, open));
+      if (!param) return null;
+      let depth = 0;
+      for (let j = open; j < src.length; j += 1) {
+        if (src[j] === '{') depth += 1;
+        else if (src[j] === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            try {
+              // eslint-disable-next-line no-new-func
+              return new Function(param[1], src.slice(open + 1, j));
+            } catch {
+              return null;
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    const configSrc = fs.readFileSync(springConfigPath, 'utf8');
+    const rnStiffness = lift(configSrc, 'stiffnessFromOrigamiValue');
+    const rnDamping = lift(configSrc, 'dampingFromOrigamiValue');
+
+    // D23's transcription, restated here so the two can be compared. Kept
+    // as literals on purpose: if D23's expressions are edited without
+    // editing these, that is exactly the drift the row is watching for.
+    const mineStiffness = (t) => (t - 30) * 3.62 + 194;
+    const mineDamping = (f) => (f - 8) * 3 + 25;
+
+    // The shipped token first, then a spread wide enough that a changed
+    // slope or intercept cannot hide inside a single sample.
+    const probeSrc = fs.readFileSync(path.join(SRC, 'constants/motion.js'), 'utf8');
+    const shipped = probeSrc.match(/\bdiveIn:\s*\{\s*friction:\s*(\d+(?:\.\d+)?)\s*,\s*tension:\s*(\d+(?:\.\d+)?)\s*\}/);
+    const probes = [0, 1, 8, 30, 40, 100, 200];
+    if (shipped) probes.unshift(Number(shipped[1]), Number(shipped[2]));
+
+    for (const [label, theirs, mine] of [
+      ['stiffnessFromOrigamiValue', rnStiffness, mineStiffness],
+      ['dampingFromOrigamiValue', rnDamping, mineDamping],
+    ]) {
+      if (!theirs) {
+        problems.push(`could not lift \`${label}\` out of SpringConfig.js; the mapping moved or was renamed`);
+        continue;
+      }
+      for (const v of probes) {
+        const a = theirs(v);
+        const b = mine(v);
+        if (!Number.isFinite(a) || Math.abs(a - b) > 1e-9) {
+          problems.push(`${label}(${v}) is ${a} in react-native, D23 transcribes it as ${b}`);
+        } else {
+          evaluated += 1;
+        }
+      }
+    }
+
+    // The two onUpdate properties D23 leans on without naming them.
+    const animSrc = fs.readFileSync(springAnimPath, 'utf8');
+    const secondsClock = /this\._frameTime\s*\+=\s*deltaTime;/.test(animSrc)
+      && /const deltaTime\s*=\s*\(now - this\._lastTime\)\s*\/\s*1000;/.test(animSrc);
+    if (!secondsClock) {
+      problems.push(
+        "SpringAnimation.onUpdate no longer accumulates `_frameTime` from a milliseconds/1000 delta, " +
+          "D23 calls `at(ms / 1000)` on that assumption"
+      );
+    }
+    // `Animated.spring` is called here with friction/tension only, so the
+    // origami branch is the one that runs and it is the one that has to
+    // still set mass to 1. Resolved to that branch rather than tested for
+    // containment: `this._mass = 1;` also appears in the bounciness/speed
+    // branch, so a whole-file grep would stay green with the branch D23
+    // actually runs on set to any mass at all.
+    const originAt = animSrc.indexOf('SpringConfig.fromOrigamiTensionAndFriction(');
+    let branchSrc = null;
+    if (originAt >= 0) {
+      let depth = 0;
+      for (let j = originAt; j < animSrc.length; j += 1) {
+        if (animSrc[j] === '{') depth += 1;
+        else if (animSrc[j] === '}') {
+          if (depth === 0) {
+            branchSrc = animSrc.slice(originAt, j);
+            break;
+          }
+          depth -= 1;
+        }
+      }
+    }
+    if (branchSrc === null) {
+      problems.push(
+        'could not resolve the branch of SpringAnimation that calls ' +
+          '`SpringConfig.fromOrigamiTensionAndFriction`, which is the only path a ' +
+          'friction/tension token takes'
+      );
+    } else if (!/this\._mass\s*=\s*1;/.test(branchSrc)) {
+      problems.push(
+        'the origami tension/friction branch of SpringAnimation no longer sets `_mass = 1`, ' +
+          "and D23's closed form assumes mass 1"
+      );
+    }
+  }
+
+  if (problems.length === 0) {
+    ok(
+      `D23b D23's spring arithmetic still matches react-native ${MEASURED_VERSION}: ` +
+        `both origami mappings evaluated out of SpringConfig.js and agreeing at ${evaluated} probe values, ` +
+        'seconds clock and mass 1 both still in onUpdate'
+    );
+  } else {
+    bad('D23b the transcribed spring arithmetic is still RN\'s', problems.join('; '));
   }
 }
 
