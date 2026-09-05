@@ -818,9 +818,16 @@ export const PackageOpenScreen = ({ navigation, route }) => {
         </>
       )}
 
-      {/* LAST CHILD, so the drop crosses over the entry, the panel and the
-          overlay alike — it is the one object in this beat that belongs to
-          neither surface. It takes no touches (R-N3.3's other half). */}
+      {/* The drop crosses over the entry, the panel and the overlay alike —
+          it is the one object in this beat that belongs to neither surface.
+          It takes no touches (R-N3.3's other half).
+
+          LAST CHILD IS NOT WHAT MAKES THAT TRUE, and believing it was is
+          what hid the whole Depart beat under `sendOverlay` (`zIndex: 2`,
+          below) from the day this shipped. The layer carries its own rank
+          now — `GIFT_LAYER_Z`, asserted above every `zIndex` in `src/` by
+          `check-gift-layer-rank.mjs` — so its position in this list is
+          ordinary readability and nothing depends on it. */}
       <NectarGiftLayer
         gift={gift.gift}
         travel={gift.travel}
@@ -973,8 +980,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    // Above the reveal Pressable, below nothing — the consent sheet sits at
-    // 2 and the two are mutually exclusive by `nectarConsent`.
+    // Above the reveal Pressable. NOT "below nothing", which is what this
+    // said until the gift layer's rank landed: an unranked sibling loses to
+    // this view no matter how late it is mounted, and `NectarGiftLayer` was
+    // exactly that. It is now `GIFT_LAYER_Z` and is above this by
+    // assertion. The consent sheet sits at 2 as well and the two are
+    // mutually exclusive by `nectarConsent`.
     zIndex: 2,
   },
   railTrack: {

@@ -21,6 +21,31 @@ import { HoneyDrop } from './HoneyDrop';
 // half stays on `sendOverlay`, which keeps swallowing taps while this layer
 // draws over the entry it must not intercept.
 
+// THE RANK, AND WHY THE LAYER NEEDS ONE AT ALL.
+//
+// This file used to say, one comment up, that the drop "crosses over the
+// entry, the panel and the overlay alike", and `PackageOpen` mounted it as
+// the LAST CHILD to make that true. Both were reasonable and together they
+// were wrong: `PackageOpen.js`'s send overlay declares `zIndex: 2`, and once
+// any sibling declares a stacking rank, being last stops meaning being on
+// top. The overlay won. Depart and its stain painted UNDERNEATH the white
+// panel card for the whole beat.
+//
+// It was invisible rather than wrong-looking, and measurably so: 26
+// consecutive screencast frames from 176ms to 610ms were byte identical,
+// one md5 between all of them, while the drop was in the tree the whole
+// time at full opacity, travelling. A beat you cannot see and a beat that
+// did not run look the same from the outside.
+//
+// So the layer now STATES its rank instead of inferring it from position. 20
+// is not a taste number: the largest `zIndex` anywhere in `src/` today is
+// 10, and `check-gift-layer-rank.mjs` asserts this constant is strictly
+// greater than every one of them. That is the property the sentence above
+// claims — above everything, not above the thing we happened to think of —
+// so a new `zIndex` that would occlude the gift reds a row rather than
+// silently swallowing the choreography again.
+export const GIFT_LAYER_Z = 20;
+
 // THE STAIN'S PEAK, MEASURED. Two bounds, and the one that binds is not the
 // one the spec names.
 //
@@ -130,6 +155,9 @@ const styles = StyleSheet.create({
   // all carry the same note, all three earned the hard way).
   layer: {
     ...StyleSheet.absoluteFill,
+    // See GIFT_LAYER_Z. The constant is read HERE and nowhere else, so the
+    // gate's assertion about the number is an assertion about the paint.
+    zIndex: GIFT_LAYER_Z,
   },
   stain: {
     position: 'absolute',
