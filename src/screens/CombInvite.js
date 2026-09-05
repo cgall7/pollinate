@@ -11,7 +11,9 @@ import { isPlaceholderName } from '../utils/placeholderName';
 
 const InviteShell = ({ navigation, children }) => (
   <View style={styles.screen}>
-    <BackButton onPress={() => navigation.canGoBack() && navigation.goBack()} />
+    <BackButton
+      onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.replace('Onboarding'))}
+    />
     <View style={styles.content}>{children}</View>
   </View>
 );
@@ -91,8 +93,8 @@ export const CombInviteLandingScreen = ({ navigation, route }) => {
     ? `${preview.inviterName} asked you to write for ${preview.subjectName}.`
     : `${preview.inviterName} asked you to write.`;
   const disclosure = preview.hasActiveMonth
-    ? `Everything written in this comb stays sealed until delivery — only ${preview.subjectName} ever reads it.`
-    : "Each month, this comb gathers around one person, and everything written stays sealed until it's delivered. There's no one to write for just yet — join now and you'll be part of it when the month opens.";
+    ? `Everything written in this comb stays sealed until delivery. Only ${preview.subjectName} ever reads it.`
+    : "Each month, this comb gathers around one person, and everything written stays sealed until it's delivered. There's no one to write for just yet. Join now and you'll be part of it when the month opens.";
 
   return (
     <InviteShell navigation={navigation}>
