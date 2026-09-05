@@ -2,6 +2,11 @@
 //
 //   npm run check:nectar-consent
 //
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
+//
 // WHAT IT IS FOR, stated plainly because the gate is green today and will be
 // green tomorrow: it arms a transition nobody is scheduled to notice. The
 // same shape as check-legal-consent-gate.mjs, and for the same reason — the
@@ -553,6 +558,27 @@ check(
   false
 );
 
+// THE RESERVE ITSELF IS BUILT HERE AND ARGUED IN SECTION E, where its own two
+// rows live (E0 non-empty, E0a carve-out membership). It is hoisted above
+// section D because D4's `noNectarOnCompose` probe keys on this same Set —
+// Lumen's requirement, ruled 2026-09-05: the identifier list a probe hunts
+// derives from ONE declarator and never from a hand copy that stays
+// self-consistent while the app drifts. Hoisting the construction moves no
+// measurement; every consumer reads the same finished Set it read before.
+const NECTAR_MIGRATION_FILE_RE = /nectar/i;
+const OBJECT_RE = /create\s+(?:or\s+replace\s+)?(table|view|function)\s+(?:if not exists\s+)?public\.(\w+)/gi;
+let nectarMigrationFiles = [];
+try {
+  nectarMigrationFiles = (await readdir(migrationDir)).filter((f) => NECTAR_MIGRATION_FILE_RE.test(f)).sort();
+} catch {
+  /* no migrations directory in this tree */
+}
+const QUERY_RESERVE = new Set();
+for (const f of nectarMigrationFiles) {
+  const src = await readFile(path.join(migrationDir, f), 'utf8');
+  for (const m of src.matchAll(OBJECT_RE)) QUERY_RESERVE.add(m[2]);
+}
+
 // --- D. Placement --------------------------------------------------------
 const exists = async (rel) => {
   try {
@@ -598,17 +624,57 @@ check(
 );
 
 // D4 THE PROBE ITSELF, for the one surface where absence is mechanically
-// checkable. DES-28 D5 adds a row to a "Send note · Plant seed" menu. No such
-// menu exists: ComposeNote and PlantSeed are reached from two separate inbox
-// screens. A menu offering both would, by construction, navigate to both from
-// ONE file. Scoped exactly that way — this finds a menu, not the absence of
-// every possible menu — and it self-deletes: the day the menu is built this
-// reds and asks DES-28 for the placement it could not have had before.
+// checkable.
+//
+// THE PREDECESSOR IS RETIRED, AND THE REASON IS THE POINT. `noActionMenu`
+// asked whether one file navigated to BOTH `ComposeNote` and `PlantSeed`,
+// because DES-28 D5 adds a nectar row to a "Send note · Plant seed" menu and
+// no such menu existed: the two compose screens were reached from two separate
+// inbox screens, never from one sheet. R-WD merged all four into one write
+// door, one inbox and one compose surface, so NEITHER ROUTE NAME EXISTS. The
+// old probe would have gone green vacuously (no file can satisfy a conjunction
+// of two strings neither of which is in the tree) and its own control D5 would
+// have gone red — which is exactly what its author built D5 to say: green
+// because the screens were RENAMED, not because the menu is absent.
+//
+// There is no re-point that saves it. Re-pointing at two dead route names
+// would preserve a measurement whose subject is gone, which is the
+// label-versus-mechanism failure in instrument form. So it is retired and
+// replaced, with the reason recorded here rather than in a commit message.
+//
+// AND THE CONTAINER EXISTS NOW. R-WD-3's delivery segment IS the two-way
+// choice the declaration's note was waiting for, rendered as a segment instead
+// of a sheet. The placement question D5 was holding open has been ANSWERED,
+// not skipped: no nectar row on compose. R-NT-5 rules that giving starts at a
+// person and the comb is where you give, so a giving affordance on the write
+// door would be a third giving door and it is unruled. If anyone wants one,
+// that is a design ruling to request, not a row to build. Ruled by Lumen,
+// 2026-09-05, UX Design thread 160660d9; the declaration in
+// `src/constants/nectar.js` carries the same sentence.
+//
+// THE SUCCESSOR keeps a measurement rather than leaving a note. It reds the
+// day a nectar identifier appears on the merged compose surface.
+//
+// SCOPE, stated rather than implied: the needle is `QUERY_RESERVE`, the same
+// migration-enumerated declarator sections E and F key on — never a hand-typed
+// list, which would be a second copy of the schema able to stay
+// self-consistent while the app drifts. So this finds the nectar row ARRIVING
+// WITH ITS DATA, which is the only way it can carry a balance, an amount or a
+// send. It does not claim to catch a purely decorative glyph; the reserve is
+// what makes the claim it does make derivable.
+//
+// EMPTY-RESERVE COVERAGE IS ATTRIBUTED, not assumed: if the reserve narrowed
+// to nothing this probe would find nothing and green vacuously, and E0 below
+// ("the query reserve is non-empty") reds in the same run, independently of
+// this row. That is why the construction is hoisted above this section.
+const COMPOSE_REL = 'src/screens/Compose.js';
 const PROBES = {
-  noActionMenu: () =>
-    parsed
-      .filter(({ src }) => /navigate\(\s*['"]ComposeNote['"]/.test(src) && /navigate\(\s*['"]PlantSeed['"]/.test(src))
-      .map(({ rel }) => rel),
+  noNectarOnCompose: () => {
+    const compose = parsed.filter(({ rel }) => rel === COMPOSE_REL);
+    return compose
+      .filter(({ src }) => [...QUERY_RESERVE].some((name) => new RegExp(`\\b${name}\\b`).test(src)))
+      .map(({ rel }) => rel);
+  },
 };
 const probeFailures = [];
 for (const s of unhosted) {
@@ -623,13 +689,30 @@ for (const s of unhosted) {
 }
 check('D4 every named container-absence probe still finds nothing', probeFailures, []);
 
-// D5 the reverse direction of D4's probe: a probe that can no longer FIND
-// anything is a probe that has stopped working. Both navigation targets must
-// still be reachable from somewhere, or `noActionMenu` is green because the
-// screens were renamed rather than because the menu is absent.
-const reachesCompose = parsed.some(({ src }) => /navigate\(\s*['"]ComposeNote['"]/.test(src));
-const reachesSeed = parsed.some(({ src }) => /navigate\(\s*['"]PlantSeed['"]/.test(src));
-check('D5 noActionMenu probe control: both menu targets are still reachable somewhere', [reachesCompose, reachesSeed], [true, true]);
+// D5 THE CONTROL, and it is the reverse direction of D4's probe: a probe that
+// can no longer FIND anything is a probe that has stopped working. The
+// predecessor's control asserted two route names were still reachable, and it
+// died with them.
+//
+// This one is a FOUND-TOKEN control, which is the stronger shape — Sage's,
+// adopted by Lumen over the "the file exists and parses" version she first
+// ruled, because parsing proves the file is READABLE and not that the probe
+// reads its CONTENT. So the control names a witness the probe must find in the
+// same file it scans, end to end through the same pipeline.
+//
+// THE WITNESS IS `DELIVERY_MODES`, R-WD-3's own delivery segment — the ruled
+// shape of this surface, one door where delivery time is the only variable
+// (POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md R-WD-3). Deliberately not a prose
+// token: a
+// copy rewrite would red a prose control falsely, whereas the segment cannot
+// leave compose without a spec revisit that would rightly reopen this gate.
+const composeFile = parsed.find(({ rel }) => rel === COMPOSE_REL);
+const composeCarriesSegment = Boolean(composeFile) && /\bDELIVERY_MODES\b/.test(composeFile.src);
+check(
+  'D5 noNectarOnCompose probe control: the merged compose surface is in the probe\'s universe and still carries its ruled delivery segment',
+  [Boolean(composeFile), composeCarriesSegment],
+  [true, true]
+);
 
 // D6 THE CONTROL ON A1a'S EXCLUSION. NECTAR_SURFACES holds the only prose in
 // the declaration module — the `note` and `preConsent` fields, which describe
@@ -664,19 +747,6 @@ check('D6 nothing in the app imports NECTAR_SURFACES (the exclusion in A1a holds
 // literal naming an internal ledger table has no legitimate reason to exist
 // unguarded either, so a false member costs nothing and a missed one costs
 // a silent leak.
-const NECTAR_MIGRATION_FILE_RE = /nectar/i;
-const OBJECT_RE = /create\s+(?:or\s+replace\s+)?(table|view|function)\s+(?:if not exists\s+)?public\.(\w+)/gi;
-let nectarMigrationFiles = [];
-try {
-  nectarMigrationFiles = (await readdir(migrationDir)).filter((f) => NECTAR_MIGRATION_FILE_RE.test(f)).sort();
-} catch {
-  /* no migrations directory in this tree */
-}
-const QUERY_RESERVE = new Set();
-for (const f of nectarMigrationFiles) {
-  const src = await readFile(path.join(migrationDir, f), 'utf8');
-  for (const m of src.matchAll(OBJECT_RE)) QUERY_RESERVE.add(m[2]);
-}
 check(
   `E0 the query reserve is non-empty, enumerated from ${nectarMigrationFiles.length} nectar migration(s)`,
   QUERY_RESERVE.size > 0,

@@ -498,7 +498,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   if (DROP_MAX_RADIUS * 2 === 44) {
     ok('A5 DROP_MAX_RADIUS spans the ratified 44pt tap target exactly — the same object cannot be larger in flight than the box it lives in at rest without being two objects');
   } else {
-    bad('A5', `DROP_MAX_RADIUS ${DROP_MAX_RADIUS} spans ${DROP_MAX_RADIUS * 2}pt, not the 44pt floor LinkButton/SeedsInbox/NotesInbox all cite — R-N6's door and R-N3's drop have come apart`);
+    bad('A5', `DROP_MAX_RADIUS ${DROP_MAX_RADIUS} spans ${DROP_MAX_RADIUS * 2}pt, not the 44pt floor LinkButton and the write inbox all cite — R-N6's door and R-N3's drop have come apart`);
   }
 }
 

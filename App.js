@@ -14,10 +14,8 @@ import { EveningMirror } from './src/screens/EveningMirror';
 import { LegalScreen } from './src/screens/Legal';
 import { AccountScreen } from './src/screens/Account';
 import { DeleteAccountScreen } from './src/screens/DeleteAccount';
-import { NotesInbox } from './src/screens/NotesInbox';
-import { ComposeNote } from './src/screens/ComposeNote';
-import { PlantSeed } from './src/screens/PlantSeed';
-import { SeedsInbox } from './src/screens/SeedsInbox';
+import { WriteInbox } from './src/screens/WriteInbox';
+import { Compose } from './src/screens/Compose';
 import { CreateHiveFlow } from './src/screens/CreateHive';
 import { CreateCombScreen } from './src/screens/CreateComb';
 import { HiveDetailScreen } from './src/screens/HiveDetail';
@@ -352,26 +350,27 @@ export default function App() {
                 Stack.Screen children of this same root stack. */}
             <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
 
-            {/* Project 7 (Gratitude Notes, no-tip variant). Both modal: Notes
-                opens from the Honeycomb tab's header, Compose opens from
-                Notes' header, neither is a tab of its own yet — that's a
-                design placement call, not an engineering one. */}
-            <Stack.Screen name="Notes" component={NotesInbox} options={{ presentation: 'modal' }} />
-            <Stack.Screen name="ComposeNote" component={ComposeNote} options={{ presentation: 'modal' }} />
+            {/* R-WD — ONE WRITE DOOR. Four routes became two: `Notes` +
+                `Seeds` are `WriteInbox`, `ComposeNote` + `PlantSeed` are
+                `Compose`. A seed is a property of a note (a delivery date),
+                not a different place, so the merged compose carries the
+                delivery segment and the merged inbox types each row by its
+                delivery state.
 
-            {/* Project 8 (Seeds). 8.2 plants, 8.4 lists — a planted seed is no
-                longer invisible. 8.8's reveal choreography is still @Pixel's:
-                the sealed -> bloomed transition happens on SeedsInbox today
-                (§22.2's refetch), it just does not yet have a beat. Modal for
-                the same reason Compose is: where Seeds finally lives in the IA
-                is Project 10's call. */}
-            <Stack.Screen name="PlantSeed" component={PlantSeed} options={{ presentation: 'modal' }} />
-            <Stack.Screen name="Seeds" component={SeedsInbox} options={{ presentation: 'modal' }} />
+                Both still modal, and both still reached from the Honeycomb
+                tab's header rather than from a tab of their own — where
+                writing finally lives in the IA is still Project 10's call.
+
+                8.8's reveal choreography is still @Pixel's: the planted ->
+                bloomed transition happens on `WriteInbox` (§22.2's refetch),
+                it just does not yet have a beat. */}
+            <Stack.Screen name="WriteInbox" component={WriteInbox} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Compose" component={Compose} options={{ presentation: 'modal' }} />
 
             {/* Project 10: Wrapped is no longer a tab (Colin's ruling — it
                 lives in the Garden). It has to be registered somewhere or the
                 screen ships unreachable, and a root-stack modal is the same
-                treatment Notes/Seeds/Compose get for the same reason.
+                treatment WriteInbox/Compose get for the same reason.
 
                 `onComplete` is what makes it a screen rather than a trap: with
                 the prop undefined, `PollinateWrapped.js:147` sends the last

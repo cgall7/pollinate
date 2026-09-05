@@ -151,8 +151,8 @@ export const NectarGiftLayer = ({ gift, travel, dropScale, dropOpacity, bloom })
 
 const styles = StyleSheet.create({
   // `absoluteFill`, NOT `absoluteFillObject` — the latter does not exist in
-  // RN 0.86.2 (SeedsInbox.js:451, Onboarding.js:992, GlassBackground.js:73
-  // all carry the same note, all three earned the hard way).
+  // RN 0.86.2 (WriteInbox.js, Onboarding.js:992, GlassBackground.js:73 all
+  // carry the same note, all three earned the hard way).
   layer: {
     ...StyleSheet.absoluteFill,
     // See GIFT_LAYER_Z. The constant is read HERE and nowhere else, so the

@@ -39,8 +39,7 @@ export const DROP_MIN_RADIUS = 3;
 
 // THE CEILING IS THE RATIFIED TAP TARGET, and that is R-N6 read backwards.
 // The door IS this object at rest, in the 44pt box the design system already
-// floors every control at (`LinkButton`, `SeedsInbox`, `NotesInbox` all cite
-// it). The same object cannot be larger in flight than the box it lives in
+// floors every control at (`LinkButton` and the write inbox both cite it). The same object cannot be larger in flight than the box it lives in
 // at rest without being two objects, so the largest gift is exactly that
 // box: r = 22.
 export const DROP_MAX_RADIUS = 22;

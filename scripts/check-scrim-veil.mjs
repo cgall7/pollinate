@@ -147,8 +147,9 @@ console.log('check-scrim-veil — the modal veil is a solved pair, on every grou
 // somebody classifies the ground it sits on — which is the point: the token is
 // one number and a sixth consumer on an unreasoned ground is the whole hazard.
 const CONSUMER_GROUNDS = {
-  'src/screens/NotesInbox.js': ['background'],
-  'src/screens/SeedsInbox.js': ['background'],
+  // R-WD merged NotesInbox and SeedsInbox into one typed inbox. Two consumers
+  // on the same declared ground became one; the ground did not move.
+  'src/screens/WriteInbox.js': ['background'],
   'src/components/MintRotationSheet.js': ['background'],
   'src/components/NectarConsentSheet.js': ['__covers__', 'paperEvening'],
   'src/screens/PackageOpen.js': ['__covers__', 'paperEvening'],

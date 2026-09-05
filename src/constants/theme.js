@@ -144,10 +144,12 @@ const colors = {
   // these rows sit inside a card that already has its own `surface`/border,
   // so the row needs only enough tint to read as a row, not a second card.
   rowVeil: withAlpha(pigment.inkVeil, 0.03),
-  // The modal scrim. Two `detailOverlay` sites shipped this literal, and
-  // SeedsInbox's own comment says it matches NotesInbox *deliberately* —
-  // "a seed detail and a note detail should be siblings." That was someone
-  // doing the right thing by hand; this is the same thing with a name on it.
+  // The modal scrim. Two `detailOverlay` sites shipped this literal, on the
+  // two inboxes R-WD has since merged into one, and the seeds side's own
+  // comment said it matched the notes side *deliberately* — "a seed detail and
+  // a note detail should be siblings." That was someone doing the right thing
+  // by hand; this is the same thing with a name on it, and the merge made the
+  // sibling relation one surface rather than an agreement between two.
   //
   // R-N3.5 (GUIDES/POLLINATE_NECTAR_LIVING_EXCHANGE.md) ruled a RE-SOLVE of
   // this pair after a capture showed the scrimmed compose cream reading as

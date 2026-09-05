@@ -10,11 +10,11 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
 
 // 8b.6's discovery surface — the door into `PackageOpen.js`, same job
-// `SeedsInbox.js`'s "Received" tab does for seeds (no push notifications
+// `WriteInbox.js`'s "Received" side does for notes (no push notifications
 // exist anywhere in this app; every "you were sent something" surface here
 // is an in-app inbox, not a system alert, so this follows that precedent
-// rather than inventing a first one). Deliberately one list, not Seeds'
-// received/sent toggle: a hive's "sent" side already has a home,
+// rather than inventing a first one). Deliberately one list, not the write
+// inbox's received/sent toggle: a hive's "sent" side already has a home,
 // HiveDetail, and showing it twice would be two places to learn one fact.
 //
 // Backed by `HiveStore.listReceivedPackages`, which is not callable until

@@ -5,7 +5,7 @@
 //
 // WHAT THIS IS FOR, and it is one thing.
 //
-// `PlantSeed.js` decides whether "Plant this seed" is pressable. `plantSeed`
+// `Compose.js` decides whether "Plant this seed" is pressable. `plantSeed`
 // decides whether the same draft is sendable. Those are two files, two authors
 // and two futures, and when they drift the user is the one who finds out: the
 // button lights up, they press it, and the store throws the sentence the
@@ -19,7 +19,7 @@
 // modules under test are untouched and unaware. Like that gate, there is no
 // Postgres here and therefore no skip path — it runs everywhere, always.
 //
-// What it deliberately does NOT prove: that `PlantSeed.js` renders. It is JSX
+// What it deliberately does NOT prove: that `Compose.js` renders. It is JSX
 // against React Native and there is no renderer in this repo. §5 asserts only
 // that the screen imports the shared rule rather than re-inlining it, which is
 // a source check and labelled as one.
@@ -71,7 +71,7 @@ globalThis.__PLANT_STUB_CLIENT__ = {
 };
 
 const { SeedsStore, SEED_CONTENT_MAX } = await import(pathToFileURL(path.join(ROOT, 'src/services/SeedsStore.js')).href);
-const { validateSeedDraft, bloomFloor, sealHint, bloomHint, bloomDateLabel, seedCtaLabel, SEED_CTA_LABELS, SEED_DRAFT_REASONS } =
+const { validateSeedDraft, bloomFloor, plantedHint, bloomHint, bloomDateLabel, seedCtaLabel, SEED_CTA_LABELS, SEED_DRAFT_REASONS } =
   await import(pathToFileURL(path.join(ROOT, 'src/utils/seedDraft.js')).href);
 
 let pass = 0;
@@ -188,8 +188,14 @@ console.log('\n  §4 — the two hints read before a recipient is picked');
 // them with a name in place; the screen renders them with no name for as long
 // as the form is blank, and a sentence with a hole in it is worse than a
 // vaguer one.
-eq('seal hint, named', sealHint('Maya'), "Sealed until it blooms — Maya won't see this until then.");
-eq('seal hint, nobody picked', sealHint(null), "Sealed until it blooms — they won't see this until then.");
+// R-WD-3 rules "seal" off the compose surface (hive and rotation vocabulary; a
+// held note is PLANTED) and Colin's standing ban takes the dash, so the one
+// sentence became two. The interpolation moves from mid-sentence to
+// SENTENCE-INITIAL with it, and the fallback is capital "They" in both arms
+// now — Lumen's correction, and it is the load-bearing half of this change:
+// the second arm is not unchanged in shape, only in job.
+eq('planted hint, named', plantedHint('Maya'), "Planted until it blooms. Maya won't see this until then.");
+eq('planted hint, nobody picked', plantedHint(null), "Planted until it blooms. They won't see this until then.");
 eq('bloom hint, named', bloomHint('Maya', 'March 3, 2027'), "Maya won't see this until March 3, 2027.");
 eq('bloom hint, nobody picked', bloomHint(null, 'March 3, 2027'), "They won't see this until March 3, 2027.");
 // The fallback used to be picked by lower-casing the name and comparing it to
@@ -200,11 +206,16 @@ eq('no date -> no label, rather than "Invalid Date"', bloomDateLabel(null), null
 // ---------------------------------------------------------------------------
 console.log('\n  §5 — source check (labelled: this proves wiring, not behaviour)');
 
-const screen = fs.readFileSync(path.join(ROOT, 'src/screens/PlantSeed.js'), 'utf8');
-eq('PlantSeed imports the shared rule', /validateSeedDraft/.test(screen), true);
-eq('PlantSeed sources its CTA label from the shared rule, not a hand-picked string', /seedCtaLabel\(/.test(screen), true);
+// R-WD merged `PlantSeed.js` and `ComposeNote.js` into one compose surface
+// where delivery time is the only variable. The screen these rows read is
+// `Compose.js` now; every property they assert is the same property, because
+// planting is still planting and it is still the shared rule that decides
+// whether the CTA lights up.
+const screen = fs.readFileSync(path.join(ROOT, 'src/screens/Compose.js'), 'utf8');
+eq('Compose imports the shared rule', /validateSeedDraft/.test(screen), true);
+eq('Compose sources its plant CTA label from the shared rule, not a hand-picked string', /seedCtaLabel\(/.test(screen), true);
 eq(
-  'PlantSeed does not re-inline the length rule',
+  'Compose does not re-inline the length rule',
   /content[^\n]*\.length\s*>\s*SEED_CONTENT_MAX/.test(screen),
   false
 );
@@ -217,9 +228,9 @@ eq(
 //
 // So it no longer names an identifier. It names the two things §23.1 actually
 // requires of a consumer, and both are properties a rename cannot fake:
-eq('PlantSeed derives its view rather than choosing it', /resolveListView\(/.test(screen), true);
+eq('Compose derives its view rather than choosing it', /resolveListView\(/.test(screen), true);
 eq(
-  'PlantSeed never renders a branch off a bare row count (§23.1)',
+  'Compose never renders a branch off a bare row count (§23.1)',
   /connections\.length\s*===\s*0/.test(screen),
   false
 );

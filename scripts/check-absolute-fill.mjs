@@ -14,7 +14,8 @@
 // THIS IS THE SECOND TIME THIS CLASS WAS FOUND. Deezine's R43 FAIL 2
 // (2026-08-11) found and fixed four sites, each left with an in-file comment
 // documenting the hazard (GlassBackground.js:47, MonthlyRecap.js:505,
-// Onboarding.js:944, SeedsInbox.js:451-453) — and the sweep that would have
+// Onboarding.js:944, and SeedsInbox.js:451-453 as it stood before R-WD merged
+// that file away) — and the sweep that would have
 // caught the rest never ran. Pixel's 2026-08-25 count: 14 references, 9 live
 // (the bug, still shipping today on 8 of them) and 5 comments (the fix,
 // already landed). A grep keyed on the string `absoluteFillObject` cannot

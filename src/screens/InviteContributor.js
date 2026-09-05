@@ -19,12 +19,13 @@ import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState
 // HiveDetail.js's "+ Invite a writer" row anytime after ("you can invite
 // more writers anytime" — §4.1 — is a promise, not a one-time offer).
 //
-// Connection picker modeled on PlantSeed.js: same LOAD_STATES/resolveListView
+// Connection picker modeled on the write compose surface (`Compose.js`, and
+// `PlantSeed.js` before R-WD merged it there): same LOAD_STATES/resolveListView
 // state machine, same reason — a failed connections read must not render
 // identically to "you have nobody to invite" (§23.2's tier judgement; a
 // missing roster candidate is a materially different sentence from a network
-// failure). Multi-select instead of PlantSeed's single recipient, since a
-// hive roster can gain more than one writer at once.
+// failure). Multi-select instead of compose's single recipient, since a hive
+// roster can gain more than one writer at once.
 const COPY = {
   unknown: {
     title: "Your connections didn't load",
@@ -156,7 +157,8 @@ export const InviteContributor = ({ navigation, route }) => {
         <Text style={styles.eyebrow}>INVITE WRITERS</Text>
         <Text style={styles.title}>Who else is writing for {subjectName}?</Text>
         {/* §4.2's formula, previewed rather than sent — no push notifications
-            exist anywhere in this app (PlantSeed.js's own header note), so
+            exist anywhere in this app (ReceivedPackages.js's header note
+            states the same thing about the same absence), so
             this is the message a writer meets once they open the hive, not
             something dispatched off this screen. */}
         <View style={styles.previewCard}>

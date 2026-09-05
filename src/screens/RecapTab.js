@@ -373,7 +373,7 @@ export const RecapTab = () => {
       )}
 
       {unknown ? (
-        // Copy is placeholder in the same sense SeedsInbox's is — the register
+        // Copy is placeholder in the same sense the write inbox's is — the register
         // is borrowed from its shipped sibling, and the words are Deezine's to
         // overrule. Deliberately names the journal rather than the surface:
         // this screen is "Recap" on main and "Garden" under the tab shell, and

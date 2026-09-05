@@ -47,8 +47,9 @@ const LIVE_ALPHA = alphaOf('scrim');
 const SHIPPED_PIGMENT = P.inkVeil;
 const SPOT = A(mix(P.accentDeep, P.inkVeil, 0.25), alphaOf('spotlightDim'));
 
-// THE POPULATION. `theme.colors.scrim` is ONE number read by five sites —
-// NotesInbox:252, SeedsInbox:460, MintRotationSheet:106, NectarConsentSheet:81,
+// THE POPULATION. `theme.colors.scrim` is ONE number read by four sites —
+// WriteInbox:539 (NotesInbox:252 and SeedsInbox:460 before R-WD merged them
+// into one typed inbox), MintRotationSheet:106, NectarConsentSheet:81,
 // PackageOpen:915 (`sendScrim`) — so the re-solve is scoped to every ground any
 // of them sits on, per the ruling's own "the token is one number". The four
 // cover bases are read out of hiveThemes.js's `base:` list rather than typed.

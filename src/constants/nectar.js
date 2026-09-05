@@ -220,15 +220,28 @@ export const NECTAR_SURFACES = [
   {
     id: 'action-menu-row',
     deliverable: 'DES-28 D5',
-    preConsent: 'Menu shows only "Send note · Plant seed"; the nectar row does not exist.',
+    preConsent:
+      'One compose surface: a recipient picker, a write field and a delivery segment ' +
+      '(Now / On a date). No nectar identifier appears anywhere on it.',
     host: null,
-    probe: 'noActionMenu',
+    probe: 'noNectarOnCompose',
     note:
-      'THE CONTAINER DOES NOT EXIST. The deliverable adds a row to an existing ' +
-      '"Send note · Plant seed" menu. There is no such menu at 35194bd and none on ' +
-      'any of the 181 github branches swept: ComposeNote and PlantSeed are reached ' +
-      'from two separate inbox screens, never from one sheet. The probe is exactly that fact, so the ' +
-      'day someone builds the menu this row reds and asks for the placement.',
+      'THE CONTAINER EXISTS NOW, AND THE PLACEMENT WAS ANSWERED RATHER THAN SKIPPED. ' +
+      'This entry used to read "the container does not exist": the deliverable adds a ' +
+      'row to an existing "Send note · Plant seed" menu, and there was no such menu at ' +
+      '35194bd nor on any of the 181 github branches swept, because the two compose ' +
+      'screens were reached from two separate inbox screens and never from one sheet. ' +
+      'R-WD built that container (POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md, Lumen, ' +
+      '2026-09-05; UX Design thread 160660d9): one write door, one inbox, one compose ' +
+      'surface whose delivery segment IS that two-way choice, rendered as a segment ' +
+      'instead of a sheet. The old probe fired exactly as its author designed it to — ' +
+      'it self-deleted when the menu arrived. ' +
+      'ANSWER OF RECORD: NO NECTAR ROW ON COMPOSE. R-NT-5 rules that giving starts at ' +
+      'a person and the comb is where you give, so a giving affordance on the write ' +
+      'door would be a third giving door and it is unruled. Anyone who wants one is ' +
+      'requesting a design ruling, not filing a row to build. ' +
+      'The successor probe keeps a measurement rather than leaving a note: it reds the ' +
+      'day a nectar identifier appears on the merged compose surface.',
   },
 ];
 

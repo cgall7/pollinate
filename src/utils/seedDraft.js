@@ -82,12 +82,27 @@ export const seedCtaLabel = (draft, planting) => {
 
 // Both hints in the copy (GRATITUDE_COPY_LIBRARY §4, 8.2) interpolate the
 // recipient's name, and both have to read before anyone is picked — a sentence
-// with a hole in it is worse than a slightly vaguer sentence. "they"/"They" is
-// the fallback, cased for its position rather than lower-cased at the call
-// site, because `name.toLowerCase() === 'they'` would also catch a person
-// actually called They.
-export const sealHint = (recipientName) =>
-  `Sealed until it blooms — ${recipientName ?? 'they'} won't see this until then.`;
+// with a hole in it is worse than a slightly vaguer sentence. "They" is the
+// fallback, cased for its position rather than lower-cased at the call site,
+// because `name.toLowerCase() === 'they'` would also catch a person actually
+// called They.
+//
+// BOTH FALLBACKS ARE CAPITAL NOW, and that is a consequence of the R-WD-4
+// rewrite rather than a style change. `sealHint` used to read
+// "Sealed until it blooms — {name} won't see this until then.", where the
+// interpolation sat MID-SENTENCE after a dash, so its fallback was lowercase
+// "they" while `bloomHint`'s was capital. R-WD-3 rules "seal" off the compose
+// surface (it is hive and rotation vocabulary; a held note is PLANTED) and
+// Colin's standing ban takes the dash, so the sentence became two sentences —
+// which moves the interpolation to SENTENCE-INITIAL position and the fallback
+// with it. Lumen's correction, ruled 2026-09-05 in UX Design thread 160660d9:
+// the second arm is not unchanged in shape, only in job.
+//
+// Renamed with the string. A helper still called `sealHint` while returning
+// the planted sentence is a name that lies to the next reader, on the one
+// surface whose whole rule is which word is used.
+export const plantedHint = (recipientName) =>
+  `Planted until it blooms. ${recipientName ?? 'They'} won't see this until then.`;
 
 export const bloomHint = (recipientName, dateLabel) =>
   `${recipientName ?? 'They'} won't see this until ${dateLabel}.`;

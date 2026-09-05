@@ -684,37 +684,44 @@ const HoneycombFeed = () => {
             ? `${connections.length} CONNECTION${connections.length === 1 ? '' : 'S'}`
             : 'YOUR HIVE'
         }
-        // "Hive", not "Honeycomb": Project 10 renamed the tab per the ruling,
-        // and one of two places the old word was still on screen. Grepping
-        // `src/` + `App.js` for the old name turned up the other: live error
-        // copy at `:288`, now brand-free per Deezine. Everything else is an
-        // identifier or a comment, except `supabase.js:16`, which is a
-        // `console.warn` — developer-visible, rebrand debt, not mine to sweep
-        // from inside a navigation change.
+        // "Honeycomb", not "Hive" — R-WD-4's header rider, and it corrects an
+        // inversion rather than picking a preference. The 09-04 direction
+        // ruled this tab HONEYCOMB; "hive" is a CLAIMED NOUN in this product
+        // (a hive is the keepsake object), so the screen title was asserting
+        // the wrong one of the two. The eyebrow above already says YOUR HIVE
+        // about the people, which is the sense that survives.
         //
-        // The files keep their names. `check-demo-hive.mjs:74` reads
+        // The `Hive` route name in MainTabs.js is code-internal and gate-read
+        // (`check:nav-depth` resolves it), so it stands. The files keep their
+        // names for the same reason: `check-demo-hive.mjs:74` reads
         // `src/components/HoneycombGrid.js` by path and unwraps its regex
         // match with no null guard, so a file rename fails that gate as a
         // TypeError rather than a diagnosis — and a rename with no
         // user-facing half is not worth buying that with.
-        title="Hive"
+        title="Honeycomb"
         right={
-          // Project 7 and Project 8 entry points — both modal routes live on
-          // the root stack, not this tab's own navigator, hence getParent().
+          // R-WD-1 — THE LEAF AND MAIL DOORS MERGE INTO ONE. Both modal
+          // routes live on the root stack, not this tab's own navigator,
+          // hence getParent().
           //
-          // PLACEMENT IS A DESIGN CALL I MADE, NOT AN ENGINEERING ONE. A
-          // compose screen nothing opens is a well-tested absence, so Seeds
-          // needed *a* door; the header beside Notes is the only surface that
-          // already has this shape. @Pixel/@Deezine — moving it is this block
-          // and nothing else, and the tab bar rebuild (Project 10) may well
-          // take both icons anyway.
+          // Two doors said there were two places to write. There is one: a
+          // seed is a note with a delivery date, and the delivery choice now
+          // lives inside compose (R-WD-3) rather than in the choice of which
+          // header icon to press. `create-outline` because the errand is
+          // WRITING, which neither a leaf (a seed's mark, and it survives on
+          // the row) nor an envelope (a note already sent) names.
           //
-          // The leaf now opens the LIST, not the compose screen. When 8.2 was
-          // the only Seeds surface, a door straight to compose was the only
-          // door there was. Now it matches Notes exactly — icon opens the
-          // inbox, `+` inside it composes — and the two entry points beside
-          // each other behaving differently would have been a thing to learn
-          // for no reason.
+          // The header ends at two icons, and the second one is not this
+          // errand: the gift door is RECEIVING, and delivered hives are not
+          // something you write.
+          //
+          // Placement is still a design call rather than an engineering one,
+          // and it is still the header — the tab bar rebuild (Project 10) may
+          // yet take it. What changed is that there is now one thing to move.
+          //
+          // The door opens the LIST, not compose, and the `+` inside composes
+          // — the shipped icon-opens-list convention, kept.
+          //
           // §32.2 anchor, and an errand LANDING site rather than a residence.
           // `on="right"` resolves to the screen's right content edge, which on
           // a right-aligned icon row is 15pt of the gift icon — fine for a bee
@@ -723,24 +730,17 @@ const HoneycombFeed = () => {
           // resident's rest position is permanent).
           <PerchAnchor id="header-actions" on="right" at={0.5} style={styles.headerActions}>
             <PressableScale
-              onPress={() => navigation.getParent()?.navigate('Seeds')}
+              onPress={() => navigation.getParent()?.navigate('WriteInbox')}
               haptic={null}
-              accessibilityLabel="Seeds"
+              accessibilityLabel="Write to someone"
             >
-              <Ionicons name="leaf-outline" size={22} color={theme.colors.ink} />
+              <Ionicons name="create-outline" size={22} color={theme.colors.ink} />
             </PressableScale>
-            <PressableScale
-              onPress={() => navigation.getParent()?.navigate('Notes')}
-              haptic={null}
-              accessibilityLabel="Notes"
-            >
-              <Ionicons name="mail-outline" size={22} color={theme.colors.ink} />
-            </PressableScale>
-            {/* 8b.6's discovery door — same placement reasoning as Seeds/Notes
-                above (a compose/open screen nothing points at is untested
-                dead code): the header beside them is the only surface that
+            {/* 8b.6's discovery door — same placement reasoning as the write
+                door above (a compose/open screen nothing points at is untested
+                dead code): the header beside it is the only surface that
                 already has this shape. Moving it is Project 10's call, same
-                note the two icons above already carry. */}
+                note the icon above already carries. */}
             <PressableScale
               onPress={() => navigation.getParent()?.navigate('ReceivedPackages')}
               haptic={null}

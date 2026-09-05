@@ -13,11 +13,14 @@ import { PressableScale } from './PressableScale';
 // similar — identical. The app owns `empty` and `loading` and has been using
 // `empty` to mean `failed`.
 //
-// This is §23.8's one component. Four consumers: HoneycombTab, NotesInbox,
-// ComposeNote, and PlantSeed (8.2, the first one built against it). The
-// screens keep the §23.2 tier judgement — whether a given call's absence
-// changes what the screen asserts about the user is a per-call decision and
-// cannot live in here.
+// This is §23.8's one component, and every screen that makes a load-bearing
+// read imports it — `PlantSeed` (8.2) was the first built against it, and
+// R-WD folded that screen into `Compose.js` and gave the merged `WriteInbox`
+// the same discipline the notes half never had. Deliberately no consumer
+// count here: the number has drifted twice already and a count in a comment
+// is a claim with no owner. The screens keep the §23.2 tier judgement —
+// whether a given call's absence changes what the screen asserts about the
+// user is a per-call decision and cannot live in here.
 //
 // WHAT THIS DELIBERATELY DOES NOT RENDER: `loading`, `ready` and `empty`.
 // §23.4 says retry transitions to `loading` and reuses the screen's existing

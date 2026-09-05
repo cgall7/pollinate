@@ -34,11 +34,12 @@
 //      registration site (Wrapped wires `onComplete` to `goBack` right in
 //      App.js) or in the resolved component file. Attribute-value, not
 //      "anywhere in the file": a compose-style modal always has a `goBack`
-//      on its submit path (`ComposeNote.handleSend`, `PlantSeed`'s
+//      on its submit path (`Compose.handleSubmit`; before R-WD merged the
+//      four write screens into two, `ComposeNote.handleSend` and `PlantSeed`'s
 //      equivalent), so the screens most likely to trap a user who changed
 //      their mind satisfy a file-scoped predicate for free — Sage proved it
-//      by deleting ComposeNote's close control and watching the file-scoped
-//      version stay green. Attribute-value, not `onPress`-value: Wrapped's
+//      by deleting the compose screen's close control and watching the
+//      file-scoped version stay green. Attribute-value, not `onPress`-value: Wrapped's
 //      exit hangs off `onComplete`, and an `onPress`-name rule would break
 //      the one screen the enumerator was built to find.
 //   4. Every press-shaped dismiss attribute (`onPress`/`onLongPress`) sits
@@ -144,7 +145,7 @@ const dismissCallsIn = (node) => {
 // A dismiss call wired where a user can reach it: a JSX attribute whose
 // value is an inline function containing a dismiss call, or a bare method
 // reference to one (`onPress={navigation.goBack}`). Returns the attribute
-// site, not the call site — `ComposeNote.js` has a `goBack` in `handleSend`
+// site, not the call site — `Compose.js` has a `goBack` in `handleSubmit`
 // too, and citing that line sent an auditor into the submit path.
 const dismissExitsIn = (node) => {
   const found = [];
@@ -333,7 +334,7 @@ for (const modal of modals) {
     bad(
       label,
       `${rel(file)} has no JSX attribute whose value dismisses (.goBack()/.pop()/.popToTop()/.dismiss()). ` +
-        'A dismiss call elsewhere in the file does not count — ComposeNote\'s submit path has one, and a ' +
+        'A dismiss call elsewhere in the file does not count — the compose screen\'s submit path has one, and a ' +
         'user who changed their mind cannot reach it. With headerShown:false global, this screen has no ' +
         'system chrome — the Seeds/Notes trap.',
     );
