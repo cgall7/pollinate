@@ -100,7 +100,12 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
       style={styles.card}
       accessibilityLabel={`Open the comb ${comb.name}`}
     >
-      <GradientCard style={styles.material} contentStyle={styles.fill} innerStyle={styles.inner}>
+      <GradientCard
+        colors={theme.gradients.sheen}
+        style={styles.material}
+        contentStyle={styles.fill}
+        innerStyle={styles.inner}
+      >
         <View style={styles.headerRow}>
           <View style={styles.iconRing}>
             <Ionicons name="people" size={18} color={theme.colors.ink} />
