@@ -9,6 +9,7 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "check:demo-hive": "node scripts/check-demo-hive.mjs",
+    "check:comb-bloom": "node scripts/check-comb-bloom.mjs",
     "check:comb-dive": "node scripts/check-comb-dive.mjs",
     "check:comb-identity": "node scripts/check-comb-identity.mjs",
     "check:comb-pending-shelf": "node scripts/check-comb-pending-shelf.mjs",
