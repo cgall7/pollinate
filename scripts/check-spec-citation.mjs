@@ -79,12 +79,13 @@
 //                   line, the same fixture without it must stay green, and the
 //                   sentence rewrapped at a different column must stay green.
 //
-// NO ROW HERE HOLDS A FILE COUNT. Eleven files carry the sentence today and
-// this gate asserts none of that: it holds the property that every occurrence
-// is disclaimed, so a new script is covered at birth and a retired one costs
-// nothing. Asserting the cardinality would make this gate an owner for a claim
-// nobody ruled, and the count would go stale on the next commit that adds a
-// script.
+// NO ROW HERE HOLDS A FILE COUNT, and this comment does not carry one either.
+// C1 prints how many files carry the sentence on the tree it is run against,
+// so the tally is measured on every run rather than written here, where it
+// would go stale on the next commit that adds a script. What this gate asserts
+// is the property that every occurrence is disclaimed, so a new script is
+// covered at birth and a retired one costs nothing. Asserting the cardinality
+// would make this gate an owner for a claim nobody ruled.
 import fs from 'node:fs';
 import path from 'node:path';
 
