@@ -93,7 +93,8 @@
     "check:glass-definition": "node scripts/check-glass-definition.mjs",
     "check:gradient-card-contract": "node scripts/check-gradient-card-contract.mjs",
     "check:tdz-reference-order": "node scripts/check-tdz-reference-order.mjs",
-    "check:gift-layer-rank": "node scripts/check-gift-layer-rank.mjs"
+    "check:gift-layer-rank": "node scripts/check-gift-layer-rank.mjs",
+    "check:nectar-surface-yield": "node scripts/check-nectar-surface-yield.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dancing-script": "^0.4.2",

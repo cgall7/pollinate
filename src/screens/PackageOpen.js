@@ -271,6 +271,19 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     setSendAmount(null);
     setSendCustom('');
     setSendFailed(false);
+    // R-N3.4 — AND THIS IS WHERE THE SEND SURFACE STANDS BACK UP. The beat
+    // no longer restores it when a gift succeeds ("it never returns
+    // re-armed"), so beginning a composition is what puts it back. This
+    // screen needs that in both of its own directions and they are opposite:
+    // opening the entry overlay SHOWS a panel that must be drawn, and
+    // finishing a gift leaves the ENDING slot's panel mounted with nowhere
+    // else to go — a yielded card there would be a dead screen, not a stood
+    // down one. `handleOpenEntrySend` and the success tail both route
+    // through here, and on the success tail the arm lands in the same
+    // synchronous block as `setEntrySendOpen(false)`, so the entry panel
+    // unmounts on the commit that restores the value rather than a tick
+    // after it.
+    gift.arm();
   };
 
   const handleOpenEntrySend = () => {
@@ -753,6 +766,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
               balanceDrops={balanceDrops}
               displayDrops={gift.displayDrops}
               controlsStyle={gift.controlsStyle}
+              surfaceStyle={gift.surfaceStyle}
               originRef={giftOrigin}
               selected={sendAmount}
               onSelect={handleSelectPreset}
@@ -803,6 +817,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
             balanceDrops={balanceDrops}
             displayDrops={gift.displayDrops}
             controlsStyle={gift.controlsStyle}
+            surfaceStyle={gift.surfaceStyle}
             originRef={giftOrigin}
             selected={sendAmount}
             onSelect={handleSelectPreset}

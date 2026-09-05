@@ -174,6 +174,20 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       if (reduced || !origin || !destination) await wait(NECTAR.settle);
       setSuccessMessage(message);
       AccessibilityInfo.announceForAccessibility(message);
+      // R-N3.4 — THE COMPOSITION IS OVER, SO IT IS CLEARED HERE RATHER THAN
+      // LEFT TO THE UNMOUNT. `goBack` is not instant: the screen stays
+      // mounted and painted for the whole dismissal transition, which is the
+      // window Lumen's capture caught holding a re-armed compose with the
+      // same four words still in the field and Send live. One accidental tap
+      // in that window gifts the same words twice. The surface itself stays
+      // yielded (the beat no longer restores it on success), and this is the
+      // state half of the same ruling: nothing held over.
+      //
+      // NOT `retireAttempt()`, deliberately: that mints a fresh send id
+      // because a NEW attempt is starting, and nothing is starting here.
+      setNote('');
+      setAmount(null);
+      setCustom('');
       // `gift.send` resolves only after Settle, so the departure and the
       // authoritative balance decrease stay visible before closing.
       navigation.goBack();
@@ -222,7 +236,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       <Text style={styles.target}>To {recipientLabel}</Text>
       {!nectarConsent && <PressableScale onPress={() => setNectarConsentSheetOpen(true)} style={styles.consent}><Text style={styles.consentText}>Turn this on before sending.</Text></PressableScale>}
       {nectarConsent && (
-        senderInactive ? <PressableScale accessibilityLabel="Not now" onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
+        senderInactive ? <PressableScale accessibilityLabel="Not now" onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} surfaceStyle={gift.surfaceStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
       )}
       {nectarConsent && <><Text style={styles.words}>{wordCount(note)}/8 words</Text>{validationMessage && <Text style={styles.validation}>{validationMessage}</Text>}</>}
       {successMessage && <Text accessibilityLiveRegion="polite" style={styles.srOnly}>{successMessage}</Text>}

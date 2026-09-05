@@ -89,6 +89,29 @@ export const isSendableAmount = (drops, balanceDrops) => {
 // the panel renders it INSTEAD of `balanceDrops`, which stays the
 // authoritative number and is what `isSendableAmount` is asked about, so a
 // mid-count frame can never authorise a send the server would refuse.
+//
+// R-N3.4 — THE CARD ITSELF YIELDS, AND THAT IS WHY THE PAINT IS ITS OWN
+// NODE. The ruling is that every painted part of the send surface falls away
+// on the Gather clock, because R-N3.3's criterion — "the drop should fly
+// over the entry it is for, not over a dimmed copy of it" — was undershot by
+// its own named mechanism: the scrim went and a 354x360 opaque white card
+// stayed, so the beat played over a blank instead of over the sentence being
+// thanked.
+//
+// IT CANNOT BE ONE FADED VIEW, and that is a layout fact rather than a
+// preference. Opacity on a parent applies to every descendant, so fading
+// `card` would take the balance line with it — and the balance line is the
+// one thing R-N3 keeps, because Settle counts it 340ms after Gather ends
+// ("you watch it leave you"). So the card's PAINT (its ground, its radius,
+// its shadow) is a separate absolutely-positioned sibling that carries
+// `surfaceStyle`, and the content sits above it in ordinary flow. The paint
+// goes, the controls go, the number stays.
+//
+// PAINT ORDER HERE IS MOUNT ORDER AND THAT IS SOUND, unlike the case
+// `check-gift-layer-rank` was written for: no sibling inside this card
+// declares a `zIndex`, so nothing has been promoted out of document order.
+// The moment one does, this comment is wrong and that gate's own reasoning
+// applies.
 export const NectarSendPanel = ({
   nectarConsent,
   balanceDrops,
@@ -106,11 +129,17 @@ export const NectarSendPanel = ({
   onSend,
   onCancel,
   controlsStyle,
+  surfaceStyle,
   originRef,
 }) => (
   <>
     {nectarConsent && (
       <View style={styles.card}>
+        {/* The card's ground. Childless on purpose — see the header: the
+            moment anything renders inside this node it inherits the fade,
+            and the balance line is the one element that must not. */}
+        <Animated.View pointerEvents="none" style={[styles.cardPaint, surfaceStyle]} />
+
         <Animated.View style={[styles.controls, controlsStyle]}>
           <Text style={styles.heading}>Send nectar</Text>
         </Animated.View>
@@ -125,7 +154,31 @@ export const NectarSendPanel = ({
         {/* THE ONE ELEMENT THAT DOES NOT FALL AWAY — see the header. It
             reads `displayDrops`, which is `balanceDrops` at rest and the
             animated value during a gift; the fallback keeps a caller that
-            passes neither on today's behaviour rather than blank. */}
+            passes neither on today's behaviour rather than blank.
+
+            AND IT CARRIES ITS OWN GROUND, for the reason R-N3.2 gives for
+            the drop's backing. Before R-N3.4 this line always sat on the
+            card's white; the card now yields under it, so the line is left
+            over whatever the screen happens to be showing. Measured against
+            every ground it can land on, `inkSoft` clears 4.5:1 on all six
+            light ones (worst 5.3792 on `washPeach`, 5.8353 on `background`)
+            and reads 2.0727 on `paperEvening` — reachable, not theoretical:
+            a tall entry's paper measures y 269-610 while this line sits at
+            y 309-329, so the paper is behind it. Backed, it is 6.3074 on all
+            seven by construction, which is a property of the object rather
+            than a patch to a timing. At rest the ground is white on white
+            and invisible; it only becomes a ground when there is no other.
+
+            IT IS ALSO THE LESSER OF THE TWO SHIPPABLE STATES, and that is a
+            render finding rather than a preference. On a tall entry the line
+            lands ON the memory whether it is backed or not — unbacked, that
+            is two texts in the same pixels and neither is readable; backed,
+            it is one legible sentence covering one line of another. The
+            collision itself is not mine to resolve: R-N3 keeps this line for
+            Settle to count and R-N3.4 clears the card so the memory can be
+            read, and on a tall entry those two want the same pixels. Filed
+            for Lumen with both frames. */}
+
         <Text style={styles.balance}>
           {(displayDrops === undefined ? balanceDrops : displayDrops) === null
             || (displayDrops === undefined ? balanceDrops : displayDrops) === undefined
@@ -219,12 +272,22 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'center',
   },
+  // THE BOX, NOT THE PAINT. Everything that decides where things sit stays
+  // here so the card's layout is byte-identical to what it was before the
+  // split; everything that decides what is visible moved to `cardPaint`.
+  // `padding` staying here is load-bearing in both directions: it keeps the
+  // content inset unchanged, and an absolutely-positioned child fills the
+  // PADDING BOX, so the ground still reaches the card's outer edge.
   card: {
     width: '100%',
-    backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.large,
     padding: theme.spacing.lg,
     alignItems: 'center',
+  },
+  cardPaint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
     ...theme.shadows.card,
   },
   heading: {
@@ -237,6 +300,16 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     textAlign: 'center',
     marginTop: theme.spacing.xs,
+    // `alignSelf: 'center'` rather than the default stretch, so the ground is
+    // the size of the sentence and not a full-width band across the beat, and
+    // NO VERTICAL PADDING, which is the difference between a layout change
+    // and none: the text's frame is already a full line box, and 2pt here
+    // grew the card 4pt and moved the Send button's own hit centre from
+    // y 519 to y 521 in the rig. Measured both ways.
+    alignSelf: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: theme.spacing.sm,
   },
   presetRow: {
     flexDirection: 'row',

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { NECTAR, NECTAR_EASING } from '../constants/motion';
+import { DURATIONS, NECTAR, NECTAR_EASING } from '../constants/motion';
 import { buildDropFlight, dropRadiusForAmount } from './nectarFlight';
 import { nectarFailureReturnPlan } from './nectarGiftLifecycle';
 
@@ -80,6 +80,14 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
   const scrim = useRef(new Animated.Value(1)).current;
   // The panel's controls. Not the balance line — see `useNectarGift`'s
   // consumer and the deviation noted there.
+  //
+  // R-N3.4 — ONE VALUE DRIVES BOTH THE CONTROLS AND THE CARD'S GROUND. The
+  // ruling puts the card body on the Gather clock the controls already ride,
+  // and a second value set to the same duration would be a second copy of
+  // one derivation — the exact shape R-N3.2 closed for the drop's backing.
+  // The two published styles differ only in what they carry: the controls
+  // also sink 4pt, the ground does not move. They cannot drift because there
+  // is nothing to drift from.
   const controls = useRef(new Animated.Value(1)).current;
 
   const count = useRef(new Animated.Value(0)).current;
@@ -137,16 +145,39 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
     [count],
   );
 
-  const reset = useCallback(() => {
+  // THE SEND SURFACE STANDS UP AGAIN, AND THIS IS THE ONLY PLACE IT DOES.
+  //
+  // R-N3.4: "the resting state after a completed send is the panel standing
+  // down … it never returns re-armed." Restoring the surface is therefore
+  // not part of finishing a gift — it is part of BEGINNING A COMPOSITION,
+  // which is a different event with a different owner. The caller says when
+  // that happens; the beat never says it on the caller's behalf.
+  //
+  // Idempotent by construction (`setValue` to the value it already holds),
+  // so a caller may arm on every keystroke or once on open.
+  const arm = useCallback(() => {
+    scrim.setValue(1);
+    controls.setValue(1);
+  }, [scrim, controls]);
+
+  // The FLIGHT's own state, and nothing about the surface. Split out of what
+  // used to be one `reset()` that also put `controls` and `scrim` back to 1
+  // on the success path — which is the mechanism behind the re-armed compose
+  // Lumen captured (batch C, right panel): the snap ran inside the promise
+  // chain, one whole tick before the caller could unmount or navigate, so a
+  // fully repainted panel with the previous words still in it was on screen
+  // for at least a frame and for the entire dismissal transition on the comb
+  // mount. The failure path never called this — it animates the surface back
+  // up over `NECTAR.gather`, because a gift that came home must be sendable
+  // again. One function was serving two opposite endings.
+  const resetFlight = useCallback(() => {
     travel.setValue(0);
     dropScale.setValue(0);
     dropOpacity.setValue(0);
     bloom.setValue(0);
-    scrim.setValue(1);
-    controls.setValue(1);
     setGift(null);
     setPhase(GIFT_IDLE);
-  }, [travel, dropScale, dropOpacity, bloom, scrim, controls]);
+  }, [travel, dropScale, dropOpacity, bloom]);
 
   /**
    * Fly one gift.
@@ -202,12 +233,53 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
       if (reduced) {
         setPhase(GIFT_SETTLE);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // R-N3.4's Reduced Motion clause: the send surface still yields, as
+        // the ruled interaction-feedback substitute — a flat fade at
+        // `DURATIONS.reducedMotionFade`, §14.1's one number for this. It is
+        // NOT a new surface (R-N3.0 forbids that) and it is not the Gather
+        // clock either: there is no travel to keep out of the way of here,
+        // so the yield is paced by the mandate rather than by a beat that
+        // does not run. The balance line is outside this fade at both mounts
+        // and the count is deliberately not gated on `reduced` (§5), so the
+        // one thing left to watch is the one thing RM must not remove.
+        Animated.parallel([
+          Animated.timing(controls, {
+            toValue: 0,
+            duration: DURATIONS.reducedMotionFade,
+            easing: NECTAR_EASING.absorbRise,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scrim, {
+            toValue: 0,
+            duration: DURATIONS.reducedMotionFade,
+            easing: NECTAR_EASING.absorbRise,
+            useNativeDriver: true,
+          }),
+        ]).start();
         const optimisticCountDone = countTo(optimistic);
         return settledCommit
           .then(async (res) => {
             if (res.ok) {
               await optimisticCountDone;
             } else {
+              // The gift came home, so the surface must be sendable again —
+              // the same obligation the full-motion failure path discharges
+              // over `NECTAR.gather`, on this path's own clock. A snap would
+              // be a transition, which is exactly what RM removes.
+              Animated.parallel([
+                Animated.timing(controls, {
+                  toValue: 1,
+                  duration: DURATIONS.reducedMotionFade,
+                  easing: NECTAR_EASING.absorbRise,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(scrim, {
+                  toValue: 1,
+                  duration: DURATIONS.reducedMotionFade,
+                  easing: NECTAR_EASING.absorbRise,
+                  useNativeDriver: true,
+                }),
+              ]).start();
               await countTo(base);
             }
             return res;
@@ -328,7 +400,7 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
       })
         .then(() => {
           inFlight.current = false;
-          reset();
+          resetFlight();
           return { ok: true };
         })
         .catch((failurePayload) => {
@@ -391,7 +463,7 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
           return returnHomeDone.then(() => ({ ok: false, err }));
         });
     },
-    [reduced, travel, dropScale, dropOpacity, bloom, scrim, controls, countTo, reset],
+    [reduced, travel, dropScale, dropOpacity, bloom, scrim, controls, countTo, resetFlight],
   );
 
   // Built here rather than at the two call sites: the overlay panel and the
@@ -404,5 +476,12 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
     transform: [{ translateY: controls.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }) }],
   };
 
-  return { gift, phase, send, travel, dropScale, dropOpacity, bloom, scrim, controls, controlsStyle, displayDrops };
+  // R-N3.4 — the card's ground, on the same driver and with no transform.
+  // OPACITY ONLY IS THE POINT: the controls sink 4pt as they go because R-N3
+  // says the panel empties downward, but a ground that also moved would
+  // shear away from the content it is behind and read as two cards. The card
+  // does not leave; it stops being painted.
+  const surfaceStyle = { opacity: controls };
+
+  return { gift, phase, send, arm, travel, dropScale, dropOpacity, bloom, scrim, controls, controlsStyle, surfaceStyle, displayDrops };
 };

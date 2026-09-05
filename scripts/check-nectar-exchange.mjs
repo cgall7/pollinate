@@ -869,15 +869,89 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   }
 
   // ROW 6 — Reduce Motion. NOT "there is a reduced branch": the claim is that
-  // the branch removes the TRAVEL and keeps the ARRIVAL. So: no Animated
-  // timing on the path driver inside it, and the count still runs.
-  const rmBlock = /if \(reduced\) \{([\s\S]*?)\n      \}/.exec(HOOK)?.[1] ?? '';
-  const rmTravels = /Animated\.(timing|spring|sequence|parallel)/.test(rmBlock);
-  const rmCounts = /countTo\(/.test(rmBlock);
-  if (rmBlock && !rmTravels && rmCounts) {
-    ok('D3 the Reduce Motion branch removes the travel and keeps the gift — zero Animated drivers inside it, and the numeral still counts because "a number changing is content, not motion" (§5). The drop layer still mounts, so the surface population is identical to the motion path');
+  // the branch removes the TRAVEL and keeps the ARRIVAL.
+  //
+  // AMENDED FOR R-N3.4, AND THE OLD SHAPE WAS ALREADY WIDER THAN ITS OWN
+  // HEADER. This row used to be `/Animated\.(timing|spring|sequence|parallel)/`
+  // over the block's source text: it forbade EVERY tween while the sentence
+  // above it forbade one — "no Animated timing ON THE PATH DRIVER". A proxy
+  // that quantifies over more than the claim does is a row that reds on
+  // correct work, and R-N3.4 is that work: the send surface yields under RM
+  // too, as §14.1's mandated flat fade. It was also weaker than it looked in
+  // the other direction, because a text scan cannot tell WHICH value is
+  // being driven, so `Animated.timing(travel, …)` and
+  // `Animated.timing(controls, …)` were the same string to it.
+  //
+  // Written as a UNIVERSAL instead. Every Animated driver inside the branch
+  // is enumerated off the AST and classified; a driver in neither class is a
+  // FAILURE rather than an absence, so the next value added here has to be
+  // ruled on rather than defaulting to permitted.
+  const RM_PATH_DRIVERS = ['travel', 'dropScale', 'dropOpacity', 'bloom'];
+  const RM_SURFACE_DRIVERS = ['controls', 'scrim'];
+  const rmIfs = [];
+  visit(tree, (n) => {
+    if (n.type === 'IfStatement' && n.test?.type === 'Identifier' && n.test.name === 'reduced'
+      && n.consequent?.type === 'BlockStatement') rmIfs.push(n);
+  });
+  const rmDrivers = [];
+  let rmCounts = false;
+  if (rmIfs.length === 1) {
+    visit(rmIfs[0].consequent, (n) => {
+      if (n.type !== 'CallExpression') return;
+      if (n.callee?.type === 'Identifier' && n.callee.name === 'countTo') rmCounts = true;
+      if (n.callee?.type !== 'MemberExpression') return;
+      if (n.callee.object?.name !== 'Animated') return;
+      const method = n.callee.property?.name;
+      // `parallel`/`sequence`/`stagger`/`delay` are composers, not drivers —
+      // their members are separate CallExpressions this same walk reaches.
+      if (!['timing', 'spring', 'decay'].includes(method)) return;
+      const target = n.arguments[0];
+      const config = n.arguments[1];
+      const durationProp = config?.type === 'ObjectExpression'
+        ? config.properties.find((prop) => prop.key?.name === 'duration')
+        : null;
+      const duration = durationProp?.value?.type === 'MemberExpression'
+        ? `${durationProp.value.object?.name}.${durationProp.value.property?.name}`
+        : durationProp?.value?.value ?? null;
+      rmDrivers.push({
+        name: target?.type === 'Identifier' ? target.name : `<${target?.type ?? 'missing'}>`,
+        method,
+        duration,
+      });
+    });
+  }
+  const rmPath = rmDrivers.filter((d) => RM_PATH_DRIVERS.includes(d.name));
+  const rmSurface = rmDrivers.filter((d) => RM_SURFACE_DRIVERS.includes(d.name));
+  const rmUnclassified = rmDrivers.filter(
+    (d) => !RM_PATH_DRIVERS.includes(d.name) && !RM_SURFACE_DRIVERS.includes(d.name),
+  );
+  // The yield is the §14.1 number or it is not the ruled substitute.
+  const rmSurfaceMistimed = rmSurface.filter((d) => d.duration !== 'DURATIONS.reducedMotionFade');
+  if (rmIfs.length === 1 && rmCounts && rmPath.length === 0 && rmUnclassified.length === 0
+    && rmSurface.length > 0 && rmSurfaceMistimed.length === 0) {
+    ok(`D3 the Reduce Motion branch removes the travel and keeps the gift — every Animated driver inside it enumerated off the AST and classified: ${rmDrivers.length} total, 0 on a path driver (${RM_PATH_DRIVERS.join('/')}), ${rmSurface.length} on the send surface (${RM_SURFACE_DRIVERS.join('/')}) and every one of those at DURATIONS.reducedMotionFade — R-N3.4's ruled fast-fade substitute, which is §14.1's one number for this case. The numeral still counts because "a number changing is content, not motion" (§5), and the drop layer still mounts, so the surface population is identical to the motion path`);
   } else {
-    bad('D3', `RM branch found=${!!rmBlock}, contains an animation=${rmTravels}, still counts=${rmCounts} — §5/§6 row 6 wants no tween and a gift that still arrives`);
+    bad('D3', `RM branch found=${rmIfs.length}, counts=${rmCounts}, path drivers=[${rmPath.map((d) => d.name).join(', ')}], surface drivers=[${rmSurface.map((d) => `${d.name}@${d.duration}`).join(', ')}], unclassified=[${rmUnclassified.map((d) => `${d.name}@${d.duration}`).join(', ')}] — §5/§6 row 6 wants no tween on the path and a gift that still arrives, and R-N3.4 wants the surface yield at the mandated RM fade`);
+  }
+
+  // D3b — THE CONTROL FOR D3, because a classifier this shape has two ways
+  // to go quiet and neither shows up as a red. Re-run the same enumeration
+  // against a branch with a path driver injected and against one with a
+  // driver in no class at all: both must be rejected. Without this, a
+  // `visit` that stopped reaching into the branch would report zero path
+  // drivers and read exactly like a clean pass.
+  const rmClassify = (drivers) => ({
+    path: drivers.filter((d) => RM_PATH_DRIVERS.includes(d.name)).length,
+    unclassified: drivers.filter(
+      (d) => !RM_PATH_DRIVERS.includes(d.name) && !RM_SURFACE_DRIVERS.includes(d.name),
+    ).length,
+  });
+  const rmInjectedPath = rmClassify([...rmDrivers, { name: 'travel', method: 'timing', duration: 340 }]);
+  const rmInjectedNew = rmClassify([...rmDrivers, { name: 'somethingNew', method: 'timing', duration: 200 }]);
+  if (rmDrivers.length > 0 && rmInjectedPath.path === 1 && rmInjectedNew.unclassified === 1) {
+    ok(`D3b the row's classifier is live and its null class is a failure — the real branch yields ${rmDrivers.length} enumerated drivers (non-empty, so D3 is not vacuous), a re-injected \`travel\` lands in the forbidden class, and an unheard-of driver lands in NEITHER class rather than defaulting to permitted`);
+  } else {
+    bad('D3b', `enumerated=${rmDrivers.length}, injected path=${rmInjectedPath.path}, injected unknown=${rmInjectedNew.unclassified} — the classifier cannot distinguish the cases D3's verdict rests on`);
   }
 
   // R-N3.3 — the two jobs, separated. THE ABSENCE IS THE ASSERTION: the
