@@ -739,18 +739,57 @@ const findQueryCalls = (ast) => {
 //       convention B6 already uses for a binding shape the census can't
 //       classify: a named handler this walk cannot connect to any rendered
 //       control is not evidence of safety, it is evidence of nothing.
+const isFunctionish = (t) =>
+  t === 'ArrowFunctionExpression' || t === 'FunctionExpression' || t === 'FunctionDeclaration';
+
+// WHICH DECLARATIONS ARE HANDLERS. `const handleX = () => {…}`,
+// `function handleX() {…}`, and `const handleX = useCallback(() => {…}, deps)`.
+// The third was forward-ported 2026-09-05 with the exclusivity clause, ruled
+// in by Lumen for three reasons, and it is not a nicety.
+//
+// `useCallback(…)` is a CallExpression, so a resolver that only accepts a
+// function-expression init walks straight PAST the declarator and returns the
+// enclosing COMPONENT's name, whose JSX wiring is (correctly) nothing. A
+// correctly guarded handler then reads cannot-tell, which is red on the one
+// idiom this codebase reaches for most: 38 declarations in src/ take this
+// shape. That false red's remediation gradient points at UNWRAPPING the
+// memoization to make the gate green, which is PROBE-B's defect class one
+// notch milder, and PROBE-B is why the clause above exists.
+//
+// It also matters to the clause itself. A useCallback handler wired to a
+// guarded control AND called on mount should read 'other-callers'. Without
+// this, it reads cannot-tell for the wrong reason, which is safe by accident
+// rather than by mechanism, and an accident is not a gate.
+//
+// THE WRAPPER SET IS AN ENUMERATED SET, NEVER A `use*` REGEX (Lumen's pin
+// (i)). `useMemo` returning a function is a different claim and is not
+// licensed here by accident of spelling. Extend this Set against this
+// comment when a shape appears, which is `isUnderGuard`'s own convention.
+//
+// The acceptance keys on a CallExpression init whose callee is IN THE SET
+// with a functionish first argument, so a store's ObjectExpression init is
+// still not a handler and the trigger-disjointness rows below stay green.
+const HOOK_HANDLER_WRAPPERS = new Set(['useCallback']);
+const declaredHandlerName = (node) => {
+  if (node.type === 'FunctionDeclaration' && node.id) return node.id.name;
+  if (node.type !== 'VariableDeclarator' || node.id.type !== 'Identifier' || !node.init) return null;
+  const { init } = node;
+  if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') return node.id.name;
+  if (
+    init.type === 'CallExpression' &&
+    init.callee.type === 'Identifier' &&
+    HOOK_HANDLER_WRAPPERS.has(init.callee.name) &&
+    init.arguments[0] &&
+    isFunctionish(init.arguments[0].type)
+  ) {
+    return node.id.name;
+  }
+  return null;
+};
 const findEnclosingHandlerName = (ancestors) => {
   for (let i = ancestors.length - 1; i >= 0; i -= 1) {
-    const { node } = ancestors[i];
-    if (
-      node.type === 'VariableDeclarator' &&
-      node.id.type === 'Identifier' &&
-      node.init &&
-      (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')
-    ) {
-      return node.id.name;
-    }
-    if (node.type === 'FunctionDeclaration' && node.id) return node.id.name;
+    const name = declaredHandlerName(ancestors[i].node);
+    if (name) return name;
   }
   return null;
 };
@@ -1212,6 +1251,47 @@ const QUERY_CALIBRATION = [
      }`,
     false,
   ],
+  // THE useCallback PAIR (Lumen's pin (iv), 2026-09-05). The first is the
+  // false red this resolver closes: before it, the walk named the enclosing
+  // component and the row read cannot-tell. The second is the clause
+  // composing through the new resolver, which is the whole reason the two
+  // ship together.
+  [
+    'useCallback handler wired to a guarded control',
+    `function Comp() {
+       const handleSend = useCallback(async () => { await client.rpc('record_zap', {}); }, []);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    true,
+  ],
+  [
+    'useCallback handler wired to an UNguarded control',
+    `function Comp() {
+       const handleSend = useCallback(async () => { await client.rpc('record_zap', {}); }, []);
+       return <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  [
+    'useCallback handler wired guarded but ALSO called bare on mount, so the clause still reaches it',
+    `function Comp() {
+       const loadBalance = useCallback(async () => { await client.from('nectar_zaps').select('amount_microusd'); }, []);
+       useEffect(() => { loadBalance(); }, []);
+       return nectarConsent && <Button onPress={loadBalance} />;
+     }`,
+    false,
+  ],
+  // The wrapper set is a Set, not a spelling. `useMemo` returning a function
+  // is a different claim and is deliberately not licensed, so this reads
+  // cannot-tell rather than inheriting the button's authority.
+  [
+    'a useMemo-wrapped function is NOT a licensed wrapper, so no authority is inherited',
+    `function Comp() {
+       const handleSend = useMemo(() => async () => { await client.rpc('record_zap', {}); }, []);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
   [
     'a member name that merely spells the same is not a reference to the handler',
     `function Comp() {
@@ -1233,6 +1313,68 @@ for (const [label, src, want] of QUERY_CALIBRATION) {
   if (got !== want) calibrationFailures.push(`${label} — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 }
 check('E1 query-reserve calibration: guard, render-authority, cannot-tell, and carve-out probes all verify as expected', calibrationFailures, []);
+
+// E1a THE useCallback RESOLVER, MEASURED ON THIS TREE'S OWN DECLARATIONS
+// rather than only on the probes above. A calibration probe proves the
+// resolver handles the shape I wrote; this row proves it handles the shape
+// the app actually writes, which is the population a future money identifier
+// will be declared in. For every `const x = useCallback(fn, deps)` in the
+// enumerated universe, take the calls that sit DIRECTLY in fn's body. Their
+// innermost enclosing function IS fn, so a nested arrow's calls belong to the
+// arrow and not to x. Then check that the resolver names x rather than the
+// enclosing component, whose JSX wiring is nothing.
+//
+// THIS IS THE ROW E3a's HEADER CITES. Until 2026-09-05 that citation had no
+// referent on main: E1a lived only on pixel/handler-caller-exclusivity, which
+// was pushed, announced and never merged, so a comment on main spent nine
+// days pointing into a branch. Forward-ported here with the resolver it
+// controls, which is what makes the sentence true.
+//
+// `resolverCovered > 0` is this row's own vacuity guard, and it is not
+// decoration: if the useCallback idiom ever left this tree, or if the body
+// resolution stopped matching, the misresolved list would be empty for the
+// wrong reason and the row would go green measuring nothing.
+const useCallbackHandlers = [];
+const resolvedCalls = [];
+for (const { rel, ast } of parsed) {
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.init &&
+      node.init.type === 'CallExpression' &&
+      node.init.callee.type === 'Identifier' &&
+      HOOK_HANDLER_WRAPPERS.has(node.init.callee.name) &&
+      node.init.arguments[0] &&
+      isFunctionish(node.init.arguments[0].type)
+    ) {
+      useCallbackHandlers.push({ rel, name: node.id.name, fn: node.init.arguments[0] });
+    }
+    if (node.type !== 'CallExpression') return;
+    let fn = null;
+    for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+      if (isFunctionish(ancestors[i].node.type)) {
+        fn = ancestors[i].node;
+        break;
+      }
+    }
+    if (fn) resolvedCalls.push({ fn, name: findEnclosingHandlerName(ancestors) });
+  });
+}
+const misresolved = [];
+let resolverCovered = 0;
+for (const h of useCallbackHandlers) {
+  const inBody = resolvedCalls.filter((c) => c.fn === h.fn);
+  if (inBody.length === 0) continue;
+  resolverCovered += 1;
+  const wrong = [...new Set(inBody.filter((c) => c.name !== h.name).map((c) => String(c.name)))];
+  if (wrong.length) misresolved.push(`${h.rel} ${h.name} -> ${wrong.join(', ')}`);
+}
+check(
+  `E1a every useCallback-declared handler resolves to its own name (${useCallbackHandlers.length} declared, ${resolverCovered} with a call in the body)`,
+  [misresolved, resolverCovered > 0],
+  [[], true]
+);
 
 // E2 THE REAL QUESTION, over the same source universe A1 already enumerated.
 // Bootstrap objects are excluded from the population this check judges —
