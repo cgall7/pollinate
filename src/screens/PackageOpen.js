@@ -241,6 +241,18 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     return sendAmount;
   };
 
+  // THE STEP IS DECLARED HERE, ABOVE ITS FIRST READER, and that placement is
+  // load bearing. `sendTarget` below reads `step`, and this whole component is
+  // one function body, so a declaration further down sits in the temporal dead
+  // zone of every render that reaches that read. The `&&` short circuit hid it:
+  // harmless while `entrySendOpen` is false, a ReferenceError the instant the
+  // per entry nectar drop flips it true, and App.js wraps the whole navigator in
+  // the app's only ErrorBoundary, so the throw costs the session. Derivation
+  // order, not a guard, is what keeps this correct. It is a pure read of state
+  // that is null before the package loads, so it is safe above the early
+  // returns as well as below them.
+  const step = sequence && revealState && !revealState.done ? sequence[revealState.index] : null;
+
   // THE TARGET IS DERIVED, NOT STORED, and that is the fix to my own first
   // cut. Held in state it had to be re-set by an effect every time a panel
   // appeared and cleared on every success, and a cleared target with a
@@ -525,7 +537,6 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     );
   }
 
-  const step = sequence && revealState && !revealState.done ? sequence[revealState.index] : null;
   // DES-21 §9 — `connectedAuthorIds === null` (not loaded yet) fails closed
   // to no door, matching the state's own comment.
   const authorReachable = !!(step && connectedAuthorIds && connectedAuthorIds.has(step.authorId));

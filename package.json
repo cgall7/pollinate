@@ -91,7 +91,8 @@
     "check:absolute-fill": "node scripts/check-absolute-fill.mjs",
     "check:nectar-consent": "node scripts/check-nectar-consent.mjs",
     "check:glass-definition": "node scripts/check-glass-definition.mjs",
-    "check:gradient-card-contract": "node scripts/check-gradient-card-contract.mjs"
+    "check:gradient-card-contract": "node scripts/check-gradient-card-contract.mjs",
+    "check:tdz-reference-order": "node scripts/check-tdz-reference-order.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dancing-script": "^0.4.2",
