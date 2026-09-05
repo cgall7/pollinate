@@ -923,6 +923,21 @@ const paperCode = codeOnly(paperSrc, paperAst);
   }
 }
 
+// ── the transcription D23 and D23b share ─────────────────────────────────
+// ONE WRITER, on Lumen's amendment. These two functions are this file's
+// copy of react-native's `stiffnessFromOrigamiValue` and
+// `dampingFromOrigamiValue`. D23 runs the shipped token through them to get
+// the milestone milliseconds; D23b probes RN's real mappings against them.
+// They were briefly two copies, one per row, and that is a defect the pair
+// cannot catch between them: D23b compares RN to ITS OWN literals, so an
+// edit to D23's copy alone is invisible in every direction, and D23's bands
+// are wide enough (354ms inside 250 to 900) for a wrong coefficient to ride
+// in band while the row prints confident milliseconds about a spring the
+// device never ran. Hoisted, an edit to the transcription is an edit to the
+// probed object by construction.
+const springStiffnessFromOrigami = (tension) => (tension - 30) * 3.62 + 194;
+const springDampingFromOrigami = (friction) => (friction - 8) * 3 + 25;
+
 // ── D23. the dive is slow enough to read ────────────────────────────────
 {
   // THE ROW COLIN'S COMPLAINT EARNED. `SPRINGS.diveIn` carried the note
@@ -931,10 +946,13 @@ const paperCode = codeOnly(paperSrc, paperAst);
   // watching it. A prose claim about timing is not a timing check, so this
   // row runs the token through RN's own pipeline and asserts the number.
   //
-  // Replicates react-native/Libraries/Animated/SpringConfig.js
-  // (stiffness = (t-30)*3.62+194, damping = (f-8)*3+25, mass 1) and the
-  // closed-form solution in SpringAnimation.onUpdate — not an approximation
-  // of a spring, the same arithmetic the device runs.
+  // Replicates react-native/Libraries/Animated/SpringConfig.js, through the
+  // hoisted `springStiffnessFromOrigami`/`springDampingFromOrigami` pair
+  // above with mass 1, plus the closed-form solution in
+  // SpringAnimation.onUpdate. Not an approximation of a spring, the same
+  // arithmetic the device runs. The coefficients are deliberately NOT
+  // restated here: D23b holds that pair against the real module, and a
+  // number repeated in prose is a copy nothing checks.
   const motionSrc = fs.readFileSync(path.join(ROOT, 'src/constants/motion.js'), 'utf8');
   const m = motionSrc.match(/\bdiveIn:\s*\{\s*friction:\s*(\d+(?:\.\d+)?)\s*,\s*tension:\s*(\d+(?:\.\d+)?)\s*\}/);
   if (!m) {
@@ -942,8 +960,8 @@ const paperCode = codeOnly(paperSrc, paperAst);
   } else {
     const friction = Number(m[1]);
     const tension = Number(m[2]);
-    const k = (tension - 30) * 3.62 + 194;
-    const c = (friction - 8) * 3 + 25;
+    const k = springStiffnessFromOrigami(tension);
+    const c = springDampingFromOrigami(friction);
     const zeta = c / (2 * Math.sqrt(k));
     const w0 = Math.sqrt(k);
     const w1 = w0 * Math.sqrt(Math.max(0, 1 - zeta * zeta));
@@ -1001,8 +1019,12 @@ const paperCode = codeOnly(paperSrc, paperAst);
 //      check-link-parse-differential's V1.
 //   2. RN's own two origami mappings, lifted out of SpringConfig.js and
 //      EVALUATED, agree with D23's transcription at the shipped token and
-//      at a spread of probe values. Behaviour rather than text, so a
-//      rename or a reformat stays green and a changed coefficient reds.
+//      at a spread of probe values. Behaviour rather than text for the
+//      ARITHMETIC: an algebraic refactor or a reformat that preserves the
+//      numbers stays green, a changed coefficient reds. The lift is
+//      name-keyed, so a RENAMED mapping also reds, with "could not lift".
+//      That is the correct failing shape, not a false positive: the row
+//      has lost its referent and must not imply the comparison still holds.
 //   3. the two properties of SpringAnimation.onUpdate that D23's `at(t)`
 //      silently depends on: mass is 1 on the tension/friction path, and
 //      the integrator's clock is in seconds. D23 calls `at(ms / 1000)`.
@@ -1069,12 +1091,6 @@ const paperCode = codeOnly(paperSrc, paperAst);
     const rnStiffness = lift(configSrc, 'stiffnessFromOrigamiValue');
     const rnDamping = lift(configSrc, 'dampingFromOrigamiValue');
 
-    // D23's transcription, restated here so the two can be compared. Kept
-    // as literals on purpose: if D23's expressions are edited without
-    // editing these, that is exactly the drift the row is watching for.
-    const mineStiffness = (t) => (t - 30) * 3.62 + 194;
-    const mineDamping = (f) => (f - 8) * 3 + 25;
-
     // The shipped token first, then a spread wide enough that a changed
     // slope or intercept cannot hide inside a single sample.
     const probeSrc = fs.readFileSync(path.join(SRC, 'constants/motion.js'), 'utf8');
@@ -1083,8 +1099,8 @@ const paperCode = codeOnly(paperSrc, paperAst);
     if (shipped) probes.unshift(Number(shipped[1]), Number(shipped[2]));
 
     for (const [label, theirs, mine] of [
-      ['stiffnessFromOrigamiValue', rnStiffness, mineStiffness],
-      ['dampingFromOrigamiValue', rnDamping, mineDamping],
+      ['stiffnessFromOrigamiValue', rnStiffness, springStiffnessFromOrigami],
+      ['dampingFromOrigamiValue', rnDamping, springDampingFromOrigami],
     ]) {
       if (!theirs) {
         problems.push(`could not lift \`${label}\` out of SpringConfig.js; the mapping moved or was renamed`);
