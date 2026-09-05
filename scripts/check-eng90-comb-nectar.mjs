@@ -7,7 +7,17 @@ import { createRequire } from 'node:module';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS = path.join(ROOT, 'supabase/migrations');
 const require = createRequire(import.meta.url);
-if (process.env.SKIP_PG_GATES === '1') { console.log('check-eng90-comb-nectar: SKIPPED'); process.exit(0); }
+if (process.env.SKIP_PG_GATES === '1') {
+  // A skip has two halves: the condition that asks the environment, and the
+  // announcement that shows the licence. This gate wired the first and printed
+  // a bare word for the second, so run-checks.mjs, which scans every
+  // SKIPPED-bearing line for a SKIP_* name and fails closed, read it as a skip
+  // nobody asked for. The licence existed in the code and nowhere the runner
+  // could see it. Naming the variable here is the whole fix; every sibling gate
+  // that reads SKIP_PG_GATES already announces it in this form.
+  console.log('check-eng90-comb-nectar: SKIPPED — SKIP_PG_GATES=1 set explicitly');
+  process.exit(0);
+}
 let EmbeddedPostgres;
 try { EmbeddedPostgres = require('embedded-postgres').default; require('pg'); }
 catch (e) { console.error(`check-eng90-comb-nectar: FAILED — ${e.message}`); process.exit(1); }
