@@ -96,7 +96,8 @@
     "check:gift-layer-rank": "node scripts/check-gift-layer-rank.mjs",
     "check:nectar-surface-yield": "node scripts/check-nectar-surface-yield.mjs",
     "check:scrim-veil": "node scripts/check-scrim-veil.mjs",
-    "check:spec-citation": "node scripts/check-spec-citation.mjs"
+    "check:spec-citation": "node scripts/check-spec-citation.mjs",
+    "check:nectar-events-reader": "node scripts/check-nectar-events-reader.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dancing-script": "^0.4.2",

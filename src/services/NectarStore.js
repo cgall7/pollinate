@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 // DES-28 Deliverable 7's bootstrap point (D3, Sage's ruling 2026-08-26) —
 // the client half of 19a's consent + starter-grant RPC
@@ -14,6 +15,20 @@ const requireUserId = async (client) => {
   } = await client.auth.getUser();
   if (!user) throw new Error('Not signed in');
   return user.id;
+};
+
+// Mirrors HiveStore.js's `resolveDirectName` contract exactly (same two
+// producers, same shape): `names` is keyed by every id the batch join
+// ANSWERED, not every id it was asked for. A missing key is a row RLS or a
+// deleted profile dropped silently — that's the permission word, 'Someone'.
+// A present key whose value is placeholder-class (`isPlaceholderName` — an
+// unrepaired `handle_new_user` default) is a row the read reached with
+// nothing to show, so it goes absent (`null`) instead of misreporting a
+// name gap as an authorization gap.
+const resolveDirectName = (names, id) => {
+  if (!names.has(id)) return 'Someone';
+  const name = names.get(id);
+  return isPlaceholderName(name) ? null : name;
 };
 
 export const NectarStore = {
@@ -138,5 +153,65 @@ export const NectarStore = {
       .order('id', { ascending: false });
     if (error) throw error;
     return data ?? [];
+  },
+
+  // R-NT-3 (GUIDES/POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md, Part 3): the
+  // Nectar tab's ledger, merged newest-first across the two tables that
+  // carry a gift between people. Ruled correction at the mock round — two
+  // tables, not three: `ledger_transactions` (the starter grant, `funding`
+  // type) renders nowhere, because a grant is not a gift and has no person
+  // (nectar.js's own arrival note already rules it announces nothing).
+  //
+  // `id` is the shared `transaction_id`, not either table's own primary
+  // key — `nectar_zaps.id` and `comb_nectar_notes.id` are separate
+  // idempotency-handle spaces (client-generated per attempt), so only the
+  // ledger transaction each row is unique-FK'd to is safe as a cross-table
+  // list key.
+  //
+  // `nectar_zaps_select_own` / `comb_nectar_notes_select_sender_or_recipient`
+  // already scope both reads to the caller as sender or recipient; the two
+  // `.or()` filters are defense in depth, same convention as every other
+  // accessor here.
+  async listNectarEvents() {
+    const client = requireSupabase();
+    const userId = await requireUserId(client);
+
+    const [{ data: zaps, error: zapsError }, { data: notes, error: notesError }] = await Promise.all([
+      client
+        .from('nectar_zaps')
+        .select('transaction_id, sender_id, recipient_id, amount_drops, created_at')
+        .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+      client
+        .from('comb_nectar_notes')
+        .select('transaction_id, sender_id, recipient_id, note_text, amount_drops, created_at')
+        .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+    ]);
+    if (zapsError) throw zapsError;
+    if (notesError) throw notesError;
+
+    const rows = [...(zaps ?? []), ...(notes ?? [])];
+    if (rows.length === 0) return [];
+
+    const counterpartyIds = [...new Set(rows.map((r) => (r.sender_id === userId ? r.recipient_id : r.sender_id)))];
+    const { data: profiles, error: profilesError } = await client
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', counterpartyIds);
+    if (profilesError) throw profilesError;
+    const names = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
+
+    return rows
+      .map((r) => {
+        const isSender = r.sender_id === userId;
+        return {
+          id: r.transaction_id,
+          direction: isSender ? 'to' : 'from',
+          counterpartyName: resolveDirectName(names, isSender ? r.recipient_id : r.sender_id),
+          amountDrops: Number(r.amount_drops),
+          noteText: r.note_text ?? null,
+          createdAt: r.created_at,
+        };
+      })
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
   },
 };
