@@ -52,7 +52,13 @@
 //                      arm — 60 of 61 store calls on this tree take exactly
 //                      that shape. So E asks whether the CONTROL wired to the
 //                      call's enclosing handler is rendered under a guard,
-//                      and treats the call as inheriting that authority.
+//                      and treats the call as inheriting that authority, but
+//                      ONLY IF EVERY REFERENCE TO THAT HANDLER IN ITS OWN
+//                      FILE IS A LICENSED ONE. That is the exclusivity
+//                      clause, ruled by Lumen 2026-09-05 and forward-ported
+//                      from the 2026-08-26 finding that rule E greened its
+//                      own worst case: a handler wired to a guarded control
+//                      and ALSO called bare from a mount effect.
 //                      Two objects — `nectar_consents`, `consent_to_nectar` —
 //                      are exempted by property, not by call site: they are
 //                      how consent is itself established or read, and gating
@@ -748,20 +754,125 @@ const findEnclosingHandlerName = (ancestors) => {
   }
   return null;
 };
-const findHandlerWiring = (ast, handlerName) => {
-  const wiring = [];
-  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
-    if (
-      node.type === 'JSXAttribute' &&
-      node.value?.type === 'JSXExpressionContainer' &&
-      node.value.expression.type === 'Identifier' &&
-      node.value.expression.name === handlerName
-    ) {
-      wiring.push({ node, ancestors });
-    }
-  });
-  return wiring;
+
+// THE EXCLUSIVITY CLAUSE (ruled by Lumen 2026-09-05; forward-ported from
+// pixel/handler-caller-exclusivity@8a8766c, which was cut against a rule E
+// that had no store arms yet and is superseded by this commit).
+//
+// Arm (2) as first written quantified over the handler's WIRINGS. A mount
+// effect calling the handler is a CallExpression reference, and the wiring
+// walk never collected one, so a second invocation path was invisible BY
+// CONSTRUCTION rather than by oversight. The gate greened its own worst case:
+//
+//   const loadBalance = async () => { await client.from('nectar_zaps')… };
+//   useEffect(() => { loadBalance(); }, []);
+//   return nectarConsent && <Pressable onPress={loadBalance} />;
+//
+// Every JSX attribute wiring `loadBalance` is guarded, so wiring-only
+// authority passed it while the effect fired the ask on mount regardless of
+// consent, which is the one event rule E exists to catch. And the sharp half:
+// DELETE the guarded control and the same leak reds, so the remediation
+// gradient a builder feels pointed at wiring a guarded button, meaning at
+// shipping the leak. Both shapes are permanent E1 rows below.
+//
+// THE CLAUSE IS THE QUANTIFIER ARM (3) ALREADY CARRIES, BROUGHT BACK TO
+// ARM (2). Arm (3) rules that a store method inherits authority iff EVERY
+// reference to it in the universe is authorised. Arm (2) quantified over
+// wirings, which is the wrong set. With the clause, inherited authority is
+// universal over references everywhere rule E grants it, and the same hole
+// one file boundary out closes for free through arm (3)'s recursion: a store
+// caller that is a wired handler with a second caller answers 'other-callers'
+// and arm (3) propagates it.
+//
+// TRIGGER DISJOINTNESS, so the clause cannot over-fire on the store arms.
+// `findEnclosingHandlerName` above wants a VariableDeclarator whose init IS a
+// function, or a FunctionDeclaration. A store method's enclosing declarator
+// has an ObjectExpression init, so arm (2) never fires inside a store file
+// and the clause is unreachable from arms (3) and (4). Stated here and shown
+// by measurement: the exclusivity probes red E1 while every arm-(3)/(4) row
+// in E3 stays green, and E3 carries a row asserting the arrow-valued store
+// method shape is not intercepted either.
+//
+// LICENSED POSITIONS ARE A LIST, DELIBERATELY MINIMAL AND ENUMERABLE:
+//   - the declaration itself, and only when it is NOT exported;
+//   - a JSX attribute wiring, which is the authority arm (2) reads;
+//   - the deps-array position of a `use*` call.
+// Everything else is `other-callers`, which fails in the safe direction
+// beside `cannot-tell`. That INCLUDES a reference sitting under its own guard
+// at its own position, `nectarConsent && loadBalance()` inline. Recognising
+// that shape would turn the licence list into a second authority analysis;
+// refusing it is a false red in the safe direction, and a builder who hits it
+// routes through a licensed shape. Extend the list against this comment when
+// a legitimate shape appears, which is `isUnderGuard`'s own convention.
+//
+// THE DEPS EXEMPTION IS POSITIONAL, not a name match: the identifier must be
+// an ELEMENT of the ArrayExpression that is an argument of a `use*` call.
+// React compares that position for equality and never calls it. `const fns =
+// [handleX]` is not that position and classifies as `other-callers`.
+//
+// AN EXPORTED WIRED HANDLER IS NOT LICENSABLE. This census reaches one file,
+// so an exported name's callers are by definition not all visible here and
+// exclusivity cannot be established. Export goes to the safe direction. The
+// frame that decides it is the one directly above the declaration's own
+// STATEMENT, not anywhere in the ancestry: every handler in this app is
+// declared inside `export default function Screen()`, and an ancestry-wide
+// test would call every declaration an escape and red the single-caller case
+// the clause exists to pass.
+const HOOK_CALL_RE = /^use[A-Z]/;
+const isExportedDeclaration = (ancestors, declKind) => {
+  const stmtIdx = declKind === 'FunctionDeclaration' ? ancestors.length - 1 : ancestors.length - 2;
+  const above = ancestors[stmtIdx - 1];
+  return Boolean(
+    above &&
+      (above.node.type === 'ExportNamedDeclaration' || above.node.type === 'ExportDefaultDeclaration')
+  );
 };
+const classifyReference = (ancestors) => {
+  const p = ancestors[ancestors.length - 1];
+  const gp = ancestors[ancestors.length - 2];
+  if (!p) return 'other';
+  // Positions where the identifier is a KEY or a member name: a different
+  // binding that merely spells the same, not a reference to this handler.
+  if (p.node.type === 'MemberExpression' && p.key === 'property' && !p.node.computed) return 'not-a-reference';
+  if (p.node.type === 'ObjectProperty' && p.key === 'key' && !p.node.computed) return 'not-a-reference';
+  if (
+    (p.node.type === 'VariableDeclarator' || p.node.type === 'FunctionDeclaration') &&
+    p.key === 'id'
+  ) {
+    return isExportedDeclaration(ancestors, p.node.type) ? 'other' : 'declaration';
+  }
+  if (
+    p.node.type === 'JSXExpressionContainer' &&
+    p.key === 'expression' &&
+    gp?.node.type === 'JSXAttribute' &&
+    gp.key === 'value'
+  ) {
+    return 'jsx-wiring';
+  }
+  if (
+    p.node.type === 'ArrayExpression' &&
+    p.key === 'elements' &&
+    gp?.node.type === 'CallExpression' &&
+    gp.key === 'arguments' &&
+    gp.node.callee.type === 'Identifier' &&
+    HOOK_CALL_RE.test(gp.node.callee.name)
+  ) {
+    return 'dep-list';
+  }
+  return 'other';
+};
+const findHandlerReferences = (ast, handlerName) => {
+  const refs = [];
+  walkWithAncestry(ast.program ?? ast, (node, ancestors) => {
+    if (node.type !== 'Identifier' || node.name !== handlerName) return;
+    const kind = classifyReference(ancestors);
+    if (kind === 'not-a-reference') return;
+    refs.push({ node, ancestors, kind });
+  });
+  return refs;
+};
+const findHandlerWiring = (ast, handlerName) =>
+  findHandlerReferences(ast, handlerName).filter((r) => r.kind === 'jsx-wiring');
 // ---------------------------------------------------------------------------
 // (3) AND (4) — ADDED 2026-08-27 BY ENG-63/64/65, WHICH IS THE FIRST CODE
 // THIS RULE EVER JUDGED. E2 shipped with a caveat stated up front: "gate-only,
@@ -909,9 +1020,15 @@ const findStoreMethodCallers = (universe, binding, method) => {
   return callers;
 };
 
-// Returns 'guarded', 'unguarded', or 'cannot-tell' (a named handler with no
-// traceable wiring in its own file — see the header note on the cross-file
-// limit this shares with `isUnderGuard`).
+// Returns 'guarded', or one of three failing verdicts. All three fail E2
+// identically; they differ only in where they send the next reader, and they
+// are ordered here from most actionable to least:
+//   'unguarded'     a wiring site sits outside the guard.
+//   'other-callers' every wiring is guarded, but the handler is referenced
+//                   somewhere unlicensed, so its caller set is not knowable
+//                   from this file. The exclusivity clause.
+//   'cannot-tell'   no traceable wiring at all, and see the header note on
+//                   the cross-file limit this shares with `isUnderGuard`.
 //
 // `universe` is optional and only arm (3) uses it; passing nothing keeps the
 // original three-arm behaviour, which is what the arm-(1)/(2) calibration
@@ -921,11 +1038,15 @@ const callAuthority = (hit, ast, universe = null, depth = 0) => {
   if (GUARDS.some((g) => isUnderEffectGuard(hit.ancestors, g))) return 'guarded';
   const handlerName = findEnclosingHandlerName(hit.ancestors);
   if (handlerName) {
-    const wiring = findHandlerWiring(ast, handlerName);
+    const refs = findHandlerReferences(ast, handlerName);
+    const wiring = refs.filter((r) => r.kind === 'jsx-wiring');
     if (wiring.length > 0) {
-      return wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g)))
-        ? 'guarded'
-        : 'unguarded';
+      if (!wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g)))) return 'unguarded';
+      // THE EXCLUSIVITY CLAUSE. Every wiring is guarded; authority is
+      // inherited only if no OTHER reference to this handler exists in this
+      // file. See the block above `classifyReference` for the licence list
+      // and why an unlicensed reference is refused rather than analysed.
+      return refs.some((r) => r.kind === 'other') ? 'other-callers' : 'guarded';
     }
   }
   // Arm (3). `depth` stops a store method that calls another store method on
@@ -948,7 +1069,16 @@ const callAuthority = (hit, ast, universe = null, depth = 0) => {
       // two defects have nothing in common but their colour. (Found
       // 2026-08-29 by being on the receiving end of it: R-N3's send hoisted
       // its RPC into `const commit = …` and this row named the wrong cause.)
-      return verdicts.some((v) => v === 'unguarded') ? 'unguarded' : 'cannot-tell';
+      //
+      // `other-callers` PROPAGATES HERE FOR THE SAME REASON. It is a CAUSE
+      // label, not a colour, so the collapse must not rename it to
+      // cannot-tell on the way out: a store method whose caller is a wired
+      // handler with a second invocation path has a knowable defect and a
+      // place to look, while cannot-tell says nothing here can tell. The
+      // ordering below is the same worst-caller ordering, extended by one.
+      if (verdicts.some((v) => v === 'unguarded')) return 'unguarded';
+      if (verdicts.some((v) => v === 'other-callers')) return 'other-callers';
+      return 'cannot-tell';
     }
   }
   return 'cannot-tell';
@@ -1001,6 +1131,96 @@ const QUERY_CALIBRATION = [
     `client.rpc('consent_to_nectar', {});`,
     'exempt',
   ],
+  // EXCLUSIVITY PROBES. The first two are the fixture from issue b48c4bc5,
+  // both polarities, and they are permanent rows on Lumen's pin (f): the
+  // fixture that proved the hole is what keeps it shut.
+  //
+  // PROBE-A is the defect itself. Before the clause it returned `true`,
+  // measured on main's own blob 923f761c, so the gate authorised a mount
+  // fetch that fires regardless of consent.
+  [
+    'PROBE-A guarded control, but the handler is ALSO called bare on mount, so not its only caller',
+    `function Comp() {
+       const loadBalance = async () => { await client.from('nectar_zaps').select('amount_microusd'); };
+       useEffect(() => { loadBalance(); }, []);
+       return nectarConsent && <Button onPress={loadBalance} />;
+     }`,
+    false,
+  ],
+  // PROBE-B is the sharp half and the reason the clause is not merely a
+  // missing case. The SAME leak with the guarded control deleted always
+  // redded, so before the clause the way to turn PROBE-B green was to wire a
+  // guarded button, which changes nothing about the mount fetch. The
+  // remediation gradient pointed at shipping the leak. Both rows red now, and
+  // the row that must stay red is this one.
+  [
+    'PROBE-B the same bare mount call with NO control at all is still refused',
+    `function Comp() {
+       const loadBalance = async () => { await client.from('nectar_zaps').select('amount_microusd'); };
+       useEffect(() => { loadBalance(); }, []);
+       return <View />;
+     }`,
+    false,
+  ],
+  [
+    'guarded control, handler also passed as a plain argument, which escapes the walk',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       setTimeout(handleSend, 1000);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  // Lumen's pin (e). The census reaches one file, so an exported handler's
+  // callers are not all visible and exclusivity cannot be established.
+  [
+    'guarded control, handler EXPORTED, so its callers are not all in this file',
+    `export const handleSend = async () => { await client.rpc('record_zap', {}); };
+     function Comp() {
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  // Lumen's pin (c). The exemption is the POSITION, not the name.
+  [
+    'guarded control, handler referenced only in a hook dependency list is still exclusive',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       useEffect(() => {}, [handleSend]);
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    true,
+  ],
+  [
+    'the same identifier in a plain array literal is NOT the deps position',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       const fns = [handleSend];
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    false,
+  ],
+  // Lumen's pin (b), and it is a KNOWN false red kept on purpose. This call
+  // is guarded in fact. Recognising it would make the licence list a second
+  // authority analysis; refusing it keeps the list a list. A builder who hits
+  // this row routes through a licensed shape rather than widening it.
+  [
+    'a second reference under its OWN guard is unlicensed and refused in the safe direction',
+    `function Comp() {
+       const loadBalance = async () => { await client.from('nectar_zaps').select('amount_microusd'); };
+       return nectarConsent && <View><Button onPress={loadBalance} />{nectarConsent && loadBalance()}</View>;
+     }`,
+    false,
+  ],
+  [
+    'a member name that merely spells the same is not a reference to the handler',
+    `function Comp() {
+       const handleSend = async () => { await client.rpc('record_zap', {}); };
+       api.handleSend;
+       return nectarConsent && <Button onPress={handleSend} />;
+     }`,
+    true,
+  ],
 ];
 const calibrationFailures = [];
 for (const [label, src, want] of QUERY_CALIBRATION) {
@@ -1044,6 +1264,14 @@ check(
 // file holding the reserved call and a caller file holding the reference.
 const mini = (rel, src) => ({ rel, ast: parse(src, { sourceType: 'module', plugins: ['jsx'] }) });
 const STORE_SRC = `export const Store = { async pull() { return client.from('nectar_zaps').select('x'); } };`;
+// The handler name arm 2 would resolve for a store file's reserved call. Used
+// by the trigger-disjointness rows: the answer must be null, which is what
+// makes arm 2 unreachable from arms 3 and 4.
+const handlerNameOfStoreCall = (src) => {
+  const f = mini('src/services/Store.js', src);
+  const hit = findQueryCalls(f.ast).find((h) => QUERY_RESERVE.has(h.name));
+  return findEnclosingHandlerName(hit.ancestors);
+};
 const authorityOfStoreCall = (universe) => {
   const store = universe.find((f) => f.rel.endsWith('Store.js'));
   const hit = findQueryCalls(store.ast).find((h) => QUERY_RESERVE.has(h.name));
@@ -1163,6 +1391,51 @@ const ARM_CALIBRATION = [
         mini('src/screens/A.js', `function C(){ return nectarConsent && <B onPress={() => Store.pull()} />; }`),
       ]),
     'guarded',
+  ],
+  // THE DISJOINTNESS ROWS (Lumen's pin (a), 2026-09-05), AND THEY ARE ASKED
+  // AT THE TRIGGER, NOT AT THE VERDICT. My first draft asserted that an
+  // arrow-valued store method still reads 'guarded' through arm 3, and that
+  // row was decoration: teaching `findEnclosingHandlerName` to accept an
+  // ObjectProperty left it green, because arm 2 also requires JSX WIRING and
+  // a store file has no JSX, so arm 3 answered either way. The row was
+  // vouched for by the arm it was not about. What actually has to hold is
+  // that the resolver returns NOTHING inside a store, so ask it directly.
+  // Each row reds under its own resolver-loosening mutation, and the E2
+  // measurement above is the second half of the same story: loosening the
+  // resolver also breaks live resolution, because an inline `commit: () => …`
+  // argument property would start shadowing the real handler.
+  [
+    'trigger disjointness: an ObjectMethod store method resolves to NO handler name',
+    () => String(handlerNameOfStoreCall(STORE_SRC)),
+    'null',
+  ],
+  [
+    'trigger disjointness: an arrow-VALUED store method resolves to NO handler name',
+    () =>
+      String(
+        handlerNameOfStoreCall(
+          `export const Store = { pull: async () => client.from('nectar_zaps').select('x') };`
+        )
+      ),
+    'null',
+  ],
+  // THE CLAUSE ONE FILE BOUNDARY OUT (Lumen's pin (d)). The store method's
+  // only caller is a wired handler that is ALSO called bare on mount, which
+  // is PROBE-A's shape hosted in a caller file. Arm (2) answers
+  // 'other-callers' at depth 1 and arm (3)'s collapse must carry the label
+  // out rather than renaming it to cannot-tell: the two say different things
+  // to whoever reads the E2 line, and only one of them names a defect.
+  [
+    'arm 3: a caller that is a guarded-but-not-exclusive handler propagates other-callers',
+    () =>
+      authorityOfStoreCall([
+        mini('src/services/Store.js', STORE_SRC),
+        mini(
+          'src/screens/A.js',
+          `function C(){ const handleGo = () => Store.pull(); useEffect(() => { handleGo(); }, []); return nectarConsent && <B onPress={handleGo} />; }`
+        ),
+      ]),
+    'other-callers',
   ],
 ];
 const armFailures = [];
