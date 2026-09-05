@@ -26,7 +26,7 @@ check(/PendingCombInvite\.set\(inviteCode\)/.test(screen) && /PendingCombInvite\
 check(!/PendingCombInvite\.set/.test(app), 'I3b no legacy invite code persistence in App aside from initial routing');
 check(/comb_preview_by_invite_code/.test(store) && /if \(!row\) return null/.test(store), 'I4 landing uses the anon preview and fails closed');
 check(/memberCount >= 3/.test(screen) && /people are in this comb/.test(screen), 'I5 landing count is membership copy and suppressed below three');
-check(/stays sealed until delivery/.test(screen) && /only \{preview\.subjectName\} ever reads it/.test(screen), 'I6 entry disclosure precedes the join action');
+check(/stays sealed until delivery/.test(screen) && /Only \$\{preview\.subjectName\} ever reads it/.test(screen), 'I6 landing ships the ruled disclosure sentence');
 check(
   screen.includes('isPlaceholderName(profile?.display_name)') &&
     screen.includes('setNeedsName(isPlaceholderName(profile?.display_name))') &&

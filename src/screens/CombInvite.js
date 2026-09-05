@@ -11,15 +11,29 @@ import { isPlaceholderName } from '../utils/placeholderName';
 
 const InviteShell = ({ navigation, children }) => (
   <View style={styles.screen}>
-    <BackButton onPress={() => navigation.canGoBack() && navigation.goBack()} />
+    <BackButton
+      onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.replace('Onboarding'))}
+    />
     <View style={styles.content}>{children}</View>
   </View>
 );
 
-const InviteError = ({ navigation, onRetry }) => (
+// COPY-6 (Lumen, 2026-09-03): the three ways this screen can fail to show an
+// invitation are not one error, they're three different facts about the code.
+// Surface 2 and 3 never got a retry button crossed by mistake — retry only
+// belongs where retrying can change the answer, and a code that resolves to
+// nothing will resolve to nothing again.
+const InviteUnavailable = ({ navigation }) => (
   <InviteShell navigation={navigation}>
     <Text style={styles.heading}>This invitation isn't available.</Text>
     <Text style={styles.body}>Ask the person who invited you for a fresh link.</Text>
+  </InviteShell>
+);
+
+const InviteUnreachable = ({ navigation, onRetry }) => (
+  <InviteShell navigation={navigation}>
+    <Text style={styles.heading}>We couldn't open this invitation.</Text>
+    <Text style={styles.body}>Check your connection and try again.</Text>
     <PrimaryButton onPress={onRetry}>Try again</PrimaryButton>
   </InviteShell>
 );
@@ -28,21 +42,22 @@ export const CombInviteLandingScreen = ({ navigation, route }) => {
   const { session } = useAuth();
   const inviteCode = route.params?.inviteCode;
   const [preview, setPreview] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  // 'loading' | 'unreachable' | 'notFound' | 'ready'
+  const [status, setStatus] = useState('loading');
 
   const load = async () => {
-    setLoading(true);
-    setFailed(false);
+    setStatus('loading');
     try {
       const next = await CombInviteStore.preview(inviteCode);
-      if (!next?.hasActiveMonth) throw new Error('No active month');
+      if (!next) {
+        setStatus('notFound');
+        return;
+      }
       setPreview(next);
+      setStatus('ready');
     } catch (err) {
       console.warn('Comb invite preview failed', err);
-      setFailed(true);
-    } finally {
-      setLoading(false);
+      setStatus('unreachable');
     }
   };
 
@@ -59,25 +74,36 @@ export const CombInviteLandingScreen = ({ navigation, route }) => {
     }
   };
 
-  if (loading) {
+  if (status === 'loading') {
     return <InviteShell navigation={navigation}><ActivityIndicator color={theme.colors.ink} /></InviteShell>;
   }
-  if (failed || !preview) return <InviteError navigation={navigation} onRetry={load} />;
+  if (status === 'unreachable') return <InviteUnreachable navigation={navigation} onRetry={load} />;
+  if (status === 'notFound') return <InviteUnavailable navigation={navigation} />;
 
   const countLine = preview.memberCount >= 3
     ? `${numberInWordsCapped(preview.memberCount)} people are in this comb.`
     : null;
 
+  // Surface 1 (COPY-6): pre-launch, dormant, and subject-gone all collapse to
+  // `hasActiveMonth === false` server-side, and the one sentence true across
+  // all three is "there is no one to write for right now" — not "the month
+  // hasn't started," which is false for subject-gone. Join stays offered:
+  // the server already admits the membership row unconditionally.
+  const heading = preview.hasActiveMonth
+    ? `${preview.inviterName} asked you to write for ${preview.subjectName}.`
+    : `${preview.inviterName} asked you to write.`;
+  const disclosure = preview.hasActiveMonth
+    ? `Everything written in this comb stays sealed until delivery. Only ${preview.subjectName} ever reads it.`
+    : "Each month, this comb gathers around one person, and everything written stays sealed until it's delivered. There's no one to write for just yet. Join now and you'll be part of it when the month opens.";
+
   return (
     <InviteShell navigation={navigation}>
       <Text style={styles.eyebrow}>AN INVITATION TO WRITE</Text>
-      <Text style={styles.heading}>{preview.inviterName} asked you to write for {preview.subjectName}.</Text>
+      <Text style={styles.heading}>{heading}</Text>
       <View style={styles.bloom}><Text style={styles.bloomGlyph}>✦</Text></View>
       <Text style={styles.combName}>{preview.combName}</Text>
       {countLine ? <Text style={styles.secondary}>{countLine}</Text> : null}
-      <Text style={styles.disclosure}>
-        Everything written in this comb stays sealed until delivery — only {preview.subjectName} ever reads it.
-      </Text>
+      <Text style={styles.disclosure}>{disclosure}</Text>
       <PrimaryButton onPress={continueToJoin}>{session ? 'Continue' : 'Join with Magic Link'}</PrimaryButton>
     </InviteShell>
   );
