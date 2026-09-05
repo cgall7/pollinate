@@ -78,17 +78,30 @@ check(
   'collapsed organizer card exposes a visible chapter-count affordance',
   /const chapterCount = comb\.chapters\?\.length \?\? 0/.test(card) &&
     /const chapterCountLabel = chapterCount === 1 \? '1 past month' : `\$\{chapterCount\} past months`/.test(card) &&
-    /const chapterSignalLabel = `\$\{expanded \? '▾' : '▸'\} \$\{chapterCountLabel\}`/.test(card) &&
+    /<Ionicons name=\{expanded \? 'chevron-down' : 'chevron-forward'\} size=\{14\} color=\{theme\.colors\.inkSoft\} \/>/.test(card) &&
     /\{chapterCount > 0 && \(\s*<View style=\{styles\.historySignal\}>/.test(card) &&
     !/\{expanded && chapterCount > 0 && \(\s*<View style=\{styles\.historySignal\}>/.test(card) &&
-    /<Text style=\{styles\.metaLine\}>\{chapterSignalLabel\}<\/Text>/.test(card)
+    /<Text style=\{styles\.metaLine\}>\{chapterCountLabel\}<\/Text>/.test(card)
 );
+
+// R-RF-4 (Lumen, 2026-09-05). Its own row rather than a conjunct on the
+// affordance row above: those two claims fail for different reasons and a
+// conjunction would name the wrong one. Measured when this landed: '▾' and
+// '▸' occurred at exactly one site in all of src/, this file's line 36, so
+// the negative below is the whole of the app's ASCII-glyph population, not a
+// sample of it.
+check('the chapter signal carries no ASCII glyph', !/[▾▸]/.test(card));
 
 check(
   'chapter labels use the shared placeholder classifier for empty and New user names',
   /import\s*{\s*isPlaceholderName\s*}\s*from\s*'\.\.\/utils\/placeholderName'/.test(card) &&
     /export const organizerChapterSubjectName = \(name\) => \(isPlaceholderName\(name\) \? 'someone' : name\)/.test(card) &&
-    /organizerChapterSubjectName\(chapter\.subjectName\)/.test(card)
+    /organizerChapterSubjectName\(chapter\.subjectName\)/.test(card) &&
+    // R-RF-2: the write CTA's announced label runs through the same
+    // classifier as the visible chapter lines. The negative is the actual
+    // defect shape, a raw `rotation.subjectName` in an accessibilityLabel.
+    /accessibilityLabel=\{`Write for \$\{organizerChapterSubjectName\(rotation\.subjectName\)\}`\}/.test(card) &&
+    !/accessibilityLabel=\{`Write for \$\{rotation\.subjectName/.test(card)
 );
 
 check(
@@ -114,7 +127,8 @@ const fixtureChapterRows = [
   { id: 'open', sealed_at: null, voided_at: null },
 ];
 const fixtureAffordance = ({ chapters, expanded }) => ({
-  signal: chapters.length > 0 ? `${expanded ? '▾' : '▸'} ${chapters.length} past month${chapters.length === 1 ? '' : 's'}` : null,
+  icon: chapters.length > 0 ? (expanded ? 'chevron-down' : 'chevron-forward') : null,
+  signal: chapters.length > 0 ? `${chapters.length} past month${chapters.length === 1 ? '' : 's'}` : null,
   rows: expanded ? chapters.map((chapter) => `Month ${chapter.ordinal}: ${fixtureChapterSubjectName(chapter.subjectName)}`) : [],
 });
 const fixtureChapterIds = fixtureChapterRows
@@ -141,7 +155,11 @@ check(
   fixtureAffordance({
     expanded: false,
     chapters: [{ id: 'one', ordinal: 1, subjectName: 'Maya' }],
-  }).signal === '▸ 1 past month'
+  }).signal === '1 past month' &&
+    fixtureAffordance({
+      expanded: false,
+      chapters: [{ id: 'one', ordinal: 1, subjectName: 'Maya' }],
+    }).icon === 'chevron-forward'
 );
 
 check(
@@ -152,12 +170,13 @@ check(
       { id: 'one', ordinal: 1, subjectName: 'Maya' },
       { id: 'two', ordinal: 2, subjectName: 'Jonah' },
     ],
-  }).signal === '▸ 2 past months'
+  }).signal === '2 past months'
 );
 
 check(
   'zero chapter fixture renders no history affordance',
-  fixtureAffordance({ expanded: false, chapters: [] }).signal === null
+  fixtureAffordance({ expanded: false, chapters: [] }).signal === null &&
+    fixtureAffordance({ expanded: false, chapters: [] }).icon === null
 );
 
 const expandedChapterFixture = fixtureAffordance({
@@ -171,7 +190,8 @@ const expandedChapterFixture = fixtureAffordance({
 
 check(
   'expanded chapter fixture preserves signal and renders every chapter',
-  expandedChapterFixture.signal === '▾ 3 past months' &&
+  expandedChapterFixture.signal === '3 past months' &&
+    expandedChapterFixture.icon === 'chevron-down' &&
     expandedChapterFixture.rows.length === 3 &&
     expandedChapterFixture.rows.includes('Month 1: Maya') &&
     expandedChapterFixture.rows.includes('Month 2: someone') &&

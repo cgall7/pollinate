@@ -33,7 +33,6 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
   const inviteUrl = getCombInviteUrl(comb.inviteCode);
   const chapterCount = comb.chapters?.length ?? 0;
   const chapterCountLabel = chapterCount === 1 ? '1 past month' : `${chapterCount} past months`;
-  const chapterSignalLabel = `${expanded ? '▾' : '▸'} ${chapterCountLabel}`;
   const shareInvite = () => Share.share({ message: inviteUrl });
   const memberLabel =
     comb.memberCount == null
@@ -120,9 +119,17 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
         ) : (
           <Text style={styles.emptyLine}>{isPreLaunch ? 'Invite people to get started.' : 'No open month right now.'}</Text>
         )}
+        {/* R-RF-4 (Lumen) — this row shipped the only two ASCII glyphs
+            left in src/; every other mark in the app is an Ionicon. The
+            chevron is decorative here and stays unlabelled on purpose: the
+            whole card is one PressableScale, and RN's Pressable is
+            accessible:true by default, so this subtree is absorbed into the
+            card's own "Open the comb {name}" stop and is never a separate
+            announcement. */}
         {chapterCount > 0 && (
           <View style={styles.historySignal}>
-            <Text style={styles.metaLine}>{chapterSignalLabel}</Text>
+            <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={14} color={theme.colors.inkSoft} />
+            <Text style={styles.metaLine}>{chapterCountLabel}</Text>
           </View>
         )}
         {/* DES-29 §8.1/§8.2 — pre-launch only, un-gated by `expanded`: the
@@ -174,7 +181,17 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
               <PressableScale
                 onPress={() => onWrite?.(rotation)}
                 style={styles.actionRow}
-                accessibilityLabel={`Write for ${rotation.subjectName || 'this month'}`}
+                // R-RF-2 (Lumen): the announced label is a rendered
+                // string and takes the same §1B.38 guard as the visible
+                // ones. `rotation.subjectName` is the stored value, so a
+                // placeholder-class name ('New user', the signup default,
+                // or '') announced "Write for New user" while RotationFold,
+                // two nodes up in this same card, was already rendering
+                // "Writing for someone" off the shared classifier. Same
+                // classifier here, same lowercase word: §1B.38.12 keeps
+                // capital 'Someone' as the AUTHORIZATION refusal, and this
+                // is name-absence, not refusal.
+                accessibilityLabel={`Write for ${organizerChapterSubjectName(rotation.subjectName)}`}
               >
                 <Ionicons name="create" size={16} color={theme.colors.ink} />
                 <Text style={styles.actionText}>Write this month</Text>
