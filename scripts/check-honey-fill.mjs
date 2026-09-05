@@ -126,15 +126,36 @@ if (near(hmax, 26.82, 0.01)) {
 } else {
   bad('honeyHMax ceiling', `got ${hmax.toFixed(4)}pt, expected 26.82pt (§6.4 correction)`);
 }
-// The old ladder's step, kept as a REFERENCE POINT rather than as a rung:
-// R-N2 retired the four rungs, but 6.70pt is still the height the starter
-// grant renders at (500/2000 of the ceiling), so §6.4's corrected figure is
-// still checkable against something the screen actually draws.
+// THE DAY-ONE ROW — R-N8's ruling, asserted on the one thing it is about:
+// the vessel a user sees on the day they consent.
+//
+// This row used to read "the grant renders at 6.70pt, §6.4's corrected
+// quarter-ceiling". That literal was the LINEAR law's answer wearing the
+// ceiling's name, and it would have gone red on R-N8 while saying nothing
+// about what R-N8 changed. The expectation is now DERIVED from the ceiling
+// (`hmax / 2`) rather than typed, so re-ratifying the grant, the cap or the
+// cell size re-derives it instead of quietly breaking it — and the row still
+// does the old one's job, because a height checked against half the ceiling
+// is a check on the ceiling too.
+//
+// WHAT IT ASSERTS IS THE RULING AND NOT ITS ARITHMETIC. R-N8's claim is that
+// the starter grant fills exactly half the vessel; that it does so because
+// sqrt(g / 4g) = 1/2 is the reason, not the property. Restore the linear body
+// of `honeyLevelForDrops` and this row reds at 6.7045pt against 13.4090pt,
+// which is the mutate-back the ruling names.
 const grantHeight = honeyHeightForLevel(SIZE, honeyLevelForDrops(NECTAR_STARTER_GRANT_DROPS));
-if (near(grantHeight, 6.70, 0.01)) {
-  ok(`starter grant renders at ${grantHeight.toFixed(4)}pt, matching §6.4's corrected quarter-ceiling 6.70pt`);
+if (near(grantHeight, hmax / 2, 0.0001)) {
+  ok(
+    `R-N8 day one: the ${NECTAR_STARTER_GRANT_DROPS}-drop starter grant renders at ${grantHeight.toFixed(4)}pt, ` +
+      `exactly half the ${hmax.toFixed(4)}pt ceiling — the vessel every new user starts at`
+  );
 } else {
-  bad('grant height', `got ${grantHeight.toFixed(4)}pt, expected 6.70pt`);
+  bad(
+    'day-one half vessel',
+    `the starter grant renders at ${grantHeight.toFixed(4)}pt, expected half the ceiling (${(hmax / 2).toFixed(4)}pt). ` +
+      `R-N8 holds that sqrt(grant / cap) = 1/2 by construction at cap = 4 x grant; this reds if the law, the cap's ` +
+      `multiplier or the grant moves without the others`
+  );
 }
 
 // --- 2. Every rung stays in the linear (two-straight-edges) region -----
@@ -361,10 +382,19 @@ if (selectionVsBloom >= 10 && retained >= 0.65) {
 // hid the defect. Every preset, in BOTH directions, from the starter grant.
 //
 // This row ASSERTS non-zero movement and REPORTS perceptibility. It does not
-// assert perceptibility: at the shipped cap the 10-drop preset moves 0.402
-// physical px @3x, which is rendered (antialiased) but is not something a
-// spreadsheet can call visible. See this file's header and the open note
-// beside `honeyLevelForDrops`.
+// assert perceptibility: under R-N8 the 10-drop preset moves 0.400 physical
+// px @3x from the grant, which is rendered (antialiased) but is not something
+// a spreadsheet can call visible. See this file's header and the ruling
+// record beside `honeyLevelForDrops`.
+//
+// AND ITS SCOPE IS THE GRANT, WHICH IS ONE POINT OF A DOMAIN. §6 acceptance
+// row 1 says "every preset" and names no starting balance; this row probes a
+// single one. That was an honest gap while it was the only probe available,
+// and it hid a real defect for as long as it stood alone: under the linear
+// law there were 11 starting balances at which receiving the LARGEST preset
+// moved the rendered vessel by nothing at all, none of them anywhere near
+// the grant. Row 8d below is the universal, and this row is kept because it
+// is the one that carries the printed per-preset figures.
 {
   const heightAt = (drops) => honeyHeightForLevel(SIZE, honeyLevelForDrops(drops));
   const base = heightAt(NECTAR_STARTER_GRANT_DROPS);
@@ -390,10 +420,95 @@ if (selectionVsBloom >= 10 && retained >= 0.65) {
   );
   if (subPixel.length) {
     console.log(
-      `  note R-N2 residue: preset(s) ${subPixel.join('/')} move under one physical pixel at @3x from the grant ` +
-        `(cap ${NECTAR_LADDER_CAP_DROPS}). No legal cap fixes it — 10 drops needs cap <= 804 for 1px @3x, at which ` +
-        `the grant already renders at 62% of the vessel. OWNER: Lumen (the cap is a placeholder whose premise moved; ` +
-        `see the open note in src/constants/nectar.js). The event's legibility is R-N3's drop and R-N4's bee, not this edge.`
+      `  note R-N2 residue, SURVIVING R-N8: preset(s) ${subPixel.join('/')} move under one physical pixel at @3x ` +
+        `from the grant (cap ${NECTAR_LADDER_CAP_DROPS}, square-root law). R-N8 did not close this and does not claim ` +
+        `to: the curve is TANGENT to the linear law at the grant (the derivative of sqrt(x/c) at x = c/4 is exactly ` +
+        `1/c), so resolution is unchanged at precisely the point this residue is measured from — 0.400px @3x where it ` +
+        `was 0.402. What R-N8 did close is the collapse NEAR EMPTY, which was the wider defect and is row 8d. ` +
+        `OWNER: Lumen. The event's legibility is R-N3's drop and R-N4's bee, not this edge.`
+    );
+  }
+}
+
+// 8d. §6 ACCEPTANCE ROW 1, READ AS THE UNIVERSAL IT IS WRITTEN AS. R-N8.
+//
+// Row 8c probes ONE starting balance. The acceptance row it cites quantifies
+// over none: "every preset, sent and received, moves the rendered height".
+// This row asks it at every integer balance the vessel can hold, in both
+// directions, and it exists because the single-probe version was green
+// through a real defect for as long as it was the only probe.
+//
+// WHAT WAS HIDING, and it was the rendered FLOOR rather than the law: any
+// balance whose unclamped height falls under `HONEY_MIN_HEIGHT` renders at
+// the floor, so a band of balances near empty all draw the same vessel.
+// Under the linear law that band was 1..111 drops, WIDER THAN THE LARGEST
+// PRESET, which is what made "receiving 100 drops changes nothing" reachable
+// at 11 distinct starting balances. Under R-N8 the band is 1..6, narrower
+// than the smallest preset, and the count of dead starting balances is zero
+// for all three presets in both directions.
+//
+// The floor is not the defect and this row does not argue against it. Zero
+// stays the only dark case (row 8b). The floor was CONCEALING the linear
+// law's resolution collapse near empty by rendering a legal minimum where
+// the arithmetic had run out, which is why a row scoped to the grant could
+// not see it and why this one is not scoped at all.
+//
+// THIS ROW ASSERTS MOVEMENT, NOT PERCEPTIBILITY, exactly as 8c does — it
+// reports the worst case in physical pixels and asserts only that it is
+// non-zero. A row that asserted perceptibility would be asserting a device
+// result from a spreadsheet.
+{
+  const heightAt = (drops) => honeyHeightForLevel(SIZE, honeyLevelForDrops(drops));
+  const dead = [];
+  const worst = [];
+  // ONE SWEEP COVERS BOTH DIRECTIONS, and that is a property of the universal
+  // rather than a shortcut. Receiving `amount` from balance d compares
+  // (d, d + amount); sending it from balance d compares (d - amount, d).
+  // Quantified over EVERY starting balance those are the same set of pairs,
+  // so a second loop would be the same measurement printed twice — which is
+  // worse than one, because a duplicated expression reads as corroboration.
+  // Row 8c is scoped to a single balance and therefore genuinely does need
+  // both directions.
+  NECTAR_PRESETS.forEach((amount) => {
+    let deadPairs = 0;
+    let minMove = Infinity;
+    let minAt = null;
+    for (let d = 0; d + amount <= NECTAR_LADDER_CAP_DROPS; d += 1) {
+      const move = heightAt(d + amount) - heightAt(d);
+      if (move <= 0) deadPairs += 1;
+      if (move < minMove) {
+        minMove = move;
+        minAt = d;
+      }
+    }
+    if (deadPairs) dead.push(`${amount} (${deadPairs} balances)`);
+    worst.push(`${amount}: worst ${minMove.toFixed(4)}pt (${(minMove * 3).toFixed(3)}px @3x) at balance ${minAt}`);
+  });
+
+  // The floor's collapse band, printed because it is the quantity the row is
+  // really about and it is not otherwise visible anywhere.
+  let bandTop = 0;
+  for (let d = 1; d <= NECTAR_LADDER_CAP_DROPS; d += 1) {
+    if (heightAt(d) <= HONEY_MIN_HEIGHT + 1e-12) bandTop = d;
+  }
+  const smallestPreset = Math.min(...NECTAR_PRESETS);
+
+  if (dead.length === 0 && bandTop < smallestPreset) {
+    ok(
+      `every preset moves the rendered meniscus across EVERY adjacent balance pair, so both directions — ${worst.join('; ')}; ` +
+        `the floor's collapse band is 1..${bandTop} drops, narrower than the smallest preset (${smallestPreset})`
+    );
+  } else if (dead.length) {
+    bad(
+      'preset resolution (universal)',
+      `these presets produce NO rendered movement at some starting balances: ${dead.join(', ')} — §6 acceptance row 1 ` +
+        `quantifies over every balance, not just the grant. The floor's collapse band is 1..${bandTop} drops`
+    );
+  } else {
+    bad(
+      'floor collapse band',
+      `the floor collapses balances 1..${bandTop} into one rendered vessel, which is wider than the smallest preset ` +
+        `(${smallestPreset}) — a gift of that size is invisible somewhere in that band`
     );
   }
 }

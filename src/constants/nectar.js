@@ -367,12 +367,33 @@ export const NECTAR_STARTER_GRANT_DROPS = 500;
 // it was NO HONEYED STATE AT ALL. That reading of an empty vessel SURVIVES
 // R-N2 verbatim (the gate is now `member.honeyLevel > 0`, and zero is still
 // the only dark case); what does not survive is "0..4 rather than a
-// percentage" — R-N2 measured that the steps were the defect. This constant
-// now has exactly one job, as the multiplier in the cap's derived bound
-// above, and that bound's own premise is flagged there.
+// percentage" — R-N2 measured that the steps were the defect.
+//
+// R-N8 GIVES THE NUMBER 4 BACK A MEANING, and the name is now the stale part.
+// R-N2's annotation left this constant as a bare multiplier whose own premise
+// had been flagged as gone: it was "four rungs" in a register with no rungs.
+// Under the square-root law below, `cap = 4 x grant` is exactly the condition
+// that puts the starter grant at HALF the vessel, because sqrt(g / 4g) = 1/2
+// for every value of g. So the multiplier is derived again, from a statement
+// about the day-one picture rather than from a step count.
+//
+// THE NAME IS LEFT ALONE ON PURPOSE. Renaming it is a rename across the cap
+// derivation and check-nectar-consent's F3, and it would be a second change
+// riding a ruling about a curve. What the name costs is one reader's
+// double-take; what a rename costs is a diff that no longer reads as R-N8.
+// Flagged rather than done, and it is a one-line follow-up either way.
 export const NECTAR_LADDER_RUNGS = 4;
 
 // PLACEHOLDER (DES-24 §7.2), bounded by Ruling 2 above rather than chosen.
+//
+// R-N8 note: the bound stays an INEQUALITY here and that is deliberate. A cap
+// LARGER than 4 x grant is still safe against Ruling 2's failure (the grant
+// can never fill the cell), so the safety bound is unchanged and F3 still
+// asserts it. What equality buys is the half-full day-one vessel, and that is
+// asserted where it can be seen — on the RENDERED height, in
+// check-honey-fill's day-one row — rather than as a relation between two
+// numbers. Raise the cap above the bound and F3 stays green while that row
+// goes red, which is the right pair of answers: still safe, no longer half.
 export const NECTAR_LADDER_CAP_DROPS = NECTAR_STARTER_GRANT_DROPS * NECTAR_LADDER_RUNGS;
 
 // THE PRESET AMOUNTS. Moved here from `NectarSendPanel` by R-N2: a preset is
@@ -404,50 +425,94 @@ export const NECTAR_PRESETS = [10, 50, 100];
 // owns both (`honeyHeightForLevel`, hexGeometry.js). This function is ledger
 // arithmetic and stays free of the renderer's units — which is also what
 // keeps this file importable from a bare `node` script.
+// R-N8 (Lumen, 2026-09-05) — THE LAW IS SQUARE ROOT, NOT LINEAR.
+//
+// NEITHER CONSTANT MOVED. The open note that used to stand below this
+// function is resolved here rather than deleted, because its finding was
+// correct and it is what produced this ruling: the cap's two constraints
+// were incompatible AS LONG AS THE MAP WAS LINEAR. Headroom wants a large
+// cap, resolution wants a small one, and no single number satisfies both.
+// R-N8's move is to stop looking for that number and change the curve, which
+// is the one degree of freedom nobody had spent.
+//
+// WHAT FALLS OUT, each reproduced numerically on this tree before it was
+// written down:
+//
+//   * THE GRANT LANDS AT EXACTLY HALF THE VESSEL, BY CONSTRUCTION.
+//     sqrt(g / 4g) = 1/2 for every g, so this survives re-ratifying the grant
+//     and does not have to be re-tuned alongside it. At a 44pt cell that is
+//     13.4090pt of the 26.8180pt ceiling, against 6.7045pt under the linear
+//     law. This is the day-one picture, and it is the whole reason for the
+//     ruling: the state EVERY new user starts in was reading as nearly empty.
+//
+//   * RESOLUTION AT THE GRANT POINT IS IDENTICAL, NOT MERELY SIMILAR. The
+//     derivative of sqrt(x/c) at x = c/4 is exactly 1/c, which is the linear
+//     law's slope everywhere. So the curve is TANGENT to the old law at the
+//     grant, and the register the presets were tuned against is unchanged
+//     where they were tuned. Measured over the finite preset steps rather
+//     than at the limit: 10 drops moves 0.400px @3x where it moved 0.402.
+//
+//   * HEADROOM IS UNTOUCHED. Saturation is still at the cap, and a 100-drop
+//     gift arriving at 1900 still moves 2.037px @3x.
+//
+// AND THE ONE NOBODY ASKED FOR, WHICH IS THE STRONGEST OF THE FOUR. Under
+// the linear law the RENDERED FLOOR collapsed a wide band of balances into a
+// single picture: every balance from 1 to 111 drops rendered at exactly
+// `HONEY_MIN_HEIGHT`. That band is wider than the largest preset this product
+// offers, so there were starting balances at which receiving 100 drops moved
+// the vessel by nothing at all. Under the square-root law the band is 1 to 6
+// drops, smaller than the smallest preset, and EVERY preset moves the
+// rendered height from EVERY starting balance. §6 acceptance row 1 asks for
+// exactly that and had only ever been checked from the grant.
+//
+// The floor is not the villain and it is doing its job — zero stays the only
+// dark case. What the floor was doing was HIDING the linear law's resolution
+// collapse near empty, by rendering a legal minimum where the arithmetic had
+// run out. In a product whose first verb is give, that mattered in one
+// direction more than the other: someone who gave away 90% of their grant
+// held 50 drops and rendered at the floor, the same vessel as someone holding
+// a single drop. Square root renders 4.2403pt, a band you can see.
+// GENEROSITY MUST NOT READ AS SELF-EMPTYING.
 export const honeyLevelForDrops = (drops) => {
   const n = Number(drops);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.min(1, n / NECTAR_LADDER_CAP_DROPS);
+  return Math.min(1, Math.sqrt(n / NECTAR_LADDER_CAP_DROPS));
 };
 
 // ---------------------------------------------------------------------------
-// OPEN, AND FLAGGED RATHER THAN RULED — the cap's premise moved underneath it.
+// RESOLVED BY R-N8 (Lumen, 2026-09-05) — kept as a record, not deleted.
 //
-// `NECTAR_LADDER_CAP_DROPS` is derived above as `grant x NECTAR_LADDER_RUNGS`,
-// and Ruling 2's argument for the multiplier was "the grant must land on the
-// LOWEST VISIBLE RUNG". Continuous, there are no rungs, so the number 4 has
-// lost the derivation that produced it. Its VALUE and its bound are
-// deliberately untouched here: retuning a placeholder whose reasoning has
-// moved is a design ruling, and it is Lumen's.
+// This block used to read "OPEN, AND FLAGGED RATHER THAN RULED", and it held
+// the finding that the cap's two constraints were incompatible: headroom
+// wants a large cap, resolution wants a small one, and it proved there was
+// no legal cap that satisfied both. That proof stands and was never wrong.
+// What it was scoped to is the part worth keeping visible: IT QUANTIFIED
+// OVER CAPS, WITH THE LAW HELD FIXED. The conclusion "no cap fixes it" is
+// true and is not the conclusion "this cannot be fixed", and the difference
+// between those two sentences is the whole of R-N8.
 //
-// What this build can contribute is the arithmetic she does not have yet,
-// because it turns out the two constraints on the cap are now INCOMPATIBLE:
+// The ruling is recorded beside `honeyLevelForDrops` above, where the law it
+// changed lives. Its riders, all discharged in the same commit:
 //
-//   * headroom  — a new user must not see a near-full cell, which wants a
-//     LARGE cap. At 2000 the grant renders at 25% and there are 1500 drops
-//     of room above it.
-//   * resolution — the smallest gift must move a rendered edge, which wants
-//     a SMALL cap. At `honeyHMax(44)` = 26.8180pt:
+//   1. this note resolved with the ruling record (here)
+//   2. check-honey-fill's day-one row re-derived from the ceiling rather
+//      than from the retired quarter-ceiling literal
+//   3. 8c's printed residue arithmetic re-derived under the new law
+//   4. mutate-back: restoring the linear body reds the day-one row
 //
-//         preset  10 -> 0.1341pt = 0.402 physical px @3x, 0.268 @2x
-//         preset  50 -> 0.6705pt = 2.011 physical px @3x, 1.341 @2x
-//         preset 100 -> 1.3409pt = 4.023 physical px @3x, 2.682 @2x
+// ONE FIGURE FROM THE OLD NOTE DOES NOT SURVIVE AND IS CORRECTED HERE rather
+// than left to be quoted. It said a cap of 804 or below would give the
+// 10-drop preset a physical pixel at @3x, "at which the grant already renders
+// at 62% of the vessel". Both halves were linear-law arithmetic. Under R-N8
+// the 10-drop preset still moves 0.400px @3x from the grant, so THE RESIDUE
+// IS NOT CLOSED BY THIS RULING and 8c still prints it. What changed is that
+// it is no longer the only place near the floor where resolution runs out:
+// that part IS closed, and the numbers are above.
 //
-// So 50 and 100 clear a physical pixel comfortably on both densities and 10
-// does not, on either. And there is no cap that rescues it: 10 drops needs
-// cap <= 804 to move one physical pixel at @3x, at which point the grant
-// already renders at 62% of the vessel and saturates after three gifts —
-// DES-24 §5's progress bar, arrived at from the other side.
-//
-// THE SMALLEST PRESET CANNOT BE MADE LEGIBLE ON THE MENISCUS BY ANY CAP.
-// That is a finding, not a defect, and §2 of the spec is why: a level is a
-// STATE and a gift is an EVENT, so the meniscus was never the thing that had
-// to carry 10 drops — the drop that leaves your hand (R-N3) and the bee that
-// brings it (R-N4) are. The one line that disagrees is §6 acceptance row 1,
-// which asks every preset to produce a measurable change; it is measurable
-// in points and sub-pixel on glass, and only a device settles the gap
-// between those two. Routed to Lumen with the numbers rather than resolved
-// by quietly moving her constant.
+// The residue's owner is unchanged and so is the reason. §2 of the spec:
+// a level is a STATE and a gift is an EVENT, so the meniscus was never the
+// thing that had to carry 10 drops. The drop that leaves your hand (R-N3)
+// and the bee that brings it (R-N4) are.
 
 // ---------------------------------------------------------------------------
 // R-N4 — THE ARRIVAL. Did a gift land while you were not looking?
