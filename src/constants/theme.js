@@ -148,7 +148,52 @@ const colors = {
   // SeedsInbox's own comment says it matches NotesInbox *deliberately* —
   // "a seed detail and a note detail should be siblings." That was someone
   // doing the right thing by hand; this is the same thing with a name on it.
-  scrim: withAlpha(pigment.inkVeil, 0.4),
+  //
+  // R-N3.5 (GUIDES/POLLINATE_NECTAR_LIVING_EXCHANGE.md) ruled a RE-SOLVE of
+  // this pair after a capture showed the scrimmed compose cream reading as
+  // mud, and ruled one acceptance row: the scrimmed ground keeps at least half
+  // its LCh chroma. Dusk, not olive.
+  //
+  // THE PAIR RE-SOLVED ONTO THE PIGMENT IT ALREADY HAD, and the alpha moved.
+  // That is a deviation from the ruling's named mechanism, and it is written
+  // here rather than smuggled, per R-CL: a ruling's named mechanism is a
+  // floor, not a ceiling, and saying so in the file is what makes the
+  // measurement canon. Reproduce all of it with
+  // `node scripts/derive-nectar-veil.mjs`, which reads this file's own source.
+  //
+  //   * THE RULED ROW IS GREEN ON THE GROUND THE RULING NAMES. The quoted
+  //     composite rgb(163,156,122) keeps 86.6% of the cream's chroma and its
+  //     hue moves 1.0 degree. "Olive" on a cream is a LIGHTNESS fact at held
+  //     hue; chroma retention cannot see it.
+  //   * THE ROW IS RED ON A GROUND THE RULING DOES NOT NAME. This token is one
+  //     number read by five sites, and on `washSky` a warm veil cancels a cool
+  //     ground: C* 6.59 -> 2.99, retaining 45.4%. A grey — which is
+  //     `spotlightDim`'s own retired defect (C* 2.83, below) on a different
+  //     ground, in a brand with no grey in it.
+  //   * THE VEIL MAY NOT MOVE TOWARD WARMTH, for two reasons outside this
+  //     ruling. `spotlightDim` was DERIVED to be distinguishable from this
+  //     token (ΔE00 16.41 on the page, published below as the improvement) and
+  //     the two mean opposite things. And the drop in flight is amber by
+  //     R-N3.2, so an amber veil camouflages the object the beat is about:
+  //     every warm candidate fails one or both.
+  //
+  // So the only axis left is the alpha, and on it every bar moves the same
+  // way. 0.55 is the smallest two-decimal value clearing the ruled row on
+  // EVERY ground with a margin that is not inside its own floor's noise
+  // (washSky 70.2% against 50%; 0.45 clears at 50.8% and 0.445 at 50.1%,
+  // which is a coincidence rather than a measurement). It carries the
+  // separations up with it rather than spending them: ΔE00 from a
+  // spotlight-dimmed page 16.41 -> 25.40, modal card against the page it makes
+  // inert 27.65 -> 37.62, and R-N3.2's drop floor is untouched at 16.4244
+  // because the binding ground there is a BARE cover the veil never reaches.
+  //
+  // THE NUMBER INSIDE THE CLEARED RANGE IS A JUDGMENT AND IT IS THE RULING
+  // AUTHOR'S. `check-scrim-veil` holds the PROPERTIES and no row holds 0.55,
+  // so moving it is one edit here and the gate keeps its meaning. What the
+  // gate cannot rule on is the cream: "olive" has no numeric band anywhere in
+  // this repo, and the band I would have to invent to pick by is not a band
+  // anybody owns.
+  scrim: withAlpha(pigment.inkVeil, 0.55),
 
   // THE SPOTLIGHT DIM — the transient dim behind a hex tap. Not `scrim`, and the
   // gap between them is the whole point: `scrim` means THE PAGE IS INERT, a modal
