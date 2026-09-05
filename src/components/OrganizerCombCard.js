@@ -27,13 +27,42 @@ const MINT_REFUSAL_COPY = {
 
 export const organizerChapterSubjectName = (name) => (isPlaceholderName(name) ? 'someone' : name);
 
+// R-RF-4 (Lumen): the chapter affordance used to be an ASCII '▾'/'▸' in a Text
+// node while every other affordance in the app speaks Ionicons. 14pt inkSoft,
+// matching `metaLine`'s own pigment so the mark and its count read as one line.
+const CHAPTER_SIGNAL_ICON_SIZE = 14;
+
+// ONE WRITER for the write CTA's two channels. The visible Text and the
+// no-name-claim arm of the announced label are the same string, so the
+// fallback cannot drift away from the button it is describing.
+const WRITE_CTA_TEXT = 'Write this month';
+
 export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, onMinted }) => {
   const rotation = comb.openRotation;
   const daysLeft = useDaysLeft(rotation?.closesAt);
   const inviteUrl = getCombInviteUrl(comb.inviteCode);
   const chapterCount = comb.chapters?.length ?? 0;
   const chapterCountLabel = chapterCount === 1 ? '1 past month' : `${chapterCount} past months`;
-  const chapterSignalLabel = `${expanded ? '▾' : '▸'} ${chapterCountLabel}`;
+  const chapterSignalIcon = expanded ? 'chevron-down' : 'chevron-forward';
+  // R-RF-2 (Lumen): the label used to be `Write for ${rotation.subjectName ||
+  // 'this month'}`, which announced raw placeholder-class names to VoiceOver
+  // ("Write for New user") that no sighted user is ever shown.
+  //
+  // DEVIATION FROM THE RULING'S NAMED MECHANISM, stated here because it is a
+  // deviation: "use `organizerChapterSubjectName` here" alone would announce
+  // "Write for someone" for an ABSENT name too, because `isPlaceholderName`
+  // coalesces `name ?? ''` and cannot tell a placeholder from a missing read.
+  // RotationFold does tell them apart and they render differently: a FALSY
+  // `subjectName` is a REFUSED READ (R-38.9-F) and takes the branch that makes
+  // no name claim at all ("This month is already underway."), while a truthy
+  // placeholder renders "Writing for someone". So the classifier is applied
+  // only where the fold applies it, behind the SAME falsy test the fold uses,
+  // and the absent case falls back to the button's own visible text rather
+  // than to a person the screen never claimed. Announced label tracks the
+  // rendered surface in all three states by construction, not by coincidence.
+  const writeCtaLabel = rotation?.subjectName
+    ? `Write for ${organizerChapterSubjectName(rotation.subjectName)}`
+    : WRITE_CTA_TEXT;
   const shareInvite = () => Share.share({ message: inviteUrl });
   const memberLabel =
     comb.memberCount == null
@@ -127,7 +156,8 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
         )}
         {chapterCount > 0 && (
           <View style={styles.historySignal}>
-            <Text style={styles.metaLine}>{chapterSignalLabel}</Text>
+            <Ionicons name={chapterSignalIcon} size={CHAPTER_SIGNAL_ICON_SIZE} color={theme.colors.inkSoft} />
+            <Text style={styles.metaLine}>{chapterCountLabel}</Text>
           </View>
         )}
         {/* DES-29 §8.1/§8.2 — pre-launch only, un-gated by `expanded`: the
@@ -179,10 +209,10 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
               <PressableScale
                 onPress={() => onWrite?.(rotation)}
                 style={styles.actionRow}
-                accessibilityLabel={`Write for ${rotation.subjectName || 'this month'}`}
+                accessibilityLabel={writeCtaLabel}
               >
                 <Ionicons name="create" size={16} color={theme.colors.ink} />
-                <Text style={styles.actionText}>Write this month</Text>
+                <Text style={styles.actionText}>{WRITE_CTA_TEXT}</Text>
               </PressableScale>
             )}
           </View>

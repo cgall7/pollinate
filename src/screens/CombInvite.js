@@ -197,6 +197,6 @@ const styles = StyleSheet.create({
   bloom: { width: 112, height: 112, borderRadius: 56, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.washYellow },
   bloomGlyph: { fontSize: 44, color: theme.colors.ink },
   inputLabel: { ...theme.type.label, color: theme.colors.ink, marginTop: theme.spacing.md },
-  input: { ...theme.type.body, color: theme.colors.ink, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.surfaceBorderStrong, borderRadius: 14, minHeight: 54, paddingHorizontal: theme.spacing.md },
+  input: { ...theme.type.body, color: theme.colors.ink, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.surfaceBorderStrong, borderRadius: theme.borderRadius.small, minHeight: 54, paddingHorizontal: theme.spacing.md },
   error: { ...theme.type.bodySm, color: theme.colors.danger },
 });
