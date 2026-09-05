@@ -235,8 +235,16 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       <View style={styles.members}>{members.map((member) => <PressableScale key={member.profile_id} innerRef={recipientId === member.profile_id ? recipientDestination : undefined} onPress={() => chooseRecipient(member.profile_id)} style={[styles.member, recipientId === member.profile_id && styles.selected]}><Text style={styles.memberName}>{memberName(member.display_name)}</Text></PressableScale>)}</View>
       <Text style={styles.target}>To {recipientLabel}</Text>
       {!nectarConsent && <PressableScale onPress={() => setNectarConsentSheetOpen(true)} style={styles.consent}><Text style={styles.consentText}>Turn this on before sending.</Text></PressableScale>}
+      {/* R-N3.6. `subjectBeneath={false}` below, and it is read off this
+          screen's structure rather than chosen. The panel is a child in
+          ordinary flow inside `styles.container`, and the gift's destination
+          is `recipientDestination`, a member chip in the TO row that sits
+          above it in the same flow. The drop crosses beside this surface and
+          never over it, so the card yields and the balance line stays, which
+          is where Settle counts. The one ground the line is left on when the
+          card goes is `backgroundWriting`, 6.0823 against `inkSoft`. */}
       {nectarConsent && (
-        senderInactive ? <PressableScale accessibilityLabel="Not now" onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} surfaceStyle={gift.surfaceStyle} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
+        senderInactive ? <PressableScale accessibilityLabel="Not now" onPress={() => navigation.goBack()} style={styles.consent}><Text style={styles.consentText}>Not now</Text></PressableScale> : <NectarSendPanel nectarConsent={nectarConsent} balanceDrops={balanceDrops} displayDrops={gift.displayDrops} controlsStyle={gift.controlsStyle} surfaceStyle={gift.surfaceStyle} subjectBeneath={false} originRef={giftOrigin} selected={amount} onSelect={choosePreset} customValue={custom} onChangeCustom={changeCustom} note={note} onChangeNote={changeNote} sending={sending} failed={failed} sendDisabled={!sendable} onSend={send} onCancel={() => navigation.goBack()} />
       )}
       {nectarConsent && <><Text style={styles.words}>{wordCount(note)}/8 words</Text>{validationMessage && <Text style={styles.validation}>{validationMessage}</Text>}</>}
       {successMessage && <Text accessibilityLiveRegion="polite" style={styles.srOnly}>{successMessage}</Text>}

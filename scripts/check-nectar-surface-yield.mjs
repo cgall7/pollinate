@@ -31,7 +31,18 @@
 //     served two opposite endings; the row asks which values the success
 //     teardown writes, not whether a function named reset exists.
 //
-// EIGHT ROWS, and they are not equally strong:
+// R-N3.6 ADDED THE FOURTH THING THAT CAN BREAK IT, and it is invisible to a
+// text scan for a fourth reason. R-N3.4's build surfaced a collision between
+// two live rulings: R-N3 keeps the balance line so Settle has a numeral to
+// count, R-N3.4 clears the card so the memory can be read, and on a tall entry
+// those two want the same pixels. Lumen ruled the line yields, and ruled the
+// principle: during the flight the send surface may keep an element painted
+// only where the story's subject is not beneath it. So the panel now takes
+// `subjectBeneath`, one behaviour per mount, keyed on structure and never on a
+// measurement. The break is a mount that declares the comfortable answer, or a
+// new mount that declares nothing at all, and neither is misspelled.
+//
+// TEN ROWS, and they are not equally strong:
 //
 //   G1  universe    files walked, all parsed, panel mounts found, hook found.
 //                   An enumerator over an empty set is green about nothing.
@@ -60,9 +71,24 @@
 //                   absence — because a caller that does neither leaves a
 //                   permanently invisible panel with an unreachable Send, and
 //                   that is the one way this fix can be worse than the bug.
-//   G8  witness     G3, G4 and G6 being green only says the tree is clean
-//                   today. G8 reconstructs each real defect in memory out of
-//                   the real files and REQUIRES the resolvers to red. If the
+//   G9  hookup      THE RULED ROW FOR R-N3.6, first half. The balance line is
+//                   an `Animated.Text` whose style is
+//                   `[styles.balance, subjectBeneath ? surfaceStyle : null]`.
+//                   Asserted as a shape and not as a mention, because the
+//                   three near misses all read as correct: an animated value
+//                   on a plain <Text> does nothing, `controlsStyle` would drag
+//                   R-N3's 4pt settle onto the numeral, and an ungated style
+//                   yields the line at all three mounts.
+//   G10 classified  THE RULED ROW FOR R-N3.6, second half, and it does not
+//                   trust the prop. Each mount's answer is DERIVED from its own
+//                   JSX ancestry (in flow, so nothing of the screen is under
+//                   it, versus taken out of flow, so something can be) and
+//                   compared to what it declares. An ancestry the row cannot
+//                   read demands the yield rather than passing, because
+//                   keeping the line painted is the side that needs a licence.
+//   G8  witness     G3, G4, G6, G9 and G10 being green only says the tree is
+//                   clean today. G8 reconstructs each real defect in memory out
+//                   of the real files and REQUIRES the resolvers to red. If the
 //                   anchors stop existing this row fails rather than going
 //                   quiet.
 //
@@ -82,9 +108,15 @@ const HOOK_REL = 'src/components/useNectarGift.js';
 const COMPONENT = 'NectarSendPanel';
 const HOOK = 'useNectarGift';
 const SURFACE_PROP = 'surfaceStyle';
+const YIELD_PROP = 'subjectBeneath';
 const PAINT_STYLE = 'cardPaint';
 const BALANCE_STYLE = 'balance';
+const BALANCE_TAG = 'Animated.Text';
 const SURFACE_VALUES = ['controls', 'scrim'];
+// The two spreads that make a style object absolutely positioned without ever
+// writing the word. `absoluteFillObject` is in the list because a future author
+// reaching for the non-frozen form must not silently leave this row's domain.
+const ABSOLUTE_SPREADS = ['StyleSheet.absoluteFill', 'StyleSheet.absoluteFillObject'];
 
 let pass = 0;
 const failures = [];
@@ -132,6 +164,70 @@ const styleRefs = (node, out = [], unresolved = []) => {
   return { out, unresolved };
 };
 
+const memberPath = (node) => (node?.type === 'Identifier' ? node.name
+  : node?.type === 'MemberExpression' ? `${memberPath(node.object)}.${memberPath(node.property)}` : null);
+
+// R-N3.6's structural key, resolved rather than trusted. A style object is
+// ABSOLUTE if it says so or spreads one of the two helpers that say it for it;
+// FLOW if it resolves and says neither; OPAQUE if it spreads something this
+// file cannot open. Opaque is a third answer and never a quiet `flow`: the
+// whole point of the row below is that keeping the line painted needs a
+// licence, so an unreadable ancestor must not hand one out.
+const classifyStyleObject = (obj) => {
+  let opaque = false;
+  for (const p of obj.properties ?? []) {
+    if (p.type === 'SpreadElement') {
+      const src = memberPath(p.argument);
+      if (src && ABSOLUTE_SPREADS.includes(src)) return 'absolute';
+      opaque = true;
+      continue;
+    }
+    if (p.type === 'ObjectProperty' && (p.key?.name ?? p.key?.value) === 'position') {
+      if (p.value?.value === 'absolute') return 'absolute';
+    }
+  }
+  return opaque ? 'opaque' : 'flow';
+};
+
+// One `style={…}` expression, resolved to the classifications it contributes.
+// Arrays, inline objects and conditional branches are all opened rather than
+// dropped: an inline `{ backgroundColor: … }` beside a named style is ordinary
+// idiom here and reading it as opaque would make every screen unresolvable.
+// Anything genuinely unopenable is still named as opaque, so the row's domain
+// never grows quietly.
+const classifyStyleExpr = (node, sheet, out = []) => {
+  if (!node) return out;
+  if (node.type === 'ArrayExpression') { node.elements.forEach((el) => classifyStyleExpr(el, sheet, out)); return out; }
+  if (node.type === 'ConditionalExpression') { classifyStyleExpr(node.consequent, sheet, out); classifyStyleExpr(node.alternate, sheet, out); return out; }
+  if (node.type === 'LogicalExpression') { classifyStyleExpr(node.right, sheet, out); return out; }
+  if (node.type === 'ObjectExpression') { out.push({ label: '{inline}', kind: classifyStyleObject(node) }); return out; }
+  if (node.type === 'NullLiteral' || node.type === 'BooleanLiteral') return out;
+  if (node.type === 'MemberExpression' && node.object?.name === 'styles') {
+    const name = node.property?.name;
+    out.push({ label: `styles.${name}`, kind: sheet.has(name) ? sheet.get(name) : 'opaque' });
+    return out;
+  }
+  out.push({ label: memberPath(node) ?? `<${node.type}>`, kind: 'opaque' });
+  return out;
+};
+
+// Every `StyleSheet.create` in one file, flattened to name -> classification.
+const styleSheetIn = (tree) => {
+  const sheet = new Map();
+  walk(tree, (n) => {
+    if (n.type !== 'CallExpression') return;
+    const c = n.callee;
+    if (!(c?.type === 'MemberExpression' && c.object?.name === 'StyleSheet' && c.property?.name === 'create')) return;
+    const arg = n.arguments?.[0];
+    if (arg?.type !== 'ObjectExpression') return;
+    for (const p of arg.properties) {
+      if (p.type !== 'ObjectProperty' || p.value?.type !== 'ObjectExpression') continue;
+      sheet.set(p.key?.name ?? p.key?.value, classifyStyleObject(p.value));
+    }
+  });
+  return sheet;
+};
+
 // ── the collector, as a function so G8 can re-run it on mutated source ──────
 const RAW_MOUNT = new RegExp(`<${COMPONENT}\\b`, 'g');
 const collect = (sources) => {
@@ -146,6 +242,7 @@ const collect = (sources) => {
   for (const [rel, code] of sources) {
     let tree;
     try { tree = parse(code, PARSE_OPTS); } catch (err) { parseFailures.push(`${rel}: ${err.message}`); continue; }
+    const sheet = styleSheetIn(tree);
 
     walk(tree, (node, stack) => {
       // ---- mounts -------------------------------------------------------
@@ -154,7 +251,37 @@ const collect = (sources) => {
           .filter((a) => a.type === 'JSXAttribute')
           .map((a) => a.name?.name);
         const spreads = node.attributes.filter((a) => a.type === 'JSXSpreadAttribute').length;
-        mounts.push({ site: `${rel}:${node.loc.start.line}`, props, spreads });
+
+        // What the mount SAYS. A bare `subjectBeneath` is JSX shorthand for
+        // true and is read as true rather than as unresolved, so the row can
+        // never be dodged by writing the idiom.
+        const attr = node.attributes.find((a) => a.type === 'JSXAttribute' && a.name?.name === YIELD_PROP);
+        let declared;
+        if (!attr) declared = 'absent';
+        else if (attr.value === null) declared = true;
+        else {
+          const v = attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : null;
+          declared = v?.type === 'BooleanLiteral' ? v.value : 'unresolved';
+        }
+
+        // What the mount IS. Walk the enclosing JSX and ask whether any
+        // ancestor takes this surface out of flow. In flow, nothing of the
+        // screen is under the panel; out of flow, something can be, and the
+        // licence to keep the line painted is withheld.
+        const chain = [];
+        for (const anc of stack) {
+          if (anc.type !== 'JSXElement') continue;
+          const styleAttr = (anc.openingElement?.attributes ?? [])
+            .find((a) => a.type === 'JSXAttribute' && a.name?.name === 'style');
+          if (!styleAttr) continue;
+          const expr = styleAttr.value?.type === 'JSXExpressionContainer' ? styleAttr.value.expression : null;
+          const tag = jsxName(anc.openingElement.name);
+          for (const part of classifyStyleExpr(expr, sheet)) chain.push({ tag, style: part.label, kind: part.kind });
+        }
+        const overlaid = chain.some((c) => c.kind === 'absolute') ? true
+          : chain.some((c) => c.kind === 'opaque') ? 'unresolved' : false;
+
+        mounts.push({ site: `${rel}:${node.loc.start.line}`, props, spreads, declared, overlaid, chain });
       }
 
       // ---- hook consumers ----------------------------------------------
@@ -172,7 +299,9 @@ const collect = (sources) => {
         if (out.includes(PAINT_STYLE) && out.includes(SURFACE_PROP)) {
           paint = { line: node.loc.start.line, children: (element?.children ?? []).filter((c) => c.type !== 'JSXText' || c.value.trim()).length, node: element };
         }
-        if (out.includes(BALANCE_STYLE)) balance = { line: node.loc.start.line, stack: [...stack] };
+        if (out.includes(BALANCE_STYLE)) {
+          balance = { line: node.loc.start.line, stack: [...stack], tag: jsxName(node.name), expr };
+        }
       }
 
       // ---- the hook's published styles and its teardown -----------------
@@ -330,6 +459,65 @@ if (consumerFiles.length > 0 && stranded.length === 0) {
   bad('G7 consumers', `${stranded.length} consumer(s) in no class: ${stranded.map((c) => `${c.rel} (${c.kind})`).join(', ')} of ${consumerFiles.length} total. Such a screen yields its panel once and never repaints it, leaving an invisible card with an unreachable Send — worse than the defect this ruling fixes`);
 }
 
+// ── G9 yield hookup (R-N3.6) ────────────────────────────────────────────────
+// Written against the exact shape rather than "mentions surfaceStyle
+// somewhere", because the three ways this can be wrong all look right in
+// review: an `Animated.Value` on a plain `<Text>` animates nothing; a hookup
+// reading `controlsStyle` would drag R-N3's 4pt settle onto the numeral and
+// put it on a second beat; and a hookup with no test yields the line at all
+// three mounts, which is the ruling inverted.
+const hookupVerdict = (balance) => {
+  const e = balance?.expr;
+  if (!balance) return { ok: false, detail: 'the balance line did not resolve at all' };
+  const tagOk = balance.tag === BALANCE_TAG;
+  if (e?.type !== 'ArrayExpression' || e.elements.length !== 2) {
+    return { ok: false, detail: `tag=${balance.tag}, style expression is ${e?.type ?? '(none)'} with ${e?.elements?.length ?? 0} element(s); expected a two-element array` };
+  }
+  const [base, gated] = e.elements;
+  const baseOk = base?.type === 'MemberExpression' && base.object?.name === 'styles' && base.property?.name === BALANCE_STYLE;
+  const condOk = gated?.type === 'ConditionalExpression'
+    && gated.test?.type === 'Identifier' && gated.test.name === YIELD_PROP
+    && gated.consequent?.type === 'Identifier' && gated.consequent.name === SURFACE_PROP
+    && gated.alternate?.type === 'NullLiteral';
+  return {
+    ok: tagOk && baseOk && condOk,
+    detail: `tag=${balance.tag} (want ${BALANCE_TAG}), base=${baseOk ? `styles.${BALANCE_STYLE}` : base?.type}, gate=${condOk ? `${YIELD_PROP} ? ${SURFACE_PROP} : null` : `test=${gated?.test?.name ?? gated?.type}, consequent=${gated?.consequent?.name ?? gated?.consequent?.type}, alternate=${gated?.alternate?.type}`}`,
+  };
+};
+const hookup = hookupVerdict(state.balance);
+if (hookup.ok) {
+  ok(`G9 yield hookup: the balance line (${PANEL_REL}:${state.balance.line}) is an \`${BALANCE_TAG}\` whose style is \`[styles.${BALANCE_STYLE}, ${YIELD_PROP} ? ${SURFACE_PROP} : null]\`. It reads the SAME published style the card's ground reads, so R-N3.6's "same driver, same clock" is true by construction rather than by care at three call sites, and it yields by its own hookup rather than by ancestry, which is the premise G4 guards from the other side`);
+} else {
+  bad('G9 yield hookup', `${hookup.detail}. An animated value on a plain <Text> animates nothing, \`controlsStyle\` here would put R-N3's 4pt settle on the numeral, and an ungated style yields the line at every mount, and all three read as correct in a diff`);
+}
+
+// ── G10 mount classification (R-N3.6) ───────────────────────────────────────
+// THE RULED ROW FOR R-N3.6, and it does not trust the prop. Lumen ruled the
+// split keys on structure, "destination beneath the surface versus beside it",
+// explicitly not on a measurement, so this derives each mount's answer from
+// its own JSX ancestry and compares. A mount in ordinary flow has nothing of
+// the screen under it and may keep the line; a mount taken out of flow may
+// not. An ancestry this row cannot read is not a pass: keeping the line
+// painted is what needs the licence, so `unresolved` demands the yield.
+//
+// A UNIVERSAL, not a pattern. `subjectBeneath` has no default in the panel
+// precisely so a new mount that never declares it lands here as `absent`
+// rather than inheriting the answer that keeps the line up.
+const classifyMounts = (mounts) => {
+  const requires = (m) => (m.overlaid === false ? false : true);
+  return {
+    undeclared: mounts.filter((m) => m.declared === 'absent' || m.declared === 'unresolved'),
+    mismatched: mounts.filter((m) => typeof m.declared === 'boolean' && m.declared !== requires(m)),
+    requires,
+  };
+};
+const cls = classifyMounts(state.mounts);
+if (state.mounts.length > 0 && cls.undeclared.length === 0 && cls.mismatched.length === 0) {
+  ok(`G10 mount classification: all ${state.mounts.length} mount(s) declare \`${YIELD_PROP}\` and each declaration equals the answer derived from its own ancestry. ${state.mounts.map((m) => `${m.site} declared=${m.declared}, derived overlaid=${m.overlaid}${m.chain.filter((c) => c.kind === 'absolute').map((c) => ` via ${c.tag} ${c.style}`).join('')}`).join('; ')}. The split is structural, never a measurement: a line that stayed for short entries and yielded for tall ones would be two beats decided by a number`);
+} else {
+  bad('G10 mount classification', `${cls.undeclared.length} mount(s) declare nothing this row can read (${cls.undeclared.map((m) => `${m.site} (${m.declared})`).join(', ') || 'none'}) and ${cls.mismatched.length} contradict their own structure (${cls.mismatched.map((m) => `${m.site} declared=${m.declared}, derived overlaid=${m.overlaid}, requires=${cls.requires(m)}`).join(', ') || 'none'}), of ${state.mounts.length} total. A panel drawn over the thing it is sending to must not keep any of itself painted during the flight`);
+}
+
 // ── G8 witness ──────────────────────────────────────────────────────────────
 // Each mutation reconstructs a real defect out of the real files. `anchored`
 // proves the mutation actually changed something (a mutation that found
@@ -381,6 +569,88 @@ const mutate = (rel, fn) => sources.map(([r, code]) => [r, r === rel ? fn(code) 
     anchored: mutated.find(([r]) => r === HOOK_REL)[1] !== target[1],
     reds: after.hook.teardownWrites.length > 0,
     saw: `teardown writes=[${after.hook.teardownWrites.join(', ')}]`,
+  });
+}
+
+{
+  // 4. R-N3.6's own defect, and the reason the prop has no default: a new
+  //    mount that never declares. Reconstructed by deleting the declaration
+  //    from a real call site, which leaves a file where nothing is misspelled
+  //    and every existing row is still green.
+  const target = sources.find(([r]) => r === 'src/screens/CombNectarCompose.js');
+  // Anchored on the following prop as well, so this can only match the
+  // declaration itself and never the prose that names it.
+  const mutated = mutate(target[0], (code) => code.replace(` ${YIELD_PROP}={false} originRef=`, ' originRef='));
+  const state4 = collect(mutated);
+  const after = classifyMounts(state4.mounts);
+  mutations.push({
+    name: 'a mount site declares no subjectBeneath',
+    anchored: mutated.find(([r]) => r === target[0])[1] !== target[1] && state4.parseFailures.length === 0,
+    reds: after.undeclared.length === 1,
+    saw: `${after.undeclared.length} undeclared mount(s)${after.undeclared.length ? ` at ${after.undeclared[0].site}` : ''}, ${state4.parseFailures.length} parse failure(s)`,
+  });
+}
+{
+  // 5. The comfortable answer. The entry overlay claims its subject is not
+  //    under it, which is the shipped defect R-N3.6 removes, wearing the new
+  //    prop's name. Only the DERIVATION catches this one: the declaration is
+  //    well formed, a boolean, and completely wrong.
+  const target = sources.find(([r]) => r === 'src/screens/PackageOpen.js');
+  const mutated = mutate(target[0], (code) => code.replace(`${YIELD_PROP}={true}`, `${YIELD_PROP}={false}`));
+  const state5 = collect(mutated);
+  const after = classifyMounts(state5.mounts);
+  mutations.push({
+    name: 'the overlaid mount claims nothing is beneath it',
+    anchored: mutated.find(([r]) => r === target[0])[1] !== target[1] && state5.parseFailures.length === 0,
+    reds: after.mismatched.length === 1,
+    saw: `${after.mismatched.length} mismatched mount(s)${after.mismatched.length ? ` at ${after.mismatched[0].site} (declared=${after.mismatched[0].declared}, overlaid=${after.mismatched[0].overlaid})` : ''}, ${state5.parseFailures.length} parse failure(s)`,
+  });
+}
+{
+  // 6. The line loses its hookup and goes back to a plain painted <Text>.
+  //    This is the whole ruling undone in one edit, and the panel still
+  //    compiles, still renders, and still shows a number.
+  const target = sources.find(([r]) => r === PANEL_REL);
+  //    BOTH TAGS, because a half-swapped element is a syntax error and a row
+  //    that reds on a parse failure has tested the parser rather than the
+  //    resolver. `anchored` asserts the mutated tree still parses.
+  const mutated = mutate(PANEL_REL, (code) => code
+    .replace(
+      `<Animated.Text style={[styles.${BALANCE_STYLE}, ${YIELD_PROP} ? ${SURFACE_PROP} : null]}>`,
+      `<Text style={styles.${BALANCE_STYLE}}>`)
+    .replace('</Animated.Text>', '</Text>'));
+  const state6 = collect(mutated);
+  const after = hookupVerdict(state6.balance);
+  mutations.push({
+    name: 'the balance line loses its yield hookup',
+    anchored: mutated.find(([r]) => r === PANEL_REL)[1] !== target[1] && state6.parseFailures.length === 0,
+    reds: after.ok === false,
+    saw: `${after.detail}, ${state6.parseFailures.length} parse failure(s)`,
+  });
+}
+
+{
+  // 7. THE OPAQUE BRANCH, which is the one decision in G10 that could pass
+  //    quietly forever. A mount whose ancestry this row cannot read must be
+  //    treated as overlaid, because the licence being asked for is the licence
+  //    to keep pixels over the subject. Reconstructed by handing an ancestor a
+  //    style the file cannot open: the mount still declares `false`, nothing
+  //    else changes, and G10 must stop believing it.
+  //
+  //    Written after the row's first cut read a perfectly ordinary
+  //    `style={[styles.container, { backgroundColor: cover.base }]}` as
+  //    unreadable and redded correct work. A row that fails closed is only
+  //    safe if the set it closes on is the set it means.
+  const target = sources.find(([r]) => r === 'src/screens/PackageOpen.js');
+  const mutated = mutate(target[0], (code) => code.replace('<View style={styles.ending}>', '<View style={pixelOpaqueStyle}>'));
+  const state7 = collect(mutated);
+  const after = classifyMounts(state7.mounts);
+  const opaqueMount = state7.mounts.find((m) => m.overlaid === 'unresolved');
+  mutations.push({
+    name: 'an ancestor style this row cannot open still demands the yield',
+    anchored: mutated.find(([r]) => r === target[0])[1] !== target[1] && state7.parseFailures.length === 0 && !!opaqueMount,
+    reds: after.mismatched.length === 1 && after.mismatched[0].overlaid === 'unresolved',
+    saw: `${after.mismatched.length} mismatched mount(s)${opaqueMount ? ` and ${opaqueMount.site} derived overlaid=unresolved` : ' and no mount derived unresolved'}, ${state7.parseFailures.length} parse failure(s)`,
   });
 }
 

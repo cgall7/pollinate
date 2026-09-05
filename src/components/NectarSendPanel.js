@@ -84,6 +84,10 @@ export const isSendableAmount = (drops, balanceDrops) => {
 // leaves, the number counts. Flagged to Lumen; it is the only reading under
 // which Settle has anything to act on.
 //
+// R-N3.6 SCOPES THAT SENTENCE TO THE MOUNTS WHERE IT IS TRUE. "The numeral
+// does not fall away" is now a statement about two of the three mounts, not
+// about this component. See the R-N3.6 block below for which and why.
+//
 // `controlsStyle` is that group's animated opacity + 4pt settle, owned by
 // `useNectarGift` and applied here. `displayDrops` is the counting value —
 // the panel renders it INSTEAD of `balanceDrops`, which stays the
@@ -112,6 +116,34 @@ export const isSendableAmount = (drops, balanceDrops) => {
 // declares a `zIndex`, so nothing has been promoted out of document order.
 // The moment one does, this comment is wrong and that gate's own reasoning
 // applies.
+//
+// R-N3.6 — THE LINE YIELDS WHERE THE SUBJECT IS UNDER IT, AND `subjectBeneath`
+// IS THE MOUNT SAYING WHICH IT IS.
+//
+// R-N3.4's build turned up a collision between two live rulings rather than a
+// bug: R-N3 keeps this line so Settle has a numeral to count, R-N3.4 clears
+// the card so the memory can be read, and on a tall entry those two want the
+// same pixels (the line sits at y 309 to 329 and a long memory's paper
+// measures y 269 to 610, both read off the DOM). Lumen ruled the line yields,
+// and ruled the principle that decides every future case of the class:
+// DURING THE FLIGHT THE SEND SURFACE MAY KEEP AN ELEMENT PAINTED ONLY WHERE
+// THE STORY'S SUBJECT IS NOT BENEATH IT.
+//
+// SO THE SPLIT IS STRUCTURAL AND NEVER A MEASUREMENT. A line that stayed for
+// short entries and yielded for tall ones would be two beats decided by a
+// number, which is presence per state and banned. `subjectBeneath` names what
+// the mount IS: the entry overlay is drawn over the paper block it is sending
+// to, so nothing of that surface stays; the ending slot and the comb compose
+// are children in ordinary flow, whose destination sits beside the panel and
+// above it, so their line stays and Settle counts as ruled.
+//
+// IT RIDES `surfaceStyle` AND NOT A CLOCK OF ITS OWN, which is what makes
+// "same driver, same clock" true by construction instead of by care at three
+// call sites. The card's ground and this line are then the same fade, and
+// under Reduce Motion they stay the same fade, because the substitute moves
+// the driver rather than the hookup. §5's rule is untouched: the count still
+// runs, it simply has no painted stage on this one mount, and the balance
+// re-enters at its settled value with the next `arm`.
 export const NectarSendPanel = ({
   nectarConsent,
   balanceDrops,
@@ -130,6 +162,13 @@ export const NectarSendPanel = ({
   onCancel,
   controlsStyle,
   surfaceStyle,
+  // R-N3.6. NO DEFAULT, deliberately: a default would make a mount that never
+  // declares this read as "the subject is not under me", which is the answer
+  // that keeps the line painted. The one class of defect this ruling exists to
+  // stop would then arrive as an absence, and an absence has no string to
+  // grep. `check-nectar-surface-yield` G10 enumerates the mounts and derives
+  // the answer from each one's own ancestry rather than trusting the prop.
+  subjectBeneath,
   originRef,
 }) => (
   <>
@@ -151,40 +190,45 @@ export const NectarSendPanel = ({
             drops available, M needed)"), so a control that offers 100 drops
             without saying you hold 40 is a control that hides its own
             failure. The numeral lives where the number is spent. */}
-        {/* THE ONE ELEMENT THAT DOES NOT FALL AWAY — see the header. It
-            reads `displayDrops`, which is `balanceDrops` at rest and the
-            animated value during a gift; the fallback keeps a caller that
-            passes neither on today's behaviour rather than blank.
+        {/* THE ELEMENT THAT STAYS WHERE STAYING IS LICENSED, and that
+            licence is `subjectBeneath` (R-N3.6, header). It reads
+            `displayDrops`, which is `balanceDrops` at rest and the animated
+            value during a gift; the fallback keeps a caller that passes
+            neither on today's behaviour rather than blank.
 
-            AND IT CARRIES ITS OWN GROUND, for the reason R-N3.2 gives for
-            the drop's backing. Before R-N3.4 this line always sat on the
-            card's white; the card now yields under it, so the line is left
-            over whatever the screen happens to be showing. Measured against
-            every ground it can land on, `inkSoft` clears 4.5:1 on all six
-            light ones (worst 5.3792 on `washPeach`, 5.8353 on `background`)
-            and reads 2.0727 on `paperEvening` — reachable, not theoretical:
-            a tall entry's paper measures y 269-610 while this line sits at
-            y 309-329, so the paper is behind it. Backed, it is 6.3074 on all
-            seven by construction, which is a property of the object rather
-            than a patch to a timing. At rest the ground is white on white
-            and invisible; it only becomes a ground when there is no other.
+            THE YIELD IS ITS OWN HOOKUP AND NEVER ANCESTRY. It reads the same
+            published style the card's ground reads, so the two cannot land on
+            two clocks, and it stays a SIBLING of the paint node rather than
+            moving inside it. Ancestry would have been the cheap way to do
+            this and it is the wrong one: opacity reaches every descendant, so
+            a line parented into the fading node would yield at all three
+            mounts and R-N3's numeral would be gone from the two that keep it.
+            `check-nectar-surface-yield` G4 holds that premise and G9 holds
+            this hookup.
 
-            IT IS ALSO THE LESSER OF THE TWO SHIPPABLE STATES, and that is a
-            render finding rather than a preference. On a tall entry the line
-            lands ON the memory whether it is backed or not — unbacked, that
-            is two texts in the same pixels and neither is readable; backed,
-            it is one legible sentence covering one line of another. The
-            collision itself is not mine to resolve: R-N3 keeps this line for
-            Settle to count and R-N3.4 clears the card so the memory can be
-            read, and on a tall entry those two want the same pixels. Filed
-            for Lumen with both frames. */}
+            IT CARRIES ITS OWN GROUND for the reason R-N3.2 gives for the
+            drop's backing, and R-N3.6 changes what that ground is FOR rather
+            than whether it is needed. Before R-N3.6 the chip was load
+            bearing: the line was painted over a tall entry's paper, and
+            `inkSoft` on `paperEvening` measures 2.0727 while every light
+            ground clears 4.5:1 (worst 5.3792 on `washPeach`). That one
+            failing ground is exactly the case the ruling removes, so on the
+            two mounts that keep the line every ground it can now land on
+            passes unbacked: `backgroundWriting` 6.0823 on the comb compose,
+            and the four hive covers on the ending slot at 5.8353 / 5.3792 /
+            5.5243 / 6.0823. The chip stays by ruling, as R-N3.2's property of
+            the object rather than as a patch holding one pair up: backed it
+            is 6.3074 on all seven by construction, and at rest it is white on
+            white and invisible. Stated this way round so nobody later reads
+            the measurement as the reason and deletes the chip when the
+            grounds move. */}
 
-        <Text style={styles.balance}>
+        <Animated.Text style={[styles.balance, subjectBeneath ? surfaceStyle : null]}>
           {(displayDrops === undefined ? balanceDrops : displayDrops) === null
             || (displayDrops === undefined ? balanceDrops : displayDrops) === undefined
             ? "We couldn't check your drops."
             : `You have ${displayDrops === undefined ? balanceDrops : displayDrops} drops.`}
-        </Text>
+        </Animated.Text>
 
         <Animated.View style={[styles.controls, controlsStyle]}>
         {onChangeNote && (

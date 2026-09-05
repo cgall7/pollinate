@@ -1122,19 +1122,30 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     );
   }
 
-  // THE PANEL'S NUMERAL SURVIVES GATHER. This is the one place this build
-  // DEVIATES from the letter of R-N3 (Gather fades "the panel's contents";
-  // Settle counts a numeral 340ms later), so it gets a row rather than a
-  // comment: the balance line must NOT be inside the faded group.
+  // THE PANEL'S NUMERAL IS NOT A DESCENDANT OF THE FADED GROUP. This is the
+  // one place this build DEVIATES from the letter of R-N3 (Gather fades "the
+  // panel's contents"; Settle counts a numeral 340ms later), so it gets a row
+  // rather than a comment.
+  //
+  // R-N3.6 NARROWED WHAT THIS ROW IS ALLOWED TO CLAIM, and the row itself is
+  // unchanged because it was already the narrower thing. It used to be headed
+  // "the numeral survives Gather", which is now true at two of the three
+  // mounts and false at the entry overlay, where the line yields with the card
+  // by ruling. What is measured here is ANCESTRY: the line is a sibling of the
+  // controls group, not a child of it. That is what lets one mount yield the
+  // numeral and two keep it, since a line parented into the fading group would
+  // go at all three and R-N3's Settle would have nothing to count anywhere.
+  // `check-nectar-surface-yield` G9 holds the other half, the hookup that
+  // decides which mounts yield.
   const controlsGroups = PANEL.split('<Animated.View style={[styles.controls, controlsStyle]}>');
   const balanceInsideControls = controlsGroups.slice(1).some((g) => {
     const end = g.indexOf('</Animated.View>');
     return end >= 0 && /styles\.balance/.test(g.slice(0, end));
   });
   if (!balanceInsideControls && /styles\.balance/.test(PANEL)) {
-    ok('D6 the balance line is OUTSIDE the group Gather fades — the deviation is real and it is the only reading under which Settle has a numeral to count. A row rather than a comment, because the next person to tidy this panel will see two Animated.Views and want to merge them');
+    ok('D6 the balance line is a SIBLING of the group Gather fades, not a child of it. That ancestry is what makes R-N3 and R-N3.6 compatible: the numeral can yield at the one mount whose subject sits beneath the panel and stay at the two whose subject sits beside it. A row rather than a comment, because the next person to tidy this panel will see two Animated.Views and want to merge them');
   } else {
-    bad('D6', 'the balance line sits inside the faded controls group — Gather removes it at 180ms and Settle counts it at 520ms, so "you watch it leave you" has nothing to watch');
+    bad('D6', 'the balance line sits inside the faded controls group, so it goes at every mount rather than at the one R-N3.6 rules. Gather removes it at 180ms and Settle counts it at 520ms, and "you watch it leave you" then has nothing to watch anywhere');
   }
 }
 

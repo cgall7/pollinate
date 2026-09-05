@@ -767,6 +767,14 @@ export const PackageOpenScreen = ({ navigation, route }) => {
               displayDrops={gift.displayDrops}
               controlsStyle={gift.controlsStyle}
               surfaceStyle={gift.surfaceStyle}
+              // R-N3.6. FALSE, and structurally rather than by preference:
+              // this panel is a child in ordinary flow inside the ending
+              // block, which is the OTHER arm of the reveal's ternary, so no
+              // entry is mounted at all while it is on screen. Its
+              // destination is `endingTitleRef`, the colophon sentence, which
+              // sits above it in the same flow. Nothing of the story is under
+              // this surface, so the line stays and Settle counts as ruled.
+              subjectBeneath={false}
               originRef={giftOrigin}
               selected={sendAmount}
               onSelect={handleSelectPreset}
@@ -818,6 +826,16 @@ export const PackageOpenScreen = ({ navigation, route }) => {
             displayDrops={gift.displayDrops}
             controlsStyle={gift.controlsStyle}
             surfaceStyle={gift.surfaceStyle}
+            // R-N3.6. TRUE, and this is the mount the ruling was written
+            // for. `sendOverlay` is `StyleSheet.absoluteFill`, so this panel
+            // is drawn OVER the reveal rather than beside it, and its
+            // destination is `entryPaperRef`, the paper block of the very
+            // sentence being thanked, directly underneath. The subject is
+            // beneath the surface here by construction, so nothing of the
+            // surface stays. Not conditioned on how tall the entry is: the
+            // structure is the same on every entry and one behaviour per
+            // mount is the rule.
+            subjectBeneath={true}
             originRef={giftOrigin}
             selected={sendAmount}
             onSelect={handleSelectPreset}

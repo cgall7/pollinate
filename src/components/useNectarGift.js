@@ -78,8 +78,9 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
   // overlay itself stays mounted. The drop flies over the entry it is for,
   // not over a dimmed copy of it.
   const scrim = useRef(new Animated.Value(1)).current;
-  // The panel's controls. Not the balance line — see `useNectarGift`'s
-  // consumer and the deviation noted there.
+  // The panel's controls, and since R-N3.6 the balance line at the one mount
+  // that yields it. The panel decides which mounts those are; this value only
+  // knows it is the Gather clock. See NectarSendPanel's R-N3.6 block.
   //
   // R-N3.4 — ONE VALUE DRIVES BOTH THE CONTROLS AND THE CARD'S GROUND. The
   // ruling puts the card body on the Gather clock the controls already ride,
@@ -239,9 +240,17 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
         // NOT a new surface (R-N3.0 forbids that) and it is not the Gather
         // clock either: there is no travel to keep out of the way of here,
         // so the yield is paced by the mandate rather than by a beat that
-        // does not run. The balance line is outside this fade at both mounts
-        // and the count is deliberately not gated on `reduced` (§5), so the
-        // one thing left to watch is the one thing RM must not remove.
+        // does not run.
+        //
+        // R-N3.6 CORRECTS WHAT THIS PARAGRAPH USED TO CLAIM. It said the
+        // balance line sits outside this fade at both mounts; the line now
+        // rides `controls` at the entry mount, so RM yields it there exactly
+        // as full motion does. That is the ruling's own scoping and it costs
+        // no information: the count is still not gated on `reduced` (§5), it
+        // runs on the animated value wherever that value is painted, and the
+        // balance re-enters at its settled figure with the next `arm`. RM
+        // moves the driver, never the hookup, so there is one behaviour per
+        // mount rather than one per accessibility setting.
         Animated.parallel([
           Animated.timing(controls, {
             toValue: 0,
