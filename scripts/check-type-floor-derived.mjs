@@ -254,11 +254,50 @@ const failures = [];
 
 for (const s of sites) {
   const loc = `${rel(s.file)}:${s.line}`;
-  if (!s.owner) {
-    fail += 1;
-    failures.push(`${loc} — \`fontSize: ${s.propName} * ${s.multiplier}\` has no enclosing component this gate recognises`);
+
+  // A MODULE CONSTANT IS NOT A PROP, AND ITS RANGE IS ONE VALUE.
+  //
+  // Added 2026-09-05 (R-NT): the nectar tab's hero vessel derives its "You"
+  // glyph from `HERO_CELL_SIZE * 0.42` — the same ratio the comb cell uses,
+  // which is the point, since `honeyHMax` clears that glyph's line box. But
+  // `HERO_CELL_SIZE` is a file-scope const, not a prop threaded from a call
+  // site, so the prop path below had nothing to enumerate and this site read
+  // as unverifiable.
+  //
+  // It is not unverifiable, it was unmodelled — a distinction this gate's own
+  // header makes about the opposite case ("unreadable is not the same as
+  // passing"). A constant has exactly one value, so the minimum IS that value
+  // and there is no call-site search to do. `localConst` is the resolver the
+  // gate already trusts for a prop's own initialiser, reused unchanged, and
+  // an unresolvable name still fails closed on the line below.
+  //
+  // ORDERED AFTER THE PROP TEST so a prop and a same-named module const can
+  // never be confused: the prop path wins whenever the identifier appears in
+  // the enclosing component's own destructure.
+  const isProp = Boolean(s.owner) && new RegExp(`\\b${s.propName}\\b`).test(s.owner.propsText);
+  // Recorded so the green report can say WHICH resolver answered. Without it
+  // a const site prints under whichever component `enclosingComponent`
+  // happened to attribute it to — a name it is not a prop of, which is a
+  // wrong sentence in a passing line.
+  s.resolvedAs = isProp ? 'prop' : 'const';
+  if (!isProp) {
+    const asConst = localConst(fileText.get(s.file), s.propName);
+    if (asConst === null) {
+      fail += 1;
+      failures.push(`${loc} — \`fontSize: ${s.propName} * ${s.multiplier}\` is neither a prop of ` +
+        `${s.owner ? s.owner.name : 'any component this gate recognises'} nor a numeric const in this file`);
+      continue;
+    }
+    const size = asConst * s.multiplier;
+    if (size < FLOOR) {
+      fail += 1;
+      failures.push(`${loc} — ${s.propName} is the constant ${asConst} → fontSize ${size} (floor is ${FLOOR})`);
+    } else {
+      pass += 1;
+    }
     continue;
   }
+
   const ownDefault = propDefault(s.owner.propsText, s.propName);
   const result = resolveDerived(s.owner.name, s.propName, ownDefault);
 
@@ -285,7 +324,8 @@ if (sites.length === 0) {
   console.log('Below floor or unverifiable:');
   failures.forEach((f) => console.log(`  FAIL ${f}`));
 } else {
-  sites.forEach((s) => console.log(`  ok   ${rel(s.file)}:${s.line} — ${s.owner.name}.${s.propName} * ${s.multiplier}`));
+  sites.forEach((s) => console.log(`  ok   ${rel(s.file)}:${s.line} — ` +
+    `${s.resolvedAs === 'prop' ? `${s.owner.name}.` : 'const '}${s.propName} * ${s.multiplier}`));
 }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

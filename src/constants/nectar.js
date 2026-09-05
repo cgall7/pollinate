@@ -99,8 +99,45 @@ export const NECTAR_CONSENT_GUARD = 'nectarConsent';
 // body and passes with it. The two conditions were being read as one.
 export const NECTAR_CONSENT_SHEET_GUARD = 'nectarConsentSheetOpen';
 
-// THE WORD RESERVE. Money words that may not be rendered outside EITHER guard
-// above (`nectarConsent`, or the consent sheet's own closed-by-default state).
+// THE THIRD GUARD, AND IT EXISTS BECAUSE THE NECTAR TAB'S PRE-CONSENT STATE
+// IS A WHOLE SCREEN RATHER THAN A SHEET.
+//
+// R-NT-4 as amended (GUIDES/POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md, Lumen,
+// 2026-09-05; UX Design thread 160660d9) puts the full explainer on the tab
+// before consent: a headline, a body naming the starter grant, and a CTA that
+// opens the sheet above. That copy carries reserve words and is BY
+// CONSTRUCTION not under a positive `nectarConsent` — measured rather than
+// predicted, on a four-arm probe run at 9b6ebed and reproduced by Sage:
+// `{!nectarConsent && …}`, `{nectarUnconsented && …}` with the name
+// undeclared, and a ternary's alternate arm all RED; `{nectarConsent && …}`
+// greens. `isUnderGuard` requires a BARE Identifier at each of its two
+// recognised positions, so a negation is invisible to it by construction and
+// not by bug.
+//
+// So this is a third POSITIVE-POLARITY name in the same rule, exactly as the
+// sheet guard was a second: the walker is untouched, and what the app writes
+// is the name rather than the negation.
+//
+// AND THE NAME HAS TO BE EARNED, because `!hasNectarConsent(row)` is false
+// for a row that has not arrived yet as well as for a person who said no.
+// Two separate things certify it, and NEITHER ALONE WOULD:
+//
+//   POLARITY, by the gate. `GUARD_AUTHORITY` requires this binding to
+//   initialise from `!hasNectarConsent(…)` with the negation outermost —
+//   Sage's fix, and it is load-bearing: the pre-existing clause checks only
+//   that the call appears somewhere in the initialiser, so reusing it here
+//   would certify the CONSENTED boolean under the unconsented name.
+//
+//   RESOLUTION, by the screen. The binding cannot know whether the read has
+//   landed; `unknown` and `no` are the same value in it. So the guarded
+//   subtree sits under the screen's own settled-read ancestor, and until that
+//   is true the tab renders neither state (§23.1 — empty is a positive claim,
+//   and so is "you have not turned this on").
+export const NECTAR_UNCONSENTED_GUARD = 'nectarUnconsented';
+
+// THE WORD RESERVE. Money words that may not be rendered outside ONE OF THE
+// THREE guards above (`nectarConsent`; the consent sheet's own closed-by-
+// default state; or the tab's resolved no).
 //
 // Each of these is measured against this tree, not assumed. Over the 1025
 // rendered strings App.js + src/**/*.js hold at 35194bd (re-measured after

@@ -7,6 +7,7 @@ import { SPRINGS } from '../constants/motion';
 import { TodayTab } from '../screens/TodayTab';
 import { RecapTab } from '../screens/RecapTab';
 import { HoneycombTab } from '../screens/HoneycombTab';
+import { NectarTab } from '../screens/NectarTab';
 import { TabBarButton } from './TabBarButton';
 import { AccountDoor } from './AccountDoor';
 import { GlassBackground, useReduceTransparency } from './GlassBackground';
@@ -15,14 +16,25 @@ import { SIDE_INSET, BAR_HEIGHT, BAR_BOTTOM, DOOR_END_INSET, DOOR_TOP_GAP } from
 const Tab = createBottomTabNavigator();
 
 
-// DES-27 (Pixel, 2026-08-26, Project 22 Slice 1): the bar is Today | Hive |
-// Garden — the Wallet shell retires (it was never more than a "Coming Soon"
-// placeholder, Project 10) and the capsule goes back to being symmetric.
-// This is the only tab-name mapping left from Project 10's rename:
+// DES-27 (Pixel, 2026-08-26, Project 22 Slice 1): the bar was Today | Hive |
+// Garden — the Wallet shell retired (it was never more than a "Coming Soon"
+// placeholder, Project 10) and the capsule went back to being symmetric.
+//
+// R-NT-1 (Lumen, 2026-09-05, POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 3):
+// FOUR icons now — Today | Hive | Nectar | Garden. Nectar is a tab and not a
+// room on the Hive because Colin looked at the shipped header and could not
+// find nectar at all; the owner failing to locate a surface is the legibility
+// verdict on its placement. Today stays FIRST: landing trains writing, not
+// checking. The old "centre slot = focal" note was an artifact of a 3-dock
+// and dies with it.
+//
+// The tab-name mappings left from Project 10's rename:
 //
 //   Honeycomb -> Hive    same screen, the ruling's name for it.
 //   Recap     -> Garden  Garden is "where you reflect"; Recap is what it
 //                        opens on, and Wrapped moved inside it (below).
+//
+// Nectar needs no mapping: R-NT names the tab Nectar and the route is Nectar.
 //
 // Every glyph name below was checked against the installed glyphmaps
 // (@expo/vector-icons .../glyphmaps/{Ionicons,MaterialCommunityIcons}.json)
@@ -30,6 +42,17 @@ const Tab = createBottomTabNavigator();
 const TAB_ICONS = {
   Today: { active: 'sunny', inactive: 'sunny-outline' },
   Hive: { active: 'hexagon-multiple', inactive: 'hexagon-multiple-outline', set: MaterialCommunityIcons },
+  // R-NT-2 amendment: the DROP, not a hexagon and not a jar. The hexagon is
+  // Honeycomb's glyph and the vessel on the tab itself is the own cell drawn
+  // large, so the dock mark is the object a gift is made of.
+  //
+  // R-NT-6: no numeral, no badge, ever.
+  Nectar: { active: 'water', inactive: 'water-outline' },
+  // R-NT's mock drew Garden outline in both states; NOT ADOPTED. A mock does
+  // not retune a shipped term, and the filled `flower` on active is what every
+  // other tab's active glyph does. Pixel's observation that the petal disc
+  // reads heavier than the other three active glyphs is logged for Colin's
+  // device eye, not acted on here.
   Garden: { active: 'flower', inactive: 'flower-outline' },
 };
 
@@ -106,14 +129,17 @@ export const MainTabs = () => {
         tabBarIcon: ({ focused }) => <TabIcon routeName={route.name} focused={focused} />,
       })}
     >
-      {/* All three are direct children on purpose. Every screen below holds
-          at least one `getParent()?.navigate(...)`, which resolves to the
-          root stack only from this depth — Today→Lock, Hive→Seeds/Notes/
-          Onboarding, Garden→Wrapped.
+      {/* All four are direct children on purpose. The screens below that call
+          `getParent()?.navigate(...)` resolve to the root stack only from this
+          depth — Today→Input, Hive→Notes/Onboarding, Garden→Wrapped.
           Insert a navigator and those calls find no route and do nothing,
-          silently. Enforced, not documented: `npm run check:nav-depth`. */}
+          silently. Enforced, not documented: `npm run check:nav-depth`.
+          (Nectar makes no such call — R-NT-5's amendment holds the give door
+          back until a destination is ruled — so it is a direct child for
+          consistency and for the day it does.) */}
       <Tab.Screen name="Today" component={TodayTab} />
       <Tab.Screen name="Hive" component={HoneycombTab} />
+      <Tab.Screen name="Nectar" component={NectarTab} />
       {/* Garden's landing content is Recap — the ruling's solo-user
           description of this tab ("your entries, streak, monthly recap") is
           RecapTab's contents line for line. The file keeps its name because

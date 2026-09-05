@@ -132,6 +132,7 @@ import {
   NECTAR_RESERVE,
   NECTAR_STARTER_GRANT_DROPS,
   NECTAR_SURFACES,
+  NECTAR_UNCONSENTED_GUARD,
   hasNectarConsent,
 } from '../src/constants/nectar.js';
 
@@ -244,19 +245,37 @@ check(
   []
 );
 
-// TWO GUARDS, NOT AN EXEMPTION LIST. `nectarConsent` covers every surface that
-// exists once the user has a wallet; the sheet guard covers the one surface
-// whose entire audience is users who do not. Both are POSITIVE-POLARITY names,
-// so isUnderGuard reads them with no change to the walker — the carve-out is a
-// second name in the same rule, not a second rule.
-const GUARDS = [NECTAR_CONSENT_GUARD, NECTAR_CONSENT_SHEET_GUARD];
+// THREE GUARDS, NOT AN EXEMPTION LIST. `nectarConsent` covers every surface
+// that exists once the user has a wallet; the sheet guard covers the one
+// surface whose entire audience is users who do not; and `nectarUnconsented`
+// (R-NT-4, 2026-09-05) covers the nectar tab's pre-consent state, which is a
+// whole screen rather than a sheet. All three are POSITIVE-POLARITY names, so
+// isUnderGuard reads them with no change to the walker — each carve-out is
+// another name in the same rule, not another rule.
+//
+// AND THE SET IS SPLIT, BECAUSE ONE ARRAY WAS ANSWERING TWO QUESTIONS. The
+// list below used to be a single `GUARDS`, read by B4 (may this WORD render
+// here?) and by `callAuthority` (may this QUERY run here?). Those questions
+// have different right answers for the new name: the pre-consent explainer is
+// exactly where the money words belong, and it is exactly where a reserved
+// QUERY must never run — a nectar read authorised by "this person has not
+// consented" is the DES-28 prohibition with a licence stapled to it. So
+// adding the third name to the shared array would have widened E2 silently
+// while B4 was the only row anyone was looking at.
+//
+// Nothing observable moves today: the pre-consent branch makes no reserved
+// query, and E2's own header says its value has always been being correct
+// before the first site is written. QUERY_GUARDS' membership is therefore
+// UNCHANGED, and that is the point of writing it down as its own name.
+const RENDER_GUARDS = [NECTAR_CONSENT_GUARD, NECTAR_CONSENT_SHEET_GUARD, NECTAR_UNCONSENTED_GUARD];
+const QUERY_GUARDS = [NECTAR_CONSENT_GUARD, NECTAR_CONSENT_SHEET_GUARD];
 const reserveHits = allStrings.filter((s) => matchesReserve(s.value));
 const unguardable = reserveHits.filter((s) => !GUARDABLE.has(s.position));
 const unguarded = reserveHits.filter(
-  (s) => GUARDABLE.has(s.position) && !GUARDS.some((g) => isUnderGuard(s.ancestors, g))
+  (s) => GUARDABLE.has(s.position) && !RENDER_GUARDS.some((g) => isUnderGuard(s.ancestors, g))
 );
 check(
-  `B4 every rendered money word sits under one of the guards (${GUARDS.join(' | ')})`,
+  `B4 every rendered money word sits under one of the guards (${RENDER_GUARDS.join(' | ')})`,
   unguarded.map((s) => `${s.rel}:${s.line} ${JSON.stringify(s.value)}`),
   []
 );
@@ -310,8 +329,8 @@ check(
 //
 // ZERO FEEDERS IS DELIBERATELY LEGAL. A component that receives a guard prop
 // nothing passes holds `undefined`, which is falsy, so its copy does not
-// render — the failure is dead code, not exposed money words. Both guard names
-// fail in the safe direction on absence, which is the same property C1 pins
+// render — the failure is dead code, not exposed money words. Every guard name
+// fails in the safe direction on absence, which is the same property C1 pins
 // for the predicate itself.
 const GUARD_AUTHORITY = {
   [NECTAR_CONSENT_GUARD]: {
@@ -341,6 +360,51 @@ const GUARD_AUTHORITY = {
       const arg = init.arguments[0];
       // No argument at all is `undefined`, which is falsy and therefore closed.
       return arg === undefined || (arg.type === 'BooleanLiteral' && arg.value === false);
+    },
+  },
+  // THE RESOLVED NO, AND THE CLAUSE IS NOT THE FIRST ONE REUSED.
+  //
+  // Sage's fix (2026-09-05, thread 160660d9), and it is load-bearing rather
+  // than tidy. `NECTAR_CONSENT_GUARD`'s clause above asks only whether a
+  // `hasNectarConsent` call appears ANYWHERE in the initialiser subtree —
+  // correct for a name that means the consented boolean, and exactly wrong
+  // here: reused verbatim, `const nectarUnconsented = hasNectarConsent(row)`
+  // would pass B7 while holding the CONSENTED value under the UNCONSENTED
+  // name, and the gate would be stamping the wrong value as authorised.
+  //
+  // So the shape is pinned rather than searched for: the initialiser IS a `!`
+  // UnaryExpression, its argument holds exactly one `hasNectarConsent` call,
+  // and it holds no further negation. `!!hasNectarConsent(row)` is the
+  // consented boolean wearing two marks and reds here, which a
+  // count-the-negations-anywhere test would have passed.
+  //
+  // COMPARISON FORMS ARE NOT PRE-APPROVED. `=== false` and `!== true` were
+  // offered and Lumen ruled them out until a legitimate site appears: zero
+  // occur on this tree, and the convention this file already runs on
+  // (isUnderGuard's own comment, the cannot-tell-fails paragraph above) is to
+  // extend the recogniser against the comment when a real case shows up
+  // rather than to license shapes nothing writes.
+  //
+  // WHAT THIS CLAUSE DOES NOT CERTIFY: that the read has landed. The binding
+  // cannot know — `hasNectarConsent(null)` is false for "not yet" and for
+  // "no" alike (C1 makes that collapse deliberate). Resolution is the
+  // screen's half: the guarded subtree sits under its own settled-read
+  // ancestor. Named here so the name is not read as claiming both.
+  [NECTAR_UNCONSENTED_GUARD]: {
+    describe: 'initialised from !hasNectarConsent(…) (the negation outermost, and single)',
+    ok: (init) => {
+      if (!init || init.type !== 'UnaryExpression' || init.operator !== '!') return false;
+      let calls = 0;
+      let negations = 0;
+      walkWithAncestry(init.argument, (n) => {
+        if (n.type === 'UnaryExpression' && n.operator === '!') negations += 1;
+        if (
+          n.type === 'CallExpression' &&
+          n.callee.type === 'Identifier' &&
+          n.callee.name === 'hasNectarConsent'
+        ) calls += 1;
+      });
+      return calls === 1 && negations === 0;
     },
   },
 };
@@ -452,7 +516,16 @@ check(
   `B9 the consent sheet's open state (\`${NECTAR_CONSENT_SHEET_GUARD}\`) is rooted only in declared bootstrap hosts`,
   (() => {
     const doors = roots.filter((b) => b.name === NECTAR_CONSENT_SHEET_GUARD);
-    const allowed = new Set(['src/screens/PackageOpen.js', 'src/screens/CombNectarCompose.js']);
+    // R-NT: the tab's `Turn on gifts` is the THIRD sheet door, and it is a
+    // door and not a switch — Sage's 2026-08-26 bootstrap ruling, restated in
+    // the R-NT build rulings. Only the sheet's affirmative fires
+    // consent_to_nectar(), because the first call irreversibly mints the
+    // starter grant.
+    const allowed = new Set([
+      'src/screens/PackageOpen.js',
+      'src/screens/CombNectarCompose.js',
+      'src/screens/NectarTab.js',
+    ]);
     const actual = new Set(doors.map((b) => b.rel));
     const unexpected = doors.filter((b) => !allowed.has(b.rel)).map((b) => b.at);
     const missing = [...allowed].filter((rel) => !actual.has(rel)).map((rel) => `${rel}: missing consent-sheet root`);
@@ -732,7 +805,7 @@ check('D6 nothing in the app imports NECTAR_SURFACES (the exclusion in A1a holds
 // argument to `.from(...)` or `.rpc(...)` — see SeedsStore.js, NotesStore.js,
 // HiveStore.js, all of which use exactly that shape. So E asks the same
 // question B4 asks, one layer earlier: does a string literal naming a nectar
-// data object sit under one of the two guards, regardless of what it would
+// data object sit under one of the QUERY guards, regardless of what it would
 // go on to render.
 //
 // ENUMERATED FROM THE MIGRATIONS IN TREE, same shape as C4 and for the same
@@ -1143,14 +1216,14 @@ const findStoreMethodCallers = (universe, binding, method) => {
 // original three-arm behaviour, which is what the arm-(1)/(2) calibration
 // probes rely on to stay a test of arms (1) and (2).
 const callAuthority = (hit, ast, universe = null, depth = 0) => {
-  if (GUARDS.some((g) => isUnderGuard(hit.ancestors, g))) return 'guarded';
-  if (GUARDS.some((g) => isUnderEffectGuard(hit.ancestors, g))) return 'guarded';
+  if (QUERY_GUARDS.some((g) => isUnderGuard(hit.ancestors, g))) return 'guarded';
+  if (QUERY_GUARDS.some((g) => isUnderEffectGuard(hit.ancestors, g))) return 'guarded';
   const handlerName = findEnclosingHandlerName(hit.ancestors);
   if (handlerName) {
     const refs = findHandlerReferences(ast, handlerName);
     const wiring = refs.filter((r) => r.kind === 'jsx-wiring');
     if (wiring.length > 0) {
-      if (!wiring.every((w) => GUARDS.some((g) => isUnderGuard(w.ancestors, g)))) return 'unguarded';
+      if (!wiring.every((w) => QUERY_GUARDS.some((g) => isUnderGuard(w.ancestors, g)))) return 'unguarded';
       // THE EXCLUSIVITY CLAUSE. Every wiring is guarded; authority is
       // inherited only if no OTHER reference to this handler exists in this
       // file. See the block above `classifyReference` for the licence list
@@ -1460,7 +1533,7 @@ for (const { rel, ast } of parsed) {
 }
 const unguardedQueries = queryHits.filter((h) => callAuthority(h, h.ast, parsed) !== 'guarded');
 check(
-  `E2 every non-bootstrap query naming a reserved nectar identifier is authorised by a rendered guard (${GUARDS.join(' | ')})`,
+  `E2 every non-bootstrap query naming a reserved nectar identifier is authorised by a rendered guard (${QUERY_GUARDS.join(' | ')})`,
   unguardedQueries.map((h) => `${h.rel}:${h.line} ${h.name} [${callAuthority(h, h.ast, parsed)}]`),
   []
 );

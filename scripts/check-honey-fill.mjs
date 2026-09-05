@@ -534,15 +534,25 @@ if (selectionVsBloom >= 10 && retained >= 0.65) {
 
   // Find HoneyFill by DECLARATION, never by a name+position lookup into the
   // text — a nested lookalike is what makes that fall through.
+  //
+  // AN `export` WRAPPER IS UNWRAPPED FIRST, added 2026-09-05 (R-NT): the
+  // component became `export const HoneyFill` when the nectar tab needed the
+  // same painter for its hero vessel, and a `const`-only scan reads an
+  // ExportNamedDeclaration as absent. This row's own failure text is the
+  // reason that mattered rather than merely annoyed — it says the row CANNOT
+  // BE CHECKED, which is not the same as it holding, so the gate reported
+  // honestly and the fix belongs in the extractor. The measurement below is
+  // untouched: the same declarator, the same three assertions.
   let honeyFillNode = null;
-  for (const node of ast.program.body) {
+  for (const top of ast.program.body) {
+    const node = top.type === 'ExportNamedDeclaration' && top.declaration ? top.declaration : top;
     if (node.type !== 'VariableDeclaration') continue;
     for (const d of node.declarations) {
       if (d.id.type === 'Identifier' && d.id.name === 'HoneyFill') honeyFillNode = d.init;
     }
   }
   if (!honeyFillNode) {
-    bad('HoneyFill declaration', 'no top-level `const HoneyFill = …` in HoneycombGrid.js — R-N2 row 2 cannot be checked, which is not the same as it holding');
+    bad('HoneyFill declaration', 'no top-level `const HoneyFill = …` (exported or not) in HoneycombGrid.js — R-N2 row 2 cannot be checked, which is not the same as it holding');
   } else {
     const body = gridSource.slice(honeyFillNode.start, honeyFillNode.end);
 

@@ -154,7 +154,13 @@ const BloomLight = ({ size, reduced }) => {
 // on washSky) and §6.5(a) (a photo-backed own cell needs the same backing,
 // drawn above the photo, not the unconditional `surface` polygon at the
 // bottom of the stack, which sits BENEATH the photo).
-const HoneyFill = ({ size, level, reduced }) => {
+//
+// EXPORTED for R-NT's nectar tab, which draws this same own cell large as the
+// balance's vessel (R-NT-2 amendment: the app has exactly one vessel for this
+// quantity, so a second painter would be a second vessel). It renders SVG
+// primitives and therefore needs an `<Svg>` ancestor — the tab supplies one,
+// with the same padded canvas and the same paint order the cell uses here.
+export const HoneyFill = ({ size, level, reduced }) => {
   const target = honeyHeightForLevel(size, level);
   // THE HEIGHT IS ANIMATED FROM THE PREVIOUS ONE AND NEVER RENDERED AT THE
   // NEW ONE — R-N2's load-bearing clause, and the whole reason the ladder
