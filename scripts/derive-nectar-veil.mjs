@@ -4,9 +4,16 @@
 // NOT a gate — `run-checks.mjs` enumerates `scripts/check-*.mjs` and this is
 // deliberately not one, exactly as `derive-spotlight-dim.mjs` is not one. It is
 // the REPRODUCTION for the table published in the channel and in
-// GUIDES/POLLINATE_NECTAR_LIVING_EXCHANGE.md. Every input is read out of
-// src/constants/theme.js and src/constants/hiveThemes.js source; nothing typed
-// twice, so this file cannot drift from the tokens it reasons about.
+// POLLINATE_NECTAR_LIVING_EXCHANGE.md (Lumen, design workspace).
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
+//
+// Every input is read out of src/constants/theme.js and
+// src/constants/hiveThemes.js source; nothing typed twice, so this file cannot
+// drift from the tokens it reasons about.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';

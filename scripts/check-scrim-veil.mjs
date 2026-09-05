@@ -36,7 +36,8 @@
 // ruling's named mechanism is a floor, not a ceiling, and that saying so in
 // the file is what makes the measurement canon.
 //
-// SIX ROWS, and the split is one census, three properties, two controls.
+// SEVEN ASSERTIONS ACROSS SIX LETTERED ROWS, and the split is two guards on
+// the population, four properties, one control row.
 //
 //   G1  universe    Files walked, all parsed, the token found, its consumer
 //                   set non-empty, every consumer resolvable to a declared
@@ -55,13 +56,24 @@
 //                   page stays at least as far from a spotlight-dimmed page
 //                   as theme.js publishes. This is the row that forbids the
 //                   obvious fix, so it is the one most worth keeping.
+//   G4b card        The second half of the same bar, pointed the other way:
+//                   the modal card stays at least as far from the page it
+//                   makes inert as it was before the re-solve. G4 stops the
+//                   veil converging with a token it must differ from; G4b
+//                   stops it going light enough to flatten the modal.
 //   G5  legibility  R-N3.2's backed drop clears 16.4244 from every ground it
 //                   crosses, scrimmed covers included. Held, per the ruling.
-//   G6  controls    Three mutate-backs built out of the real tokens: the
-//                   shipped 0.4 must red G3 on washSky, an amber veil must red
-//                   G4, and a veil at the ruled floor exactly must not read as
-//                   passing. A classifier that cannot go red has not been
-//                   shown to be measuring anything.
+//   G6  controls    Three resolvers rebuilt out of the real tokens, covering
+//                   three rows with two candidate veils: the shipped 0.4 must
+//                   red G3 on washSky, and the amber candidate must red G4 and
+//                   red G5, which is why it is two candidates and not three.
+//                   A classifier that cannot go red has not been shown to be
+//                   measuring anything. G1, G2 and G4b have NO resolver here,
+//                   stated as the gap it is rather than explained away: G1 and
+//                   G2 carry their own in-row guards, and G4b has only been
+//                   observed to red alongside G4 under both mutations run
+//                   against this gate, which is evidence and not a mechanism.
+//                   A resolver that reds G4b while G4 holds is owed.
 //
 // NO ROW HERE HOLDS THE CHOSEN ALPHA. The number is a design judgment inside a
 // cleared range and it belongs to the ruling author; the rows hold the
@@ -215,9 +227,13 @@ const groundNames = (name) => (name === '__covers__' ? coverNames : [name]);
 const DECLARED = [...new Set(Object.values(CONSUMER_GROUNDS).flat().flatMap(groundNames))]
   .map((name) => ({ name, hex: pig(name) }));
 
-// The bars theme.js itself publishes, recomputed here from source rather than
-// copied out of a comment. `SPOT_BAR` is the figure the spotlightDim block
-// calls "improved"; a re-solve may raise it and may never lower it.
+// The bars theme.js itself publishes, and these two ARE literals copied out of
+// comments, deliberately and unlike every other figure in this file. They are
+// HISTORICAL floors: `SPOT_BAR` is the figure the spotlightDim block calls
+// "improved" (measured at scrim 0.4) and `CARD_BAR` is this PR's own pre-fix
+// card separation. Recomputing either from the live token would compare the
+// value to itself and the ratchet would hold nothing. A re-solve may raise
+// them and may never lower them, which is the claim the literal encodes.
 const SPOT_BAR = 16.41;
 const CARD_BAR = 27.65;
 

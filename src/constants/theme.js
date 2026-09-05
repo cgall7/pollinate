@@ -216,9 +216,18 @@ const colors = {
   //   room L* on a cell                79.30          79.26   <- held
   //   spotlight dL*, cell ground       17.08          17.12   <- held
   //   ink / inkSoft on the room    9.86 / 3.63    9.85 / 3.63 <- held
-  //   dE00 from `scrim` (page)          9.64          16.41   <- improved
+  //   dE00 from `scrim`@0.4 (page)      9.64          16.41   <- improved
   //   C*                                2.83          28.06   <- the whole point
   //   spotlight dL*, PAGE ground       17.75          16.98   <- the one that moves
+  //
+  // The two `scrim` cells carry their alpha because `scrim` has since moved.
+  // They were measured against `inkVeil`@0.4; R-N3.5 re-solved that token to
+  // @0.55, so the reproduce command below now prints 21.32 and 25.40 for that
+  // row. Nothing here retunes: every other row is scrim-independent and holds
+  // to the printed digit, and the separation this derivation bought grows
+  // rather than shrinks, so `improved` is still the right word for the cell.
+  // The alpha is on the label so the published table and its own reproduction
+  // agree about which measurement they are.
   //
   // Reproduce: `node scripts/derive-spotlight-dim.mjs` — reads this file's own
   // source and composites with `scripts/lib/color.mjs`. Computed from source;

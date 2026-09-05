@@ -1,6 +1,11 @@
-// R-RF-5 (`GUIDES/POLLINATE_RRF5_LANDING_BLOOM_SPEC.md`) and D2
-// (`GUIDES/POLLINATE_D2_LANDING_LETTER_SPEC.md`) — the invite landing's comb
+// R-RF-5 (`POLLINATE_RRF5_LANDING_BLOOM_SPEC.md`) and D2
+// (`POLLINATE_D2_LANDING_LETTER_SPEC.md`) — the invite landing's comb
 // centerpiece and the letter treatment around it.
+//
+// Every spec cited in this file lives in the design workspace, not at
+// any path in this repo; nothing under `GUIDES/` is in this tree, so a
+// bare `GUIDES/...` address opens nothing for whoever reads this file
+// next.
 //
 //   npm run check:comb-bloom
 //
