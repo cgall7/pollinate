@@ -93,10 +93,17 @@ const identifiersIn = (node) => {
 // ======================================================================
 console.log('\nA. Segmentation');
 
-// The corpus is the app's own candidate copy for the two named first
-// adopters, plus the shapes that have historically broken text handling
-// here. Asserted non-empty before it is looped over: run-checks cannot see
-// an empty universe inside a gate, so the gate has to.
+// The corpus is candidate copy for the two named first adopters, plus the
+// shapes that have historically broken text handling here. Asserted non-empty
+// before it is looped over: run-checks cannot see an empty universe inside a
+// gate, so the gate has to.
+//
+// It said "the app's own candidate copy" until 2026-09-05. One member stopped
+// being that: `'Pause.\nThink of someone.'` was the Lock gate's line, and R-OD
+// deleted the gate. It stays in the corpus as a FIXTURE — what A3 needs is a
+// two-line string, not that particular one — and no number here moves. The
+// sentence that claimed provenance for the whole list is what changed, because
+// it had stopped being true of one member.
 const CORPUS = [
   "Good morning, Colin — today's cell is fresh.",
   'Good afternoon, Colin. The hive hums along.',
@@ -141,7 +148,8 @@ if (CORPUS.length > 0) {
 // A3 — THE STRUCTURAL ROW. A hard line break in the copy must survive word
 // grain. Without `breakBefore`, 'Pause.\nThink of someone.' renders as one
 // run-on row: the author's structure deleted by a rendering choice, and
-// invisible to every other assertion here.
+// invisible to every other assertion here. (That string is the retired Lock
+// gate's copy, kept as the worked example; the row is about any hard break.)
 {
   const segs = segmentText('Pause.\nThink of someone.', GRAINS.WORD);
   const breaks = segs.map((s, i) => (s.breakBefore ? i : -1)).filter((i) => i >= 0);

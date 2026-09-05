@@ -176,18 +176,27 @@ const thirdArgIsRealConnectionsCheck =
 check('the call site\'s third argument is `connections.length > 0` (real data, not a literal)', thirdArgIsRealConnectionsCheck, true);
 
 // ============================================================================
-// SITE 2 — CoreRitual.js: "Load demo data" retires at a real journal entry
+// SITE 2 — TodayTab.js: "Load demo data" retires at a real journal entry
 // ============================================================================
-const ritualAst = await parseFile('src/screens/CoreRitual.js');
+//
+// HOST MOVED 2026-09-05, RULE UNCHANGED. This block read `CoreRitual.js`'s
+// LockScreen until R-OD deleted that gate (Lumen, thread 160660d9,
+// POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 1). She ruled the
+// affordance TRANSPLANTED rather than deleted, onto Today's empty card, with
+// the mechanism moving whole: same DEMO_CONTENT guard, same
+// `getFirstEntryDate` eligibility read, same fail-dormant default. So all ten
+// assertions below move with it, unchanged in kind, and the rule they enforce
+// is the same rule.
+const todayAst = await parseFile('src/screens/TodayTab.js');
 
-const lockScreen = findDeclarator(ritualAst.program, 'LockScreen');
-check('LockScreen is found as a const declarator', Boolean(lockScreen), true);
-const lockBody = lockScreen?.init?.body;
+const todayTab = findDeclarator(todayAst.program, 'TodayTab');
+check('TodayTab is found as a const declarator', Boolean(todayTab), true);
+const hostBody = todayTab?.init?.body;
 
 // useState(false) initialising the eligibility flag, and its setter name.
 let eligibilityState = null;
-if (lockBody) {
-  walkWithAncestry(lockBody, (node) => {
+if (hostBody) {
+  walkWithAncestry(hostBody, (node) => {
     if (eligibilityState) return;
     if (
       node.type === 'VariableDeclarator' &&
@@ -203,15 +212,33 @@ if (lockBody) {
     }
   });
 }
-check('LockScreen declares a demo-eligibility useState flag', Boolean(eligibilityState), true);
+check('TodayTab declares a demo-eligibility useState flag', Boolean(eligibilityState), true);
 
 // A useEffect whose body calls EntryStore.getFirstEntryDate().
+//
+// SCOPED TO THE EFFECT THAT OWNS THE FLAG, and that scoping is new with the
+// host move. `CoreRitual.js`'s LockScreen had exactly one `useEffect`, so
+// "some effect in this component calls getFirstEntryDate" and "the eligibility
+// effect calls it" were the same sentence there. `TodayTab.js` has several,
+// and one of them — the first-save celebration — already calls
+// `getFirstEntryDate` for its own unrelated reasons. Unscoped, the row would
+// go green on a component whose demo flag never read the journal at all: the
+// witness would be another effect entirely. The population is therefore the
+// effects that touch the eligibility setter, and the claim is about them.
 let effectCallsGetFirstEntryDate = false;
 let effectSetsEligibilityFalseOnRealEntry = false;
-if (lockBody && eligibilityState) {
-  for (const { node: effectCall } of findCalls(lockBody, (callee) => isIdentifierNamed(callee, 'useEffect'))) {
+if (hostBody && eligibilityState) {
+  for (const { node: effectCall } of findCalls(hostBody, (callee) => isIdentifierNamed(callee, 'useEffect'))) {
+    const effectBody = effectCall.arguments[0]?.body ?? { type: 'EmptyStatement' };
+    let touchesEligibilitySetter = false;
+    walkWithAncestry(effectBody, (node) => {
+      if (node.type === 'CallExpression' && isIdentifierNamed(node.callee, eligibilityState.setterName)) {
+        touchesEligibilitySetter = true;
+      }
+    });
+    if (!touchesEligibilitySetter) continue;
     let callsIt = false;
-    walkWithAncestry(effectCall.arguments[0]?.body ?? { type: 'EmptyStatement' }, (node) => {
+    walkWithAncestry(effectBody, (node) => {
       if (node.type === 'CallExpression' && isMemberCallNamed(node.callee, 'EntryStore', 'getFirstEntryDate')) callsIt = true;
     });
     if (callsIt) {
@@ -231,13 +258,13 @@ if (lockBody && eligibilityState) {
     }
   }
 }
-check('LockScreen\'s useEffect calls EntryStore.getFirstEntryDate()', effectCallsGetFirstEntryDate, true);
+check('the eligibility effect calls EntryStore.getFirstEntryDate()', effectCallsGetFirstEntryDate, true);
 check('the eligibility setter is driven by the resolved value, not a literal', effectSetsEligibilityFalseOnRealEntry, true);
 
 // The seed handler must also retire the button immediately on success
 // (not wait for a remount) — a call to the setter with `false` inside
 // handleLoadDemoData's success branch.
-const handleLoadDemoData = lockBody ? findDeclarator(lockBody, 'handleLoadDemoData') : null;
+const handleLoadDemoData = hostBody ? findDeclarator(hostBody, 'handleLoadDemoData') : null;
 let seedSuccessRetiresButton = false;
 if (handleLoadDemoData && eligibilityState) {
   walkWithAncestry(handleLoadDemoData.init, (node) => {
@@ -255,7 +282,7 @@ check('handleLoadDemoData retires the button (`setEligible…(false)`) on a succ
 
 // The rendered button: DEMO_CONTENT && ( eligibilityFlag ? <button> : null )
 let renderedButtonNode = null;
-walkWithAncestry(lockBody ?? { type: 'EmptyStatement' }, (node) => {
+walkWithAncestry(hostBody ?? { type: 'EmptyStatement' }, (node) => {
   if (renderedButtonNode) return;
   if (
     node.type === 'LogicalExpression' &&
@@ -266,7 +293,7 @@ walkWithAncestry(lockBody ?? { type: 'EmptyStatement' }, (node) => {
     renderedButtonNode = node;
   }
 });
-check('LockScreen has a top-level `DEMO_CONTENT && (…)` guard', Boolean(renderedButtonNode), true);
+check('TodayTab has a top-level `DEMO_CONTENT && (…)` guard', Boolean(renderedButtonNode), true);
 
 const rightOfGuard = renderedButtonNode?.right;
 // Parenthesised expressions don't add an AST node, so `right` is the ternary directly.

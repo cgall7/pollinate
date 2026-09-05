@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
@@ -27,6 +27,8 @@ import { PendingCombRow } from '../components/PendingCombRow';
 import { useDaysLeft } from '../components/useDaysLeft';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
+import { DEMO_CONTENT } from '../constants/demoMode';
+import * as Haptics from 'expo-haptics';
 
 // --- P1a, the greeting's staging (Pixel, 2026-08-28) ---------------------
 //
@@ -39,8 +41,9 @@ import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
 // MB-D1's stage light coming up behind him.
 //
 // SIZE, AND IT COSTS NOTHING. 132 is not a compromise between 44 and "bigger"
-// — it is the shipped hero scale (`CoreRitual.js`, `WelcomeBee size={132}`),
-// so the app gains a second hero mount rather than a third bee size. And it
+// — it is the hero scale this staging was measured against: the Lock gate's
+// `WelcomeBee size={132}`, retired with the gate in R-OD. The measurement
+// frame is historical, the number is not. And it
 // sits under the LOD threshold: `MASCOT_BASE_PX / (MASCOT_WIDTH_FRACTION * 3)`
 // = 150.7317, so any integer size <= 150 renders on the base cut at @3x.
 // Above that, `MascotBee` reaches for the hero pair — which the register
@@ -256,6 +259,53 @@ export const TodayTab = ({ navigation, route }) => {
         setOrganizerCombs([]);
       });
   }, []);
+
+  // --- "Load demo data" (transplanted from the Lock gate, R-OD) ----------
+  //
+  // Colin, 2026-08-10: a real button rather than the old hidden five-tap
+  // gesture, seeding 180 days so Wrapped and Recap have something to show.
+  // It lived on `CoreRitual.js`'s LockScreen, which R-OD deletes; Lumen ruled
+  // TRANSPLANT rather than delete (thread 160660d9), because the capability
+  // has a live justification and Today's empty card is the surface a fresh
+  // dev build now opens on. The mechanism below is the gate's, moved whole:
+  // same DEMO_CONTENT guard, same `getFirstEntryDate` eligibility read, same
+  // fail-dormant default.
+  //
+  // FAIL-DORMANT, AND IT IS THE SHAPE NOT THE VALUE. Initial state is `false`
+  // and the `.catch` leaves it false, so an unanswered or failed read renders
+  // nothing: absent is the safe value. It also starts hidden rather than
+  // flashing on for one frame on every genuinely fresh account — a one-tap-late
+  // appearance costs less than a control that appears and vanishes under a
+  // thumb.
+  const [eligibleForDemoData, setEligibleForDemoData] = useState(false);
+
+  useEffect(() => {
+    if (!DEMO_CONTENT) return undefined;
+    let cancelled = false;
+    EntryStore.getFirstEntryDate()
+      .then((firstISO) => {
+        if (!cancelled) setEligibleForDemoData(!firstISO);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLoadDemoData = () => {
+    EntryStore.seedDemoData(180)
+      .then((count) => {
+        setEligibleForDemoData(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Demo data loaded', `Filled the last ${count} days with entries.`);
+      })
+      .catch(() => {
+        // Reworded on transplant: the gate's copy read "went wrong — try
+        // again", and the dash is Colin's standing ban (2026-09-05). Two
+        // sentences say it without one.
+        Alert.alert("Couldn't load demo data", 'Something went wrong. Try again.');
+      });
+  };
 
   // ELIGIBILITY. Runs only when the signal is present, so an ordinary Today
   // mount, a tab switch, a resume and a later save all cost nothing here.
@@ -591,14 +641,56 @@ export const TodayTab = ({ navigation, route }) => {
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>Today's page is blank.</Text>
               <Text style={styles.emptyBody}>
-                One line is enough. Write it, and your day opens.
+                One line is enough.
               </Text>
-              <PrimaryButton onPress={() => navigation.getParent()?.navigate('Lock')}>
+              {/* R-OD-1: straight to Input. The `Lock` interstitial this
+                  used to open is deleted — it asked the user to Begin
+                  something this card had already begun. */}
+              <PrimaryButton onPress={() => navigation.getParent()?.navigate('Input')}>
                 Write today's entry
               </PrimaryButton>
             </View>
           )}
           </PerchAnchor>
+
+          {/* The transplanted seeding link, R-OD, form ruled by Lumen: a quiet
+              inkSoft text link at the caption register, below the empty card's
+              own content, never a button and never gold. That is the register
+              it already shipped in on the gate, so nothing is re-registered
+              here — only the host moved.
+
+              OUTSIDE the `PerchAnchor`, deliberately. `PerchAnchor` measures
+              its own wrapping View, so a second child would grow the
+              `entry-card` perch rect and move where the bee lands. It also
+              keeps the link off the card, which is what makes "below the empty
+              card's own content" and "never adjacent to the write door" both
+              true at once.
+
+              NO `!entry` CLAUSE, and that is a derivation rather than an
+              omission. Eligibility IS `getFirstEntryDate()` returning nothing,
+              so an eligible account has never written an entry and today's
+              card is necessarily the empty one. The single case the derivation
+              does not cover is a SPLIT READ: the journal date resolves and
+              today's entry fails, putting the error card here instead of the
+              empty one. Not impossible, two calls; bounded, because the whole
+              consequence is a caption-size link under an error card in a build
+              that already opted into demo content. Duplicating the branch test
+              here would also break the shape both demo gates read:
+              they require a bare `DEMO_CONTENT` as the guard's left operand
+              and the eligibility flag alone as the nested test. */}
+          {DEMO_CONTENT && (
+            // Nested inside the DEMO_CONTENT guard, not ANDed alongside it at
+            // the top level — check-demo-content-callsites.mjs's isUnderGuard
+            // only recognises a bare `DEMO_CONTENT` as the LogicalExpression's
+            // immediate left operand, and `DEMO_CONTENT && eligibleForDemoData
+            // && (…)` would leave the JSX reading as unguarded to that walker.
+            eligibleForDemoData ? (
+              <PressableScale onPress={handleLoadDemoData} style={styles.demoDataLink}>
+                <Text style={styles.demoDataLinkText}>Load demo data</Text>
+              </PressableScale>
+            ) : null
+          )}
+
           {/* IMMEDIATELY BENEATH the entry that was just persisted, and inside
               index 0 so it settles with the journal card rather than opening a
               cascade step of its own. `entry &&` is not belt and braces: the
@@ -803,6 +895,15 @@ const styles = StyleSheet.create({
     color: theme.colors.inkSoft,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  demoDataLink: {
+    alignSelf: 'center',
+    marginTop: 16,
+  },
+  demoDataLinkText: {
+    ...theme.type.bodySm,
+    color: theme.colors.textSecondary,
+    textDecorationLine: 'underline',
   },
   quoteCard: {
     backgroundColor: theme.colors.surface,

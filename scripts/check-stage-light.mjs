@@ -533,7 +533,8 @@ const renderArms = (name) => {
     bad(
       'E3 the breathing arm is unmoved',
       `the breathing arm is \`${txt}\` and pulse-parks-at-0.5 is ${parksAtMid}. The static repair was scoped to leave ` +
-        'ambient alone; a change here moves CoreRitual and Onboarding, which nothing has ratified.',
+        'ambient alone; a change here moves Onboarding, which nothing has ratified. (CoreRitual was the ' +
+        'second breathing mount until R-OD retired the Lock gate on 2026-09-05; `breathe` now has one consumer.)',
     );
   } else {
     ok('E3 calibration: the breathing arm still spans [intensity x 0.75, intensity] and still parks at pulse 0.5 under Reduce Motion — the repair reaches the static arm and stops there');

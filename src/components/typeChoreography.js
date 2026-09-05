@@ -62,7 +62,8 @@ export const MAX_SEGMENTS = 40;
 //
 // Returns `{ text, breakBefore }[]`. `breakBefore` means "this segment
 // starts a new row" and exists so that a HARD LINE BREAK IN THE COPY
-// SURVIVES WORD GRAIN. Without it, `'Pause.\nThink of someone.'` renders as
+// SURVIVES WORD GRAIN. Without it, `'Pause.\nThink of someone.'` (the Lock
+// gate's line, retired by R-OD; kept here as the worked example) renders as
 // one run-on row: the author's structure silently deleted by a rendering
 // choice. The renderer inserts a full-width spacer, so one flex-wrap
 // container serves both grains and the grain only changes what gets

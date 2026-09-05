@@ -9,7 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { theme } from './src/constants/theme';
 import { fontAssets } from './src/constants/fontAssets';
 import { OnboardingFlow } from './src/screens/Onboarding';
-import { LockScreen, InputScreen } from './src/screens/CoreRitual';
+import { InputScreen } from './src/screens/CoreRitual';
 import { EveningMirror } from './src/screens/EveningMirror';
 import { LegalScreen } from './src/screens/Legal';
 import { AccountScreen } from './src/screens/Account';
@@ -230,15 +230,6 @@ export default function App() {
               )}
             </Stack.Screen>
 
-            <Stack.Screen name="Lock">
-              {(props) => (
-                <LockScreen
-                  {...props}
-                  onOpen={() => props.navigation.navigate('Input')}
-                />
-              )}
-            </Stack.Screen>
-
             <Stack.Screen name="Input">
               {(props) => (
                 <InputScreen
@@ -303,7 +294,7 @@ export default function App() {
 
             {/* Private Hives (8b.2/8b.3, hero — PLANS/Pollinate_Delivery_Slices.md
                 Project 8b). Pushed from Today's hive shelf via getParent(),
-                same as Lock/Input above: a flow you go deeper into, not a
+                same as Input above: a flow you go deeper into, not a
                 utility sheet, so no `presentation: 'modal'`. */}
             <Stack.Screen name="CreateHive" component={CreateHiveFlow} />
             <Stack.Screen name="CreateComb" component={CreateCombScreen} />

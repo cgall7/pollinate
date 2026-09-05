@@ -19,7 +19,7 @@
 //
 //   1. RENDERED-STRING RULE (structural, scales): any rendered string
 //      matching /demo/i must sit inside a DEMO_CONTENT guard. The two
-//      affordances that say the word — CoreRitual's "Load demo data",
+//      affordances that say the word — Today's "Load demo data",
 //      Onboarding's "Skip to the logged-in view (demo)" — are caught by
 //      what they SAY, so the demo affordance somebody adds in November is
 //      covered without anyone registering it, as long as it names itself.
@@ -186,7 +186,7 @@ check('every enumerated file parses', parseFailures, []);
 //   alert     handler-bound. The Alert call sits beside the JSX, never
 //             inside the wrapper. Measured at b5e7754 over this gate's own
 //             universe: 4 /demo/i hits in `alert`, all 4 unguarded, and 2
-//             of them false — CoreRitual's "Demo data loaded" and
+//             of them false — Today's "Demo data loaded" and
 //             "Couldn't load demo data" are the success and failure copy
 //             of a seeding button that IS correctly gated. (Sage measured
 //             3 before DevVersionTag gained a second alert string; the
@@ -262,8 +262,12 @@ const unguardedDemoStrings = demoStrings
 check(`every rendered string matching /demo/i is inside a ${FLAG} guard`, unguardedDemoStrings, []);
 
 // Walker controls — a broken extractor must not read as "no violations".
-check('walker control: finds "Load demo data" in CoreRitual.js',
-  demoStrings.some((s) => s.rel === 'src/screens/CoreRitual.js' && s.value === 'Load demo data'), true);
+// Host moved 2026-09-05: R-OD deleted `CoreRitual.js`'s Lock gate and Lumen
+// ruled the affordance transplanted to Today's empty card. The control follows
+// the string, because a control that names a file the string has left stops
+// being a calibration witness and starts being a second way to go red.
+check('walker control: finds "Load demo data" in TodayTab.js',
+  demoStrings.some((s) => s.rel === 'src/screens/TodayTab.js' && s.value === 'Load demo data'), true);
 check('walker control: finds the skip-demo link string in Onboarding.js',
   demoStrings.some((s) => s.rel === 'src/screens/Onboarding.js' && /skip to the logged-in view/i.test(s.value)), true);
 

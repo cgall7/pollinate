@@ -6,11 +6,12 @@
 //
 // WHY THIS EXISTS
 //
-// Six call sites do `navigation.getParent()?.navigate('Seeds' | 'Notes' |
-// 'Onboarding' | 'Lock' | 'Wrapped')`. They work because their screens are
-// direct `<Tab.Screen>` children of the one tab navigator, which is itself a
-// direct `<Stack.Screen>` of the root stack — so `getParent()` IS the root
-// stack, which is where those routes live.
+// Screens inside the tab navigator reach root-stack routes with
+// `navigation.getParent()?.navigate(…)` — `'Seeds'`, `'Notes'`,
+// `'Onboarding'`, `'Input'`, `'Wrapped'` and others. They work because their
+// screens are direct `<Tab.Screen>` children of the one tab navigator, which
+// is itself a direct `<Stack.Screen>` of the root stack — so `getParent()` IS
+// the root stack, which is where those routes live.
 //
 // Put one navigator in between and `getParent()` returns the *tab* navigator
 // instead. It is non-null, so `?.` does not save you: `.navigate('Seeds')`

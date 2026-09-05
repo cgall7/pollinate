@@ -993,9 +993,11 @@ console.log('\nE. One bee');
   //    "Is this the mascot" is answered by REACHABILITY, not by a list. The
   //    two components that draw `mascot-*.png` seed the set; anything whose
   //    own file renders a member joins it, to a fixpoint. So a wrapper that
-  //    adds a rhythm to the mascot (`WelcomeBee`, the 132pt held pose) passes
-  //    by construction, and a new bee that draws its own shapes fails by
-  //    construction — neither needs an entry anywhere.
+  //    adds a rhythm to the mascot passes by construction, and a new bee that
+  //    draws its own shapes fails by construction — neither needs an entry
+  //    anywhere. (The worked example was `WelcomeBee`, the 132pt held pose,
+  //    until R-OD deleted it on 2026-09-05. It left the set the same way it
+  //    joined: by construction, with no edit here. That is the property.)
   //
   //    A hardcoded permitted-set is the version of this row that has the hole
   //    it exists to close: the first draft was one, and adding `WelcomeBee` to
@@ -1013,9 +1015,10 @@ console.log('\nE. One bee');
   //        mascot somewhere in its file." A component that draws its own bee
   //        on one branch and delegates to `MascotBee` on another satisfied
   //        that and passed — verified, it goes green. And that is not a
-  //        hypothetical shape: it is `WelcomeBee` as it stood this morning,
+  //        hypothetical shape: it was `WelcomeBee` as it stood on 2026-09-02,
   //        one `<MascotBee>` away from being invisible to the row written to
-  //        find it. So a wrapper joins only if it renders a member AND draws
+  //        find it. (That component is deleted; the shape it demonstrated is
+  //        what the row measures, and the row is unchanged.) So a wrapper joins only if it renders a member AND draws
   //        no vectors of its own. Scope stated plainly: "draws its own" means
   //        it imports `react-native-svg`, which is how every bee this project
   //        has ever drawn was drawn. A bee assembled from rounded `View`s

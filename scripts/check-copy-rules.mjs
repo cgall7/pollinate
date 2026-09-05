@@ -16,9 +16,12 @@
 //
 //   2. An untracked script in one agent's scratch directory ran the list over
 //      `Onboarding.js` by regex, invisible to `npm test`. It had been red
-//      since it was written — on an IMPORT STATEMENT, `import { LockScreen }
+//      since it was written — on an IMPORT STATEMENT, `import { InputScreen }
 //      from './CoreRitual'`, which its line-based predicate could not tell
-//      apart from a rendered word. A gate that always says "1 failed" with a
+//      apart from a rendered word. (The example named `LockScreen` until R-OD
+//      deleted that export on 2026-09-05; the sibling import from the same
+//      module is live and makes the same point.) A gate that always says
+//      "1 failed" with a
 //      written explanation beside it trains everyone to read past its output,
 //      and the next real red arrives in a slot people have learned to skip.
 //      That script is retired by this file.
@@ -521,7 +524,7 @@ for (const word of Object.keys(WORD_EXEMPT_ALLOW)) {
 }
 check('every crypto allowlist entry is still rendered', staleWordExemptEntries, []);
 
-// An import path is not a string in text position, so `import { LockScreen }
+// An import path is not a string in text position, so `import { InputScreen }
 // from './CoreRitual'` is outside the collected set BY CONSTRUCTION rather
 // than by an allowlist that has to grow every time someone imports that
 // module somewhere new. This asserts the construction, so a future collector
@@ -577,6 +580,16 @@ for (const [label, line] of FROZEN) check(`${label} is still rendered`, texts.ha
 // of the word, not a different OBJECT), and the nudge ask this PR adds,
 // which is the same referent as the destination by D5's own ruling. `blank`
 // has two: the destination and the same ask.
+//
+// FOURTH `page` MEMBER, 2026-09-05: R-OD-3's save overlay, `It's on today's
+// page.` (POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 1), replacing `Your day
+// is open. Enjoy it.` This row went red on it, correctly and by design — a new
+// spend of a reserved word has to be argued rather than typed. The argument:
+// the sentence names THE SAME OBJECT the destination names, Today's page, and
+// says the entry is now on it. It is not a second thing called a page; it is a
+// pointer at the first one, from the screen the user is leaving. Deictic like
+// `legalCopy.js`'s members but about the destination rather than the document,
+// and admitted on the same ground D5 admitted the nudge ask.
 console.log(`\n--- E. reserved words stay on their one referent ---`);
 // Spelled-out inflections, not bare prefix-at-boundary: both words are strict
 // prefixes of unrelated English ("blanket", "pageant", "pager"), the same
@@ -591,6 +604,7 @@ const RESERVED_ALLOW = {
     'This app is published by . We are responsible for the information described on this page. In data-protection terms, we are its controller.',
     'If we change how any of this works, we will change this page and the date at the top of it. For anything that meaningfully affects your privacy, we will tell you in the app rather than expecting you to re-read this.',
     NUDGE_ASK_LABEL,
+    "It's on today's page.",
   ]),
   blank: new Set(["Today's page is blank.", NUDGE_ASK_LABEL]),
 };

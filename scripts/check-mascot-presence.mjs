@@ -2,9 +2,10 @@
 //
 // This gate closes the two defects Colin identified on 2026-09-02:
 //   * WelcomeBee ran a fixed bob plus wing metronome instead of the shared
-//     whole-silhouette Breath.
+//     whole-silhouette Breath. RETIRED — see the M2/M3 note below; the defect
+//     was fixed on 2026-09-02 and its subject was deleted on 2026-09-05.
 //   * the body raster retained the master's charcoal wing construction line,
-//     exposing an immobile ghost wing behind the animated one.
+//     exposing an immobile ghost wing behind the animated one. LIVE, M1/M4.
 //
 //   npm run check:mascot-presence
 
@@ -17,7 +18,6 @@ import * as mascot from '../src/constants/mascot.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
-const welcome = read('src/components/WelcomeBee.js');
 const bee = read('src/components/MascotBee.js');
 const pipeline = read('design/pipeline/build_layers.py');
 const cut = read('design/pipeline/cut.py');
@@ -27,7 +27,6 @@ const failures = [];
 const ok = (id, message) => { passed += 1; console.log(`  ok   ${id} ${message}`); };
 const bad = (id, message) => { failures.push(`${id}: ${message}`); console.log(`  FAIL ${id} ${message}`); };
 
-const ast = parse(welcome, { sourceType: 'module', plugins: ['jsx'] });
 const walk = (node, visit) => {
   if (!node || typeof node !== 'object') return;
   if (Array.isArray(node)) { node.forEach((item) => walk(item, visit)); return; }
@@ -82,37 +81,53 @@ const walk = (node, visit) => {
   }
 }
 
-// M2 — the hero declares Breath directly. No driven beat means MascotBee owns
-// both the gentle whole-body rise and the irregular wing punctuation.
-{
-  const mounts = [];
-  walk(ast.program, (node) => {
-    if (node.type !== 'JSXOpeningElement' || node.name?.name !== 'MascotBee') return;
-    const props = new Map(node.attributes
-      .filter((attr) => attr.type === 'JSXAttribute')
-      .map((attr) => [attr.name.name, attr.value?.type === 'JSXExpressionContainer'
-        ? welcome.slice(attr.value.expression.start, attr.value.expression.end).replace(/\s+/g, ' ')
-        : '<literal>']));
-    mounts.push(props);
-  });
-  const only = mounts[0];
-  if (mounts.length === 1 && /!reduced/.test(only.get('breath') ?? '') && !only.has('beat') && !only.has('flutter')) {
-    ok('M2', 'WelcomeBee has one MascotBee and asks for shared Breath, with no caller-driven wing or flight loop');
-  } else {
-    bad('M2', `expected one active breath gated on reduced and no beat/flutter; found ${mounts.length} mount(s), breath=${only?.get('breath') ?? 'absent'}, beat=${only?.has('beat') ?? false}, flutter=${only?.has('flutter') ?? false}`);
-  }
-}
-
-// M3 — unresolved preference is motion-off, not assumed normal. Also reject
-// the old local conductor even if a breath prop happens to remain nearby.
-{
-  const stateHook = /import \{ useReducedMotionState \} from '\.\.\/constants\/motion';/.test(welcome)
-    && /const \{ reduced, resolved \} = useReducedMotionState\(\);/.test(welcome);
-  const failClosedBreath = /breath=\{resolved && !reduced\}/.test(welcome);
-  const retired = /Animated\.(?:loop|sequence|timing)|\bconst\s+(?:bob|wing)\b/.test(welcome);
-  if (stateHook && failClosedBreath && !retired) ok('M3', 'Reduce Motion fails closed until resolved, and the fixed bob/wing conductor is absent');
-  else bad('M3', `state hook complete=${stateHook}; breath waits for resolution=${failClosedBreath}; retired local conductor present=${retired}`);
-}
+// M2 and M3 — RETIRED 2026-09-05. Their subject no longer exists.
+//
+// WHY, AND IT IS NOT "THE DEFECTS WENT AWAY". `WelcomeBee.js` was deleted by
+// R-OD (POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 1, ruled by Lumen
+// on Colin's 2026-09-05 direction): the Lock interstitial was the component's
+// only mount, so the gate died and the hero on it died with it. The two
+// defects M2 and M3 were written against were FIXED ON 2026-09-02, three days
+// before the deletion, and shipped fixed. Deleting the file did not repair
+// them and must not be read as having repaired them.
+//
+// A gate that cannot do its measurement must not imply the measurement still
+// holds. `read('src/components/WelcomeBee.js')` at module scope would THROW
+// rather than fail, which is the wrong failure shape for a missing subject,
+// so it is gone rather than left to fault. These rows are retired explicitly,
+// here, rather than deleted silently.
+//
+// THE ONE FACT THAT DIES WITH THE ROWS, CARRIED FORWARD:
+//
+//   `WelcomeBee.js:44` held `breath={resolved && !reduced}` — the tree's ONLY
+//   breath gated on RESOLUTION rather than on the flag alone. `FlyingBee.js`
+//   holds `breath={!reduced}`, which is the other side of R-RM-1, not a
+//   substitute subject. If any future surface mounts `MascotBee` at rest,
+//   fail-closed-until-resolved applies, and M3's row shape is the reference:
+//   the component reads `useReducedMotionState`, destructures `{ reduced,
+//   resolved }` by name, passes `breath={resolved && !reduced}`, and runs no
+//   local bob or wing conductor of its own.
+//
+// That sentence is the successor to the row. It is a rule with a written
+// reference, not a measurement, and it is stated as such.
+//
+// COVERAGE GAP, OWED AND NOT CLOSED. M3's third clause also carried a
+// transferable half: no component reintroduces a local bob or wing conductor
+// outside the shared Breath system. Generalising that clause over
+// `src/components` as M3's own regex was measured and rejected in the same
+// thread — `Animated.loop|sequence|timing` is this codebase's ordinary motion
+// vocabulary and matches 25 to 27 files, none of them a mascot conductor, so
+// the row would ship day-one red or exemption-list itself down to nothing.
+// The replacement is semantic and M6-adjacent: a component other than
+// `MascotBee` that owns a wing-shaped and body-shaped Image pair and animates
+// them outside the shared mount. That is an AST walk, it is FILED as its own
+// row (Pixel's queue, ruled out of the R-OD commit by Lumen), and until it
+// lands this gate does NOT measure that property anywhere. Named gap, named
+// owner, no implied green.
+//
+// M1, M4, M5 and M6 are untouched: they read the rasters, the source pipeline,
+// the shared crop and `MascotBee` itself, so "one presence system, one moving
+// wing" still has an owner at the component that actually draws.
 
 // M4 — the source writer assigns the charcoal perimeter away from the body.
 // M1 checks the artifact; this checks that regenerating it cannot restore the
@@ -170,27 +185,6 @@ if (failures.length) {
 
 export const MUTATIONS = [
   {
-    row: 'M2',
-    why: 'Disabling Breath leaves the hero still even though the shared component remains intact.',
-    file: 'src/components/WelcomeBee.js',
-    from: 'breath={resolved && !reduced}',
-    to: 'breath={false}',
-  },
-  {
-    row: 'M3',
-    why: 'Dropping the resolved boundary assumes normal motion before the OS preference returns.',
-    file: 'src/components/WelcomeBee.js',
-    from: 'breath={resolved && !reduced}',
-    to: 'breath={!reduced}',
-  },
-  {
-    row: 'M3',
-    why: 'The boolean hook reintroduces the unresolved-as-normal mount window.',
-    file: 'src/components/WelcomeBee.js',
-    from: "import { useReducedMotionState } from '../constants/motion';",
-    to: "import { useReducedMotion } from '../constants/motion';",
-  },
-  {
     row: 'M4',
     why: 'Subtracting only the bright wing restores the charcoal ghost to the next body export.',
     file: 'design/pipeline/build_layers.py',
@@ -210,12 +204,5 @@ export const MUTATIONS = [
     file: 'src/components/MascotBee.js',
     from: "style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, bodyStyle]}",
     to: "style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}",
-  },
-  {
-    row: null,
-    why: 'Changing explanatory prose must not make a mechanism gate fire.',
-    file: 'src/components/WelcomeBee.js',
-    from: '// The hero used to own a second motion language:',
-    to: '// The hero previously owned a second motion language:',
   },
 ];

@@ -108,9 +108,14 @@ export const DAILY_PROMPTS = [
 // B1–B3 out of onboarding. They are NOT deleted — the argument they made
 // arrives one line a day instead, which is the product's own thesis applied
 // to its own pitch. Lumen's ruling put them here rather than on the gate
-// line: §27.1 ("Pause. / Think of someone.") already owns the gate, under
-// the rule merged with it — a gate aims; the screen with the field asks.
-// These are the screen with the field, so these are questions.
+// line, under the rule merged with it: a gate aims, and the screen with the
+// field asks. These are the screen with the field, so these are questions.
+//
+// R-OD (2026-09-05) removed the other half of that division of labour — the
+// gate itself, and §27.1's "Pause. / Think of someone." with it. Nothing here
+// moves: these were always the questions, and now they are the only ones the
+// user meets. The ruling's reasoning is recorded rather than restated as a
+// live split.
 //
 // The originals, verbatim from GUIDES/GRATITUDE_ONBOARDING_GIVEN_COPY.md §5:
 //   B1  "The morning showed up without you."

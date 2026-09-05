@@ -43,10 +43,16 @@ export const MASCOT_ASPECT = 1013 / 1049;
 // against StripedBee's 0.47: the mascot has a head and a trailing abdomen.
 export const MASCOT_WIDTH_FRACTION = 16.4 / 24;
 
-// WelcomeBee's character box inside its ceremonial stage. This is layout,
+// The hero's character box inside its ceremonial stage. This is layout,
 // not motion, but it lives beside the mascot geometry so measurements of the
 // hero use the box the component actually passes rather than the 132pt stage
 // around it. Moving it changes the hero's silhouette, not merely a comment.
+//
+// THE NAME IS HISTORICAL, THE STAGE IS NOT. `WelcomeBee` was deleted by R-OD
+// (its only mount, the Lock gate, retired on 2026-09-05); the 132pt hero stage
+// it named is still shipped, at `TodayTab.js`'s `HERO_SIZE = 132`. The
+// identifier stays because it has live readers in `check-perch-weight.mjs` and
+// renaming it would move nothing but text through six measured call sites.
 export const WELCOME_BEE_STAGE_FRACTION = 0.68;
 
 // Wing root, as a fraction of the character box. This is the pivot for the
@@ -177,7 +183,7 @@ export const MASCOT_CLEARANCE = [
 //
 // **He is right, and the arithmetic says how right.** Breath's entire visible
 // output is the wing tip travelling `2 * BREATH_FLAP_RADIUS * sin(1 degree)`
-// = 1.4346% of the drawn height. At WelcomeBee's 132pt stage that is **0.9111pt
+// = 1.4346% of the drawn height. At the 132pt hero stage that is **0.9111pt
 // peak-to-peak over 2100ms — 0.434pt/s, 0.0072pt per frame at 60fps.** The
 // character is, to the eye, a still image. The doctrine's bar is "you never
 // catch it performing; if you stare, it rewards you"; a stare is rewarded with
@@ -206,7 +212,7 @@ export const MASCOT_CLEARANCE = [
 export const BREATH_RISE_CYCLE_MS = 6500;
 
 // Peak-to-peak vertical travel of the whole character, as a fraction of its
-// drawn HEIGHT. At WelcomeBee's 132pt stage the passed character box is
+// drawn HEIGHT. At the 132pt hero stage the passed character box is
 // 89.76pt and the drawing is 63.5158pt high, so the travel below is 2.0325pt.
 // At a direct 44pt chrome mount the drawing is 31.1352pt high: 0.9963pt.
 //
@@ -311,7 +317,7 @@ export const SETTLE_INTERVAL_MAX_MS = 45000;
 
 // The dip, as a fraction of DRAWN height — the same denominator
 // `BREATH_RISE_FRACTION` uses, so the two body terms are comparable without a
-// conversion. 3% is 1.9055pt at WelcomeBee's 132pt stage and 0.9341pt at a
+// conversion. 3% is 1.9055pt at the 132pt hero stage and 0.9341pt at a
 // direct chrome 44 mount — slightly LARGER than a whole breath's peak-to-peak,
 // because a settle has to read as a
 // distinct event against the breath it interrupts, not as a deeper breath.

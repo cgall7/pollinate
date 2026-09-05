@@ -5,7 +5,6 @@ import {
   Text,
   TextInput,
   Animated,
-  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -13,114 +12,20 @@ import {
 import { theme } from '../constants/theme';
 import { getDailyPrompt } from '../constants/prompts';
 import { EntryStore } from '../services/EntryStore';
-import * as Haptics from 'expo-haptics';
-import { SparkChips } from '../components/SparkChips';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { PressableScale } from '../components/PressableScale';
-import { GlowOrb } from '../components/GlowOrb';
-import { WelcomeBee } from '../components/WelcomeBee';
 import { CelebrationBadge } from '../components/CelebrationBadge';
 import { CelebrationRays } from '../components/CelebrationRays';
+import { SparkChips } from '../components/SparkChips';
 import { PaperPicker } from '../components/PaperPicker';
-import { DEMO_CONTENT } from '../constants/demoMode';
 
-// --- COMPONENT: LockScreen ---
-export const LockScreen = ({ onOpen }) => {
-  const { width } = useWindowDimensions();
-
-  // Runtime dormancy (Lumen, thread b3eac928): a decorative/seeding
-  // affordance retires once the real population it imitates exists — the
-  // demoHive roster does this at zero real connections (HoneycombTab.js),
-  // and this button is the streak side of the same rule, at zero real
-  // journal entries. Starts hidden (`false`, not `null`) rather than
-  // flashing on for one frame on every genuinely-fresh account's first
-  // Lock screen: the cost of a one-tap-late appearance is smaller than a
-  // control that appears and vanishes under someone's thumb.
-  const [eligibleForDemoButton, setEligibleForDemoButton] = useState(false);
-
-  useEffect(() => {
-    if (!DEMO_CONTENT) return undefined;
-    let cancelled = false;
-    EntryStore.getFirstEntryDate()
-      .then((firstISO) => {
-        if (!cancelled) setEligibleForDemoButton(!firstISO);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Visible demo trigger (Colin, 2026-08-10: wants a real button, not the
-  // old hidden 5-tap gesture) — seeds 180 days of realistic demo entries so
-  // Wrapped and Recap have something worth showing.
-  const handleLoadDemoData = () => {
-    EntryStore.seedDemoData(180)
-      .then((count) => {
-        setEligibleForDemoButton(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Demo data loaded', `Filled the last ${count} days with entries.`);
-      })
-      .catch(() => {
-        Alert.alert('Couldn\'t load demo data', 'Something went wrong — try again.');
-      });
-  };
-
-  return (
-    <View style={styles.container}>
-      {/* Was a flat 1.5x-screen accent disc at 15-25% opacity, which left a
-          hard circular edge visible across the cream. GlowOrb runs the same
-          light out to fully transparent, so it reads as light instead of a
-          pale yellow shape. */}
-      <GlowOrb size={width * 1.6} breathe intensity={0.55} style={{ top: -width * 0.35 }} />
-
-      <View style={styles.content}>
-        {/* Sits inside the orb, unlit by anything of its own — the light is
-            GlowOrb's job. Gives the gate a face to arrive at instead of
-            opening on a wordmark and a question. */}
-        <WelcomeBee size={132} />
-        <Text style={styles.logo}>Pollinate</Text>
-        {/* Was "Pause. / What are you grateful for today?" — the subject-less
-            journal question, and it asked something this screen has no field
-            for: one tap later InputScreen asks its own rotating
-            `dailyPrompt.question` over the actual input, so the gate's
-            question was always discarded. A gate aims; the next screen asks.
-            "Think of someone" is the aim The Ruling implies — gratitude in
-            Pollinate is about a person, and a person is what a Private Hive,
-            a seed and the feed all need as input. It claims nothing the app
-            can't do: the answer still lands in the same free-text field. */}
-        <Text style={styles.prompt}>Pause.{"\n"}Think of someone.</Text>
-
-        {/* Medium, not the default Light: this is the one tap in the app
-            that crosses a threshold rather than adjusting something. */}
-        <PrimaryButton onPress={onOpen} haptic={Haptics.ImpactFeedbackStyle.Medium}>
-          Begin
-        </PrimaryButton>
-
-        {/* Lumen's design assessment (thread 37fb8ef6, WP-10a): a dev
-            affordance sitting on the ritual gate ships to every tester.
-            Colin's 2026-08-10 note ("wants a real button, not the old
-            hidden 5-tap gesture") was about discoverability during
-            development, not about shipping it past __DEV__. DEMO_CONTENT,
-            not raw __DEV__ (Sage's LATENT finding, thread 37fb8ef6): a
-            pitch build has __DEV__ false but still wants this button. */}
-        {DEMO_CONTENT && (
-          // Nested inside the DEMO_CONTENT guard, not ANDed alongside it at
-          // the top level — check-demo-content-callsites.mjs's isUnderGuard
-          // only recognises a bare `DEMO_CONTENT` as the LogicalExpression's
-          // immediate left operand, and `DEMO_CONTENT && eligibleForDemoButton
-          // && (…)` would leave the JSX reading as unguarded to that walker.
-          eligibleForDemoButton ? (
-            <PressableScale onPress={handleLoadDemoData} style={styles.demoDataLink}>
-              <Text style={styles.demoDataLinkText}>Load demo data</Text>
-            </PressableScale>
-          ) : null
-        )}
-      </View>
-    </View>
-  );
-};
-
+// R-OD (Lumen, POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 1): the Lock
+// interstitial that used to stand in front of this screen is gone. It was a
+// fossil of the standalone-journal era, when the app conceptually locked
+// until you wrote; nothing locks anymore, because the app opens on Today
+// (Zero Onboarding, I10). Today's blank card already carries the intent, so
+// the gate asked the user to Begin something they had already begun. This
+// file now holds one screen, and Today routes straight into it.
+//
 // --- COMPONENT: InputScreen ---
 export const InputScreen = ({ onUnlock }) => {
   const [text, setText] = useState('');
@@ -199,8 +104,11 @@ export const InputScreen = ({ onUnlock }) => {
           // before navigating, so it can reject — a discarded setTimeout
           // return used to mean a failure left the celebration overlay up
           // forever with unlocking stuck true and no way to retry.
-          // Promise.resolve wraps the demo-mode caller too (Onboarding.js's
-          // LockDemoStep.onSave is synchronous), so this is safe either way.
+          // Promise.resolve is kept for a caller that hands back a plain
+          // value rather than a promise. It was written for Onboarding's
+          // LockDemoStep, which no longer exists; the wrapper stays because
+          // the contract it defends (onUnlock may be sync) still holds for
+          // any future caller, and it costs one tick.
           Promise.resolve(onUnlock(text, paper)).catch(() => {
             Alert.alert("Couldn't save", "Your entry didn't save — try again.");
             Animated.parallel([
@@ -235,7 +143,7 @@ export const InputScreen = ({ onUnlock }) => {
             <CelebrationRays />
             <CelebrationBadge />
           </View>
-          <Text style={styles.unlockingText}>Your day is open. Enjoy it.</Text>
+          <Text style={styles.unlockingText}>It's on today's page.</Text>
         </Animated.View>
       )}
 
@@ -267,8 +175,16 @@ export const InputScreen = ({ onUnlock }) => {
           <PaperPicker paper={paper} onChange={setPaper} />
         </View>
 
-        <PrimaryButton onPress={handleSave} disabled={!text.trim() || unlocking}>
-          Open my day
+        {/* R-OD-2. "Open my day" claimed the vanished gate's metaphor; "Keep
+            this" is the keepsake register the rest of the product already
+            speaks, and it claims exactly what the press does. The announced
+            label names the object the visible label leaves to context. */}
+        <PrimaryButton
+          onPress={handleSave}
+          disabled={!text.trim() || unlocking}
+          accessibilityLabel="Keep this entry"
+        >
+          Keep this
         </PrimaryButton>
       </Animated.View>
     </KeyboardAvoidingView>
@@ -287,37 +203,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
-  logo: {
-    ...theme.type.logo,
-    fontSize: 68,
-    color: theme.colors.textPrimary,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
   logoSmall: {
     ...theme.type.logo,
     fontSize: 32,
     color: theme.colors.textPrimary,
     marginBottom: 40,
     textAlign: 'center',
-  },
-  prompt: {
-    ...theme.type.bodyLg,
-    fontSize: 24,
-    lineHeight: 32,
-    fontFamily: theme.fonts.bodyMedium,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 50,
-  },
-  demoDataLink: {
-    alignSelf: 'center',
-    marginTop: 16,
-  },
-  demoDataLinkText: {
-    ...theme.type.bodySm,
-    color: theme.colors.textSecondary,
-    textDecorationLine: 'underline',
   },
   promptQuestion: {
     ...theme.type.h3,
