@@ -236,7 +236,15 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       } else if (/amount must be between 1 and 1000 drops/i.test(refusal)) {
         setValidationMessage(`Choose ${NECTAR_MIN_DROPS} to ${NECTAR_MAX_DROPS} drops.`);
       } else if (/nectar consent required/i.test(refusal)) {
-        setValidationMessage('Turn this on from a reveal before sending.');
+        // Same first sentence as the consent chip above, so the family is cut
+        // once. It names no tap on purpose: this arm renders under `:274`,
+        // which requires the client to believe consent is ON, and the chip
+        // that opens the sheet renders under `:262`, which requires the
+        // opposite. The two are mutually exclusive, so in the only state that
+        // reaches this line the sheet has no opener on screen. State the
+        // condition and the instruction; do not point at an affordance that
+        // is not rendered.
+        setValidationMessage('Gifts are off. Turn them on first.');
       } else if (/not signed in/i.test(refusal)) {
         setValidationMessage('Sign in again to send this.');
       } else if (/sender is not an active comb member/i.test(refusal)) {
