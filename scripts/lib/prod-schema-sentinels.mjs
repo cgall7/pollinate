@@ -371,4 +371,19 @@ export const SENTINELS = {
     kind: 'order',
     reason: 'function replace (unchanged grants) + policy replace only',
   },
+  // The delivery allowance (Vector, ruled by Lumen 2026-09-06). Creates
+  // nectar_refill_rotation_members(uuid) and body-replaces
+  // advance_due_rotations() -- same service_role-only posture as
+  // 20260830000012 and 20260904000001, no new column and no anon-visible
+  // table. The new function is revoked from anon in the migration that
+  // creates it, so 42501 is the only state it has ever been in from
+  // outside: column resolution precedes the privilege check, so that code
+  // proves the function exists without opening any surface. Same reasoning
+  // as ENG-93's and ENG-60's rows above.
+  '20260906000001_nectar_delivery_allowance': {
+    kind: 'rpc',
+    fn: 'nectar_refill_rotation_members',
+    args: { p_rotation_id: '00000000-0000-0000-0000-000000000000' },
+    expect: '42501',
+  },
 };

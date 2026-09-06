@@ -92,6 +92,45 @@ export const NectarStore = {
     return Number(data.available_sats);
   },
 
+  // R-N4's detector input, and it is deliberately NOT the balance.
+  //
+  // The arrival beat's claim is "a gift arrived". Until 2026-09-06 it was
+  // measured as a rise in the AVAILABLE BALANCE, which coincided with that
+  // claim only because record_zap was the sole credit path a consented user
+  // could see. The delivery allowance (20260906000001) breaks the
+  // coincidence: a refill raises the balance for nobody, and a detector
+  // keyed on rises would fly a bee carrying a gift of 380 drops from no one.
+  // So the detector reads the gift's own query instead of a proxy for it,
+  // and every credit path after this one is outside the claim by
+  // construction rather than by an accident of which RPCs exist.
+  //
+  // BOTH TABLES, and this is the half that is easy to get wrong. A gift
+  // reaches a person through nectar_zaps (record_zap) OR comb_nectar_notes
+  // (send_comb_nectar_note, ENG-90) — two tables, no shared row, and the
+  // comb note is the gift MVP-Comb actually ships. Summing only the zaps
+  // would have silently stopped announcing the most common gift in the
+  // product, which is a REGRESSION the balance-rise detector did not have.
+  // Same pair `listNectarEvents` reads, filtered to the receiving side.
+  //
+  // AN EMPTY SUM IS A REAL ZERO HERE, unlike getBalanceDrops' no-row. These
+  // are the event logs themselves: no rows means no gifts have arrived, for
+  // anyone who can read the tables at all. There is no unprovisioned state
+  // to confuse it with — the RLS policies are recipient-or-sender on rows
+  // that exist, not on an account that has to be created first. A failed
+  // read throws, and the caller's catch is where "unknown" lives.
+  async getReceivedDropsTotal() {
+    const client = requireSupabase();
+    const userId = await requireUserId(client);
+    const [{ data: zaps, error: zapsError }, { data: notes, error: notesError }] = await Promise.all([
+      client.from('nectar_zaps').select('amount_drops').eq('recipient_id', userId),
+      client.from('comb_nectar_notes').select('amount_drops').eq('recipient_id', userId),
+    ]);
+    if (zapsError) throw zapsError;
+    if (notesError) throw notesError;
+    if (!zaps || !notes) return null;
+    return [...zaps, ...notes].reduce((sum, row) => sum + Number(row.amount_drops), 0);
+  },
+
   // The zap itself. `zapId` is the caller's idempotency handle (utils/uuid),
   // generated ONCE per attempt and REUSED across retries of that attempt —
   // a fresh id on retry would record a second zap, which is the failure the

@@ -327,12 +327,29 @@ const HoneycombFeed = () => {
   // and NectarStore.getBalanceDrops keeps the two distinguishable for that
   // caller's sake.
   //
-  // R-N4 — AND THIS READ IS ALSO THE ARRIVAL DETECTOR. "Your balance has
-  // risen since your last read" is the one part of the beat the server
-  // cannot answer, because seeing is a property of a screen and not of a
-  // row; the comparison is `nectarArrivalDrops` and the memory is
-  // `NectarArrivalState`, both of which treat an unknown as an unknown
-  // rather than as a zero. THE LEVEL IS COMMITTED FIRST AND
+  // R-N4 — AND THIS EFFECT IS ALSO THE ARRIVAL DETECTOR. "Since your last
+  // read" is the one part of the beat the server cannot answer, because
+  // seeing is a property of a screen and not of a row; the comparison is
+  // `nectarArrivalDrops` and the memory is `NectarArrivalState`, both of
+  // which treat an unknown as an unknown rather than as a zero.
+  //
+  // TWO READS, AND THEY ANSWER TWO DIFFERENT QUESTIONS. The level is a
+  // STATE — how full the vessel is — so it reads the balance. The arrival is
+  // an EVENT — did a gift land — so it reads the received total. They were
+  // one read until 2026-09-06, when the delivery allowance made a rising
+  // balance stop meaning a gift; see `nectarArrivalDrops`. The refill still
+  // moves the meniscus, which is correct: the vessel really did fill. It
+  // just does not fly a bee, because nobody sent anything.
+  //
+  // THE ARRIVAL READ CANNOT COST THE LEVEL, and that needs its OWN catch
+  // rather than the effect's. The level is committed before it; the shared
+  // handler below ends in `setHoneyLevel(0)`, so letting a failed gift read
+  // reach it would wipe a vessel that had already filled correctly, on the
+  // strength of a different query failing. Caught here instead, and an
+  // unread total reaches `nectarArrivalDrops` as `null`, which is no
+  // arrival: a missed beat, never a wrong one.
+  //
+  // THE LEVEL IS COMMITTED FIRST AND
   // UNCONDITIONALLY, and that ordering is R-N4.1's "the landing causes
   // nothing" written as code: `HoneyFill`'s tween runs off the `honeyLevel`
   // prop and fires whether or not anyone flies, so a suppressed, declined or
@@ -351,12 +368,17 @@ const HoneycombFeed = () => {
     if (!nectarConsent) return undefined;
     let cancelled = false;
     (async () => {
-      const lastSeen = await NectarArrivalState.getLastSeenDrops(userId);
+      const lastSeen = await NectarArrivalState.getLastSeenReceivedDrops(userId);
       const drops = await NectarStore.getBalanceDrops();
       if (cancelled) return;
       setHoneyLevel(honeyLevelForDrops(drops));
-      NectarArrivalState.rememberDrops(userId, drops);
-      const arrived = nectarArrivalDrops(lastSeen, drops);
+      const received = await NectarStore.getReceivedDropsTotal().catch((err) => {
+        console.warn('HoneycombTab: failed to load received nectar total', err);
+        return null;
+      });
+      if (cancelled) return;
+      NectarArrivalState.rememberReceivedDrops(userId, received);
+      const arrived = nectarArrivalDrops(lastSeen, received);
       if (!arrived) return;
       // The gift's size, for the drop he carries. Set BEFORE the command so
       // it is already true on the frame the comb publishes the flight —

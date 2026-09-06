@@ -350,6 +350,23 @@ export const NectarTab = () => {
                   </Text>
                 </View>
 
+                {/* THE DELIVERY ALLOWANCE, stated as a law (Lumen, UX Design
+                    2026-09-06). Standing and unconditional on the event: this
+                    is not an announcement that a refill just happened, it is
+                    the rule the vessel obeys, said once, in the place a
+                    person comes to ask what their nectar does. Timeless
+                    register, no digits, no wage vocabulary, and it never
+                    mentions writing — nectar that scaled with what you wrote
+                    would be a wage, which is the thing this mechanic is
+                    shaped to not be.
+
+                    UNDER THE BALANCE, NOT INSIDE THE HERO CARD. The card is a
+                    measured two-column layout whose wrap rule was solved at
+                    402pt for a number beside a vessel; a third line inside it
+                    re-opens that measurement. Placement and spacing are
+                    Lumen's to ratify — the string is hers already. */}
+                <Text style={styles.allowanceNote}>Your nectar refills with each delivery.</Text>
+
                 <Text style={styles.sectionLabel}>Recently</Text>
 
                 {ledgerView === LOAD_STATES.STALE && (
@@ -522,6 +539,11 @@ const styles = StyleSheet.create({
   explainerCta: {
     marginTop: 24,
     alignSelf: 'stretch',
+  },
+  allowanceNote: {
+    ...theme.type.body,
+    color: theme.colors.inkSoft,
+    marginBottom: 28,
   },
   sectionLabel: {
     ...theme.type.label,

@@ -140,8 +140,8 @@ export const MUTATIONS = [
     row: 'F1',
     why: 'the unknown collapses to zero — the fabrication R-N4 exists to prevent, and it reds the must-be-null half rather than the must-be-drops half',
     file: 'src/constants/nectar.js',
-    from: "  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;",
-    to: "  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return now > 0 ? now : null;",
+    from: "  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;",
+    to: "  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return now > 0 ? now : null;",
   },
   {
     row: 'F1',
@@ -154,15 +154,15 @@ export const MUTATIONS = [
     row: 'F2',
     why: 'the collapsed spelling stops being reachable — the row cannot price the defect it names if the zero case answers null too. ON THE `lastSeenDrops` GUARD, and that correction is the mutation earning its keep: it first pointed at the BALANCE guard, where `!500` is false, so it changed nothing and the miss read as a weak row rather than as a mutation aimed at the wrong argument. F2\'s zero is the REMEMBERED side',
     file: 'src/constants/nectar.js',
-    from: "  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;",
-    to: "  if (!lastSeenDrops || lastSeenDrops === undefined || !Number.isFinite(then)) return null;",
+    from: "  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;",
+    to: "  if (!lastSeenReceivedDrops || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;",
   },
   {
     row: 'F3',
     why: 'the remembered balance goes on one bare device key — a second account then compares against the first account\'s number, which is two finite numbers with one larger and therefore indistinguishable from an arrival',
     file: 'src/services/nectarArrivalState.js',
-    from: "const keyFor = (userId) => `nectar_last_seen_drops_v1:${userId}`;",
-    to: "const keyFor = () => `nectar_last_seen_drops_v1`;",
+    from: "const keyFor = (userId) => `nectar_last_seen_received_v1:${userId}`;",
+    to: "const keyFor = () => `nectar_last_seen_received_v1`;",
   },
   {
     row: 'F4',
@@ -325,17 +325,31 @@ export const MUTATIONS = [
   },
   {
     row: 'G8',
-    why: 'the memory is written only when something arrived — so a balance that fell is never remembered, and the moment it climbs back to a number it already reached the bee announces it as a gift',
+    why: 'the memory is written only when something arrived — so a read that did not move is never remembered, and the memory drifts from the number the screen last showed',
     file: 'src/screens/HoneycombTab.js',
-    from: "      NectarArrivalState.rememberDrops(userId, drops);\n      const arrived = nectarArrivalDrops(lastSeen, drops);\n      if (!arrived) return;",
-    to: "      const arrived = nectarArrivalDrops(lastSeen, drops);\n      if (!arrived) return;\n      NectarArrivalState.rememberDrops(userId, drops);",
+    from: "      NectarArrivalState.rememberReceivedDrops(userId, received);\n      const arrived = nectarArrivalDrops(lastSeen, received);\n      if (!arrived) return;",
+    to: "      const arrived = nectarArrivalDrops(lastSeen, received);\n      if (!arrived) return;\n      NectarArrivalState.rememberReceivedDrops(userId, received);",
   },
   {
     row: null,
     why: 'MUST NOT FIRE — the two unknown guards in `nectarArrivalDrops` are swapped. Both answer `null`, so this is a legal reordering and every F row must stay green; a harness with no control only proves the gate is noisy',
     file: 'src/constants/nectar.js',
-    from: "  if (balanceDrops === null || balanceDrops === undefined || !Number.isFinite(now)) return null;\n  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;",
-    to: "  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;\n  if (balanceDrops === null || balanceDrops === undefined || !Number.isFinite(now)) return null;",
+    from: "  if (receivedDrops === null || receivedDrops === undefined || !Number.isFinite(now)) return null;\n  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;",
+    to: "  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;\n  if (receivedDrops === null || receivedDrops === undefined || !Number.isFinite(now)) return null;",
+  },
+  {
+    row: 'G10',
+    why: 'the detector reverts to the balance — the exact regression the re-key exists to prevent, and the one that looks most harmless: the received total is still fetched and still remembered, so every OTHER row about it stays green while every consented person is announced a gift of their own refill at every delivery',
+    file: 'src/screens/HoneycombTab.js',
+    from: "      const arrived = nectarArrivalDrops(lastSeen, received);",
+    to: "      const arrived = nectarArrivalDrops(lastSeen, drops);",
+  },
+  {
+    row: 'G10',
+    why: 'the comb note stops counting — `getReceivedDropsTotal` reads `nectar_zaps` twice, so it sums only zaps and silently stops announcing the gift MVP-Comb actually ships. A reader who takes "received-zap total" literally writes exactly this, and nothing else in the tree reds. NOT a `.limit(0)` saboteur: this row is lexical and could not see one, and a mutation a lexical row cannot catch measures nothing about the row',
+    file: 'src/services/NectarStore.js',
+    from: "      client.from('comb_nectar_notes').select('amount_drops').eq('recipient_id', userId),",
+    to: "      client.from('nectar_zaps').select('amount_drops').eq('recipient_id', userId),",
   },
 ];
 
@@ -1434,7 +1448,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   visit(arrivalTree, (n) => {
     if (n.type !== 'ObjectMethod' && n.type !== 'ObjectProperty') return;
     const name = n.key?.name;
-    if (name !== 'getLastSeenDrops') return;
+    if (name !== 'getLastSeenReceivedDrops') return;
     readBody = n.type === 'ObjectMethod' ? n.body : n.value?.body;
   });
   const zeroDefaults = [];
@@ -1449,7 +1463,7 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     ? ARRIVAL.slice(readBody.start, readBody.end).includes("raw === null")
     : false;
   if (readBody && zeroDefaults.length === 0 && returnsNullForMissing) {
-    ok(`F4 \`getLastSeenDrops\` passes a never-written key through as \`null\`: its body tests \`raw === null\` and contains zero \`?? 0\` / \`|| 0\` defaults (enumerated from the AST of that method's body alone — a file-wide search would have read the comment that names this hazard and called the explanation the defect)`);
+    ok(`F4 \`getLastSeenReceivedDrops\` passes a never-written key through as \`null\`: its body tests \`raw === null\` and contains zero \`?? 0\` / \`|| 0\` defaults (enumerated from the AST of that method's body alone — a file-wide search would have read the comment that names this hazard and called the explanation the defect)`);
   } else {
     bad('F4', `body resolved=${Boolean(readBody)}, zero-defaults found=[${zeroDefaults.join(', ')}], tests raw === null=${returnsNullForMissing} — the unknown would reach \`nectarArrivalDrops\` as a 0`);
   }
@@ -1839,17 +1853,71 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   }
 
   // G8 — THE MEMORY IS WRITTEN ON EVERY SUCCESSFUL READ, NOT ONLY ON A RISE.
-  // `nectarArrivalState`'s own header says why: remembering only rises would
-  // re-announce a balance the moment it climbed back to a number it had
-  // already reached. The defect shape is an early return placed above the
-  // write, so the row asserts the ORDER — `rememberDrops` before the
-  // `if (!arrived) return`, inside the same effect.
-  const rememberPos = TAB.indexOf('NectarArrivalState.rememberDrops(userId, drops)');
+  // `nectarArrivalState`'s own header says why: a memory written only on
+  // rises can disagree with the number the screen last showed. The defect
+  // shape is an early return placed above the write, so the row asserts the
+  // ORDER — `rememberReceivedDrops` before the `if (!arrived) return`,
+  // inside the same effect.
+  const rememberPos = TAB.indexOf('NectarArrivalState.rememberReceivedDrops(userId, received)');
   const arrivalGuardPos = TAB.indexOf('if (!arrived) return;');
   if (rememberPos !== -1 && arrivalGuardPos !== -1 && rememberPos < arrivalGuardPos) {
-    ok('G8 the arrival memory is written on every successful read — `rememberDrops` runs before the no-arrival early return, so a balance that fell or did not move is remembered too. Remembering only rises would re-announce a balance the moment it climbed back to a number it had already reached');
+    ok('G8 the arrival memory is written on every successful read — `rememberReceivedDrops` runs before the no-arrival early return, so a read that did not move is remembered too. A memory written only on rises can disagree with the number the screen last showed');
   } else {
-    bad('G8', `rememberDrops position=${rememberPos}, no-arrival guard position=${arrivalGuardPos} — the write must come first`);
+    bad('G8', `rememberReceivedDrops position=${rememberPos}, no-arrival guard position=${arrivalGuardPos} — the write must come first`);
+  }
+
+  // G10 — THE DETECTOR READS THE GIFT'S OWN QUERY, NOT THE BALANCE.
+  //
+  // Lumen's ruling (UX Design, 2026-09-06, R-N4 shape (a)): every rendered
+  // state names its query, and this flight's claim is "a gift arrived", so
+  // its detector must read received gifts rather than a balance that
+  // coincided with them only while `record_zap` was the sole credit path a
+  // consented person could see. The delivery allowance broke the
+  // coincidence: a refill raises the balance and sends nobody anything.
+  //
+  // THREE ASSERTIONS, because the ways back are three and only one of them
+  // is a rename. (1) The value compared is the received total, not the
+  // balance — resolved from the AST as the second ARGUMENT of the
+  // `nectarArrivalDrops` call, so a `getReceivedDropsTotal` read that is
+  // fetched and then ignored reds this row. (2) The balance read is STILL
+  // there and still feeds the level — the two questions did not merge back
+  // into one, in either direction: a build that dropped the balance would
+  // leave the vessel unable to fill. (3) The two source tables of a gift are
+  // both in `getReceivedDropsTotal`, because summing only `nectar_zaps`
+  // would silently stop announcing the comb note, which is the gift
+  // MVP-Comb actually ships — a regression the balance-keyed detector did
+  // not have, reachable by a reader who takes "received-zap total"
+  // literally.
+  const arrivalCallArgs = [];
+  visit(ast(TAB), (n) => {
+    if (n.type !== 'CallExpression') return;
+    if (n.callee?.type !== 'Identifier' || n.callee.name !== 'nectarArrivalDrops') return;
+    arrivalCallArgs.push(n.arguments.map((a) => (a.type === 'Identifier' ? a.name : a.type)));
+  });
+  const comparesReceived =
+    arrivalCallArgs.length === 1 &&
+    arrivalCallArgs[0].length === 2 &&
+    arrivalCallArgs[0][1] === 'received';
+  const receivedAssigned = /const received = await NectarStore\.getReceivedDropsTotal\(\)/.test(TAB);
+  const levelStillFromBalance =
+    /const drops = await NectarStore\.getBalanceDrops\(\)/.test(TAB) &&
+    /setHoneyLevel\(honeyLevelForDrops\(drops\)\)/.test(TAB);
+  const STORE = await read('src/services/NectarStore.js');
+  let totalBody = null;
+  visit(ast(STORE), (n) => {
+    if (n.type !== 'ObjectMethod' && n.type !== 'ObjectProperty') return;
+    if (n.key?.name !== 'getReceivedDropsTotal') return;
+    totalBody = STORE.slice(n.start, n.end);
+  });
+  const bothTables =
+    Boolean(totalBody) &&
+    /\.from\('nectar_zaps'\)/.test(totalBody) &&
+    /\.from\('comb_nectar_notes'\)/.test(totalBody) &&
+    (totalBody.match(/\.eq\('recipient_id', userId\)/g) || []).length === 2;
+  if (comparesReceived && receivedAssigned && levelStillFromBalance && bothTables) {
+    ok('G10 the arrival detector reads the gift\'s own query: `nectarArrivalDrops` is called exactly once and its second argument is the RECEIVED TOTAL (read from the AST, so fetching the total and then comparing the balance reds), the balance read survives and still feeds the level (the two questions stayed two), and `getReceivedDropsTotal` sums BOTH gift tables filtered to `recipient_id` — summing only `nectar_zaps` would silently stop announcing the comb note, the gift MVP-Comb ships');
+  } else {
+    bad('G10', `compares received=${comparesReceived} (args=${JSON.stringify(arrivalCallArgs)}), received read present=${receivedAssigned}, level still from balance=${levelStillFromBalance}, both gift tables filtered to recipient=${bothTables}`);
   }
 
   // G9 — R-N4.3's PRECONDITION: DOCUMENT ORDER IS ONLY THE MECHANISM WHILE

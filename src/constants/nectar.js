@@ -578,43 +578,63 @@ export const honeyLevelForDrops = (drops) => {
 // is here: ledger arithmetic, no renderer units, importable from bare `node`.
 //
 // THE TRAP IS `null`, AND IT IS THE ONE `NectarStore` ALREADY WROTE DOWN.
-// `getBalanceDrops` returns `null` for UNKNOWN-or-unprovisioned and `0` for a
-// real, read, empty wallet, and its own comment says the caller must not
-// collapse them ("empty is a positive claim", §23.1). Here that stops being a
-// rendering nicety and becomes arithmetic: treat an unknown as a previous
-// balance of 0 and the first successful read after ANY failed one fabricates
-// a gift OF THE ENTIRE BALANCE — 500 drops of bee, for nothing. So both
-// unknowns return `null`, and `null` means "no arrival", never "no gift".
+// `getReceivedDropsTotal` throws rather than guessing when it cannot read,
+// and the caller turns that into `null` — the same discipline
+// `getBalanceDrops` states for its no-row ("empty is a positive claim",
+// §23.1). Here that stops being a rendering nicety and becomes arithmetic:
+// treat an unknown as a previous total of 0 and the first successful read
+// after ANY failed one fabricates a gift OF EVERY GIFT EVER RECEIVED. So
+// both unknowns return `null`, and `null` means "no arrival", never "no
+// gift".
 //
-// THE FIRST READ OF A USER'S LIFE IS ALSO AN UNKNOWN, and that is what closes
-// the starter grant. Consent provisions the accounts and the balance goes from
-// no-row to 500 in one step; with no remembered value there is nothing to have
-// risen FROM, so the grant lands on the first-run path and announces nothing.
-// A grant is not a gift, and this is why nothing has to say so.
+// WHAT THIS IS KEYED ON, AND WHY IT MOVED. R-N4's own words are "your
+// balance has risen since your last read", and until 2026-09-06 this
+// function was handed exactly that: the available balance. That reading was
+// true of the CLAIM only by coincidence — every rise the product could then
+// produce was a received zap, and the one other riser, the starter grant,
+// escaped by an accident of ordering (it lands on the first read of a user's
+// life, so there is no remembered value for it to have risen from).
 //
-// WHAT A RISE IS SCOPED TO. R-N4's own words are "your balance has risen since
-// your last read" — a rise in the AVAILABLE BALANCE, which is what this
-// returns. It is not "a gift was received", and the difference is not
-// pedantry: the ledger is the server's and this function has read exactly one
-// number. Every rise the product can currently produce is a received zap
-// (`record_zap` credits only the recipient) and the one other riser, the
-// grant, is closed above — but that is a property of today's RPCs, not of
-// this function, and it is stated here so the next writer of a credit path
-// knows they are inside this claim.
+// The delivery allowance (20260906000001) is a credit path that does NOT
+// inherit that escape: a refill always lands on a remembered lower number,
+// and a balance-keyed detector would fly a bee carrying a gift of 380 drops
+// from nobody, for every consented person, at every delivery, forever.
 //
-// A FALL IS NOT AN ERROR AND NOT AN ARRIVAL. You sent a gift. The caller
-// still remembers the new, lower number — otherwise the balance you spent
-// down to would be re-announced as an arrival the moment it climbed back to
-// where it already was.
+// So the detector re-keys on the gift's own query — the total received
+// across `nectar_zaps` and `comb_nectar_notes` — rather than on a proxy for
+// it. Lumen's ruling (UX Design, 2026-09-06): every rendered state names its
+// query, and this flight's claim is "a gift arrived". The starter grant's
+// escape stops being an accident of ordering and becomes an escape by
+// construction, and so does every credit path written after this one. A
+// mint is not a gift, and now nothing has to say so.
 //
-// @param lastSeenDrops  the remembered balance, or `null` if never recorded
-// @param balanceDrops   the balance just read, or `null` if unknown
+// A FALL CANNOT HAPPEN, and that is the change under the re-key rather than
+// a rule this function still enforces. A received total is MONOTONE: both
+// source tables are append-only (`nectar_zaps_immutable`,
+// `comb_nectar_notes_immutable`) and their rows are FK'd `on delete
+// restrict`, so nothing subtracts. Sending a gift no longer moves this
+// number at all, where under the balance it moved it down. The `> 0` guard
+// below therefore now only catches the equal case; it is kept because a
+// detector that returns 0 as an arrival would fly a bee carrying nothing,
+// and because monotonicity is a property of two tables that could be
+// widened, not of this function.
+//
+// THE REMEMBERED VALUE IS NOW A RECEIVED TOTAL, NOT A BALANCE, and that is
+// why `NectarArrivalState` stores it under a new key. The two are both
+// finite numbers, so comparing one against the other is a shape this
+// function cannot detect — the same failure the per-account key exists to
+// prevent, arriving through time instead of through accounts.
+//
+// @param lastSeenReceivedDrops  the remembered received total, or `null` if
+//                               never recorded
+// @param receivedDrops          the received total just read, or `null` if
+//                               unknown
 // @returns the number of drops that arrived (> 0), or `null` for no arrival
-export const nectarArrivalDrops = (lastSeenDrops, balanceDrops) => {
-  const now = Number(balanceDrops);
-  const then = Number(lastSeenDrops);
-  if (balanceDrops === null || balanceDrops === undefined || !Number.isFinite(now)) return null;
-  if (lastSeenDrops === null || lastSeenDrops === undefined || !Number.isFinite(then)) return null;
+export const nectarArrivalDrops = (lastSeenReceivedDrops, receivedDrops) => {
+  const now = Number(receivedDrops);
+  const then = Number(lastSeenReceivedDrops);
+  if (receivedDrops === null || receivedDrops === undefined || !Number.isFinite(now)) return null;
+  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;
   const risen = now - then;
   return risen > 0 ? risen : null;
 };

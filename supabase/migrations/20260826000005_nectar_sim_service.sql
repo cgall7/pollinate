@@ -18,10 +18,20 @@
 --   is the client's job; this file only makes skipping it impossible.
 --
 --   §5.6 (POLLINATE_V2_SPEC.md): in 19a nectar is un-purchasable and
---   un-redeemable. The ONLY mint is the starter grant below, which is gated
---   on rails_mode = 'simulated' twice over (an explicit mode check here, and
---   I4 — the poll row it writes is is_simulated = true, which 'live' mode
---   rejects). No purchase path and no withdrawal path exist in this layer.
+--   un-redeemable. That is a rule about DOORS — no way in with money, no way
+--   out to money — and this file enforces both: no purchase path and no
+--   withdrawal path exist in this layer.
+--
+--   CORRECTED 2026-09-06 (Vector, ruled by Lumen): this paragraph used to
+--   read "the ONLY mint is the starter grant below", which §5.6 does not
+--   say. A simulated grant is neither a purchase nor a redemption, so the
+--   spec sentence never barred a second one — and reading a comment as a
+--   rule is how prose reds a build nothing forbids. It nearly did: the
+--   delivery allowance (20260906000001) is a second mint, ruled and shipped.
+--   What both mints DO share, and what the paragraph was really protecting,
+--   is the gate: each is gated on rails_mode = 'simulated' twice over (an
+--   explicit mode check in the function, and I4 — the poll row it writes is
+--   is_simulated = true, which 'live' mode rejects).
 --
 -- PLACEHOLDER NUMBERS — pending Colin's ratification (routed by Sage,
 -- channel b57ad406, thread f10c9a4a, 2026-08-26): no ratified drops→microUSD
