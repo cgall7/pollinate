@@ -378,7 +378,7 @@ export const HiveDetailScreen = ({ navigation, route }) => {
       {hive.sealedAt ? (
         <View style={styles.footer} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}>
           <Text style={styles.sealedNote}>
-            {hive.sentAt ? `Sent to ${hive.subjectName}.` : 'This hive is sealed — entries are read-only.'}
+            {hive.sentAt ? `Sent to ${hive.subjectName}.` : 'This hive is sealed. Entries are read-only.'}
           </Text>
         </View>
       ) : (

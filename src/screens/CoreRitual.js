@@ -110,7 +110,7 @@ export const InputScreen = ({ onUnlock }) => {
           // the contract it defends (onUnlock may be sync) still holds for
           // any future caller, and it costs one tick.
           Promise.resolve(onUnlock(text, paper)).catch(() => {
-            Alert.alert("Couldn't save", "Your entry didn't save — try again.");
+            Alert.alert("Couldn't save", "Your entry didn't save. Try again.");
             Animated.parallel([
               Animated.timing(overlayOpacity, {
                 toValue: 0,

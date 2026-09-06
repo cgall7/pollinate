@@ -41,7 +41,7 @@ export const PendingCombRow = ({ combName, style }) => (
     </View>
     <View style={styles.text}>
       <Text style={styles.name}>{combName}</Text>
-      <Text style={styles.status}>You're in — you'll be writing when the next month opens.</Text>
+      <Text style={styles.status}>You're in. You'll be writing when the next month opens.</Text>
     </View>
   </View>
 );

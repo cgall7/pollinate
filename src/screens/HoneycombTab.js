@@ -187,7 +187,7 @@ const WeekView = ({ sections, truncated, onLikeToggled }) => {
           than render a silently incomplete week. */}
       {truncated && (
         <Text style={styles.weekTruncationNote}>
-          Your hive was busy — showing the most recent {WEEK_FEED_LIMIT} shares from this week.
+          Your hive was busy. Showing the most recent {WEEK_FEED_LIMIT} shares from this week.
         </Text>
       )}
     </View>
@@ -934,18 +934,18 @@ const HoneycombFeed = () => {
             ) : (
               <View style={[styles.emptyState, styles.emptyStateSky]}>
                 <Text style={styles.emptyTitle}>Nothing in the hive yet.</Text>
-                <Text style={styles.emptyBody}>Be the first — share today's entry…</Text>
+                <Text style={styles.emptyBody}>Be the first. Share today's entry…</Text>
               </View>
             )
           ) : connections.length === 0 ? (
             <View style={[styles.emptyState, styles.emptyStateYellow]}>
               <Text style={styles.emptyTitle}>Make this hive yours.</Text>
-              <Text style={styles.emptyBody}>Add a connection by email — these neighbors are keeping your seats warm.</Text>
+              <Text style={styles.emptyBody}>Add a connection by email. These neighbors are keeping your seats warm.</Text>
             </View>
           ) : (
             <View style={[styles.emptyState, styles.emptyStateSky]}>
               <Text style={styles.emptyTitle}>Your connections haven't shared yet.</Text>
-              <Text style={styles.emptyBody}>Be the first — share today's entry…</Text>
+              <Text style={styles.emptyBody}>Be the first. Share today's entry…</Text>
             </View>
           )
         ) : (
@@ -978,7 +978,7 @@ const HoneycombEmptyState = () => {
   return (
     <View style={[styles.container, styles.gateContainer]}>
       <Text style={styles.gateDisplay}>Your hive is waiting.</Text>
-      <Text style={styles.gateBody}>Finish setting up your account to open it — takes less than a minute.</Text>
+      <Text style={styles.gateBody}>Finish setting up your account to open it. Takes less than a minute.</Text>
       <PrimaryButton onPress={() => navigation.getParent()?.navigate('Onboarding', { startAt: 'signup' })}>
         Finish signup
       </PrimaryButton>

@@ -198,7 +198,7 @@ export const InviteContributor = ({ navigation, route }) => {
 
         {listView === LOAD_STATES.EMPTY && (
           <Text style={styles.emptyBody}>
-            Add a connection first — then you can invite them to write here too.
+            Add a connection first. Then you can invite them to write here too.
           </Text>
         )}
 

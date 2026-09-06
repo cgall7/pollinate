@@ -52,7 +52,7 @@ export const IDEA_CATEGORIES = [
     sparks: [
       'the way the light looked this evening',
       'fresh air on my walk',
-      'a tree, a bird, the sky — something outside',
+      'a tree, a bird, the sky',
       'weather that matched my mood',
     ],
   },

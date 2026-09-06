@@ -81,7 +81,7 @@ export const MUTATIONS = [
     row: 'P8',
     why: 'the ruled sentence is trimmed, dropping the mechanism-backed promise that carries the whole state',
     file: 'src/components/PendingCombRow.js',
-    from: "      <Text style={styles.status}>You're in — you'll be writing when the next month opens.</Text>",
+    from: "      <Text style={styles.status}>You're in. You'll be writing when the next month opens.</Text>",
     to: "      <Text style={styles.status}>You're in.</Text>",
   },
   {
@@ -288,7 +288,7 @@ check(
 // comb and the upcoming one for a dormant comb — and mechanism-backed by the
 // mint's roster snapshot.
 check(
-  row.includes("You're in — you'll be writing when the next month opens."),
+  row.includes("You're in. You'll be writing when the next month opens."),
   'P8 the status line is COPY-6’s ruled sentence, verbatim'
 );
 

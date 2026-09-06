@@ -224,7 +224,7 @@ export const ContributingHiveScreen = ({ navigation, route }) => {
 
       {hive.sealedAt ? (
         <View style={styles.footer}>
-          <Text style={styles.sealedNote}>This hive is sealed — entries are read-only.</Text>
+          <Text style={styles.sealedNote}>This hive is sealed. Entries are read-only.</Text>
         </View>
       ) : (
         <View style={styles.footer}>

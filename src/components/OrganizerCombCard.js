@@ -19,9 +19,9 @@ const ROTATION_WRITER_COUNT_KIND = 'writers';
 // connection-shaped line (never a cause sentence, per the spec's own rule
 // that an owner on this card should never see a "not owner" claim).
 const MINT_REFUSAL_COPY = {
-  subjectGone: "That person's account is gone — choose someone else to write for.",
+  subjectGone: "That person's account is gone. Choose someone else to write for.",
   emptyRoster:
-    'A comb needs two people to be a comb. This comb has one member — invite someone, and the month can open.',
+    'A comb needs two people to be a comb. This comb has one member. Invite someone, and the month can open.',
   notOwner: "Couldn't open this month. Check your connection and try again.",
   unknown: "Couldn't open this month. Check your connection and try again.",
 };

@@ -74,7 +74,7 @@ export const ComposeHiveEntryScreen = ({ navigation, route }) => {
           <Text style={styles.errorText}>This hive has been sealed and can't accept new entries.</Text>
         )}
         {error === 'seatClosed' && (
-          <Text style={styles.errorText}>Your seat in this hive has closed — new entries can't be added.</Text>
+          <Text style={styles.errorText}>Your seat in this hive has closed. New entries can't be added.</Text>
         )}
         {error === 'unknown' && (
           <Text style={styles.errorText}>Couldn't save this entry. Check your connection and try again.</Text>

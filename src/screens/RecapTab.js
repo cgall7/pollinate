@@ -204,7 +204,7 @@ const WrappedCard = ({ monthLabel, monthKey, entryCount, unknown }) => {
         icon="gift-outline"
         title={`Nothing from ${monthLabel} yet`}
         subtitle="Write something and it'll be here next time."
-        accessibilityLabel={`No Wrapped for ${monthLabel} — no entries yet`}
+        accessibilityLabel={`No Wrapped for ${monthLabel}. No entries yet.`}
       />
     );
   }
@@ -222,7 +222,7 @@ const WrappedCard = ({ monthLabel, monthKey, entryCount, unknown }) => {
       subtitle={isSeen ? 'Open it again' : 'Ready to open'}
       badge={!isSeen}
       onPress={openWrapped}
-      accessibilityLabel={isSeen ? `${monthLabel}, wrapped — open again` : `${monthLabel}, wrapped — new`}
+      accessibilityLabel={isSeen ? `${monthLabel}, wrapped. Open again.` : `${monthLabel}, wrapped. New.`}
     />
   );
 };

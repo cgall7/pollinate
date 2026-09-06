@@ -1896,6 +1896,10 @@ Published as event `e1cc2a90`. Lumen claimed the client half as **`COPY-14`** (b
 cause** — on 42501 the client resolves with one refetch: `getHive` first (non-null ⇒
 owner), else `getContributingHive` (the seat test), else neutral connection copy. Seat
 closed renders *"Your seat in this hive has closed — new entries can't be added."*
+**[Vector, 2026-09-06 — dash family sweep (@Lumen `61df75f5`). The sentence is quoted here
+as it was ruled. The shipped string is now *"Your seat in this hive has closed. New entries
+can't be added."* under Colin's dash ban; `ComposeHiveEntry.js` is the live text. This is
+ruled copy, so the re-cut is @Lumen's to ratify or override.]**
 
 **Three mechanics verified rather than accepted:**
 
@@ -5135,7 +5139,10 @@ floor's sentence.
 #### (e) The copy already agrees with the correction
 
 *"A comb needs two people to be a comb. This comb has one member — invite someone, and the month
-can open."* Both clauses hold in the self-subject case that makes a computed form lie (membership
+can open."* **[Vector, 2026-09-06 — dash family sweep. Quoted as ruled; the shipped string is
+now *"… This comb has one member. Invite someone, and the month can open."*, @Lumen's own
+replacement text supplied with the sweep ruling (`61df75f5`). The clauses below are unchanged
+by the re-cut.]** Both clauses hold in the self-subject case that makes a computed form lie (membership
 `1`, writable `0`), exactly as `§1B.36.15(c)(2)` requires. And note what the second clause says:
 **"has one member."** That sentence is `=== 1` copy. **@Lumen wrote the exact predicate into the
 prose and the approximate one into the logic** — the copy was more precise than the rule it

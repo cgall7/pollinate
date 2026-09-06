@@ -52,7 +52,7 @@ export const MintRotationSheet = ({
 
         {!loading && !loadError && empty && (
           <>
-            <Text style={styles.body}>Nobody's joined yet — share the link.</Text>
+            <Text style={styles.body}>Nobody's joined yet. Share the link.</Text>
             <PressableScale onPress={shareInvite} style={styles.shareRow} accessibilityLabel="Share invite link">
               <Text style={styles.shareText}>Share invite link</Text>
             </PressableScale>
