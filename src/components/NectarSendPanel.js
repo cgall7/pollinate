@@ -54,6 +54,15 @@ export { NECTAR_PRESETS };
 // (20260826000005:336 / 20260826000006's re-issue). A client bound that
 // disagreed with it would either forbid a legal zap or promise an illegal
 // one.
+//
+// FU3 (Lumen, 2026-09-06, thread 160660d9; R-NT ratification item 5): the
+// bound is ONE SENTENCE SHAPE, `1 to 1000`, bare, and DERIVED from these two
+// at every site that quotes it. Bare because today's system spelling is bare
+// (`You have 1240 drops.`); comma grouping is a system-wide number-formatting
+// decision and does not get smuggled into a copy commit. Derived because a
+// quoted bound that stops agreeing with the server's own range either forbids
+// a legal amount or promises an illegal one, which is the same reason the
+// maximum is the server's in the first place.
 export const NECTAR_MIN_DROPS = 1;
 export const NECTAR_MAX_DROPS = 1000;
 
@@ -227,6 +236,8 @@ export const NectarSendPanel = ({
           {(displayDrops === undefined ? balanceDrops : displayDrops) === null
             || (displayDrops === undefined ? balanceDrops : displayDrops) === undefined
             ? "We couldn't check your drops."
+            : (displayDrops === undefined ? balanceDrops : displayDrops) === 1
+            ? 'You have 1 drop.'
             : `You have ${displayDrops === undefined ? balanceDrops : displayDrops} drops.`}
         </Animated.Text>
 
@@ -273,7 +284,7 @@ export const NectarSendPanel = ({
           ref={selected === null && customValue.trim().length > 0 ? originRef : undefined}
           style={styles.custom}
           keyboardType="number-pad"
-          placeholder={`Or an amount, 1-${NECTAR_MAX_DROPS}`}
+          placeholder={`Or an amount, ${NECTAR_MIN_DROPS} to ${NECTAR_MAX_DROPS}`}
           placeholderTextColor={theme.colors.inkSoft}
           value={customValue}
           onChangeText={onChangeCustom}

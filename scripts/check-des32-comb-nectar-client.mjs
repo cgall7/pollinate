@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from '@babel/parser';
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -64,10 +65,135 @@ const hasCloseAfterVisibleBalance = ({ compose, giftHook }) =>
   /if \(reduced \|\| !origin \|\| !destination\) await wait\(NECTAR\.settle\);[\s\S]*?setSuccessMessage\(message\);[\s\S]*?AccessibilityInfo\.announceForAccessibility\(message\);[\s\S]*?navigation\.goBack\(\);/.test(compose) &&
   /\.then\(\(res\) => new Promise\(\(resolve\) => \{[\s\S]*?setTimeout\(\(\) => resolve\(res\), NECTAR\.settle\);[\s\S]*?\}\)\)/.test(giftHook);
 
-const hasPlaceholderAnnouncement = ({ compose }) =>
-  /const recipientIsPlaceholder = recipient \? isPlaceholderName\(recipient\.display_name\) : true/.test(compose) &&
-  /const message = recipientIsPlaceholder \? `Sent \$\{resolvedAmount\} drops\.` : `Sent \$\{resolvedAmount\} drops to \$\{recipientLabel\}\.`/.test(compose) &&
-  !/Sent \$\{resolvedAmount\} drops to \$\{recipient \? recipientLabel : 'your comb member'\}/.test(compose);
+// FU3 (Pixel, thread 160660d9) rewrote this predicate as a property.
+//
+// It used to be a verbatim match on the whole `const message = …` ternary,
+// which pinned the SENTENCE. The row's header is about the TARGET: when the
+// recipient's name is a placeholder, the announcement must not aim at a
+// person. Lumen's FU3 pluralisation ruling changed the sentence and nothing
+// about the target, and the row went red — a row wider than its own header,
+// reddening correct work. Worse, it took the mutation below with it: the
+// mutation's `.replace()` no longer matched, so it was a no-op, the
+// predicate was already false, and `!predicate(mutated)` reported a pass.
+// A GATE THAT CANNOT DO THE MEASUREMENT MUST NOT IMPLY IT STILL HOLDS, so
+// `assertMutationCaught` now proves the mutation changed something first.
+//
+// Written as a universal over the arms of the announcement expression: every
+// arm is reached under a known value of `recipientIsPlaceholder`, both values
+// occur, no placeholder arm names the recipient, and every non-placeholder arm
+// does. That is the header, and it says nothing about wording or plurals.
+const parseSource = (code) => parse(code, { sourceType: 'module', plugins: ['jsx'] });
+
+const namesRecipient = (node) => {
+  let found = false;
+  const walk = (n) => {
+    if (found || !n || typeof n !== 'object') return;
+    if (Array.isArray(n)) return n.forEach(walk);
+    if (typeof n.type !== 'string') return;
+    if (n.type === 'Identifier' && (n.name === 'recipientLabel' || n.name === 'recipient')) {
+      found = true;
+      return;
+    }
+    for (const key of Object.keys(n)) {
+      if (key === 'loc' || key === 'leadingComments' || key === 'trailingComments') continue;
+      walk(n[key]);
+    }
+  };
+  walk(node);
+  return found;
+};
+
+// Flatten a nested ConditionalExpression into its leaves, each carrying what
+// `recipientIsPlaceholder` must be for that leaf to be the value. A leaf under
+// no test on that flag carries `null`, which the predicate treats as a failure
+// rather than as a pass, so an announcement that stops branching on the flag
+// at all is caught rather than being vacuously clean.
+const announcementArms = (node, placeholder = null) => {
+  if (!node || node.type !== 'ConditionalExpression') return [{ node, placeholder }];
+  const onFlag = node.test.type === 'Identifier' && node.test.name === 'recipientIsPlaceholder';
+  return [
+    ...announcementArms(node.consequent, onFlag ? true : placeholder),
+    ...announcementArms(node.alternate, onFlag ? false : placeholder),
+  ];
+};
+
+const FUNCTION_TYPES = new Set([
+  'FunctionDeclaration',
+  'FunctionExpression',
+  'ArrowFunctionExpression',
+  'ObjectMethod',
+  'ClassMethod',
+]);
+
+// The announcement is RESOLVED, not merely located: find the call that speaks
+// it, walk out to the innermost function that encloses that call, and take the
+// `message` binding from the nearest enclosing scope that declares one. A
+// `const message` somewhere else in this file is then none of this row's
+// business, which is the same mistake in miniature as the one this rewrite is
+// undoing.
+const successAnnouncementArms = (compose) => {
+  const ast = parseSource(compose);
+  let announceStack = null;
+  const declarations = [];
+  const stack = [];
+  const walk = (n) => {
+    if (!n || typeof n !== 'object') return;
+    if (Array.isArray(n)) return n.forEach(walk);
+    if (typeof n.type !== 'string') return;
+    const isFunction = FUNCTION_TYPES.has(n.type);
+    if (isFunction) stack.push(n);
+    if (
+      n.type === 'CallExpression' &&
+      n.callee.type === 'MemberExpression' &&
+      n.callee.property.type === 'Identifier' &&
+      n.callee.property.name === 'announceForAccessibility' &&
+      n.arguments.length === 1 &&
+      n.arguments[0].type === 'Identifier' &&
+      n.arguments[0].name === 'message'
+    ) {
+      if (announceStack) announceStack = 'ambiguous';
+      else announceStack = stack.slice();
+    }
+    if (
+      n.type === 'VariableDeclarator' &&
+      n.id.type === 'Identifier' &&
+      n.id.name === 'message' &&
+      n.init
+    ) {
+      declarations.push({ init: n.init, stack: stack.slice() });
+    }
+    for (const key of Object.keys(n)) {
+      if (key === 'loc' || key === 'leadingComments' || key === 'trailingComments') continue;
+      walk(n[key]);
+    }
+    if (isFunction) stack.pop();
+  };
+  walk(ast.program);
+  if (!announceStack || announceStack === 'ambiguous') return null;
+
+  // Innermost enclosing scope first: a declaration is in scope for the call
+  // when its own function stack is a prefix of the call's.
+  const inScope = declarations
+    .filter((d) => d.stack.every((fn, i) => announceStack[i] === fn))
+    .sort((a, b) => b.stack.length - a.stack.length);
+  if (inScope.length === 0) return null;
+  const innermost = inScope.filter((d) => d.stack.length === inScope[0].stack.length);
+  if (innermost.length !== 1) return null;
+  return announcementArms(innermost[0].init);
+};
+
+const hasPlaceholderAnnouncement = ({ compose }) => {
+  if (!/const recipientIsPlaceholder = recipient \? isPlaceholderName\(recipient\.display_name\) : true/.test(compose)) return false;
+  const arms = successAnnouncementArms(compose);
+  if (!arms || arms.length === 0) return false;
+  if (arms.some((arm) => arm.placeholder === null)) return false;
+  const placeholderArms = arms.filter((arm) => arm.placeholder === true);
+  const namedArms = arms.filter((arm) => arm.placeholder === false);
+  if (placeholderArms.length === 0 || namedArms.length === 0) return false;
+  if (placeholderArms.some((arm) => namesRecipient(arm.node))) return false;
+  if (namedArms.some((arm) => !namesRecipient(arm.node))) return false;
+  return true;
+};
 
 const hasRefusalState = ({ compose }) =>
   /const sendId = useRef\(randomUUID\(\)\)/.test(compose) &&
@@ -180,9 +306,15 @@ check(
     !fixtureBalanceSuccess({ before: 240, amount: 40, after: 240 })
 );
 
+// A mutation that no longer matches its target is a no-op, and a no-op scores
+// as CAUGHT because the unmutated source already fails whatever the predicate
+// was asked about. Every mutation below therefore gets a second, named row
+// proving it changed at least one source, so the calibration cannot go quiet.
 const assertMutationCaught = (name, mutate, predicate) => {
   const mutated = mutate({ ...baseSources });
-  check(name, !predicate(mutated));
+  const changed = Object.keys(baseSources).some((key) => mutated[key] !== baseSources[key]);
+  check(`${name} (the mutation actually changes the source)`, changed);
+  check(name, changed && !predicate(mutated));
 };
 
 assertMutationCaught(
@@ -252,7 +384,7 @@ assertMutationCaught(
   (sources) => ({
     ...sources,
     compose: sources.compose.replace(
-      'const message = recipientIsPlaceholder ? `Sent ${resolvedAmount} drops.` : `Sent ${resolvedAmount} drops to ${recipientLabel}.`;',
+      /const message =[\s\S]*?`Sent \$\{resolvedAmount\} drops to \$\{recipientLabel\}\.`;/,
       "const message = `Sent ${resolvedAmount} drops to ${recipient ? recipientLabel : 'your comb member'}.`;"
     ),
   }),

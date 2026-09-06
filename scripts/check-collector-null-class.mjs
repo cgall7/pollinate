@@ -502,24 +502,40 @@ const TABLE = [
   // asserts all four labels are declared. Nothing reads it to a person.
   { at: 'src/navigation/MainTabs.js:194 [\\bnectar\\b] "Nectar"', kind: 'not-copy/route-identity' },
 
-  // --- reaches a person, and a ruling says a different word ------------
-  // FU3 (Lumen, same thread): the bound is one sentence shape, `1 to 1000`,
-  // bare, derived from NECTAR_MAX_DROPS. These two render an en dash AND a
-  // comma, so they are two departures from one ruled string. The fix is the
-  // copy-alignment commit, not this one.
-  { at: 'src/screens/CombNectarCompose.js:149 [\\bdrops\\b] "Choose 1–1,000 drops."', kind: 'reads-to-user/wrong-word', owed: 'FU3 copy alignment' },
-  { at: 'src/screens/CombNectarCompose.js:212 [\\bdrops\\b] "Choose 1–1,000 drops."', kind: 'reads-to-user/wrong-word', owed: 'FU3 copy alignment' },
-
-  // --- reaches a person, and nobody has ruled --------------------------
-  // Money copy on the give screen, authored into a state setter and a local
-  // `const`. B4 has never measured any of these: `positionFor` settles
-  // nothing above them, so they are not permitted, they are ABSENT. No live
-  // defect today — `validationMessage` renders inside `{nectarConsent && …}`
-  // and `successMessage` can only be set from `send()`, unreachable without
-  // consent — but the standing of the claim is the finding, not the render.
-  { at: 'src/screens/CombNectarCompose.js:79 [\\bdrops\\b] "Your balance changed. You have drops now."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
-  { at: 'src/screens/CombNectarCompose.js:172 [\\bdrops\\b] "Sent drops."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
-  { at: 'src/screens/CombNectarCompose.js:172 [\\bdrops\\b] "Sent drops to ."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
+  // --- reaches a person, and the word is the ruled one ----------------
+  // FU3 (Lumen, 2026-09-06, same thread; R-NT ratification items 5 and 6).
+  // Both halves of that ruling land here, and BOTH CHANGED THE POPULATION,
+  // which is worth stating because it is the shape a copy commit hides in.
+  //
+  // The bound is one derived sentence, `Choose 1 to 1000 drops.`, taken from
+  // NECTAR_MIN_DROPS/NECTAR_MAX_DROPS at both sites. The text below reads
+  // `"Choose to drops."` because this gate's raw walk joins a template
+  // literal's quasis and drops the interpolation — the collector's own
+  // limitation, named in `rendered-strings.mjs`, not a second spelling.
+  //
+  // The pluralisation is written as WHOLE SENTENCES at every arm rather than
+  // as `${n} ${unit}`, so each rendered string is still a string in the
+  // source. A computed unit would have taken every one of these sentences out
+  // of the nectar reserve's population — the reserve matches `\bdrops\b` and
+  // `\b\d+\s+drop\b` on TEXT, and neither survives being interpolated —
+  // and they would have left this table silently while rendering unchanged.
+  //
+  // Five entries left and eight arrived. THREE of the eight are new, and they
+  // are the three singular arms below; the other five are the same strings the
+  // table already carried, moved by the line shift and reclassified. The
+  // fourth singular arm Lumen's ruling names, `NectarSendPanel.js:240`'s
+  // `You have 1 drop.`, is NOT missing from this table: it sits in a
+  // <Text> child, so `positionFor` settles it, so it is COLLECTED and
+  // `check-copy-rules` stands over it. Four ruled sites, three of them here,
+  // because this gate is the complement and not the universe.
+  { at: 'src/screens/CombNectarCompose.js:92 [\\b\\d+\\s+drop\\b] "Your balance changed. You have 1 drop now."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:93 [\\bdrops\\b] "Your balance changed. You have drops now."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:165 [\\bdrops\\b] "Choose to drops."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:193 [\\b\\d+\\s+drop\\b] "Sent 1 drop."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:194 [\\b\\d+\\s+drop\\b] "Sent 1 drop to ."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:196 [\\bdrops\\b] "Sent drops."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:197 [\\bdrops\\b] "Sent drops to ."', kind: 'reads-to-user/ruled' },
+  { at: 'src/screens/CombNectarCompose.js:237 [\\bdrops\\b] "Choose to drops."', kind: 'reads-to-user/ruled' },
 
   // A THEME KEY IS USER-FACING COPY. `THEMES[].key` is rendered directly:
   // MonthlyRecap.js:93 `{entry.theme || tagEntry(entry.text)}` inside a

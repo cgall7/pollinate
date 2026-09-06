@@ -8,7 +8,12 @@ import { hasNectarConsent } from '../constants/nectar';
 import { randomUUID } from '../utils/uuid';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PressableScale } from '../components/PressableScale';
-import { NectarSendPanel, isSendableAmount } from '../components/NectarSendPanel';
+import {
+  NectarSendPanel,
+  isSendableAmount,
+  NECTAR_MIN_DROPS,
+  NECTAR_MAX_DROPS,
+} from '../components/NectarSendPanel';
 import { NectarGiftLayer } from '../components/NectarGiftLayer';
 import { useNectarGift } from '../components/useNectarGift';
 import { NECTAR, useReducedMotion } from '../constants/motion';
@@ -76,7 +81,17 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       .then((drops) => {
         setBalanceDrops(drops);
         if (balanceChangePending && Number.isFinite(drops)) {
-          setValidationMessage(`Your balance changed. You have ${drops} drops now.`);
+          // FU3: singular at EXACTLY 1, the same three-arm shape the tab
+          // already ships (NectarTab.js:346-349). Written as whole sentences
+          // rather than a computed unit so each rendered string stays in the
+          // source as a string — a `${unit}` interpolation would take this
+          // sentence out of the nectar reserve's population and out of
+          // check-collector-null-class's table with it.
+          setValidationMessage(
+            drops === 1
+              ? 'Your balance changed. You have 1 drop now.'
+              : `Your balance changed. You have ${drops} drops now.`
+          );
           setBalanceChangePending(false);
         }
       })
@@ -146,7 +161,8 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
     if (!note.trim()) return setValidationMessage('Add a note first.');
     if (wordCount(note) > 8) return setValidationMessage('Keep it to 8 words.');
     if (note.length > 280) return setValidationMessage('Keep the note under 280 characters.');
-    if (!isSendableAmount(resolvedAmount, balanceDrops)) return setValidationMessage('Choose 1–1,000 drops.');
+    if (!isSendableAmount(resolvedAmount, balanceDrops))
+      return setValidationMessage(`Choose ${NECTAR_MIN_DROPS} to ${NECTAR_MAX_DROPS} drops.`);
     if (!recipientId) return setValidationMessage('Choose someone else in this comb.');
     setValidationMessage(null);
     setSending(true); setFailed(false);
@@ -169,7 +185,16 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
           .then(() => NectarStore.getBalanceDrops())
           .then((drops) => { setBalanceDrops(drops); return { ok: true }; }, (err) => ({ ok: false, err }));
       if (!result.ok) throw result.err;
-      const message = recipientIsPlaceholder ? `Sent ${resolvedAmount} drops.` : `Sent ${resolvedAmount} drops to ${recipientLabel}.`;
+      // FU3: four whole sentences rather than two with a computed unit, for
+      // the reason given at the balance line above.
+      const message =
+        resolvedAmount === 1
+          ? recipientIsPlaceholder
+            ? 'Sent 1 drop.'
+            : `Sent 1 drop to ${recipientLabel}.`
+          : recipientIsPlaceholder
+            ? `Sent ${resolvedAmount} drops.`
+            : `Sent ${resolvedAmount} drops to ${recipientLabel}.`;
       if (!origin || !destination) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (reduced || !origin || !destination) await wait(NECTAR.settle);
       setSuccessMessage(message);
@@ -209,7 +234,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       } else if (/note is too long/i.test(refusal)) {
         setValidationMessage('Keep the note under 280 characters.');
       } else if (/amount must be between 1 and 1000 drops/i.test(refusal)) {
-        setValidationMessage('Choose 1–1,000 drops.');
+        setValidationMessage(`Choose ${NECTAR_MIN_DROPS} to ${NECTAR_MAX_DROPS} drops.`);
       } else if (/nectar consent required/i.test(refusal)) {
         setValidationMessage('Turn this on from a reveal before sending.');
       } else if (/not signed in/i.test(refusal)) {
