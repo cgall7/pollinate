@@ -407,8 +407,22 @@ const TABLE = [
 
   // Demo entry text. `check-demo-hive` runs the forbidden list over
   // `demoHiveShares` on the stated ground that the demo set is authored
-  // copy too; these lines are the same class and reach the app through
-  // `EntryStore.js:3`'s `buildDemoEntries`, and no gate has ever read them.
+  // copy too. These two are the same class and no gate has ever read them.
+  //
+  // REACH, measured rather than assumed, because "demo" is not one thing.
+  // `buildDemoEntries` is called at `EntryStore.js:168` inside
+  // `seedDemoData`, whose own body consults DEMO_CONTENT
+  // (`__DEV__ || DEMO_MODE`), from `TodayTab.js:296`. Run at its default
+  // 180 days with its fixed seed, the corpus draws 4 Faith days: 2 `pray`
+  // lines and 2 `blessed` lines. At 365 it is 13, 7 and 6.
+  //
+  // THE DEMO ACCOUNT IS A DIFFERENT WRITER AND IT IS CLEAN ON THE TEXT.
+  // `scripts/lib/demo-seed-corpus.mjs` is what `seed-demo-account.mjs`
+  // writes, and its Faith-tagged lines carry no listed word — somebody
+  // already avoided them there. What it does carry is the THEME, so the
+  // label `Faith` renders on that account too. Scope: that file is under
+  // `scripts/`, outside this gate's universe, so this is a statement about
+  // where I looked and not a claim about the tree.
   { at: 'src/utils/demoSeed.js:44 [pray] "I am grateful for a moment of real quiet to pray today."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
   { at: 'src/utils/demoSeed.js:45 [blessed] "I am grateful to feel blessed even on an ordinary day."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
 ];
