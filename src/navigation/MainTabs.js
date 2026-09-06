@@ -137,15 +137,74 @@ export const MainTabs = () => {
           (Nectar makes no such call — R-NT-5's amendment holds the give door
           back until a destination is ruled — so it is a direct child for
           consistency and for the day it does.) */}
-      <Tab.Screen name="Today" component={TodayTab} />
-      <Tab.Screen name="Hive" component={HoneycombTab} />
-      <Tab.Screen name="Nectar" component={NectarTab} />
+      {/* R-NT ratification item 4 (Lumen, 2026-09-06, thread 160660d9;
+          POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 3): the dock's four
+          destination names are AUTHORED WORDS — `Today`, `Honeycomb`,
+          `Nectar`, `Garden`. Until this commit none of the four was
+          declared anywhere, so both accessibility channels fell back to
+          `route.name` and VoiceOver said "Hive" for a tab whose ruled name
+          is Honeycomb.
+
+          The prop is a STRING `tabBarLabel`, and it is the whole mechanism.
+          Read out of the installed @react-navigation/bottom-tabs@7.18.15:
+
+            BottomTabItem.tsx:218-226   labelString = getLabel(
+                                          { label: typeof tabBarLabel ===
+                                              'string' ? tabBarLabel : undefined,
+                                            title }, route.name)
+            BottomTabItem.tsx:349-350   accessibilityLargeContentTitle =
+                                          labelString  (the iOS HUD DRAWS it)
+            BottomTabBar.tsx:421-427    label = getLabel({ tabBarLabel, title },
+                                          route.name)
+            BottomTabBar.tsx:429-434    iOS accessibilityLabel =
+                                          `${label}, tab, i of n`  (SPOKEN)
+
+          One value, both channels. `tabBarAccessibilityLabel` is the half
+          fix that looks done: BottomTabBar.tsx:430-431 is its only consumer,
+          so it overrides the spoken string and leaves the Large Content
+          Viewer HUD still drawing `route.name`.
+
+          Declared on ALL FOUR, not only the one that differed. The other
+          three were correct by the `route.name` fallback, which is a
+          justification that expires the moment a route id moves — the exact
+          shape this arc has now tripped over twice. With four explicit
+          labels the fallback is never reached.
+
+          Invisible, still: `renderLabel` (BottomTabItem.tsx:242-247) returns
+          null before it touches the label whenever `tabBarShowLabel` is
+          false and `labelVisibilityMode` is unset, which is this tree. The
+          dock stays icons only per R-NT-1.
+
+          Route ids are NOT renamed. They are navigation identity: `TabIcon`
+          keys `TAB_ICONS` on `route.name` and the cross-tab
+          `getParent()?.navigate` targets resolve against these four names.
+          Changing an identity to fix a label is paying in the wrong
+          currency. */}
+      <Tab.Screen
+        name="Today"
+        component={TodayTab}
+        options={{ tabBarLabel: 'Today' }}
+      />
+      <Tab.Screen
+        name="Hive"
+        component={HoneycombTab}
+        options={{ tabBarLabel: 'Honeycomb' }}
+      />
+      <Tab.Screen
+        name="Nectar"
+        component={NectarTab}
+        options={{ tabBarLabel: 'Nectar' }}
+      />
       {/* Garden's landing content is Recap — the ruling's solo-user
           description of this tab ("your entries, streak, monthly recap") is
           RecapTab's contents line for line. The file keeps its name because
           `scripts/check-streaks.mjs:197` reads `src/screens/RecapTab.js` by
           path; renaming it here would only move the mismatch into a gate. */}
-      <Tab.Screen name="Garden" component={RecapTab} />
+      <Tab.Screen
+        name="Garden"
+        component={RecapTab}
+        options={{ tabBarLabel: 'Garden' }}
+      />
     </Tab.Navigator>
   );
 };

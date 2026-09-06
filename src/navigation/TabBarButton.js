@@ -16,6 +16,16 @@ import { SPRINGS, PRESS } from '../constants/motion';
 // uses; it calls preventDefault for plain left clicks while still letting
 // cmd/middle-click open a new tab. `pressOpacity: 1` arrives via `rest`, so
 // its opacity fade stays off and the spring below is the only press feedback.
+//
+// `...rest` IS LOAD-BEARING FOR ACCESSIBILITY, not just for `pressOpacity`.
+// A `tabBarButton` replaces the element BottomTabItem hands the tab's two
+// accessibility channels to (`'aria-label'` at BottomTabItem.tsx:348, the
+// string VoiceOver speaks; `accessibilityLargeContentTitle` at :349, what
+// the iOS Large Content Viewer HUD draws). Both arrive here in `rest` and
+// reach PlatformPressable only through the spread below. Naming either one
+// in the pattern above captures it and deletes the channel, and the dock's
+// declared labels (MainTabs.js) would still be there, still correct, and
+// heard by nobody. Enforced: `npm run check:collector-null-class`, N4.
 export const TabBarButton = ({ children, onPress, style, ...rest }) => {
   const scale = useRef(new Animated.Value(1)).current;
 

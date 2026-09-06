@@ -60,10 +60,20 @@
 //   BottomTabItem.tsx:348-350  accessibilityLargeContentTitle = labelString,
 //                              accessibilityShowsLargeContentViewer: true
 //
-// Neither `tabBarLabel` nor `title` is set on any of the four tab screens,
-// so both channels fall back to `route.name`: VoiceOver SPEAKS it, and the
-// iOS Large Content Viewer DRAWS it as a HUD on a long press at large text
-// sizes. The second one is a rendering, not an announcement.
+// At the commit this gate landed on, neither `tabBarLabel` nor `title` was
+// set on any of the four tab screens, so both channels fell back to
+// `route.name`: VoiceOver SPOKE it, and the iOS Large Content Viewer DREW
+// it as a HUD on a long press at large text sizes. The second one is a
+// rendering, not an announcement.
+//
+// AMENDED BY FU2 (Pixel, 2026-09-06). All four tab screens now declare a
+// string `tabBarLabel`, so the fallback is unreachable and the route ids
+// are no longer copy. N4 asserts that structurally rather than restating
+// it: THE SENTENCE ABOVE IS EXACTLY THE KIND THAT EXPIRES, which is what
+// put the route ids in this gate in the first place. What P3 measures now
+// is the LABEL — and the label is in the null class too, because `options`
+// is not a TEXT_ATTRS attribute, so the one word the dock speaks is
+// invisible to `check-copy-rules` for the same reason the route id was.
 //
 // THE TABLE RECORDS A DISPOSITION. IT DOES NOT INVENT ONE. An entry whose
 // word reaches a person and has no ruling is classified `unruled` and named
@@ -174,6 +184,58 @@ const enclosingNavigatorHeadersOff = (ancestors) => {
   return false;
 };
 
+// The string `tabBarLabel` declared on one <Tab.Screen>'s own `options`,
+// or undefined. STRING ONLY, because that is the whole of the mechanism:
+// `getLabel` (BottomTabItem.tsx:218-226) takes `tabBarLabel` only when
+// `typeof … === 'string'` and otherwise falls straight back through `title`
+// to `route.name`. A function `tabBarLabel` is a renderer for the PAINTED
+// label, which `tabBarShowLabel: false` never draws, so it would leave both
+// accessibility channels on the route id while looking declared.
+const declaredTabBarLabel = (openingElement) => {
+  for (const attr of openingElement.attributes) {
+    if (attr.type !== 'JSXAttribute' || attr.name?.name !== 'options') continue;
+    const obj = attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : null;
+    if (obj?.type !== 'ObjectExpression') return undefined;
+    for (const prop of obj.properties) {
+      if (
+        prop.type === 'ObjectProperty' &&
+        prop.key?.name === 'tabBarLabel' &&
+        prop.value?.type === 'StringLiteral'
+      ) {
+        return prop.value.value;
+      }
+    }
+  }
+  return undefined;
+};
+
+// Every component named by `screenOptions.tabBarButton`. Returned as a list
+// rather than a single name so a second one cannot arrive unmeasured.
+const tabBarButtonComponents = (attr) => {
+  const names = [];
+  const seen = new Set();
+  (function find(node) {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) return node.forEach(find);
+    if (
+      node.type === 'ObjectProperty' &&
+      node.key?.name === 'tabBarButton'
+    ) {
+      (function findJsx(n) {
+        if (!n || typeof n !== 'object') return;
+        if (Array.isArray(n)) return n.forEach(findJsx);
+        if (n.type === 'JSXOpeningElement' && n.name?.type === 'JSXIdentifier') {
+          if (!seen.has(n.name.name)) { seen.add(n.name.name); names.push(n.name.name); }
+        }
+        for (const k of Object.keys(n)) if (k !== 'loc') findJsx(n[k]);
+      })(node.value);
+      return;
+    }
+    for (const k of Object.keys(node)) if (k !== 'loc') find(node[k]);
+  })(attr.value);
+  return names;
+};
+
 // The channel a dropped string sits in, READ OFF THE AST rather than
 // declared in the table. The table below has to AGREE with this, so a
 // mechanical class cannot be asserted by hand and then quietly drift.
@@ -213,6 +275,8 @@ const inventedByCollector = [];
 const population = [];   // members of P1 union P2 union P3
 const routeIds = [];     // every *.Screen name= value, for P3's own row
 const headerOverrides = [];
+const tabBarButtons = [];  // the component named by screenOptions.tabBarButton
+const components = new Map();  // component name -> how it treats the props it is handed
 
 for (const file of files) {
   const rel = path.relative(ROOT, file);
@@ -242,8 +306,68 @@ for (const file of files) {
             navigator: `${n.object?.name}.${n.property?.name}`,
             text: v.value,
             headersOff: enclosingNavigatorHeadersOff(ancestors),
+            // The declared label, read off THIS element's own `options`.
+            // `undefined` means no string `tabBarLabel` is declared, which
+            // is the state that puts `route.name` back in front of a
+            // person — so it is a value the rows below can fail on rather
+            // than an absence they cannot see.
+            label: declaredTabBarLabel(node),
           });
         }
+      }
+      // `tabBarButton` replaces the element BottomTabItem hands the two
+      // accessibility props to, so the component it names is part of the
+      // delivery chain and is checked below.
+      if (n?.type === 'JSXMemberExpression' && n.property?.name === 'Navigator') {
+        for (const attr of node.attributes) {
+          if (attr.type !== 'JSXAttribute' || attr.name?.name !== 'screenOptions') continue;
+          for (const name of tabBarButtonComponents(attr)) {
+            tabBarButtons.push({ at: `${rel}:${attr.loc?.start.line}`, name });
+          }
+        }
+      }
+      return;
+    }
+    // Every `const X = ({ … }) => …` in the tree, recorded by how it treats
+    // the props it is handed. Needed because `tabBarButton` REPLACES the
+    // element BottomTabItem hands `aria-label` and
+    // `accessibilityLargeContentTitle` to, so a component that destructures
+    // one of them away, or stops spreading its rest, silently deletes the
+    // channel that the declared label exists to feed.
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id?.type === 'Identifier' &&
+      (node.init?.type === 'ArrowFunctionExpression' || node.init?.type === 'FunctionExpression')
+    ) {
+      const param = node.init.params[0];
+      if (param?.type === 'ObjectPattern') {
+        const named = [];
+        let restName;
+        for (const prop of param.properties) {
+          if (prop.type === 'RestElement' && prop.argument?.type === 'Identifier') {
+            restName = prop.argument.name;
+          } else if (prop.type === 'ObjectProperty') {
+            named.push(prop.key?.name ?? prop.key?.value);
+          }
+        }
+        let spreadsRest = false;
+        if (restName) {
+          walkWithAncestry(node.init.body, (inner) => {
+            if (
+              inner.type === 'JSXSpreadAttribute' &&
+              inner.argument?.type === 'Identifier' &&
+              inner.argument.name === restName
+            ) {
+              spreadsRest = true;
+            }
+          });
+        }
+        components.set(node.id.name, {
+          at: `${rel}:${node.loc?.start.line}`,
+          named,
+          restName,
+          spreadsRest,
+        });
       }
       return;
     }
@@ -285,14 +409,6 @@ for (const file of files) {
   for (const s of collected) if (!rawNodes.has(s.node)) inventedByCollector.push(`${rel}:${s.line}`);
 }
 
-// P3 joins the population after the walk, because a route id is identified
-// by its ELEMENT rather than by its text, and MainTabs.js:142 is already in
-// via P2. Keyed the same way so the table is one table.
-const routeIdKeys = new Set();
-for (const r of routeIds) {
-  routeIdKeys.add(`${r.at} [route-id] ${JSON.stringify(r.text)}`);
-}
-
 console.log(`\n--- N1. the universe, and that no predicate is standing over nothing ---`);
 check('source files were found', files.length > 0, true);
 check('every file in the universe parsed', parseFailures, 0);
@@ -324,6 +440,7 @@ const KINDS = {
   'not-copy/module-specifier': 'An import path. No channel carries it to a person.',
   'not-copy/developer-log': 'A console argument. Reaches a developer console and nothing else.',
   'not-copy/matcher-input': 'Compared against text the user wrote. Never rendered.',
+  'not-copy/route-identity': 'A navigator route id whose label channels are all declared. No channel carries it to a person.',
   'reads-to-user/ruled': 'A person reads this word and it is the ruled word.',
   'reads-to-user/unruled': 'A person reads this word and NOBODY HAS RULED ON IT.',
   'reads-to-user/wrong-word': 'A person reads this word and a ruling says a different one.',
@@ -369,10 +486,21 @@ const TABLE = [
 
   // --- reaches a person, and the word is the ruled one ----------------
   // Lumen, 2026-09-06, thread 160660d9: the dock may say `Nectar`, and the
-  // four destination names become authored labels. The route id and the
-  // ruled word agree here; `Hive` is the one that does not, and it is in
-  // N4's table because a route id is identified by its element.
-  { at: 'src/navigation/MainTabs.js:142 [\\bnectar\\b] "Nectar"', kind: 'reads-to-user/ruled' },
+  // four destination names become authored labels. FU2 declares all four as
+  // string `tabBarLabel`s, so THE LABEL is the word a person now hears and
+  // the route id beside it is no longer read at all (N4).
+  //
+  // The label is in this table and not in `check-copy-rules`' universe for
+  // the reason this gate exists: `options` is not a TEXT_ATTRS attribute, so
+  // `positionFor` settles nothing above it and the string never enters the
+  // collector's universe. The one word the dock speaks is in the null class.
+  { at: 'src/navigation/MainTabs.js:196 [\\bnectar\\b] "Nectar"', kind: 'reads-to-user/ruled' },
+
+  // The route id on the line beside it. Same text, different object, and
+  // after FU2 a different disposition: `getLabel` reaches `route.name` only
+  // when neither a string `tabBarLabel` nor a `title` is declared, and N4
+  // asserts all four labels are declared. Nothing reads it to a person.
+  { at: 'src/navigation/MainTabs.js:194 [\\bnectar\\b] "Nectar"', kind: 'not-copy/route-identity' },
 
   // --- reaches a person, and a ruling says a different word ------------
   // FU3 (Lumen, same thread): the bound is one sentence shape, `1 to 1000`,
@@ -494,19 +622,39 @@ check(
 // The four tab labels, ruled by Lumen 2026-09-06 in thread 160660d9:
 // `Today`, `Honeycomb`, `Nectar`, `Garden`. Narrow ruling, four destination
 // names, no general reserve change.
+//
+// FU2 CHANGES WHAT THIS SECTION MEASURES. Before it, no tab screen declared
+// a label, both accessibility channels fell back through `getLabel` to
+// `route.name`, and the route id WAS the word — so `Hive` was filed
+// wrong-word. FU2 declares a string `tabBarLabel` on all four, which moves
+// the subject: the LABEL is now the word a person reads, the route id is
+// navigation identity that nothing carries, and the rows below assert the
+// structure that makes that true rather than the sentence that says it.
 const RULED_TAB_LABELS = {
-  'src/navigation/MainTabs.js:140': 'Today',
-  'src/navigation/MainTabs.js:141': 'Honeycomb',
-  'src/navigation/MainTabs.js:142': 'Nectar',
-  'src/navigation/MainTabs.js:148': 'Garden',
+  'src/navigation/MainTabs.js:184': 'Today',
+  'src/navigation/MainTabs.js:189': 'Honeycomb',
+  'src/navigation/MainTabs.js:194': 'Nectar',
+  'src/navigation/MainTabs.js:204': 'Garden',
 };
 
-// The one place the route id and the ruled word disagree today. FU2 is the
-// commit that closes it, with a string `tabBarLabel` on all four screens —
-// `tabBarAccessibilityLabel` carries only the VoiceOver channel
-// (BottomTabBar.tsx:430-431) and would leave the Large Content Viewer HUD
-// still drawing `Hive`, which is the half fix that looks done.
-const TAB_LABEL_DISAGREEMENTS = ['src/navigation/MainTabs.js:141 route id "Hive" vs ruled "Honeycomb"'];
+// The props BottomTabItem hands to `tabBarButton`, which is what makes the
+// declared label reach a person at all:
+//
+//   BottomTabItem.tsx:348   'aria-label': accessibilityLabel
+//                             (BottomTabBar.tsx:429-434, the SPOKEN string)
+//   BottomTabItem.tsx:349   accessibilityLargeContentTitle: labelString
+//                             (the iOS Large Content Viewer HUD, DRAWN)
+//
+// A custom button that names either one in its own prop pattern captures it
+// out of the rest object and, unless it re-passes it by hand, deletes the
+// channel. The declared label is still there, still correct, and reaches
+// nobody: an evaluated expression with no wiring under it.
+const DELIVERED_A11Y_PROPS = [
+  'aria-label',
+  'accessibilityLabel',
+  'accessibilityLargeContentTitle',
+  'accessibilityShowsLargeContentViewer',
+];
 
 const tabRoutes = routeIds.filter((r) => r.navigator === 'Tab.Screen');
 const otherRoutes = routeIds.filter((r) => r.navigator !== 'Tab.Screen');
@@ -536,17 +684,58 @@ check(
   []
 );
 check('no screen turns a stack header back on', headerOverrides.sort(), []);
-// The tab bar is the opposite case and the reason this section exists.
-// `tabBarShowLabel: false` hides the PAINTED label only; the route name
-// still reaches a person through the VoiceOver announcement and the iOS
-// Large Content Viewer HUD, neither of which that flag touches.
+
+// THE STRUCTURAL LICENCE for the four tab route ids, and it is the whole of
+// FU2. `getLabel({ label, title }, route.name)` returns the fallback only
+// when both are undefined, and `tabBarLabel` counts as `label` only when it
+// is a STRING (BottomTabItem.tsx:218-226). So a declared string label on
+// every tab screen is what makes the route id unreachable — asserted as a
+// universal over the tab screens the AST found, so a fifth tab added
+// without one reds here instead of quietly re-opening the channel.
 check(
-  'the tab route ids that disagree with their ruled label are exactly the declared ones',
+  'every tab screen declares a string tabBarLabel, so getLabel never reaches route.name',
+  tabRoutes.filter((r) => r.label === undefined).map((r) => `${r.at} "${r.text}"`).sort(),
+  []
+);
+// And the label is the RULED word. This is the row that used to be about
+// the route id; the subject moved with the mechanism.
+check(
+  'every declared tab label is the ruled word',
   tabRoutes
-    .filter((r) => RULED_TAB_LABELS[r.at] && RULED_TAB_LABELS[r.at] !== r.text)
-    .map((r) => `${r.at} route id "${r.text}" vs ruled "${RULED_TAB_LABELS[r.at]}"`)
+    .filter((r) => RULED_TAB_LABELS[r.at] && r.label !== RULED_TAB_LABELS[r.at])
+    .map((r) => `${r.at} label ${JSON.stringify(r.label)} vs ruled "${RULED_TAB_LABELS[r.at]}"`)
     .sort(),
-  TAB_LABEL_DISAGREEMENTS.slice().sort()
+  []
+);
+// The delivery half. A declared label that the custom button eats is a
+// label nobody hears, and nothing about the declaration would show it.
+check('screenOptions names a custom tabBarButton component', tabBarButtons.length > 0, true);
+check(
+  'every custom tabBarButton component resolves to a declaration this walk saw',
+  tabBarButtons.filter((b) => !components.has(b.name)).map((b) => `${b.at} ${b.name}`).sort(),
+  []
+);
+check(
+  'every custom tabBarButton spreads the props it does not name',
+  tabBarButtons
+    .filter((b) => components.has(b.name))
+    .filter((b) => !components.get(b.name).spreadsRest)
+    .map((b) => `${b.at} ${b.name} declared at ${components.get(b.name).at}`)
+    .sort(),
+  []
+);
+check(
+  'no custom tabBarButton captures an accessibility prop out of that spread',
+  tabBarButtons
+    .filter((b) => components.has(b.name))
+    .flatMap((b) =>
+      components
+        .get(b.name)
+        .named.filter((n) => DELIVERED_A11Y_PROPS.includes(n))
+        .map((n) => `${components.get(b.name).at} ${b.name} names ${JSON.stringify(n)}`)
+    )
+    .sort(),
+  []
 );
 
 // --- what this gate found that nobody has ruled on ---------------------
@@ -554,10 +743,9 @@ check(
 // filed as acceptable is a gate implying a measurement nobody took; an
 // unruled string nobody can see is the same thing with better manners.
 const unruled = TABLE.filter((t) => t.kind === 'reads-to-user/unruled');
-const wrongWord = [
-  ...TABLE.filter((t) => t.kind === 'reads-to-user/wrong-word').map((t) => `${t.at}  → ${t.owed}`),
-  ...TAB_LABEL_DISAGREEMENTS.map((d) => `${d}  → FU2 dock labels`),
-];
+const wrongWord = TABLE.filter((t) => t.kind === 'reads-to-user/wrong-word').map(
+  (t) => `${t.at}  → ${t.owed}`
+);
 console.log(`\n--- OWED: ${unruled.length} unruled, ${wrongWord.length} wrong-word ---`);
 for (const t of unruled) console.log(`     unruled     ${t.at}  → ${t.owner}`);
 for (const w of wrongWord) console.log(`     wrong-word  ${w}`);
