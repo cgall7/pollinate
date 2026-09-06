@@ -877,7 +877,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
 
       <NectarConsentSheet
         nectarConsentSheetOpen={nectarConsentSheetOpen}
-        senderName={pkg.senderName}
+        recipientName={pkg.senderName}
         submitting={nectarConsentSubmitting}
         error={nectarConsentError}
         onAffirm={handleNectarAffirm}

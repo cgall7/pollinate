@@ -75,6 +75,53 @@ async function main() {
     await asUser(client, SENDER, () => client.query('select * from public.consent_to_nectar()'));
     await asUser(client, OUTSIDER, () => client.query('select * from public.consent_to_nectar()'));
 
+    // THE FIXTURE HAS TO FUND THE SENDER SINCE 2026-09-06, and it is worth
+    // saying why in the file that broke. Until Colin ruled the starter grant
+    // to zero, `consent_to_nectar()` minted 500 drops, so the two lines above
+    // left this gate's sender able to spend. A new account now opens empty,
+    // and every row below sends real drops: without this the very first
+    // `send` raises "insufficient nectar (0 drops available)" and the harness
+    // reports one failure standing in for twenty unrun rows.
+    //
+    // A FIXTURE, NOT A CLAIM ABOUT THE PRODUCT. The product's only supply is
+    // now the delivery allowance, and reproducing it here would mean a comb
+    // rotation, a hive, an entry and a scheduler tick to put money in an
+    // account so that a row about `send_comb_nectar_note`'s CONTRACT can run.
+    // That mechanic has its own instrument
+    // (scripts/check-nectar-delivery-allowance.mjs, whose A0c and A0d rows
+    // assert exactly the consent-opens-empty and first-credit-is-a-delivery
+    // properties). This writes the same funding shape the refill writes --
+    // invoice, simulated poll, funding transaction, two balanced postings --
+    // so the ledger invariants are satisfied the way real money satisfies
+    // them, and nothing here asserts anything about where drops come from.
+    const fund = async (uid, sats) => {
+      const { rows: [{ correlation_id: corr }] } = await client.query(
+        'insert into public.strike_invoices(user_id,requested_amount_sats) values($1,$2) returning correlation_id', [uid, sats]);
+      const { rows: [{ id: poll }] } = await client.query(
+        "insert into public.strike_invoice_polls(correlation_id,observed_state,observed_amount_sats,is_simulated,raw_response) values($1,'SIMULATED_FIXTURE',$2,true,$3) returning id",
+        [corr, sats, JSON.stringify({ simulated: true, reason: 'gate_fixture' })]);
+      const { rows: [{ id: txn }] } = await client.query(
+        "insert into public.ledger_transactions(kind,idempotency_key,source_poll_id,memo) values('funding',$1,$2,'eng90 fixture funding') returning id",
+        [`eng90-fund:${corr}`, poll]);
+      const { rows: [{ id: avail }] } = await client.query(
+        "select id from public.ledger_accounts where owner_user_id=$1 and kind='user_available'", [uid]);
+      const { rows: [{ ledger_house_account: cash }] } = await client.query(
+        "select public.ledger_house_account('strike_cash')");
+      await client.query('set constraints public.ledger_postings_balanced, public.ledger_postings_no_overdraft, public.ledger_postings_funding_matches_invoice immediate');
+      await client.query('insert into public.ledger_postings(transaction_id,account_id,amount_sats) values($1,$2,$3),($1,$4,$5)', [txn, cash, sats, avail, -sats]);
+      await client.query('set constraints public.ledger_postings_balanced, public.ledger_postings_no_overdraft, public.ledger_postings_funding_matches_invoice deferred');
+    };
+    // The same 500 the grant used to put here, so every amount below keeps
+    // the relation it was written against -- notably the 500-drop send that
+    // must fail for insufficient balance AFTER a 10-drop send has run.
+    await fund(SENDER, 500);
+    {
+      const { rows } = await client.query('select available_sats from public.user_nectar_balances where user_id=$1', [SENDER]);
+      Number(rows[0]?.available_sats) === 500
+        ? ok('fixture: the sender is funded to 500 drops (consent itself mints nothing since the zero-grant ruling)')
+        : bad('fixture funding', `sender balance = ${JSON.stringify(rows[0])}, want 500`);
+    }
+
     await expectFail('signed-out caller refused stably', () => client.query(
       'select * from public.send_comb_nectar_note($1,$2,$3,$4,$5)', [crypto.randomUUID(), combId, RECIPIENT, 'Thanks', 1]
     ), /send_comb_nectar_note: not signed in/);

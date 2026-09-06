@@ -386,4 +386,24 @@ export const SENTINELS = {
     args: { p_rotation_id: '00000000-0000-0000-0000-000000000000' },
     expect: '42501',
   },
+  // The zero-grant ruling (Colin, 2026-09-06). This migration takes
+  // nectar_starter_grant_drops() to 0 and splits the refill target out as
+  // nectar_delivery_allowance_drops(), body-replacing
+  // nectar_refill_rotation_members() so it reads the new function.
+  //
+  // THE SENTINEL NAMES THE NEW FUNCTION, NOT THE CHANGED VALUE, and that is
+  // the only sound choice available. nectar_starter_grant_drops() is
+  // executable by `authenticated` and always has been, so probing it as anon
+  // proves nothing about WHICH definition landed -- a 42501 is the same
+  // answer before and after. The allowance function did not exist until this
+  // migration and is revoked from anon and authenticated in the same file, so
+  // 42501 from anon is a state only this migration can produce. Column
+  // resolution precedes the privilege check, so the code proves the function
+  // exists without opening any surface: same reasoning as the row above it.
+  '20260906000002_no_starter_grant': {
+    kind: 'rpc',
+    fn: 'nectar_delivery_allowance_drops',
+    args: {},
+    expect: '42501',
+  },
 };

@@ -51,8 +51,8 @@ export const NECTAR_CONSENT_GUARD = 'nectarConsent';
 //
 // The reserve below says a money word may only render under `nectarConsent`.
 // Sage's bootstrap ruling puts a consent sheet in front of that flag: a door
-// icon on D3 opens a sheet that EXPLAINS nectar and STATES the starter grant,
-// and it is shown to a user for whom `nectarConsent` is false — by
+// icon on D3 opens a sheet that EXPLAINS nectar, and it is shown to a user
+// for whom `nectarConsent` is false — by
 // construction, that is the only audience it ever has. So the sheet's copy is
 // money words rendered pre-consent, and there is no spelling of the first
 // guard that admits it: put the sheet under `nectarConsent` and it can never
@@ -104,9 +104,19 @@ export const NECTAR_CONSENT_SHEET_GUARD = 'nectarConsentSheetOpen';
 //
 // R-NT-4 as amended (GUIDES/POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md, Lumen,
 // 2026-09-05; UX Design thread 160660d9) puts the full explainer on the tab
-// before consent: a headline, a body naming the starter grant, and a CTA that
+// before consent: a headline, a body saying what a drop is, and a CTA that
 // opens the sheet above. That copy carries reserve words and is BY
 // CONSTRUCTION not under a positive `nectarConsent` — measured rather than
+//
+// WHICH STRING CARRIES THE RESERVE WORD MOVED on 2026-09-06, and the guard's
+// argument did not. The body used to name the grant and its plural "drops"
+// was the reserve hit; Colin's zero-grant ruling deleted that sentence, and
+// the surviving body ("A drop is a small thank you that travels with a
+// note.") matches NO entry in NECTAR_RESERVE — `\bdrops\b` is plural and
+// `\b\d+\s+drop\b` needs a digit. The headline still says Nectar, so this
+// screen still renders a reserve word pre-consent and still needs this
+// guard. Said out loud because "the copy carries reserve words" is the kind
+// of sentence that outlives the string it was written about.
 // predicted, on a four-arm probe run at 9b6ebed and reproduced by Sage:
 // `{!nectarConsent && …}`, `{nectarUnconsented && …}` with the name
 // undeclared, and a ternary's alternate arm all RED; `{nectarConsent && …}`
@@ -227,9 +237,13 @@ export const NECTAR_SURFACES = [
       'consented at all — every zap-adjacent surface was gated on a flag only a ' +
       'zap could set. The door is a DOOR, NOT A SWITCH: tapping it opens the ' +
       'consent sheet, and only the sheet\'s affirmative fires consent_to_nectar() ' +
-      '(Bumble: the first call irreversibly mints the starter grant, so an ' +
-      'accidental tap would be a permanent mint attributed to a decision nobody ' +
-      'saw). The card sits inside the reveal tap area, whose Pressable advances ' +
+      '(Bumble: the first call is IRREVERSIBLE, so an accidental tap would be a ' +
+      'permanent decision nobody saw. Re-footed 2026-09-06: this used to read ' +
+      '"irreversibly mints the starter grant", and at a zero grant the call ' +
+      'mints nothing. What it still does is write the consent row and ' +
+      'provision the ledger accounts, and NectarStore exports no reversal of ' +
+      'either, so the door is still a door, on a reason the ruling did not ' +
+      'take away). The card sits inside the reveal tap area, whose Pressable advances ' +
       'the sequence — a placement question ENG-64 inherits, not a styling one.',
   },
   {
@@ -376,7 +390,7 @@ export const NECTAR_CONSENT_BOOTSTRAP_OBJECTS = ['nectar_consents', 'consent_to_
 // so there is no distribution to read.
 //
 // What HAS arrived since is a hard lower bound the spec could not have known,
-// and it is the starter grant. `consent_to_nectar()` mints
+// and it was the starter grant. `consent_to_nectar()` minted
 // `nectar_starter_grant_drops()` = 500 drops at the moment of consent
 // (20260826000006's re-issued comment: "500 sats… granted once, at first
 // consent, never again"). Under Ruling 1 that grant is in the balance. So:
@@ -407,10 +421,70 @@ export const NECTAR_CONSENT_BOOTSTRAP_OBJECTS = ['nectar_consents', 'consent_to_
 // exactly as they are; see the open note beside `honeyLevelForDrops` below
 // for the arithmetic this build can offer and why the retune is Lumen's.
 //
+// ANNOTATION 2026-09-06 (Colin's zero-grant ruling, UX Design channel
+// 8d2c9a5d, message a774e561): A RE-PREMISE, NOT A RETRACTION. The ruling
+// takes the starter grant to zero. Ruling 2's ARGUMENT is untouched and its
+// SUBJECT moved, so read the paragraphs above with the allowance in the
+// grant's place.
+//
+// The argument was never about the grant as such. It was about THE HIGHEST
+// BALANCE THIS SYSTEM PUTS IN AN ACCOUNT WITHOUT ANYONE HAVING GIVEN A GIFT,
+// because that is the balance a cell must not render as full. The grant used
+// to be that quantity. As of 20260906000001 the delivery allowance is, and
+// as of 20260906000002 the grant is zero and no longer a candidate at all —
+// zero is the dark case, which is an honest picture of an empty account.
+//
+// SO THE CAP RE-PREMISES ON THE ALLOWANCE AND ITS VALUE DOES NOT MOVE. Both
+// quantities were 500, so 4 x allowance is the same 2000 the cap has always
+// held. Not one rendered pixel changes at any balance, which is the strongest
+// statement available about a change of this shape and is asserted as such in
+// check-honey-fill.
+//
+// LEAVING THE CAP DERIVED FROM THE GRANT WOULD HAVE BEEN RULING 2'S OWN
+// FAILURE, ARRIVING THROUGH THE DERIVATION INSTEAD OF THROUGH THE VALUE. At
+// a grant of zero the cap is zero, and `honeyLevelForDrops` divides by it:
+// `Math.sqrt(n / 0)` is Infinity for every positive n, and `Math.min(1, ...)`
+// clamps that to a FULL VESSEL. Reproduced on this tree before it was written
+// down — every balance from one drop upward renders the completely full cell
+// that the paragraphs above exist to forbid. A shared constant is a shared
+// premise, and this one was carrying a premise the ruling deleted.
+//
 // NOT A TARGET, and the renderer is what keeps that honest: DES-24 §5 —
 // "never labelled, never captioned '4 of 5', never given progress
 // semantics." Nothing renders this number. It is a divisor.
-export const NECTAR_STARTER_GRANT_DROPS = 500;
+
+// RULED AT ZERO by Colin on 2026-09-06: "let's get rid of the 500 free
+// nectar drops. i don't want to give out free anything right now." A new
+// account opens EMPTY. Nobody is handed anything for signing up.
+//
+// A ZERO IS A RATIFIED VALUE, NOT A MISSING ONE. This constant stays, and
+// stays exported, because `consent_to_nectar()` still reads its SQL twin and
+// check-nectar-consent's F1 still couples the two. What changed is that it
+// stopped being a placeholder awaiting a magnitude: this magnitude was
+// chosen.
+//
+// It has one caller in the database and, after this ruling, ZERO callers in
+// this tree that render it — the two surfaces that promised it in words are
+// re-cut in the same commit. Do not reintroduce a sentence that names it: at
+// zero, an interpolation of this constant reads "0 drops are yours to start."
+export const NECTAR_STARTER_GRANT_DROPS = 0;
+
+// The DELIVERY ALLOWANCE (Lumen, 20260906000001), which used to be the
+// grant's second job and is now its own quantity. Mirror of
+// `nectar_delivery_allowance_drops()`; F1's sibling row couples the two.
+//
+// STILL A PLACEHOLDER, unlike the grant. Its magnitude has never been ruled.
+// The value below is the one the number has held since 20260826000006, moved
+// across the split unchanged so that the grant's ruling landed on the grant
+// alone.
+//
+// WHY IT IS NOT A GIVEAWAY, which is the distinction the zero-grant ruling
+// turns on: you do not get this for existing. You only meet it by being a
+// consented member of a comb that ACTUALLY DELIVERED, it never accrues past
+// the target, and the refill never takes. 20260906000001's own header says it
+// is built to die at the flip to live rails, where a top-up is something a
+// person pays for.
+export const NECTAR_DELIVERY_ALLOWANCE_DROPS = 500;
 
 // Four visible rungs plus absent — HoneycombGrid gated on
 // `Boolean(member.isOwn && member.honeyRung)`, so rung 0 was not a low fill,
@@ -418,6 +492,15 @@ export const NECTAR_STARTER_GRANT_DROPS = 500;
 // R-N2 verbatim (the gate is now `member.honeyLevel > 0`, and zero is still
 // the only dark case); what does not survive is "0..4 rather than a
 // percentage" — R-N2 measured that the steps were the defect.
+//
+// RE-PREMISED 2026-09-06 (Colin's zero-grant ruling): every "grant" in the
+// paragraph below is now the DELIVERY ALLOWANCE. The identity it rests on is
+// scale free — sqrt(x / 4x) = 1/2 for every x — so it survived the split
+// without a number moving, and the multiplier is still derived rather than
+// chosen. What it is derived FROM is now "the standing balance a delivery
+// tops you up to lands at half the vessel", which is the picture a member of
+// a delivering comb sees. Day one is no longer that picture: day one is zero,
+// and zero is the dark cell.
 //
 // R-N8 GIVES THE NUMBER 4 BACK A MEANING, and the name is now the stale part.
 // R-N2's annotation left this constant as a bare multiplier whose own premise
@@ -437,14 +520,20 @@ export const NECTAR_LADDER_RUNGS = 4;
 // PLACEHOLDER (DES-24 §7.2), bounded by Ruling 2 above rather than chosen.
 //
 // R-N8 note: the bound stays an INEQUALITY here and that is deliberate. A cap
-// LARGER than 4 x grant is still safe against Ruling 2's failure (the grant
-// can never fill the cell), so the safety bound is unchanged and F3 still
-// asserts it. What equality buys is the half-full day-one vessel, and that is
-// asserted where it can be seen — on the RENDERED height, in
-// check-honey-fill's day-one row — rather than as a relation between two
-// numbers. Raise the cap above the bound and F3 stays green while that row
-// goes red, which is the right pair of answers: still safe, no longer half.
-export const NECTAR_LADDER_CAP_DROPS = NECTAR_STARTER_GRANT_DROPS * NECTAR_LADDER_RUNGS;
+// LARGER than 4 x allowance is still safe against Ruling 2's failure (the
+// allowance can never fill the cell), so the safety bound is unchanged and F3
+// still asserts it. What equality buys is the half-full vessel at the
+// allowance, and that is asserted where it can be seen — on the RENDERED
+// height, in check-honey-fill's allowance row — rather than as a relation
+// between two numbers. Raise the cap above the bound and F3 stays green while
+// that row goes red, which is the right pair of answers: still safe, no
+// longer half.
+//
+// RE-PREMISED 2026-09-06 from the grant to the allowance, value unchanged at
+// 2000 because both quantities were 500. F3 moved with it: a bound written
+// against a ruled-to-zero grant reads `2000 >= 0` and is VACUOUSLY TRUE, so
+// leaving it would have retired the row without deleting it.
+export const NECTAR_LADDER_CAP_DROPS = NECTAR_DELIVERY_ALLOWANCE_DROPS * NECTAR_LADDER_RUNGS;
 
 // THE PRESET AMOUNTS. Moved here from `NectarSendPanel` by R-N2: a preset is
 // a LEDGER quantity, not panel chrome — the honey ladder's resolution is a
@@ -476,6 +565,25 @@ export const NECTAR_PRESETS = [10, 50, 100];
 // arithmetic and stays free of the renderer's units — which is also what
 // keeps this file importable from a bare `node` script.
 // R-N8 (Lumen, 2026-09-05) — THE LAW IS SQUARE ROOT, NOT LINEAR.
+//
+// RE-PREMISED 2026-09-06, ARITHMETIC UNTOUCHED. Colin ruled the starter grant
+// to zero, so read every "grant" below as THE DELIVERY ALLOWANCE — the
+// standing balance a consented member of a delivering comb is topped up to.
+// Both quantities were 500 and the cap did not move, so every figure in this
+// block is still the figure this tree renders; what changed is the name of
+// the balance they are measured at.
+//
+// TWO OF THE FOUR BULLETS SAY "day one" OR "the state EVERY new user starts
+// in", AND THOSE PHRASES DID NOT SURVIVE. A new account now opens at zero,
+// which is the dark cell and an honest picture of an empty account. The
+// half-full vessel is what a person sees after a comb they are in has
+// actually delivered — later, and earned by participation rather than by
+// signing up. The MEASUREMENT is unchanged; only the moment it describes
+// moved, and the day-one row in check-honey-fill moved with it.
+//
+// THE FOURTH BULLET IS UNTOUCHED IN EVERY WORD, and it is now the load
+// bearing one: the resolution-collapse band near empty is exactly where a
+// zero-grant account lives.
 //
 // NEITHER CONSTANT MOVED. The open note that used to stand below this
 // function is resolved here rather than deleted, because its finding was

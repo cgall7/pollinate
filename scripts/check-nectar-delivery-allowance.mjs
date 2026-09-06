@@ -5,7 +5,20 @@
 //
 // THE RULING (Lumen, UX Design thread 0a406eb6, 2026-09-06): at every
 // rotation delivery, each consented member of that comb is topped back up to
-// the starter grant. "The tide rises to half; it never takes."
+// the delivery allowance. "The tide rises to half; it never takes."
+//
+// THE TARGET GOT ITS OWN NAME LATER THE SAME DAY. The ruling was built on
+// `nectar_starter_grant_drops()`, which gave that function a second caller —
+// and when Colin ruled the starter grant to zero ("i don't want to give out
+// free anything right now"), one number was answering two questions with
+// opposite answers. 20260906000002 splits them: the grant is zero, the target
+// is `nectar_delivery_allowance_drops()` at the value it always held, and the
+// mechanic below is unchanged in every clause. A0 finds that definition
+// rather than naming its file.
+//
+// WHICH MAKES THIS MECHANIC THE ONLY SUPPLY IN THE PRODUCT. A new account
+// opens empty, so the first drop anyone ever holds arrives through a
+// delivery. A0c and A0d assert exactly that, from consent to first credit.
 //
 // WHY THIS GATE EXISTS SEPARATELY FROM check-ops9-rotation-scheduler. That
 // gate already replays every migration and calls advance_due_rotations()
@@ -25,7 +38,7 @@
 //   E. a rotation that did NOT deliver refills nobody
 //   F. live rails are a no-op — the mechanic is built to die at 19b
 //   G. THE COUPLING PROPERTY: a refill that raises cannot roll back the seal
-//   H. the grant boundary the prod-schema sentinel's 42501 depends on
+//   H. the execute boundary the prod-schema sentinel's 42501 depends on
 //
 // G IS THE ROW THAT PAYS FOR THIS FILE. §1B.31.2: a begin/exception/end is a
 // SUBTRANSACTION, so a refill step written INSIDE the seal's block would
@@ -33,6 +46,22 @@
 // is swallowed, and the tick re-picks that rotation forever. Every other row
 // here is green under that bug. This one substitutes a refill that always
 // raises and asserts the delivery survives it.
+// THE FILE THE REFILL-BODY MUTATIONS TARGET IS THE ONE THAT LAST DEFINES THE
+// FUNCTION, NOT THE ONE THAT INTRODUCED IT. 20260906000002 recreates
+// `nectar_refill_rotation_members` (it re-points the target at
+// `nectar_delivery_allowance_drops()` after Colin ruled the grant to zero),
+// and every migration is replayed in lexical order — so a mutation applied to
+// 20260906000001's copy of that body is OVERWRITTEN before a single row runs.
+// It would score as "not caught" while the gate was never given the defect.
+// A0b asserts this rather than trusting the constant below, because the next
+// migration to touch this function moves the answer again.
+//
+// G1 IS THE EXCEPTION AND STAYS ON 000001, because it does not mutate the
+// refill at all: it mutates `advance_due_rotations`, which 20260906000002
+// leaves alone. Per-mutation, by which function the `from` string belongs to.
+const REFILL_DEFINER = 'supabase/migrations/20260906000002_no_starter_grant.sql';
+const ADVANCE_DEFINER = 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql';
+
 // MUTATIONS — run with `node scripts/run-mutations.mjs
 // scripts/check-nectar-delivery-allowance.mjs`. Every row above is
 // behavioural against a real Postgres, so none of them can be greened by a
@@ -44,49 +73,49 @@ export const MUTATIONS = [
   {
     row: 'B1',
     why: 'the skip is keyed on equality instead of "at or above", so a member holding more than the target takes a NEGATIVE credit — the postings reverse and the refill CONFISCATES down to 500. This is the exact hazard the ruled sentence produced when "cap" was read as NECTAR_LADDER_CAP_DROPS, arrived at here through a one-character edit instead',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: REFILL_DEFINER,
     from: '      if v_credit <= 0 then\n        continue;\n      end if;',
     to: '      if v_credit = 0 then\n        continue;\n      end if;',
   },
   {
     row: 'D1',
     why: 'the consent join is dropped, so a scheduler provisions a wallet for someone who has never been asked — B0 is a rule about who has been asked, and this is the shape that violates it without any client ever calling anything',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: REFILL_DEFINER,
     from: '      join public.nectar_consents nc on nc.user_id = cm.profile_id\n',
     to: '',
   },
   {
     row: 'F1',
     why: 'the simulated-mode gate goes, and the mechanic survives the flip to live rails as a permanent subsidy that mints real money on a timer. Built to die means the death has to be structural',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: REFILL_DEFINER,
     from: "  if public.ledger_current_mode() <> 'simulated' then\n    return 0;\n  end if;",
     to: "  if false then\n    return 0;\n  end if;",
   },
   {
     row: 'E1',
     why: 'the delivery gate inside the refill goes, so a rotation that never sealed still refills its comb — the ruled string says "with each delivery" and this makes it "with each sweep". The caller\'s v_sealed still guards the tick, which is why the row must be able to see the function\'s own guard: two guards, and only one of them is in the file a later reader edits',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: REFILL_DEFINER,
     from: "   where r.id = p_rotation_id and r.sealed_at is not null;",
     to: "   where r.id = p_rotation_id;",
   },
   {
     row: 'G1',
     why: 'THE COUPLED BUILD: the refill moves inside the seal\'s subtransaction. Its failure now rolls back sealed_at/sent_at, the delivery is undone by a gift mechanic, and the tick re-picks that rotation on every sweep until it dead-letters. §1B.31.2 as a mutation rather than a comment',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: ADVANCE_DEFINER,
     from: '      perform public.seal_and_send_rotation(r.id);\n      v_sealed := true;',
     to: '      perform public.seal_and_send_rotation(r.id);\n      perform public.nectar_refill_rotation_members(r.id);\n      v_sealed := true;',
   },
   {
     row: 'C1',
     why: 'the idempotency pre-check goes. The unique index on idempotency_key still refuses the duplicate, but it does so as an EXCEPTION inside the per-member block, which the handler turns into a warning — so a replay logs a failure for every member instead of quietly crediting nothing, and the row that claims idempotency would be standing over a build that survives replay by raising',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: REFILL_DEFINER,
     from: '      if exists (\n        select 1 from public.ledger_transactions t where t.idempotency_key = v_key\n      ) then\n        continue;\n      end if;',
     to: '      if false then\n        continue;\n      end if;',
   },
   {
     row: null,
     why: 'MUST NOT FIRE — the member loop\'s ORDER BY is removed. It exists for determinism in a log, not for correctness: no row here depends on which member is credited first, and a gate that reddened on this would be pinning a detail nobody ruled',
-    file: 'supabase/migrations/20260906000001_nectar_delivery_allowance.sql',
+    file: REFILL_DEFINER,
     from: '       and cm.removed_at is null\n     order by cm.profile_id',
     to: '       and cm.removed_at is null',
   },
@@ -271,40 +300,160 @@ async function main() {
     ]);
 
     const GRANT = Number((await asPostgres(() => client.query('select public.nectar_starter_grant_drops() as g'))).rows[0].g);
+    const TARGET = Number((await asPostgres(() => client.query('select public.nectar_delivery_allowance_drops() as t'))).rows[0].t);
 
     // ------------------------------------------------------------------
-    // 0. The premise, checked rather than assumed: the refill target reads
-    //    the SAME server-side definition the starter grant reads. Lumen's
-    //    pin was "one writer" — a fresh literal in the migration would be a
-    //    second copy of a shared premise, and this row is what makes that
-    //    falsifiable from outside. Asserted as a TEXT property of the
-    //    migration because a number that happens to equal 500 today would
-    //    satisfy any behavioural check.
+    // 0. The premise, checked rather than assumed: the refill target reads a
+    //    SERVER-SIDE definition rather than a literal of its own. Lumen's pin
+    //    was "one writer" — a fresh number in the migration would be a second
+    //    copy of a shared premise, and this row is what makes that falsifiable
+    //    from outside. Asserted as a TEXT property of the migration because a
+    //    number that happens to equal 500 today would satisfy any behavioural
+    //    check.
+    //
+    //    THE WRITER IT NAMES CHANGED ON 2026-09-06 AND THE ROW HAD TO LEARN TO
+    //    FIND IT. This read `nectar_starter_grant_drops()` out of a migration
+    //    PINNED BY FILENAME — and that pin is the trap 20260906000001's own
+    //    header warns about at its line 36: migrations are replayed in order,
+    //    the LAST definition wins, and a row that opens a named file reads a
+    //    dead body and goes green over nothing the moment a later migration
+    //    redefines the function. 20260906000002 is exactly that migration. It
+    //    splits the allowance out of the grant so Colin's zero-grant ruling
+    //    could land on the grant alone, and under the old row this gate would
+    //    have gone on certifying a body Postgres had already replaced.
+    //
+    //    SO THE DEFINER IS FOUND, NOT NAMED. Latest migration that DEFINES the
+    //    function wins — defines, not mentions — which is the same shape
+    //    check-nectar-consent's F1 uses for the grant literal one layer up.
+    const definerOf = (fn) => {
+      const re = new RegExp(String.raw`create\s+(?:or\s+replace\s+)?function\s+public\.${fn}\s*\(`, 'i');
+      let file = null;
+      for (const f of APPLY) {
+        const src = fs.readFileSync(path.join(MIGRATIONS, f), 'utf8')
+          .split('\n').map((l) => (l.trim().startsWith('--') ? '' : l)).join('\n');
+        if (re.test(src)) file = f;
+      }
+      return file;
+    };
+    // The function's text as the LAST defining migration writes it, from its
+    // `create [or replace] function` to its own `comment on function`.
+    const definitionOf = (fn, file) => {
+      const src = fs.readFileSync(path.join(MIGRATIONS, file), 'utf8');
+      const start = new RegExp(String.raw`create\s+(?:or\s+replace\s+)?function\s+public\.${fn}\s*\(`, 'gi');
+      let m; let at = -1;
+      while ((m = start.exec(src)) !== null) at = m.index;
+      const end = src.indexOf(`comment on function public.${fn}`, at);
+      return src.slice(at, end === -1 ? undefined : end);
+    };
+    const REFILL_FN = 'nectar_refill_rotation_members';
+    const refillDefiner = definerOf(REFILL_FN);
     {
-      const sql = fs.readFileSync(path.join(MIGRATIONS, '20260906000001_nectar_delivery_allowance.sql'), 'utf8');
-      const body = sql.slice(sql.indexOf('create function public.nectar_refill_rotation_members'), sql.indexOf('comment on function public.nectar_refill_rotation_members'));
-      const readsTheGrant = /v_target\s*:=\s*public\.nectar_starter_grant_drops\(\)/.test(body);
+      const body = definitionOf(REFILL_FN, refillDefiner);
+      const readsAWriter = /v_target\s*:=\s*public\.nectar_delivery_allowance_drops\(\)/.test(body);
       // Comments AND string literals stripped before the search. A migration
       // id inside a quoted message is prose the way a `--` line is, and a
       // row that could not tell them apart would red on the explanation
       // rather than on the defect — the comment-hole shape, inverted.
       const executable = body.replace(/--[^\n]*/g, '').replace(/'(?:[^']|'')*'/g, "''");
       const holdsItsOwnNumber = /\b\d{2,}\b/.test(executable);
-      if (readsTheGrant && !holdsItsOwnNumber) {
-        ok(`A0 the refill target has one writer: the function reads nectar_starter_grant_drops() (${GRANT}) and its executable body holds no multi-digit literal of its own`);
+      if (readsAWriter && !holdsItsOwnNumber) {
+        ok(`A0 the refill target has one writer, read out of the migration that LAST defines the function (${refillDefiner}): it reads nectar_delivery_allowance_drops() (${TARGET}) and its executable body holds no multi-digit literal of its own`);
       } else {
-        bad('A0 one writer', `reads the grant=${readsTheGrant}, holds its own number=${holdsItsOwnNumber}`);
+        bad('A0 one writer', `definer=${refillDefiner}, reads the allowance=${readsAWriter}, holds its own number=${holdsItsOwnNumber}`);
       }
+    }
+
+    // A0a THE GRANT IS NOT THE TARGET ANY MORE, and this row is the half A0
+    // cannot state. A0 asks what the refill READS; this asks that the ruling
+    // reached the database — the grant is zero, the target is not, and the
+    // two are separately settable. Under the pre-split build both calls
+    // returned the same number and no row could tell the two questions apart.
+    {
+      const separable = GRANT === 0 && TARGET > 0;
+      separable
+        ? ok(`A0a the split is real in the database: the starter grant returns ${GRANT} (Colin's ruling, 2026-09-06) while the delivery allowance returns ${TARGET}. Zeroing the grant did NOT silently switch the allowance off — which it would have done quietly, because the refill's own \`if v_target <= 0 then return 0\` declines rather than raises`)
+        : bad('A0a the split is real', `grant=${GRANT} (want 0), allowance=${TARGET} (want > 0)`);
+    }
+
+    // A0b THE MUTATION TARGETS NAME THE LATEST DEFINER. Every refill-body
+    // mutation above edits a migration FILE, and the harness replays all of
+    // them in order — so a mutation applied to a superseded copy of the body
+    // is overwritten before a single row runs, and scores as "not caught"
+    // over a defect the gate was never given. A coordinate table is stale
+    // cargo; this row is what stops this one going stale silently.
+    //
+    // IT ASSERTS THE FILE AND NOT THE ANCHOR, and the first draft got that
+    // wrong in a way worth leaving written down. It also checked that each
+    // mutation's `from` string was present in the file it names — which is
+    // true of the tree and FALSE OF EVERY MUTATED TREE BY CONSTRUCTION, since
+    // removing that string is what a mutation IS. The row reddened on all
+    // seven runs, including the must-not-fire, and on the six must-red runs it
+    // sat in the caught set next to the row actually being measured, which is
+    // how a vacuous red gets mistaken for coverage. A ROW THAT CANNOT SURVIVE
+    // THE HARNESS CANNOT BE SCORED BY IT.
+    //
+    // Nothing is lost: `run-mutations.mjs` already asserts the anchor occurs
+    // EXACTLY ONCE in the named file and refuses to run the mutation
+    // otherwise, which is the stronger claim. The harness owns "the anchor is
+    // in the file"; this row owns "the file is the one Postgres ends up
+    // running", which the harness cannot see.
+    {
+      const stale = MUTATIONS
+        .filter((m) => /v_target|nectar_refill_rotation_members|removed_at is null/.test(m.from) && m.file !== ADVANCE_DEFINER)
+        .filter((m) => m.file !== `supabase/migrations/${refillDefiner}`)
+        .map((m) => `${m.row || 'must-not-fire'} -> ${m.file}`);
+      stale.length === 0
+        ? ok(`A0b every refill-body mutation targets the migration that last defines the function (${refillDefiner}), so the harness mutates the body Postgres actually runs`)
+        : bad('A0b mutation targets', `superseded: [${stale.join('; ')}]`);
     }
 
     // ------------------------------------------------------------------
     // A/B/D. One delivering rotation, three members in three states.
-    const due = await mintRotation({ owner: OWNER, subject: SUBJECT, contributors: [GIVER] });
-    await asPostgres(() => client.query('insert into public.comb_members (comb_id, profile_id) values ($1,$2) on conflict do nothing', [due.combId, QUIET]));
-
+    //
+    // THE FIXTURE HAS TO EARN ITS SUPPLY NOW, and that is the zero-grant
+    // ruling reaching this gate. Until 2026-09-06 consent itself minted 500
+    // drops, so a consented member arrived here already funded and the rows
+    // below could spend straight away. A new account now opens EMPTY, which
+    // means THE ONLY WAY A DROP ENTERS AN ACCOUNT IN THIS PRODUCT IS A
+    // DELIVERY — this mechanic is the sole supply. So the fixture opens with
+    // a real delivering rotation whose only job is to fund the two members,
+    // and every row after it runs against balances the allowance itself put
+    // there.
+    //
+    // THAT IS A STRONGER FIXTURE THAN THE ONE IT REPLACES, not a workaround.
+    // The old one could not have caught a refill that credited nobody on a
+    // FIRST delivery, because the grant had already put the money in; here
+    // the seeding tick is asserted, so a refill that only ever tops up an
+    // account someone else funded reds before row A2 is reached.
     await asUser(GIVER, () => client.query('select * from public.consent_to_nectar()'));
     await asUser(SUBJECT, () => client.query('select * from public.consent_to_nectar()'));
     // QUIET never consents. Their wallet must not be conjured by a tick.
+
+    {
+      const atConsent = await balanceOf(GIVER);
+      (atConsent ?? 0) === GRANT && GRANT === 0
+        ? ok(`A0c a consented account opens EMPTY: the giver holds ${atConsent ?? 0} drops after consenting, and consent minted nothing. Colin's ruling asserted where a person would meet it — through the real RPC, against a real ledger`)
+        : bad('A0c consent mints nothing', `giver balance after consent = ${atConsent}, grant = ${GRANT}`);
+    }
+
+    // The seeding delivery. Its own comb, so the rotation under test below is
+    // still a member's FIRST refill for that rotation and C's idempotency key
+    // is untouched by it.
+    const seed = await mintRotation({ owner: OWNER, subject: SUBJECT, contributors: [GIVER] });
+    warnings.length = 0;
+    await asService(() => client.query('select public.advance_due_rotations()'));
+    {
+      const g = await balanceOf(GIVER);
+      const sub = await balanceOf(SUBJECT);
+      const seedWarnings = refillWarnings();
+      g === TARGET && sub === TARGET && seedWarnings.length === 0
+        ? ok(`A0d THE FIRST CREDIT OF A PERSON'S LIFE IS A DELIVERY: two members who consented to an empty account are at ${TARGET} after a comb they are in delivers, and the tick raised nothing. With the grant at zero this mechanic is the ONLY supply in the product — a refill that could only top up a pre-funded account would red here`)
+        : bad('A0d the first credit', `giver ${g}, subject ${sub}, want ${TARGET} each; warnings=${JSON.stringify(seedWarnings)}`);
+    }
+    void seed;
+
+    const due = await mintRotation({ owner: OWNER, subject: SUBJECT, contributors: [GIVER] });
+    await asPostgres(() => client.query('insert into public.comb_members (comb_id, profile_id) values ($1,$2) on conflict do nothing', [due.combId, QUIET]));
 
     // Spend GIVER down, and in the same movement put SUBJECT above the
     // target — one real transfer, two of the three states this gate needs.
@@ -314,10 +463,10 @@ async function main() {
 
     const beforeGiver = await balanceOf(GIVER);
     const beforeSubject = await balanceOf(SUBJECT);
-    if (beforeGiver === GRANT - SPEND && beforeSubject === GRANT + SPEND) {
+    if (beforeGiver === TARGET - SPEND && beforeSubject === TARGET + SPEND) {
       ok(`A1 the fixture is in the state the rows need before the tick: giver ${beforeGiver} (below the target), subject ${beforeSubject} (above it)`);
     } else {
-      bad('A1 fixture state', `giver=${beforeGiver} (want ${GRANT - SPEND}), subject=${beforeSubject} (want ${GRANT + SPEND})`);
+      bad('A1 fixture state', `giver=${beforeGiver} (want ${TARGET - SPEND}), subject=${beforeSubject} (want ${TARGET + SPEND})`);
     }
 
     warnings.length = 0;
@@ -333,9 +482,9 @@ async function main() {
 
     {
       const after = await balanceOf(GIVER);
-      after === GRANT
-        ? ok(`A3 THE REFILL: a consented member who had spent down to ${beforeGiver} is topped back up to the target (${GRANT}) at the delivery, through the tick`)
-        : bad('A3 the refill', `giver balance after the tick = ${after}, want ${GRANT}`);
+      after === TARGET
+        ? ok(`A3 THE REFILL: a consented member who had spent down to ${beforeGiver} is topped back up to the target (${TARGET}) at the delivery, through the tick`)
+        : bad('A3 the refill', `giver balance after the tick = ${after}, want ${TARGET}`);
     }
 
     {
@@ -448,7 +597,6 @@ async function main() {
     //    swallowed. Under the coupled build this row reds twice over —
     //    sealed_at is null and the tick would re-pick the row forever.
     {
-      const origin = fs.readFileSync(path.join(MIGRATIONS, '20260906000001_nectar_delivery_allowance.sql'), 'utf8');
       const couplingRot = await mintRotation({ owner: OWNER, subject: SUBJECT, contributors: [GIVER] });
       await asPostgres(() => client.query(`
         create or replace function public.nectar_refill_rotation_members(p_rotation_id uuid)
@@ -458,9 +606,13 @@ async function main() {
       await asService(() => client.query('select public.advance_due_rotations()'));
       const { rows } = await asPostgres(() => client.query('select sealed_at, sent_at, seal_attempts, seal_dead_lettered_at from public.comb_rotations where id = $1', [couplingRot.rotationId]));
       const surfaced = warnings.some((w) => /advance_due_rotations: nectar refill for rotation/.test(w) && /refill exploded/.test(w));
-      // Put the real function back before anything else runs against it.
-      const fnText = origin.slice(origin.indexOf('create function public.nectar_refill_rotation_members'), origin.indexOf('comment on function public.nectar_refill_rotation_members'));
-      await asPostgres(() => client.query(fnText.replace('create function', 'create or replace function')));
+      // Put the real function back before anything else runs against it, and
+      // put back the one the DATABASE had — the latest definer, not the file
+      // that introduced it. Restoring 20260906000001's body here would have
+      // silently reverted the target to the ruled-to-zero grant for every row
+      // after this one, which is a mutation nobody wrote.
+      const fnText = definitionOf(REFILL_FN, refillDefiner);
+      await asPostgres(() => client.query(fnText.replace(/^create\s+function/i, 'create or replace function')));
       if (rows[0].sealed_at && rows[0].sent_at && rows[0].seal_attempts === 0 && !rows[0].seal_dead_lettered_at && surfaced) {
         ok('G1 THE COUPLING PROPERTY: with a refill that always raises, the delivery still commits (sealed + sent, zero seal attempts, not dead-lettered) and the failure surfaces as its own warning naming the rotation. A refill written inside the seal block would have rolled sealed_at back and left the tick re-picking that row forever — §1B.31.2, asserted rather than commented');
       } else {

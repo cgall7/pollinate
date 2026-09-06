@@ -94,6 +94,7 @@ import {
   HEX_HEIGHT_RATIO,
 } from '../src/components/hexGeometry.js';
 import {
+  NECTAR_DELIVERY_ALLOWANCE_DROPS,
   NECTAR_LADDER_CAP_DROPS,
   NECTAR_PRESETS,
   NECTAR_STARTER_GRANT_DROPS,
@@ -126,8 +127,20 @@ if (near(hmax, 26.82, 0.01)) {
 } else {
   bad('honeyHMax ceiling', `got ${hmax.toFixed(4)}pt, expected 26.82pt (§6.4 correction)`);
 }
-// THE DAY-ONE ROW — R-N8's ruling, asserted on the one thing it is about:
-// the vessel a user sees on the day they consent.
+// THE HALF-VESSEL ROW — R-N8's ruling, asserted on the one thing it is about.
+//
+// RE-PREMISED 2026-09-06, AND THE MOMENT IT DESCRIBES MOVED. This was the
+// DAY-ONE row: the vessel a user saw on the day they consented, because
+// consent minted a 500-drop starter grant. Colin ruled that grant to zero, so
+// day one is now the DARK cell and the row below it says so. The half vessel
+// is what a person rests at once a comb they are in has DELIVERED and the
+// allowance topped them up — later, and earned by participation.
+//
+// NOT ONE NUMBER MOVED. Both quantities were 500 and the cap re-premised on
+// the allowance at the same value, so this row's height is the height it has
+// always asserted. Only its subject and its sentence changed, which is the
+// whole content of the change and the reason it is stated rather than
+// silently re-pointed.
 //
 // This row used to read "the grant renders at 6.70pt, §6.4's corrected
 // quarter-ceiling". That literal was the LINEAR law's answer wearing the
@@ -139,23 +152,48 @@ if (near(hmax, 26.82, 0.01)) {
 // is a check on the ceiling too.
 //
 // WHAT IT ASSERTS IS THE RULING AND NOT ITS ARITHMETIC. R-N8's claim is that
-// the starter grant fills exactly half the vessel; that it does so because
-// sqrt(g / 4g) = 1/2 is the reason, not the property. Restore the linear body
+// the standing balance fills exactly half the vessel; that it does so because
+// sqrt(a / 4a) = 1/2 is the reason, not the property. Restore the linear body
 // of `honeyLevelForDrops` and this row reds at 6.7045pt against 13.4090pt,
 // which is the mutate-back the ruling names.
-const grantHeight = honeyHeightForLevel(SIZE, honeyLevelForDrops(NECTAR_STARTER_GRANT_DROPS));
-if (near(grantHeight, hmax / 2, 0.0001)) {
+const allowanceHeight = honeyHeightForLevel(SIZE, honeyLevelForDrops(NECTAR_DELIVERY_ALLOWANCE_DROPS));
+if (near(allowanceHeight, hmax / 2, 0.0001)) {
   ok(
-    `R-N8 day one: the ${NECTAR_STARTER_GRANT_DROPS}-drop starter grant renders at ${grantHeight.toFixed(4)}pt, ` +
-      `exactly half the ${hmax.toFixed(4)}pt ceiling — the vessel every new user starts at`
+    `R-N8: the ${NECTAR_DELIVERY_ALLOWANCE_DROPS}-drop delivery allowance renders at ${allowanceHeight.toFixed(4)}pt, ` +
+      `exactly half the ${hmax.toFixed(4)}pt ceiling — the vessel a member of a delivering comb rests at`
   );
 } else {
   bad(
-    'day-one half vessel',
-    `the starter grant renders at ${grantHeight.toFixed(4)}pt, expected half the ceiling (${(hmax / 2).toFixed(4)}pt). ` +
-      `R-N8 holds that sqrt(grant / cap) = 1/2 by construction at cap = 4 x grant; this reds if the law, the cap's ` +
-      `multiplier or the grant moves without the others`
+    'half vessel at the allowance',
+    `the allowance renders at ${allowanceHeight.toFixed(4)}pt, expected half the ceiling (${(hmax / 2).toFixed(4)}pt). ` +
+      `R-N8 holds that sqrt(a / cap) = 1/2 by construction at cap = 4 x allowance; this reds if the law, the cap's ` +
+      `multiplier or the allowance moves without the others`
   );
+}
+
+// DAY ONE IS DARK, and this row is Colin's ruling rendered rather than read.
+// A new account opens EMPTY (2026-09-06: "i don't want to give out free
+// anything right now"), so the first vessel a person ever sees is the ONE
+// DARK CASE the floor rule reserves for a genuine zero. Asserted here and not
+// only as a constant, because the thing that could go wrong is not the number
+// — it is the ladder rendering something out of it. A cap re-derived from the
+// zeroed grant would put this at the FULL ceiling, which is Ruling 2's own
+// failure and the reason the cap re-premised on the allowance.
+{
+  const dayOne = honeyHeightForLevel(SIZE, honeyLevelForDrops(NECTAR_STARTER_GRANT_DROPS));
+  if (NECTAR_STARTER_GRANT_DROPS === 0 && dayOne === 0) {
+    ok(
+      'day one is DARK: the starter grant is 0 (Colin, 2026-09-06) and a zero balance renders at 0.0000pt — ' +
+        'the one dark case, and an honest picture of an empty account'
+    );
+  } else {
+    bad(
+      'day one is dark',
+      `the starter grant is ${NECTAR_STARTER_GRANT_DROPS} and renders at ${dayOne.toFixed(4)}pt, want 0 rendering ` +
+        'at 0.0000pt. If the grant was deliberately re-ratified above zero, this row is the record that has to be ' +
+        're-authored with it — and the half-vessel row above is then about two different balances'
+    );
+  }
 }
 
 // --- 2. Every rung stays in the linear (two-straight-edges) region -----
@@ -383,11 +421,11 @@ if (selectionVsBloom >= 10 && retained >= 0.65) {
 //
 // This row ASSERTS non-zero movement and REPORTS perceptibility. It does not
 // assert perceptibility: under R-N8 the 10-drop preset moves 0.400 physical
-// px @3x from the grant, which is rendered (antialiased) but is not something
+// px @3x from the allowance, which is rendered (antialiased) but is not something
 // a spreadsheet can call visible. See this file's header and the ruling
 // record beside `honeyLevelForDrops`.
 //
-// AND ITS SCOPE IS THE GRANT, WHICH IS ONE POINT OF A DOMAIN. §6 acceptance
+// AND ITS SCOPE IS THE ALLOWANCE, WHICH IS ONE POINT OF A DOMAIN. §6 acceptance
 // row 1 says "every preset" and names no starting balance; this row probes a
 // single one. That was an honest gap while it was the only probe available,
 // and it hid a real defect for as long as it stood alone: under the linear
@@ -397,32 +435,32 @@ if (selectionVsBloom >= 10 && retained >= 0.65) {
 // is the one that carries the printed per-preset figures.
 {
   const heightAt = (drops) => honeyHeightForLevel(SIZE, honeyLevelForDrops(drops));
-  const base = heightAt(NECTAR_STARTER_GRANT_DROPS);
+  const base = heightAt(NECTAR_DELIVERY_ALLOWANCE_DROPS);
   const flat = [];
   const report = [];
   NECTAR_PRESETS.forEach((amount) => {
-    const up = heightAt(NECTAR_STARTER_GRANT_DROPS + amount) - base;
-    const down = base - heightAt(NECTAR_STARTER_GRANT_DROPS - amount);
+    const up = heightAt(NECTAR_DELIVERY_ALLOWANCE_DROPS + amount) - base;
+    const down = base - heightAt(NECTAR_DELIVERY_ALLOWANCE_DROPS - amount);
     if (up <= 0) flat.push(`+${amount}`);
     if (down <= 0) flat.push(`-${amount}`);
     report.push(`${amount}: ${up.toFixed(4)}pt (${(up * 3).toFixed(3)}px @3x, ${(up * 2).toFixed(3)}px @2x)`);
   });
   if (flat.length === 0) {
-    ok(`every preset moves the rendered meniscus from the grant, both directions — ${report.join('; ')}`);
+    ok(`every preset moves the rendered meniscus from the allowance, both directions — ${report.join('; ')}`);
   } else {
-    bad('preset resolution', `these presets produce NO rendered movement from the ${NECTAR_STARTER_GRANT_DROPS}-drop grant: ${flat.join(', ')} — this is D1's defect, which is what R-N2 exists to remove`);
+    bad('preset resolution', `these presets produce NO rendered movement from the ${NECTAR_DELIVERY_ALLOWANCE_DROPS}-drop allowance: ${flat.join(', ')} — this is D1's defect, which is what R-N2 exists to remove`);
   }
 
   // The residue, printed on every green run so it cannot be quoted as clean.
   // Same shape as check-text-pigment's owed list: a number with an owner.
   const subPixel = NECTAR_PRESETS.filter(
-    (a) => (heightAt(NECTAR_STARTER_GRANT_DROPS + a) - base) * 3 < 1
+    (a) => (heightAt(NECTAR_DELIVERY_ALLOWANCE_DROPS + a) - base) * 3 < 1
   );
   if (subPixel.length) {
     console.log(
       `  note R-N2 residue, SURVIVING R-N8: preset(s) ${subPixel.join('/')} move under one physical pixel at @3x ` +
-        `from the grant (cap ${NECTAR_LADDER_CAP_DROPS}, square-root law). R-N8 did not close this and does not claim ` +
-        `to: the curve is TANGENT to the linear law at the grant (the derivative of sqrt(x/c) at x = c/4 is exactly ` +
+        `from the allowance (cap ${NECTAR_LADDER_CAP_DROPS}, square-root law). R-N8 did not close this and does not claim ` +
+        `to: the curve is TANGENT to the linear law at the allowance (the derivative of sqrt(x/c) at x = c/4 is exactly ` +
         `1/c), so resolution is unchanged at precisely the point this residue is measured from — 0.400px @3x where it ` +
         `was 0.402. What R-N8 did close is the collapse NEAR EMPTY, which was the wider defect and is row 8d. ` +
         `OWNER: Lumen. The event's legibility is R-N3's drop and R-N4's bee, not this edge.`

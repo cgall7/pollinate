@@ -127,6 +127,7 @@ import {
   NECTAR_CONSENT_FIELD,
   NECTAR_CONSENT_GUARD,
   NECTAR_CONSENT_SHEET_GUARD,
+  NECTAR_DELIVERY_ALLOWANCE_DROPS,
   NECTAR_LADDER_CAP_DROPS,
   NECTAR_LADDER_RUNGS,
   NECTAR_RESERVE,
@@ -134,6 +135,7 @@ import {
   NECTAR_SURFACES,
   NECTAR_UNCONSENTED_GUARD,
   hasNectarConsent,
+  honeyLevelForDrops,
 } from '../src/constants/nectar.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -1808,9 +1810,20 @@ check(
 // again the moment the JS constant is repaired, a repair path that never
 // touches the comment. F4 is that residual, and it gates FRESHNESS, never
 // content: no digit is parsed out of prose anywhere in it.
+//
+// GENERALISED OVER A FUNCTION NAME on 2026-09-06, because there are now TWO
+// of these numbers and F1's argument applies word for word to both. Colin
+// ruled the starter grant to zero; 20260906000002 split the refill target out
+// as `nectar_delivery_allowance_drops()` so the ruling could land on the
+// grant alone, and that second function is a hand copy of a SQL literal in
+// exactly the way this row was written against. One extractor, two callers,
+// so the second coupling cannot be a weaker instrument than the first.
 const GRANT_FN = 'nectar_starter_grant_drops';
-const GRANT_DEFINE_SRC = String.raw`create\s+(?:or\s+replace\s+)?function\s+public\.${GRANT_FN}\s*\(`;
-const GRANT_DROP_SRC = String.raw`drop\s+function\s+(?:if\s+exists\s+)?public\.${GRANT_FN}\s*\(`;
+const ALLOWANCE_FN = 'nectar_delivery_allowance_drops';
+const defineSrcFor = (fn) => String.raw`create\s+(?:or\s+replace\s+)?function\s+public\.${fn}\s*\(`;
+const dropSrcFor = (fn) => String.raw`drop\s+function\s+(?:if\s+exists\s+)?public\.${fn}\s*\(`;
+const GRANT_DEFINE_SRC = defineSrcFor(GRANT_FN);
+const GRANT_DROP_SRC = dropSrcFor(GRANT_FN);
 // A commented-out `create function` is prose, not a definition. Blanking
 // whole `--` lines is enough here and nothing subtler would be honest: the
 // alternative is a SQL parser, and this extractor's whole calibration below
@@ -1822,12 +1835,12 @@ const uncommented = (src) =>
     .join('\n');
 // null = the file says nothing about the function.
 // { kind: 'drop' | 'define', literal: number | null } = its LAST word on it.
-const grantEventIn = (rawSrc) => {
+const fnEventIn = (fn, rawSrc) => {
   const src = uncommented(rawSrc);
   const events = [];
   for (const [kind, source] of [
-    ['define', GRANT_DEFINE_SRC],
-    ['drop', GRANT_DROP_SRC],
+    ['define', defineSrcFor(fn)],
+    ['drop', dropSrcFor(fn)],
   ]) {
     const re = new RegExp(source, 'gi');
     let m;
@@ -1844,39 +1857,98 @@ const grantEventIn = (rawSrc) => {
   const lit = body.slice(open + 2, close).match(/select\s+(\d+)\s*(?:::\s*\w+)?\s*$/i);
   return { kind: 'define', literal: lit ? Number(lit[1]) : null };
 };
+// The grant's own arity, kept so F2's corpus reads exactly as it did.
+const grantEventIn = (rawSrc) => fnEventIn(GRANT_FN, rawSrc);
 
 // Lexical sort == chronological, because every migration name is timestamp
 // prefixed. F4 leans on the same fact.
 const migrationFiles = (await readdir(migrationDir).catch(() => [])).sort();
-let grantSource = null;
-for (const f of migrationFiles) {
-  const event = grantEventIn(await readFile(path.join(migrationDir, f), 'utf8'));
-  if (event) grantSource = { file: f, event };
-}
-const grantLiteral = () => {
-  if (!grantSource) return `cannot tell: no migration in tree defines ${GRANT_FN}()`;
-  const { file, event } = grantSource;
-  if (event.kind === 'drop') return `cannot tell: ${file} drops ${GRANT_FN}() with no replacement`;
-  if (event.literal === null) return `cannot tell: ${file} defines ${GRANT_FN}() with no readable integer literal`;
+const migrationSrc = new Map();
+for (const f of migrationFiles) migrationSrc.set(f, await readFile(path.join(migrationDir, f), 'utf8'));
+// LAST DEFINING MIGRATION WINS, and the loop is what makes that true rather
+// than a filename anyone pinned. A row that named its migration by hand goes
+// green over a dead body the day a later file redefines the function -- the
+// trap 20260906000001's own header warns about at its line 36, and the third
+// sighting of it in this tree in one day.
+const latestEventFor = (fn) => {
+  let source = null;
+  for (const f of migrationFiles) {
+    const event = fnEventIn(fn, migrationSrc.get(f));
+    if (event) source = { file: f, event };
+  }
+  return source;
+};
+const grantSource = latestEventFor(GRANT_FN);
+const allowanceSource = latestEventFor(ALLOWANCE_FN);
+const literalOf = (fn, source) => {
+  if (!source) return `cannot tell: no migration in tree defines ${fn}()`;
+  const { file, event } = source;
+  if (event.kind === 'drop') return `cannot tell: ${file} drops ${fn}() with no replacement`;
+  if (event.literal === null) return `cannot tell: ${file} defines ${fn}() with no readable integer literal`;
   return event.literal;
 };
 check(
   `F1 NECTAR_STARTER_GRANT_DROPS equals the SQL grant literal (${grantSource ? grantSource.file : 'no defining migration'})`,
-  grantLiteral(),
+  literalOf(GRANT_FN, grantSource),
   NECTAR_STARTER_GRANT_DROPS
+);
+
+// F1b THE SAME COUPLING FOR THE ALLOWANCE, and it is the row that carries
+// Ruling 2 now. F1 still couples a number, but that number is ZERO and a
+// zero cannot break the cap: the quantity the ladder has to survive is the
+// allowance (see nectar.js's 2026-09-06 annotation on Ruling 2). Same
+// extractor, same fail-closed answers, same reason -- a JS constant that is a
+// hand copy of a SQL literal, agreeing today because someone read both.
+check(
+  `F1b NECTAR_DELIVERY_ALLOWANCE_DROPS equals the SQL allowance literal (${allowanceSource ? allowanceSource.file : 'no defining migration'})`,
+  literalOf(ALLOWANCE_FN, allowanceSource),
+  NECTAR_DELIVERY_ALLOWANCE_DROPS
+);
+
+// F1c THE TWO ARE READ APART. Both functions are `..._drops()`, both return a
+// bare integer, and as of 20260906000002 both are DEFINED IN ONE FILE with
+// the grant's catalog comment naming the allowance in prose. So the thing
+// that could go wrong here is not a stale number, it is an extractor that
+// answers the wrong question and agrees with itself. This row asserts the two
+// reads landed on different files-or-literals only insofar as they must be
+// INDEPENDENT: same file is legal (it is the state of this tree), identical
+// answers by accident is not, so what is pinned is that each read resolved to
+// a definition of the name it was asked about.
+check(
+  'F1c each coupling resolved to a definition of the function it names',
+  [
+    ...(grantSource && grantSource.event.kind === 'define'
+      ? []
+      : [`${GRANT_FN}: ${grantSource ? `last word is a ${grantSource.event.kind}` : 'no migration defines it'}`]),
+    ...(allowanceSource && allowanceSource.event.kind === 'define'
+      ? []
+      : [`${ALLOWANCE_FN}: ${allowanceSource ? `last word is a ${allowanceSource.event.kind}` : 'no migration defines it'}`]),
+  ],
+  []
 );
 
 // F2 CALIBRATES THE EXTRACTOR IN BOTH DIRECTIONS, because F1 is green on a
 // tree where the two sides agree and would be just as green on a regex that
 // matched nothing -- the same reason B is calibrated against a synthetic
 // corpus. A fail-closed row is invisible to a corpus that only exercises the
-// safe answer, so the corpus runs both directions: of its eight rows, four
-// assert a literal IS found and three assert one is NOT. The eighth is
+// safe answer, so the corpus runs both directions: of its ten rows, four
+// assert a literal IS found and five assert one is NOT. The tenth is
 // neither and is counted as neither -- the drop row asserts that a definition
 // SUPERSEDED is not a definition read, which is a third answer, not a
 // negative one. (An earlier draft of this comment said "four... three" of an
 // eight-row corpus and left that row uncounted in either direction; Lumen
 // caught it.)
+//
+// THE LAST TWO ROWS ARE NEW ON 2026-09-06 and they calibrate the direction
+// the split opened. There are now two `..._drops()` functions, both returning
+// a bare integer, and 20260906000002 DEFINES BOTH IN ONE FILE with the
+// grant's catalog comment naming the allowance in prose. So the extractor's
+// name key has to be load bearing rather than incidental: one row proves a
+// definition of the sibling is not read as this one, the other proves a
+// mention inside a quoted comment is not read as a definition. `uncommented`
+// blanks `--` lines and does NOT strip string literals, so that second answer
+// comes from the `create ... function public.<name>` shape and nothing else,
+// which is a fact about this extractor worth having a row for.
 const DEF = (n, replace = false) =>
   `create ${replace ? 'or replace ' : ''}function public.${GRANT_FN}()\n` +
   `returns bigint\nlanguage sql immutable\nas $$ select ${n}::bigint $$;\n`;
@@ -1913,6 +1985,19 @@ const GRANT_CALIBRATION = [
       `as $$ select current_setting('app.grant')::bigint $$;\n`,
     { kind: 'define', literal: null },
   ],
+  [
+    'a definition of the sibling allowance function is not a definition of the grant',
+    `create function public.${ALLOWANCE_FN}()\nreturns bigint\nlanguage sql immutable\n` +
+      `as $$ select 500::bigint $$;\n`,
+    null,
+  ],
+  [
+    'the sibling named inside this function\'s catalog comment is not a definition',
+    `comment on function public.${GRANT_FN}() is\n` +
+      `  'The delivery allowance no longer reads this function. It reads '\n` +
+      `  '${ALLOWANCE_FN}().';\n`,
+    null,
+  ],
 ];
 const grantCalibrationFailures = [];
 for (const [label, src, want] of GRANT_CALIBRATION) {
@@ -1923,15 +2008,45 @@ for (const [label, src, want] of GRANT_CALIBRATION) {
 }
 check('F2 grant-literal extractor calibration, both directions', grantCalibrationFailures, []);
 
-// F3 CLOSES THE OTHER END OF THE SAME CHAIN. F1 couples SQL -> JS; this
+// F3 CLOSES THE OTHER END OF THE SAME CHAIN. F1b couples SQL -> JS; this
 // couples JS -> the cap. Ruling 2's bound only holds while the cap DERIVES,
 // and the cap is the placeholder most likely to acquire a hand-tuned number
 // the day 19a produces a distribution. Written as the bound rather than as
 // an equality, because a larger cap is legal and only a smaller one
 // reintroduces the full-cell-at-consent failure.
+//
+// RE-PREMISED ON THE ALLOWANCE, 2026-09-06, AND IT HAD TO BE. Ruling 2 bounds
+// the cap against the highest balance this system puts in an account without
+// anyone having given a gift. That was the grant; Colin ruled the grant to
+// zero, and `2000 >= 0 * 4` is VACUOUSLY TRUE — the row would have gone on
+// passing while asserting nothing, which is worse than deleting it because it
+// still reads as coverage. The quantity is now the delivery allowance, the
+// value did not move (both were 500), and the row is load bearing again.
+//
+// ASSERT THE PROPERTY THAT LICENSED THE SENTENCE. What Ruling 2 forbids is a
+// vessel that renders FULL out of a balance nobody was given, so the second
+// row says that in the renderer's own terms rather than as a relation between
+// two constants: at the allowance, the level is strictly below 1.
 check(
-  `F3 the ladder cap derives from the grant (Ruling 2: cap >= ${NECTAR_LADDER_RUNGS} x grant)`,
-  NECTAR_LADDER_CAP_DROPS >= NECTAR_STARTER_GRANT_DROPS * NECTAR_LADDER_RUNGS,
+  `F3 the ladder cap derives from the allowance (Ruling 2: cap >= ${NECTAR_LADDER_RUNGS} x allowance)`,
+  NECTAR_LADDER_CAP_DROPS >= NECTAR_DELIVERY_ALLOWANCE_DROPS * NECTAR_LADDER_RUNGS,
+  true
+);
+check(
+  `F3b Ruling 2 in the renderer's terms: the allowance (${NECTAR_DELIVERY_ALLOWANCE_DROPS}) does not fill the vessel`,
+  honeyLevelForDrops(NECTAR_DELIVERY_ALLOWANCE_DROPS) < 1,
+  true
+);
+// F3c THE ZERO-CAP FAILURE, ASSERTED RATHER THAN REMEMBERED. `cap = 0` is the
+// state a re-derivation from the ruled-to-zero grant would produce, and it is
+// not a small cap: `Math.sqrt(n / 0)` is Infinity for every positive n and
+// `Math.min(1, ...)` clamps it to a FULL vessel at ONE drop. Reproduced on
+// this tree before it was written down. The row names the cap's own floor so
+// that a future edit which re-points the derivation at any zero-valued
+// constant reds here with the reason attached.
+check(
+  'F3c the ladder cap is positive — a zero cap renders every balance as a full vessel',
+  NECTAR_LADDER_CAP_DROPS > 0 && honeyLevelForDrops(1) < 1,
   true
 );
 
@@ -1962,22 +2077,31 @@ check(
 // documents no number at all. That last one is the reason F5 exists -- an
 // extractor that matched nothing would take the absent branch and this row
 // would be green forever.
-const GRANT_COMMENT_SRC = String.raw`comment\s+on\s+function\s+public\.${GRANT_FN}\s*\(`;
+const commentSrcFor = (fn) => String.raw`comment\s+on\s+function\s+public\.${fn}\s*\(`;
+const GRANT_COMMENT_SRC = commentSrcFor(GRANT_FN);
 const grantCommentIn = (rawSrc) => new RegExp(GRANT_COMMENT_SRC, 'i').test(uncommented(rawSrc));
 
-let grantCommentFile = null;
-for (const f of migrationFiles) {
-  if (grantCommentIn(await readFile(path.join(migrationDir, f), 'utf8'))) grantCommentFile = f;
-}
-const commentFreshnessFailures = [];
-if (grantSource && grantSource.event.kind === 'define' && grantCommentFile) {
-  if (grantCommentFile < grantSource.file) {
-    commentFreshnessFailures.push(
-      `${grantSource.file} defines ${GRANT_FN}() but the latest \`comment on function\` for it is ` +
-        `${grantCommentFile}, which is older -- the catalog documents a superseded grant`
-    );
-  }
-}
+const latestCommentFor = (fn) => {
+  const re = new RegExp(commentSrcFor(fn), 'i');
+  let file = null;
+  for (const f of migrationFiles) if (re.test(uncommented(migrationSrc.get(f)))) file = f;
+  return file;
+};
+const freshnessFailures = (fn, source) => {
+  const commentFile = latestCommentFor(fn);
+  if (!source || source.event.kind !== 'define' || !commentFile) return { commentFile, failures: [] };
+  if (commentFile >= source.file) return { commentFile, failures: [] };
+  return {
+    commentFile,
+    failures: [
+      `${source.file} defines ${fn}() but the latest \`comment on function\` for it is ` +
+        `${commentFile}, which is older -- the catalog documents a superseded value`,
+    ],
+  };
+};
+const grantFreshness = freshnessFailures(GRANT_FN, grantSource);
+const grantCommentFile = grantFreshness.commentFile;
+const commentFreshnessFailures = grantFreshness.failures;
 // The label names the DEFINING file, which is not always `grantSource.file`:
 // on a tree whose last word is a drop there is no definer, and saying
 // otherwise would be the same right-measurement-wrong-name mistake this
@@ -1991,6 +2115,23 @@ check(
   `F4 the ${GRANT_FN}() catalog comment is not older than its definition ` +
     `(define ${grantDefineLabel}, comment ${grantCommentFile || 'none'})`,
   commentFreshnessFailures,
+  []
+);
+
+// F4b THE SAME FRESHNESS FOR THE ALLOWANCE. Its catalog comment is the one
+// that still says PLACEHOLDER, so it is literally the ratification record for
+// a magnitude nobody has ruled -- exactly the shape F4 was written for, and
+// the half of the split that still has a number to ratify.
+const allowanceFreshness = freshnessFailures(ALLOWANCE_FN, allowanceSource);
+const allowanceDefineLabel = !allowanceSource
+  ? 'none'
+  : allowanceSource.event.kind === 'define'
+    ? allowanceSource.file
+    : `none (${allowanceSource.file} drops it)`;
+check(
+  `F4b the ${ALLOWANCE_FN}() catalog comment is not older than its definition ` +
+    `(define ${allowanceDefineLabel}, comment ${allowanceFreshness.commentFile || 'none'})`,
+  allowanceFreshness.failures,
   []
 );
 

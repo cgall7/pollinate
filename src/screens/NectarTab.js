@@ -4,7 +4,6 @@ import Svg, { Polygon } from 'react-native-svg';
 import { theme } from '../constants/theme';
 import { useReducedMotion } from '../constants/motion';
 import {
-  NECTAR_STARTER_GRANT_DROPS,
   hasNectarConsent,
   honeyLevelForDrops,
 } from '../constants/nectar';
@@ -415,8 +414,19 @@ export const NectarTab = () => {
                 exports consentToNectar() and nothing that reverses it, so a
                 pill drawn as a control would state a condition nobody can
                 change from here. Pre-consent, the whole tab is the explainer —
-                the empty vessel, the headline, the body naming the grant, the
-                door, and the status beneath it. */}
+                the empty vessel, the headline, the body saying what a drop is,
+                the door, and the status beneath it.
+
+                THE BODY LOST ITS SECOND SENTENCE on 2026-09-06 (Colin's
+                zero-grant ruling; string ratified by Lumen in the same
+                thread). It used to end "Turn gifts on and {N} drops are yours
+                to start", interpolating NECTAR_STARTER_GRANT_DROPS — which at
+                the ruled value would have SHIPPED AS "0 drops are yours to
+                start." Nothing replaces it: the CTA beneath already carries
+                the invitation, and the allowance law is deliberately NOT
+                restated here. It is stated on the sheet this CTA opens and on
+                the consented status line, and no rendered state may show it
+                twice (Lumen's acceptance row). */}
             {nectarUnconsented && (
               <>
                 <ScreenHeader eyebrow="YOUR NECTAR" title="Nectar" style={styles.header} />
@@ -429,8 +439,7 @@ export const NectarTab = () => {
                     Nectar is how you say thank you with something.
                   </Text>
                   <Text style={styles.explainerBody}>
-                    A drop is a small thank you that travels with a note. Turn gifts on and{' '}
-                    {NECTAR_STARTER_GRANT_DROPS} drops are yours to start.
+                    A drop is a small thank you that travels with a note.
                   </Text>
                   <PrimaryButton
                     onPress={() => setNectarConsentSheetOpen(true)}

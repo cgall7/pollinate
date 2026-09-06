@@ -23,9 +23,16 @@ import { PillButton } from './PillButton';
 // 1, which already carves the consent screen out of the bitcoin/sats/crypto
 // ban). Pigment is `ink`, not `accentDeep` — the latter fails WCAG on every
 // ground this sheet can render over (Pixel's §7 measurement).
+// `recipientName` is THE PERSON WHO WILL RECEIVE THE GIFT, at all three call
+// sites. Renamed from `senderName` on 2026-09-06 (Lumen's rider): the prop
+// was named for where PackageOpen reads it FROM — `pkg.senderName`, whoever
+// sent you the package — and that person is the RECIPIENT of the gift this
+// sentence is about, which is why CombNectarCompose was already passing
+// `recipientLabel` into a prop called senderName. NectarTab passes nothing
+// and renders the fallback.
 export const NectarConsentSheet = ({
   nectarConsentSheetOpen,
-  senderName,
+  recipientName,
   submitting,
   error,
   onAffirm,
@@ -45,18 +52,33 @@ export const NectarConsentSheet = ({
               reason this is `HoneyDrop` and not an illustration. */}
           <HoneyDrop radius={DROP_MAX_RADIUS} style={styles.drop} />
           <Text style={styles.headline}>Give gifts of gratitude</Text>
-          {/* R-N7. This body ends at the grant and says nothing about what
-              comes after it. Both doors it used to promise are permanently
-              shut: purchase by SPEC 19a, and the wage frame by doctrine, so
-              the allowance does not reopen either one. If replenishment is
-              ever named here it states the allowance law in the timeless
-              register, in the same string family as the grant sentence above.
-              It never offers a person a way to get more. The struck words
-              are deliberately not quoted: a grep for them must find nothing
-              in this tree. */}
+          {/* R-N7 AS AMENDED 2026-09-06 — the grant sentence is gone and the
+              allowance law took its place. Colin ruled the starter grant to
+              zero, so "we'll add 500 drops to your account to say thanks" was
+              about to become a promise of nothing; the second sentence below
+              is Lumen's ruled allowance string, verbatim and from the one
+              writer that owns it.
+
+              THIS COMMENT IS REWRITTEN IN THE SAME COMMIT AS THE STRING, and
+              that is the point rather than tidiness. It used to open "This
+              body ends at the grant and says nothing about what comes after
+              it", which the edit below makes false on its own file — a
+              justification comment is a dependency.
+
+              R-N7's own pre-authorisation is what makes this a substitution
+              and not a new offer. It read: if replenishment is ever named
+              here, it states the allowance law in the TIMELESS REGISTER. That
+              is exactly what "Your nectar refills with each delivery" is. It
+              is not an announcement that a refill just happened and it is not
+              a way to get more — it is the rule the vessel obeys. Both doors
+              the old sentence used to stand in front of are still shut:
+              purchase by SPEC 19a, and the wage frame by doctrine.
+
+              NO DIGITS. The struck words are deliberately not quoted: a grep
+              for them must find nothing in this tree. */}
           <Text style={styles.body}>
-            When you send a gift to {senderName || 'someone'}, we'll add{' '}
-            <Text style={styles.bodyStrong}>500 drops</Text> to your account to say thanks.
+            When you send a gift to {recipientName || 'someone'}, it travels as drops with your
+            note. Your nectar refills with each delivery.
           </Text>
           <Text style={styles.footnote}>Drops are units on a simulated Bitcoin network.</Text>
           {error && <Text style={styles.error}>Failed. Please try again.</Text>}
@@ -113,9 +135,6 @@ const styles = StyleSheet.create({
     color: theme.colors.ink,
     textAlign: 'center',
     marginTop: theme.spacing.md,
-  },
-  bodyStrong: {
-    fontFamily: theme.fonts.bodySemiBold,
   },
   footnote: {
     ...theme.type.bodySm,

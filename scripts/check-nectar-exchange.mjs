@@ -390,6 +390,7 @@ import {
 } from '../src/components/nectarFlight.js';
 import {
   NECTAR_PRESETS,
+  NECTAR_DELIVERY_ALLOWANCE_DROPS,
   NECTAR_STARTER_GRANT_DROPS,
   nectarArrivalDrops,
 } from '../src/constants/nectar.js';
@@ -1382,22 +1383,33 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // defect: a function hardwired to `return null` passes every "must not
   // fabricate" case in this table and is completely broken. So every unknown
   // case is paired with a true case that must produce a number.
+  // TWO REFERENCE BALANCES SINCE 2026-09-06, and the split is the point.
+  // `grant` is what a new account opens at, which Colin ruled to ZERO — so it
+  // is no longer a balance anything can be measured against, and using it as
+  // the standing figure below made F2 assert `0 > 400`. `standing` is the
+  // DELIVERY ALLOWANCE, the balance a consented member of a delivering comb
+  // is topped up to, and that is the number a fabricated arrival would be
+  // priced against. The zero keeps a row of its own, because "a new account
+  // opens empty" is now a real first read and `nectarArrivalDrops` has to
+  // answer it.
   const grant = NECTAR_STARTER_GRANT_DROPS;
+  const standing = NECTAR_DELIVERY_ALLOWANCE_DROPS;
   const mustBeNull = [
-    ['first read of a user\'s life — the starter grant', null, grant],
+    ['first read of a user\'s life — a new account opens empty', null, grant],
+    ['first read after a delivery topped you up to the allowance', null, standing],
     ['unknown balance (NectarStore returned null), remembered value present', 500, null],
     ['both unknown', null, null],
-    ['undefined rather than null, on either side', undefined, grant],
+    ['undefined rather than null, on either side', undefined, standing],
     ['undefined balance', 500, undefined],
     ['a fall — you sent a gift', 500, 400],
     ['no change', 500, 500],
     ['a non-finite remembered value (corrupt storage)', Number.NaN, 500],
     ['a non-finite balance', 500, Number.NaN],
   ];
-  const mustBeDrops = NECTAR_PRESETS.map((p) => [`a received ${p}`, grant, grant + p, p])
+  const mustBeDrops = NECTAR_PRESETS.map((p) => [`a received ${p}`, standing, standing + p, p])
     .concat([
       ['a rise from a real, read, empty wallet — 0 is not unknown', 0, 10, 10],
-      ['two gifts while away, reported as their total', grant, grant + 60, 60],
+      ['two gifts while away, reported as their total', standing, standing + 60, 60],
       ['a rise after a fall — the caller remembered the lower number', 400, 500, 100],
     ]);
 
@@ -1415,13 +1427,13 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // BALANCE. Asserted as an INEQUALITY against the largest preset rather than
   // as "returns null", so the row states what it is protecting rather than
   // restating F1 in different words — and it moves with the constants.
-  const worstFabrication = grant; // what `nectarArrivalDrops(0, grant)` would claim
+  const worstFabrication = standing; // what `nectarArrivalDrops(0, standing)` would claim
   const largestGift = Math.max(...NECTAR_PRESETS);
-  const collapsed = nectarArrivalDrops(0, grant);
-  if (nectarArrivalDrops(null, grant) === null && collapsed === worstFabrication && worstFabrication > largestGift * 4) {
-    ok(`F2 the unknown/zero distinction is load-bearing arithmetic, not a rendering nicety: \`nectarArrivalDrops(null, ${grant})\` is \`null\` (no arrival), while the collapsed spelling \`(0, ${grant})\` returns ${collapsed} — a fabricated gift ${(worstFabrication / largestGift).toFixed(1)}x the largest preset this product can send. Both spellings are exercised here, so the row names the defect's SIZE rather than only its absence`);
+  const collapsed = nectarArrivalDrops(0, standing);
+  if (nectarArrivalDrops(null, standing) === null && collapsed === worstFabrication && worstFabrication > largestGift * 4) {
+    ok(`F2 the unknown/zero distinction is load-bearing arithmetic, not a rendering nicety: \`nectarArrivalDrops(null, ${standing})\` is \`null\` (no arrival), while the collapsed spelling \`(0, ${standing})\` returns ${collapsed} — a fabricated gift ${(worstFabrication / largestGift).toFixed(1)}x the largest preset this product can send. Both spellings are exercised here, so the row names the defect's SIZE rather than only its absence`);
   } else {
-    bad('F2', `null-case=${nectarArrivalDrops(null, grant)} (want null), zero-case=${collapsed} (want ${worstFabrication}), grant ${grant} vs largest preset ${largestGift}`);
+    bad('F2', `null-case=${nectarArrivalDrops(null, standing)} (want null), zero-case=${collapsed} (want ${worstFabrication}), allowance ${standing} vs largest preset ${largestGift}`);
   }
 
   // F3 — "SINCE YOUR LAST READ" IS SCOPED TO A PERSON, AND THE SCOPE IS IN

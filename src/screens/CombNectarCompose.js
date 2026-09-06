@@ -285,7 +285,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
     <NectarGiftLayer gift={gift.gift} travel={gift.travel} dropScale={gift.dropScale} dropOpacity={gift.dropOpacity} bloom={gift.bloom} />
     <NectarConsentSheet
       nectarConsentSheetOpen={nectarConsentSheetOpen}
-      senderName={recipientLabel}
+      recipientName={recipientLabel}
       submitting={nectarConsentSubmitting}
       error={nectarConsentError}
       onAffirm={handleNectarAffirm}

@@ -58,7 +58,7 @@ const hasConsentSheet = ({ compose }) =>
   /const \[nectarConsentError, setNectarConsentError\] = useState\(false\)/.test(compose) &&
   /const handleNectarAffirm = async \(\) => \{[\s\S]*?const row = await NectarStore\.consentToNectar\(\);[\s\S]*?setConsentRow\(row\);[\s\S]*?setNectarConsentSheetOpen\(false\);/.test(compose) &&
   /!nectarConsent && <PressableScale onPress=\{\(\) => setNectarConsentSheetOpen\(true\)\}/.test(compose) &&
-  /<NectarConsentSheet[\s\S]*?nectarConsentSheetOpen=\{nectarConsentSheetOpen\}[\s\S]*?senderName=\{recipientLabel\}[\s\S]*?submitting=\{nectarConsentSubmitting\}[\s\S]*?error=\{nectarConsentError\}[\s\S]*?onAffirm=\{handleNectarAffirm\}/.test(compose);
+  /<NectarConsentSheet[\s\S]*?nectarConsentSheetOpen=\{nectarConsentSheetOpen\}[\s\S]*?recipientName=\{recipientLabel\}[\s\S]*?submitting=\{nectarConsentSubmitting\}[\s\S]*?error=\{nectarConsentError\}[\s\S]*?onAffirm=\{handleNectarAffirm\}/.test(compose);
 
 const hasCloseAfterVisibleBalance = ({ compose, giftHook }) =>
   /: await NectarStore\.sendCombNectarNote\(\{ sendId: sendId\.current, combId, recipientId, note: note\.trim\(\), amountDrops: resolvedAmount \}\)\s*\.then\(\(\) => NectarStore\.getBalanceDrops\(\)\)\s*\.then\(\(drops\) => \{ setBalanceDrops\(drops\); return \{ ok: true \}; \}, \(err\) => \(\{ ok: false, err \}\)\)/.test(compose) &&

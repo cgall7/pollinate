@@ -274,7 +274,6 @@ const NUMBER_SITES = {
   // printed it rather than inventing an answer; FU3.2 ruled them, six to
   // the word cell above and these 21 to the digit. The note each one
   // carries is now the ruling, not the question.
-  'src/components/NectarConsentSheet.js :: 500 drops': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
   'src/components/NectarSendPanel.js :: You have 1 drop.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
   'src/components/NectarSendPanel.js :: You have {} drops.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
   'src/screens/CombNectarCompose.js :: Sent 1 drop.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
