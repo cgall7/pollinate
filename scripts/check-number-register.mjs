@@ -593,12 +593,24 @@ const fileText = new Map();
 // must not be satisfied by prose about that string.
 const fileShapes = new Map();
 
+// The non-breaking spaces in rendered copy, collected on two independent
+// channels so section F can reconcile them: the AST's COOKED value, where
+// the escape is one character, and the source's own SPELLING, where it is
+// six. `NBSP` is written as an escape here for the same reason section F
+// requires it of `src/` — a byte scan is only an independent witness of a
+// character it can read in the source.
+const NBSP = '\u00A0';
+const NBSP_ESCAPE = '\\u00A0';
+const nbspSites = [];
+const rawEscapeFiles = new Set();
+
 for (const file of sourceFiles) {
   const rel = path.relative(ROOT, file);
   const src = fs.readFileSync(file, 'utf8');
   fileText.set(rel, src);
   rawFragments.set(rel, new Set((src.match(/\d+ [a-z]+/g) || []).map((m) => m.trim())));
   fileShapes.set(rel, new Set());
+  if (src.includes(NBSP_ESCAPE)) rawEscapeFiles.add(rel);
   let ast;
   try {
     ast = parse(src, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
@@ -608,6 +620,21 @@ for (const file of sourceFiles) {
   }
   const decls = declaratorsFor(ast);
   walkWithAncestry(ast.program, (node) => {
+    // Collected BEFORE the count walk's own early returns, because the
+    // point of section F is the sites that walk never reaches.
+    if (node.type === 'StringLiteral' && node.value.includes(NBSP)) {
+      nbspSites.push({ rel, line: node.loc.start.line, cooked: node.value, raw: node.extra?.raw ?? '' });
+    } else if (node.type === 'JSXText' && node.value.includes(NBSP)) {
+      // JSX text cannot carry an escape at all, so one here is a pasted
+      // character and F2 is right to red on it.
+      nbspSites.push({ rel, line: node.loc.start.line, cooked: node.value.trim(), raw: node.value });
+    } else if (node.type === 'TemplateLiteral') {
+      for (const q of node.quasis) {
+        if ((q.value.cooked ?? '').includes(NBSP)) {
+          nbspSites.push({ rel, line: node.loc.start.line, cooked: shapeOf(node, 'cooked'), raw: q.value.raw });
+        }
+      }
+    }
     if (node.type === 'StringLiteral') fileShapes.get(rel).add(node.value);
     if (node.type === 'JSXText' && node.value.trim()) fileShapes.get(rel).add(node.value.trim());
     if (node.type === 'TemplateLiteral') fileShapes.get(rel).add(shapeOf(node, 'cooked'));
@@ -963,6 +990,93 @@ check(
   []
 );
 
+// --- F. the copy this gate's own collector cannot see --------------------
+// DISCLOSED, NOT FIXED, and written as rows rather than as a note so the
+// population is measured on every run and a fourth site cannot arrive
+// quietly. An exemption that lives only in a channel message outlives its
+// justification.
+//
+// This gate reads a count as "digits, a SPACE, a lowercase noun", and it
+// spells that space as a literal ASCII space in four places: `LITERAL_COUNT`
+// (the recogniser for a count written out), `rawFragments` (A2's independent
+// byte witness), `nounIsSlot`'s `/^ $/` (the noun-is-itself-a-slot path),
+// and the noun-adjacency test on an interpolated slot.
+//
+// `NectarTab.js` joins its digit to its unit with a NON-BREAKING space,
+// because in that card's 176pt text column an ordinary space breaks the
+// line between the number and its noun and orphans the unit. That is a
+// ruled wrap fix, and it silently removes both of that card's digit
+// sentences from this gate's universe.
+//
+// MEASURED, NOT ARGUED. Mutation runs at e7b7b22, source restored from a
+// proven backup and the clean tally re-asserted after each:
+//
+//   both flipped to an ordinary space      24 green -> 21 green, 3 red
+//   the singular alone                     B1 reds: the literal site
+//                                          appears, unclassified
+//   the varying template alone             A3 and E1 red: the slot the
+//                                          singular row exists for
+//   `LITERAL_COUNT` widened alone,         B1 reds AND SO DOES A2, because
+//   source untouched                       the byte witness reads the
+//                                          escape as six characters and
+//                                          the walk reads it as one
+//   the noun-adjacency test widened        A3 and E1 red
+//   alone, source untouched
+//
+// So the eviction is not one shared premise. The recogniser evicts the
+// singular literal, the noun-adjacency test evicts the varying template,
+// and the byte witness merely shares the premise with both — which is why
+// the reconciliation cannot report the loss. A2 only asks about sites the
+// walk REPORTED, and a defect that shrinks the universe is invisible to
+// every row quantified over it.
+//
+// THE FIX IS NOT A CHARACTER-CLASS WIDENING. Widening those four to
+// accept either space reds A2 on the spot, because the AST channel reads
+// the cooked value and the byte channel reads the source spelling. It
+// needs the same raw-versus-cooked split `legalCopy.js` already forced on
+// this gate once, and that is a lane of its own. F2 and F3 build the two channels that fix
+// will need, so the instrument exists before the fix does.
+//
+// THIS SECTION IS A DEPENDENCY OF THAT FIX. Its acceptance is that these
+// three sites appear in the census under their own rows, at which point
+// every eviction claim above is false and section F is rewritten with the
+// fix rather than left behind it.
+const NBSP_DECLARED = {
+  'src/screens/NectarTab.js :: You have no<NBSP>drops yet.':
+    'outside the criterion either way: "no" is a determiner, not a numeral',
+  'src/screens/NectarTab.js :: You have 1<NBSP>drop.':
+    'evicted by `LITERAL_COUNT`. sentence + measure, and money is figures',
+  'src/screens/NectarTab.js :: You have {}<NBSP>drops.':
+    'evicted by the noun-adjacency test. the varying slot E1 exists for',
+};
+const nbspShown = (t) => t.split(NBSP).join('<NBSP>');
+// The universe guard is the row itself: `want` is a non-empty literal, so a
+// collector that found nothing reds here rather than passing over an empty
+// set. If the population ever truly goes to zero the right answer is to
+// delete section F, and a red saying "declared 3, measured 0" is the prompt
+// for that rather than a nuisance.
+check(
+  'F1 every non-breaking space in copy is a declared eviction',
+  [...new Set(nbspSites.map((s) => `${s.rel} :: ${nbspShown(s.cooked)}`))].sort(),
+  Object.keys(NBSP_DECLARED).sort()
+);
+check(
+  'F2 every one is spelled as an escape, so a byte scan can read it',
+  nbspSites.filter((s) => !s.raw.includes(NBSP_ESCAPE)).map((s) => `${s.rel}:${s.line}`).sort(),
+  []
+);
+// The two channels are independent: F1 walks the AST and reads cooked
+// values, this walks the file's bytes and never parses. The ESCAPE
+// SPELLING written into a COMMENT in `src/` reds this row, and that is
+// deliberate rather than a hole: the byte channel cannot tell prose about
+// the escape from an escape, and a gate that hunts a token must not be
+// satisfied by writing about it. Prose in `src/` spells it "non-breaking space".
+check(
+  'F3 the AST channel and an independent byte scan find the same files',
+  [...new Set(nbspSites.map((s) => s.rel))].sort(),
+  [...rawEscapeFiles].sort()
+);
+
 // --- the owed list ------------------------------------------------------
 // PRINTED ON EVERY RUN, not folded into a pass count. A count filed
 // `unruled` is a question this gate found and did not answer; a count
@@ -1016,6 +1130,15 @@ console.log(
 for (const [k, [kind, why]] of declaredSingulars.sort()) {
   console.log(`   ${kind}  ${k.split(' :: ').slice(0, 2).join(' :: ').slice(0, 96)}`);
   console.log(`     ${why}`);
+}
+
+console.log(
+  `\n--- OWED: ${nbspSites.length} non-breaking space${nbspSites.length === 1 ? '' : 's'} in copy, ` +
+    `outside this gate's universe by construction (section F) ---`
+);
+for (const k of Object.keys(NBSP_DECLARED).sort()) {
+  console.log(`   ${k}`);
+  console.log(`     ${NBSP_DECLARED[k]}`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
