@@ -338,6 +338,20 @@ export const MUTATIONS = [
     to: "  if (lastSeenReceivedDrops === null || lastSeenReceivedDrops === undefined || !Number.isFinite(then)) return null;\n  if (receivedDrops === null || receivedDrops === undefined || !Number.isFinite(now)) return null;",
   },
   {
+    row: 'F9',
+    why: 'THE SHIPPED DEFECT, RESTORED VERBATIM — both halves, because only the pair is lethal. `Number(null)` is `0` and finite, so the coercing guard passes a failed read through, and `String(Number(drops))` then lands it as the string "0" over a real remembered total; the next healthy open flies a person\'s whole gift history as one arrival from nobody. Every other row in the file stays green under it — F4 proves nothing is invented on the way OUT of storage, and this is the way in',
+    file: 'src/services/nectarArrivalState.js',
+    from: "    if (!userId || !Number.isFinite(drops)) return;\n    try {\n      await AsyncStorage.setItem(keyFor(userId), String(drops));",
+    to: "    if (!userId || !Number.isFinite(Number(drops))) return;\n    try {\n      await AsyncStorage.setItem(keyFor(userId), String(Number(drops)));",
+  },
+  {
+    row: null,
+    why: 'MUST NOT FIRE — only the WRITE coercion comes back, with the guard left correct. Under a guard that has already refused everything non-finite, `Number(drops)` is the identity and `String(Number(drops))` is a spelling, not a defect. This control is what makes F9 a claim about the GUARD rather than about the file containing the token `Number(`: it is also the measurement behind the row\'s own reasoning, since `String(null)` is "null", which the read side already rejects as unparseable — the coercion at the write is what turned the leaked `null` into a readable 0, and de-coercing the guard alone would have left that half in the file for the next person to re-arm',
+    file: 'src/services/nectarArrivalState.js',
+    from: "      await AsyncStorage.setItem(keyFor(userId), String(drops));",
+    to: "      await AsyncStorage.setItem(keyFor(userId), String(Number(drops)));",
+  },
+  {
     row: 'G10',
     why: 'the detector reverts to the balance — the exact regression the re-key exists to prevent, and the one that looks most harmless: the received total is still fetched and still remembered, so every OTHER row about it stays green while every consented person is announced a gift of their own refill at every delivery',
     file: 'src/screens/HoneycombTab.js',
@@ -1442,7 +1456,8 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // anything that coerced it here would put F2's fabrication back one layer
   // beneath the guard written to prevent it. Asserted as an ABSENCE of any
   // zero-defaulting operator on the read path, resolved from the AST inside
-  // `getLastSeenDrops`'s own body — never a file-wide text search, which
+  // `getLastSeenReceivedDrops`'s own body — never a file-wide text search,
+  // which
   // would also read the comment that names the hazard.
   let readBody = null;
   visit(arrivalTree, (n) => {
@@ -1466,6 +1481,53 @@ const PANEL = await read('src/components/NectarSendPanel.js');
     ok(`F4 \`getLastSeenReceivedDrops\` passes a never-written key through as \`null\`: its body tests \`raw === null\` and contains zero \`?? 0\` / \`|| 0\` defaults (enumerated from the AST of that method's body alone — a file-wide search would have read the comment that names this hazard and called the explanation the defect)`);
   } else {
     bad('F4', `body resolved=${Boolean(readBody)}, zero-defaults found=[${zeroDefaults.join(', ')}], tests raw === null=${returnsNullForMissing} — the unknown would reach \`nectarArrivalDrops\` as a 0`);
+  }
+
+  // F9 — AND THE WRITE SIDE REFUSES TO ERASE. Numbered after F8 because it is
+  // new; placed here because it is F4's twin and the pair only means anything
+  // read together. F4 proves nothing is INVENTED on the way out of storage.
+  // Nothing proved anything about the way in, and that asymmetry is how a
+  // coercing guard shipped green through three independent shells:
+  // `Number.isFinite(Number(drops))` passes `null`, because `Number(null)` is
+  // `0`. One failed read then writes "0" over a real remembered total and the
+  // next healthy open flies a person's entire received history as a single
+  // arrival from nobody — a larger fabrication than the one F2 prices.
+  //
+  // Keyed on the ARGUMENT, from the AST, not on the guard's text: the defect
+  // and the fix differ by one wrapping call, so a row pinned to a source
+  // string would go green on any reformatting of the wrong thing. Asserted as
+  // a pair — the raw parameter IS tested, and no `Number.isFinite` in this
+  // body receives a `Number(...)` call — because either half alone passes a
+  // body that tests both forms and keeps the coercing one.
+  let writeBody = null;
+  let writeParam = null;
+  visit(arrivalTree, (n) => {
+    if (n.type !== 'ObjectMethod' && n.type !== 'ObjectProperty') return;
+    if (n.key?.name !== 'rememberReceivedDrops') return;
+    const fn = n.type === 'ObjectMethod' ? n : n.value;
+    writeBody = fn?.body;
+    writeParam = fn?.params?.[1]?.name ?? null;
+  });
+  const isFiniteCalls = [];
+  if (writeBody) {
+    visit(writeBody, (n) => {
+      if (n.type !== 'CallExpression') return;
+      const c = n.callee;
+      if (c?.type !== 'MemberExpression') return;
+      if (c.object?.name !== 'Number' || c.property?.name !== 'isFinite') return;
+      isFiniteCalls.push(n.arguments?.[0] ?? null);
+    });
+  }
+  const testsRawParam = isFiniteCalls.some(
+    (a) => a?.type === 'Identifier' && writeParam && a.name === writeParam
+  );
+  const coerced = isFiniteCalls
+    .filter((a) => a?.type === 'CallExpression' && a.callee?.type === 'Identifier' && a.callee.name === 'Number')
+    .map(() => 'Number.isFinite(Number(...))');
+  if (writeBody && writeParam && testsRawParam && coerced.length === 0) {
+    ok(`F9 \`rememberReceivedDrops\` refuses an unknown at the WRITE: its guard tests the bare parameter \`${writeParam}\` with \`Number.isFinite\` and no \`Number.isFinite\` in that body receives a \`Number(...)\` call (both read from the AST argument, so the row cannot be satisfied by the coercing form reformatted). \`Number(null)\` is \`0\` and finite — the coercing guard writes "0" over the last real total on any failed read, and the next open flies the whole history as one arrival. F4 is the same discipline pointing the other way`);
+  } else {
+    bad('F9', `body resolved=${Boolean(writeBody)}, param=${writeParam}, tests the raw parameter=${testsRawParam}, coercing guards found=[${coerced.join(', ')}] — a \`null\` from a failed read would be written as "0" over the last real value`);
   }
 
   // ==========================================================================

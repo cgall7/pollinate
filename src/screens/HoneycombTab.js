@@ -228,8 +228,8 @@ const HoneycombFeed = () => {
   // R-N4 — the arrival memory is keyed PER USER (nectarArrivalState's own
   // header: a device is not an account), so this screen needs the id. Read
   // with `?.` even though `HoneycombTab` only mounts this branch with a
-  // session in hand: `getLastSeenDrops` answers `null` for a missing id,
-  // which is the same "unknown" every other unreadable case produces, and a
+  // session in hand: `getLastSeenReceivedDrops` answers `null` for a missing
+  // id, which is the same "unknown" every other unreadable case produces, and a
   // deref that throws here would take the whole hive down for a decoration.
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -358,10 +358,15 @@ const HoneycombFeed = () => {
   // "on the same clock" asks for — one duration for one event, not one
   // trigger.
   //
-  // REMEMBERED ON EVERY SUCCESSFUL READ, including the ones that fell and
-  // the ones that did not move (see `rememberDrops`). Deliberately not
-  // awaited before the crossing is dispatched: the write is the memory for
-  // NEXT time and nothing this frame reads it, so making the bee wait on
+  // CALLED ON EVERY PASS, including the ones that did not move and the ones
+  // where the read failed: `rememberReceivedDrops` refuses an unknown itself
+  // rather than being called conditionally, so exactly one place decides what
+  // is worth remembering. (A fall is no longer reachable at all under the
+  // re-key — both source tables are append-only, so a received total is
+  // monotone.)
+  //
+  // Deliberately not awaited before the crossing is dispatched: the memory is
+  // for NEXT time and nothing this frame reads it, so making the bee wait on
   // AsyncStorage would put a disk round trip on a beat that already has its
   // answer.
   useEffect(() => {

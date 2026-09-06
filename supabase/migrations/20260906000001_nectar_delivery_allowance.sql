@@ -49,8 +49,11 @@
 --
 -- Lumen's pin: "the refill amount reads the same server-side definition the
 -- starter grant reads. One writer." It already does —
--- nectar_starter_grant_drops() (20260826000005:68) is that definition, and
--- consent_to_nectar() reads it rather than holding a 500 of its own. So
+-- nectar_starter_grant_drops(), defined in 20260826000005_nectar_sim_service.sql,
+-- is that definition, and consent_to_nectar() reads it rather than holding a
+-- 500 of its own. Cited by NAME and by FILE, never by line: this migration
+-- edits above its own citation in that same file, which is how the :68 this
+-- replaced was stale in the commit that wrote it. So
 -- nothing is hoisted here; the refill calls the same function. A fresh 500
 -- literal in this file would have been a second copy of a shared premise.
 --

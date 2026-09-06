@@ -69,12 +69,27 @@ export const NectarArrivalState = {
   // on rises is a memory that can disagree with what the screen last showed,
   // and the cheapest way to never have that bug is to never have that branch.
   //
-  // Deliberately not called for an unknown total. There is nothing to
-  // remember, and writing one would erase the last real value.
+  // IT IS CALLED WITH UNKNOWNS, AND THE REFUSAL LIVES HERE. The caller writes
+  // on every pass, including the ones where the read failed and `drops` is
+  // `null` — `getReceivedDropsTotal` answers `null` for a missing page, and
+  // `HoneycombTab`'s own catch answers `null` for a failed one. So this
+  // method is the only thing standing between a transient network beat and an
+  // erased memory, and one place decides.
+  //
+  // `Number.isFinite` IS DELIBERATELY NOT WRAPPED IN `Number(...)`.
+  // `Number(null)` is `0`, which is finite, so the coercing form lets `null`
+  // walk through and writes "0" over the last real total. The next healthy
+  // open then computes the whole of a person's received history minus zero
+  // and flies it as ONE arrival, from nobody — strictly worse than the
+  // refill-misannouncement the re-key exists to prevent, and unreachable by
+  // the read side's own refusal to fabricate: that one proves nothing is
+  // invented on the way OUT of storage, and this is the way IN. Bare
+  // `Number.isFinite` refuses `null`, `undefined` and every string while
+  // still passing a real 0.
   async rememberReceivedDrops(userId, drops) {
-    if (!userId || !Number.isFinite(Number(drops))) return;
+    if (!userId || !Number.isFinite(drops)) return;
     try {
-      await AsyncStorage.setItem(keyFor(userId), String(Number(drops)));
+      await AsyncStorage.setItem(keyFor(userId), String(drops));
     } catch (err) {
       console.warn('NectarArrivalState: failed to persist last-seen received total', err);
     }
