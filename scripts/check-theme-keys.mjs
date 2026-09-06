@@ -25,15 +25,17 @@
 //      client-computed key into `entries.theme`, so every row minted before
 //      the rename still holds the retired word. A renamed stored identity is
 //      a READ problem: it is answered once, at the boundary, and every
-//      render inherits the answer. T3 is the universal that keeps it there,
+//      render inherits the answer. T5 is the universal that keeps it there,
 //      because the tempting fix is at the render and `TodayTab.js:618`
 //      prints `entry.theme` with no fallback of any kind.
 //
 // WHAT THE UNIVERSE IS, AND HOW IT IS BOUNDED
 //
-// T3 quantifies over every non-computed `.theme` MEMBER READ under `src/`
-// and `App.js`. That is the population because it is how a stored theme
-// leaves a record and becomes a value: `row.theme`, `entry.theme`,
+// T5 quantifies over every non-computed `.theme` MEMBER READ under `src/`
+// and `App.js`, in BOTH member syntaxes: `row.theme` and `row?.theme` are
+// different Babel node kinds and only the first was in the universe when
+// this gate shipped. That is the population because it is how a stored
+// theme leaves a record and becomes a value: `row.theme`, `entry.theme`,
 // `insight.theme`. A member is either MEASURED normalised (its node is an
 // argument of a `normalizeTheme(...)` call, read off the AST) or DECLARED
 // downstream of something that already is. A declaration is not prose: its
@@ -47,8 +49,17 @@
 //      asserted separately so a rename that deleted every call site could
 //      not go green on an empty universal
 //   2. the extractor is reconciled against an INDEPENDENT witness: a second,
-//      hand-rolled walk over the raw AST object graph, written not to share
-//      `walkWithAncestry`'s traversal, compared as sets in both directions
+//      hand-rolled walk over the raw AST object graph, written to share
+//      neither `walkWithAncestry`'s traversal NOR the extractor's node-type
+//      list, compared as sets in both directions. Independence in the key
+//      matters as much as independence in the walk: two walks filtering on
+//      the same list cannot disagree about the list, which is how an entire
+//      member syntax hid from the pair of rows written to catch a narrow
+//      extractor
+//   2b. and because the tree exercises only one of the two member syntaxes
+//      today, the extractor also runs over a FIXTURE holding both, so the
+//      universe's width is asserted by a row rather than remembered from a
+//      mutation somebody once ran
 //   3. every member is measured or named, and every name resolves
 //
 // THE KEYS CARRY LINE NUMBERS and that is a real cost, paid on purpose:
@@ -84,7 +95,7 @@ const check = (label, got, want) => {
 // does not: it is read off the AST below, which is the right tool anyway
 // because neither list it owns is exported and widening an export for a gate
 // is the gate changing the thing it measures.
-const { THEMES, FALLBACK_THEME, normalizeTheme, LEGACY_THEME_KEY_LIST } = await import(
+const { THEMES, FALLBACK_THEME, normalizeTheme, LEGACY_THEME_KEY_LIST, tagEntry } = await import(
   pathToFileURL(path.join(ROOT, 'src/utils/themeTagger.js')).href
 );
 const { STREAK_THEMES, STREAK } = await import(
@@ -201,25 +212,22 @@ console.log(`\n--- T4. every seeded line tags to the theme it is seeded under --
 // keyword lists". `tagEntry` matches by SUBSTRING, so that sentence is not
 // self-evident: it was FALSE at one line when this row was written, because
 // `moment` contains `mom` and Family is earlier in THEMES than the theme the
-// line was filed under. Re-derived here rather than imported so the row
-// measures the shipped tagger's behaviour and not a second copy of the rule.
-const tagWith = (text) => {
-  const lower = text.toLowerCase();
-  let best = FALLBACK_THEME;
-  let bestScore = 0;
-  for (const theme of THEMES) {
-    const score = theme.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
-    if (score > bestScore) {
-      bestScore = score;
-      best = theme.key;
-    }
-  }
-  return best;
-};
+// line was filed under.
+//
+// THE SHIPPED FUNCTION IS CALLED, never re-derived here. Lumen measured the
+// cost of the copy this row shipped with (thread 160660d9): drifting
+// `tagEntry` to word-boundary matching, the natural future fix for the very
+// `mom`-in-`moment` class this row's own story is about, sends the seeded
+// line "put my spirits right again" to Reflection, because `spirit` does not
+// match `spirits`. The whole 89-gate suite stayed GREEN through it. A copy of
+// the rule agrees with the rule forever and measures only the DATA underneath
+// it; importing is what makes this row red the day the algorithm and the
+// seeded lines disagree. R12's class exactly, and `tagEntry` was already
+// exported, so the repair is one identifier.
 check('there are sample lines to tag', sampleLines.length > 0, true);
 check(
   'every sample line tags to its own key',
-  sampleLines.filter(([key, text]) => tagWith(text) !== key).map(([key, text]) => `${key} -> ${tagWith(text)}: ${text}`),
+  sampleLines.filter(([key, text]) => tagEntry(text) !== key).map(([key, text]) => `${key} -> ${tagEntry(text)}: ${text}`),
   []
 );
 
@@ -239,50 +247,121 @@ files.sort();
 
 // Is this node an argument of a `normalizeTheme(...)` call? Read off the
 // ancestry rather than off the source text, so a comment naming the function
-// beside an unwrapped read cannot answer for it.
+// beside an unwrapped read cannot answer for it. BOTH call syntaxes are
+// boundaries, because the INNERMOST enclosing call is what resolves this:
+// an `f?.(x.theme)` frame has to answer for itself, not be stepped over on
+// the way out to an enclosing `normalizeTheme(...)` that never received this
+// value.
+const CALL_TYPES = new Set(['CallExpression', 'OptionalCallExpression']);
 const insideNormalizer = (ancestors) => {
   for (let i = ancestors.length - 1; i >= 0; i -= 1) {
     const { node: a, key } = ancestors[i];
-    if (a.type === 'CallExpression' && key === 'arguments') {
+    if (CALL_TYPES.has(a.type) && key === 'arguments') {
       return a.callee?.type === 'Identifier' && a.callee.name === 'normalizeTheme';
     }
   }
   return false;
 };
 
-const population = new Map();   // key -> { at, object, normalized }
-const witness = new Set();      // the independent walk's view of the same set
-for (const file of files) {
-  const rel = path.relative(ROOT, file);
-  const source = read(rel);
+// THE MEMBER SYNTAXES A `.theme` READ CAN WEAR. `a?.theme` is not a
+// `MemberExpression`: Babel parses it as `OptionalMemberExpression`, and so
+// is every link after the first `?.` in a chain. Optional chaining is this
+// codebase's house syntax, so the most natural future read was the one
+// standing outside the universal (Lumen, thread 160660d9: an undeclared
+// `month.entries[0]?.theme` sat green at 30/0 while its plain twin red).
+const MEMBER_TYPES = new Set(['MemberExpression', 'OptionalMemberExpression']);
+
+// ONE EXTRACTOR, used for the tree AND for the fixture below, so the rows
+// that calibrate it calibrate the shipped code rather than a copy of it.
+const collectThemeReads = (rel, source) => {
   const ast = parse(source, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+  const found = new Map();
+  const raw = new Set();
+  const keyOf = (node) =>
+    `${rel}:${node.loc?.start.line} ${source.slice(node.object.start, node.object.end)}.theme`;
 
   walkWithAncestry(ast.program, (node, ancestors) => {
-    if (node.type !== 'MemberExpression' || node.computed) return;
+    if (!MEMBER_TYPES.has(node.type) || node.computed) return;
     if (node.property?.name !== 'theme') return;
-    const object = source.slice(node.object.start, node.object.end);
-    population.set(`${rel}:${node.loc?.start.line} ${object}.theme`, {
-      normalized: insideNormalizer(ancestors),
-    });
+    found.set(keyOf(node), { normalized: insideNormalizer(ancestors) });
   });
 
-  // THE INDEPENDENT WITNESS. A hand-rolled walk of the raw object graph,
-  // deliberately not `walkWithAncestry`: if that traversal ever stops
-  // descending into a node kind, the population silently shrinks and every
-  // universal above it goes green. This one shares nothing with it but the
-  // parser.
-  (function raw(node) {
+  // THE INDEPENDENT WITNESS, and its independence has to be in the KEY as
+  // well as in the traversal. It is a hand-rolled walk of the raw object
+  // graph, deliberately not `walkWithAncestry`, so a traversal that stops
+  // descending into a node kind cannot shrink the population in silence.
+  // It also does NOT read `MEMBER_TYPES`: it matches the SHAPE of a member
+  // read, any node carrying an object and a non-computed `theme` property.
+  // Sharing the type test is exactly how the optional-chaining blindness
+  // hid from these two reconciliation rows, which are the rows written to
+  // catch a narrow extractor. A witness that filters on the same list can
+  // never disagree about the list. The cost is that a genuinely new
+  // member-shaped node kind reds here first and a person widens
+  // `MEMBER_TYPES`, and that is the loud direction.
+  (function rawWalk(node) {
     if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) return node.forEach(raw);
-    if (node.type === 'MemberExpression' && !node.computed && node.property?.name === 'theme') {
-      witness.add(`${rel}:${node.loc?.start.line} ${source.slice(node.object.start, node.object.end)}.theme`);
+    if (Array.isArray(node)) return node.forEach(rawWalk);
+    if (node.object && node.property && !node.computed && node.property.name === 'theme') {
+      raw.add(keyOf(node));
     }
     for (const k of Object.keys(node)) {
       if (k === 'loc' || k === 'leadingComments' || k === 'trailingComments' || k === 'innerComments') continue;
-      raw(node[k]);
+      rawWalk(node[k]);
     }
   })(ast.program);
+
+  return { found, raw };
+};
+
+const population = new Map();   // key -> { normalized }
+const witness = new Set();      // the independent walk's view of the same set
+for (const file of files) {
+  const rel = path.relative(ROOT, file);
+  const { found, raw } = collectThemeReads(rel, read(rel));
+  for (const [k, v] of found) population.set(k, v);
+  for (const k of raw) witness.add(k);
 }
+
+// THE EXTRACTOR'S OWN CALIBRATION, permanent rather than remembered. The
+// tree holds zero optional-chained `.theme` reads today, so nothing in the
+// universal below exercises the syntax that was invisible, and a repair
+// measured only by a mutation stops being measured the moment the mutation
+// is restored. This fixture is the live witness that both member syntaxes
+// are inside the universe, that the computed exclusion is still a real
+// exclusion rather than a filter that quietly stopped matching anything,
+// and that `insideNormalizer` still resolves through the extractor it is
+// called from.
+const FIXTURE = [
+  'const a = plain.theme;',
+  'const b = chained?.theme;',
+  'const c = deep.list[0]?.theme;',
+  'const d = computedKey["theme"];',
+  'const e = normalizeTheme(wrapped.theme);',
+].join('\n');
+const fixture = collectThemeReads('<fixture>', FIXTURE);
+check(
+  'the extractor collects both member syntaxes, and no computed read',
+  [...fixture.found.keys()].sort(),
+  [
+    '<fixture>:1 plain.theme',
+    '<fixture>:2 chained.theme',
+    '<fixture>:3 deep.list[0].theme',
+    '<fixture>:5 wrapped.theme',
+  ]
+);
+check(
+  'the witness agrees with the extractor on the fixture, both directions',
+  [
+    ...[...fixture.found.keys()].filter((k) => !fixture.raw.has(k)),
+    ...[...fixture.raw].filter((k) => !fixture.found.has(k)),
+  ].sort(),
+  []
+);
+check(
+  'only the wrapped fixture read is measured normalised',
+  [...fixture.found.entries()].filter(([, v]) => v.normalized).map(([k]) => k).sort(),
+  ['<fixture>:5 wrapped.theme']
+);
 
 check('there are .theme reads to classify', population.size > 0, true);
 check(

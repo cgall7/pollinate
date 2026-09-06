@@ -455,15 +455,15 @@ check('P3 (navigator route ids) found at least one', routeIds.length > 0, true);
 // all four writers of the theme identity moved together, is
 // `check-theme-keys` T1 and is not restated here.
 const corpusRel = path.relative(ROOT, CORPUS);
+// One expression, read twice: the row asserts it and the log line below
+// prints its length. A hand-typed `0` in the print would be a second writer
+// of the same answer, and the one that never reds.
+const corpusHits = population.filter((p) => p.key.startsWith(`${corpusRel}:`)).map((p) => p.key).sort();
 check('the corpus file is in the universe', files.includes(CORPUS), true);
 check('the corpus contributed strings to examine', corpusDropped > 0, true);
-check(
-  'no corpus string matches a forbidden or reserved word',
-  population.filter((p) => p.key.startsWith(`${corpusRel}:`)).map((p) => p.key).sort(),
-  []
-);
+check('no corpus string matches a forbidden or reserved word', corpusHits, []);
 console.log(`     collected ${collectedCount}, dropped ${droppedCount} (+${droppedEmptyCount} empty), raw string-bearing nodes ${rawCount}`);
-console.log(`     of which the corpus: ${corpusDropped} dropped strings, 0 predicate hits`);
+console.log(`     of which the corpus: ${corpusDropped} dropped strings, ${corpusHits.length} predicate hit${corpusHits.length === 1 ? '' : 's'}`);
 
 console.log(`\n--- N2. the extractor, reconciled against the raw walk in both directions ---`);
 // A MATCHING TOTAL IS NOT A RECONCILIATION, so both directions are asserted:
