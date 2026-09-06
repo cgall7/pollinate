@@ -59,7 +59,7 @@ export const NectarConsentSheet = ({
             <Text style={styles.bodyStrong}>500 drops</Text> to your account to say thanks.
           </Text>
           <Text style={styles.footnote}>Drops are units on a simulated Bitcoin network.</Text>
-          {error && <Text style={styles.error}>Failed — please try again.</Text>}
+          {error && <Text style={styles.error}>Failed. Please try again.</Text>}
           <PrimaryButton
             onPress={onAffirm}
             loading={submitting}
