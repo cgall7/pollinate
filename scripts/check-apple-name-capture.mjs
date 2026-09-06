@@ -37,9 +37,22 @@
 // are both behavioural and both fail SILENTLY, so asserting their spelling
 // would gate the wrong thing.
 //
-//   1. THE LADDER. self-chosen > organizer-typed > Apple > system default
-//      (Lumen, 2026-09-06). A write that ignored the rung would rename a
-//      person who had already chosen a name, and they would never be told.
+//   1. THE LADDER, in the only form that has a producer: ANY non-placeholder
+//      value already stored in `profiles.display_name` outranks an
+//      Apple-provided one, which outranks the system default. A write that
+//      ignored the rung would rename a person who had already chosen a name,
+//      and they would never be told.
+//
+//      The four-rung form of this sentence (…> organizer-typed > Apple > …)
+//      is a mis-encoding and is not what the guard implements. No organizer
+//      -typed name reaches `profiles.display_name`: all three writers of that
+//      column write the CALLER'S OWN row (`CombInviteStore.js:45`,
+//      `CombStore.js:75`, and this one), and in the comb path the subject's
+//      name is COPIED OUT of their own profile rather than typed
+//      (`20260830000011_eng60_comb_advance_rotation.sql:70-73`, and the same
+//      select in `…0008` / `…0010`). A name an organizer types for someone
+//      else lands in `private_hives.subject_name`, a different column that
+//      `adoptAppleName` never reads. Lumen's correction, 2026-09-06.
 //   2. IT NEVER THROWS. By the time it runs the person IS signed in, and
 //      `handleAppleSignIn`'s catch renders "Apple sign-in failed. Try again."
 //      A name write that escaped would tell a successfully authenticated user
@@ -51,6 +64,14 @@
 // scope is still requested and the payload is still forwarded. It carries a
 // MUST_CATCH fixture holding the original two-argument call, so the section
 // proves it can still fail — a wiring assertion that cannot red is decoration.
+//
+// AND IT MATCHES CODE, NOT PROSE. Its first cut read the files raw, so every
+// row in it could be greened by a COMMENT quoting the call — verified by
+// mutation on 2026-09-06: reverting `Onboarding.js` to the shipped two-argument
+// defect and leaving a comment that quoted the three-argument form returned
+// 34 passed, 0 failed over the live bug. A textual gate over a parser gates the
+// SPELLING, and a justification comment is prose the gate can read. `codeOnly`
+// strips comments before section C matches, and carries its own controls.
 //
 // SCOPE OF THE CLAIM. This gate does not prove Apple actually populates
 // `fullName`, that the profile row exists when the write lands, or that RLS
@@ -170,8 +191,14 @@ if (!lifted) {
   await run("adopts over 'New user' (handle_new_user's default)", { stored: 'New user' }, APPLE, ['Rosa Okafor'], 'u1');
   await run("adopts over '' (an unrepaired writer's leftover)", { stored: '' }, APPLE, ['Rosa Okafor'], 'u1');
   await run('adopts when the profile read returns no row', { stored: undefined }, APPLE, ['Rosa Okafor'], 'u1');
-  await run('DOES NOT overwrite a self-chosen name', { stored: 'Ro' }, APPLE, [], 'u1');
-  await run('DOES NOT overwrite an organizer-typed name', { stored: 'Rosa O.' }, APPLE, [], 'u1');
+  // These two are ONE property with two fixtures, not two rungs. The guard is
+  // `isPlaceholderName`, so what it defends is "any non-placeholder stored
+  // value wins" — it cannot distinguish who typed the value, and nothing in
+  // this product types one into `profiles.display_name` for another person
+  // (see the header). Labelling the second row "organizer-typed" claimed a
+  // rung with no producer and read as a second property proven.
+  await run('DOES NOT overwrite a stored name (self-chosen)', { stored: 'Ro' }, APPLE, [], 'u1');
+  await run('DOES NOT overwrite a stored name (any non-placeholder value)', { stored: 'Rosa O.' }, APPLE, [], 'u1');
 
   // NO PAYLOAD, NO WRITE — the ordinary case on every sign-in after the first.
   await run('no write when Apple sent no name', { stored: 'New user' }, null, [], 'u1');
@@ -194,17 +221,55 @@ if (!lifted) {
 
 // --- C. wiring, lexical, with a MUST_CATCH fixture ------------------------
 console.log('\nC. wiring');
+
+// Comments are not wiring. Block comments go first; then `//` to end of line,
+// EXCEPT where a quote opens before it — that `//` may live inside a string
+// (a URL), and eating real code would red a true row rather than green a false
+// one. Residual, stated rather than hidden: a trailing comment on a line that
+// also contains a string literal survives. Neither target file has such a line
+// today (checked at 90e15a7: zero block comments, zero `//` inside a string).
+const codeOnly = (src) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => {
+      const at = line.indexOf('//');
+      if (at < 0) return line;
+      const before = line.slice(0, at);
+      return /['"`]/.test(before) ? line : before;
+    })
+    .join('\n');
+
+const onboardingCode = codeOnly(onboarding);
+const storeCode = codeOnly(store);
+
+// The stripper's own controls. A stripper that ate everything would make every
+// row below red, so it fails closed — but a stripper that stripped NOTHING
+// would restore the hole silently, and that is the direction worth proving.
+check(
+  'codeOnly removes a full-line commented call',
+  /signInWithApple\(/.test(codeOnly('      // await HoneycombStore.signInWithApple(a, b, credential.fullName);')),
+  false,
+);
+check(
+  'codeOnly removes a trailing commented call',
+  /signInWithApple\(/.test(codeOnly('const x = 1; // await HoneycombStore.signInWithApple(a, b, credential.fullName);')),
+  false,
+);
+check('codeOnly keeps real code on a commented line', /const x = 1;/.test(codeOnly('const x = 1; // note')), true);
+check("codeOnly declines to strip a `//` inside a string", /http:\/\/x/.test(codeOnly("const u = 'http://x';")), true);
+
 const REQUESTS_FULL_NAME = /AppleAuthentication\.AppleAuthenticationScope\.FULL_NAME/;
 const FORWARDS_PAYLOAD = /signInWithApple\(\s*credential\.identityToken\s*,\s*rawNonce\s*,\s*credential\.fullName\s*\)/;
 const STORE_ACCEPTS = /async signInWithApple\(identityToken, nonce, fullName\)/;
 const STORE_ADOPTS = /await adoptAppleName\(client, data\?\.user\?\.id, fullName\)/;
 
-check('Onboarding still requests the FULL_NAME scope', REQUESTS_FULL_NAME.test(onboarding), true);
-check('Onboarding forwards credential.fullName to the store', FORWARDS_PAYLOAD.test(onboarding), true);
-check('signInWithApple accepts the payload', STORE_ACCEPTS.test(store), true);
-check('signInWithApple adopts the name with the signed-in user id', STORE_ADOPTS.test(store), true);
-check('the guard is the shared placeholder class, not a local literal', /isPlaceholderName\(profile\?\.display_name\)/.test(store), true);
-check('appleName is imported from the shared util', /import \{ appleFullNameToDisplayName \} from '\.\.\/utils\/appleName'/.test(store), true);
+check('Onboarding still requests the FULL_NAME scope', REQUESTS_FULL_NAME.test(onboardingCode), true);
+check('Onboarding forwards credential.fullName to the store', FORWARDS_PAYLOAD.test(onboardingCode), true);
+check('signInWithApple accepts the payload', STORE_ACCEPTS.test(storeCode), true);
+check('signInWithApple adopts the name with the signed-in user id', STORE_ADOPTS.test(storeCode), true);
+check('the guard is the shared placeholder class, not a local literal', /isPlaceholderName\(profile\?\.display_name\)/.test(storeCode), true);
+check('appleName is imported from the shared util', /import \{ appleFullNameToDisplayName \} from '\.\.\/utils\/appleName'/.test(storeCode), true);
 
 // MUST_CATCH: the exact code that shipped the defect. If the forwarding
 // pattern above matches this, section C proves nothing.
@@ -212,10 +277,15 @@ const MUST_CATCH = "await HoneycombStore.signInWithApple(credential.identityToke
 check('the original two-argument call would be caught', FORWARDS_PAYLOAD.test(MUST_CATCH), false);
 check('the MUST_CATCH fixture is a real call site, not a typo', /signInWithApple\(/.test(MUST_CATCH), true);
 
-// And the defect in its purest form: the payload named nowhere in src/.
+// And the defect in its purest form: the payload named nowhere in src/. Read
+// against the STRIPPED source — against the raw file this row was greened by
+// the justification comment added in the same commit, which named
+// `credential.fullName` twice, so it stayed green over the live defect. It is
+// still not independent of FORWARDS_PAYLOAD and must not be read as a second
+// witness; it is the narrower claim that the payload is named in code at all.
 check(
   'credential.fullName is read somewhere, which was the whole bug',
-  /credential\.fullName/.test(onboarding),
+  /credential\.fullName/.test(onboardingCode),
   true,
 );
 
