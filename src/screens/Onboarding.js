@@ -163,7 +163,12 @@ export const OnboardingFlow = ({ onDone, startAt, navigation, splashHidden }) =>
         nonce: hashedNonce,
       });
       if (!credential.identityToken) throw new Error('Apple returned no identity token');
-      await HoneycombStore.signInWithApple(credential.identityToken, rawNonce);
+      // `credential.fullName` is populated by Apple ONLY at first
+      // authorization and is unrecoverable afterwards, so it is forwarded on
+      // every call rather than conditionally — the store decides whether to
+      // adopt it. Dropping it here is what made every Apple keepsake sign
+      // itself "New user".
+      await HoneycombStore.signInWithApple(credential.identityToken, rawNonce, credential.fullName);
       finish();
     } catch (err) {
       if (err.code !== 'ERR_REQUEST_CANCELED') {

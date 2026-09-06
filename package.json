@@ -100,7 +100,8 @@
     "check:nectar-surface-yield": "node scripts/check-nectar-surface-yield.mjs",
     "check:scrim-veil": "node scripts/check-scrim-veil.mjs",
     "check:spec-citation": "node scripts/check-spec-citation.mjs",
-    "check:nectar-events-reader": "node scripts/check-nectar-events-reader.mjs"
+    "check:nectar-events-reader": "node scripts/check-nectar-events-reader.mjs",
+    "check:apple-name-capture": "node scripts/check-apple-name-capture.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dancing-script": "^0.4.2",

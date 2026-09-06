@@ -1,9 +1,42 @@
 import { supabase } from './supabase';
 import { getAuthRedirectUrl, parseAuthCallbackParams } from './authLinking';
+import { appleFullNameToDisplayName } from '../utils/appleName';
+import { isPlaceholderName } from '../utils/placeholderName';
 
 const requireSupabase = () => {
   if (!supabase) throw new Error('Supabase is not configured — check .env');
   return supabase;
+};
+
+// Adopt the name Apple handed us at first authorization, if it handed us one
+// and if nothing better is already stored. Gated on `isPlaceholderName` so the
+// ladder holds: a self-chosen name outranks an Apple-provided one.
+//
+// THIS NEVER THROWS. By the time it runs the person is already signed in, and
+// the caller's catch renders "Apple sign-in failed. Try again." — so letting a
+// failed name write escape would tell a successfully authenticated user their
+// sign-in failed and invite them to repeat the one authorization that would
+// have carried the name. A lost name is a bad outcome; a lost name reported as
+// a failed sign-in is a worse one.
+const adoptAppleName = async (client, userId, fullName) => {
+  const displayName = appleFullNameToDisplayName(fullName);
+  if (!displayName || !userId) return;
+  try {
+    const { data: profile, error } = await client
+      .from('profiles')
+      .select('display_name')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!isPlaceholderName(profile?.display_name)) return;
+    const { error: writeError } = await client
+      .from('profiles')
+      .update({ display_name: displayName })
+      .eq('id', userId);
+    if (writeError) throw writeError;
+  } catch (err) {
+    console.warn('Apple name adoption failed; profile keeps its placeholder', err);
+  }
 };
 
 // The week query's row cap. Exported so the screen can tell "got everything"
@@ -135,7 +168,14 @@ export const HoneycombStore = {
   // the raw value so it can verify the hash inside the token itself matches
   // — passing the same value to both would make every check trivially pass
   // regardless of what came back from Apple).
-  async signInWithApple(identityToken, nonce) {
+  //
+  // `fullName` is `AppleAuthentication.signInAsync()`'s `credential.fullName`,
+  // which Apple returns ONLY at first authorization (see
+  // `utils/appleName.js`). Capturing it here rather than in Onboarding.js is
+  // deliberate: this is the only function that knows the sign-in succeeded and
+  // holds the resulting user id, and the name must be adopted inside the same
+  // await the caller already has, before `finish()` routes away.
+  async signInWithApple(identityToken, nonce, fullName) {
     const client = requireSupabase();
     const { data, error } = await client.auth.signInWithIdToken({
       provider: 'apple',
@@ -143,6 +183,7 @@ export const HoneycombStore = {
       nonce,
     });
     if (error) throw error;
+    await adoptAppleName(client, data?.user?.id, fullName);
     return data;
   },
 

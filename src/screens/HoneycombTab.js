@@ -682,14 +682,21 @@ const HoneycombFeed = () => {
         eyebrow={
           connections.length > 0
             ? `${connections.length} CONNECTION${connections.length === 1 ? '' : 'S'}`
-            : 'YOUR HIVE'
+            : 'YOUR HONEYCOMB'
         }
         // "Honeycomb", not "Hive" — R-WD-4's header rider, and it corrects an
         // inversion rather than picking a preference. The 09-04 direction
         // ruled this tab HONEYCOMB; "hive" is a CLAIMED NOUN in this product
         // (a hive is the keepsake object), so the screen title was asserting
-        // the wrong one of the two. The eyebrow above already says YOUR HIVE
-        // about the people, which is the sense that survives.
+        // the wrong one of the two.
+        //
+        // 2026-09-06 (@Lumen's ruling, @Vector's finding): the eyebrow above
+        // was the residue R-WD-4 missed. It read YOUR HIVE — the claimed noun,
+        // over a list of PEOPLE, one line above a title reading Honeycomb — so
+        // the screen shipped both halves of the inversion it was correcting.
+        // It now reads YOUR HONEYCOMB, which is the house pattern (the Nectar
+        // tab sets YOUR NECTAR over Nectar) and leaves `hive` meaning exactly
+        // one thing product-wide.
         //
         // The `Hive` route name in MainTabs.js is code-internal and gate-read
         // (`check:nav-depth` resolves it), so it stands. The files keep their

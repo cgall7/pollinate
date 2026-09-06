@@ -139,7 +139,7 @@ export const CombInviteLandingScreen = ({ navigation, route }) => {
       <Text style={styles.combName}>{preview.combName}</Text>
       {countLine ? <Text style={[styles.secondary, styles.centered]}>{countLine}</Text> : null}
       <Text style={styles.disclosure}>{disclosure}</Text>
-      <PrimaryButton onPress={continueToJoin} containerStyle={styles.cta}>{session ? 'Continue' : 'Join with Magic Link'}</PrimaryButton>
+      <PrimaryButton onPress={continueToJoin} containerStyle={styles.cta}>{session ? 'Continue' : 'Join'}</PrimaryButton>
     </InviteShell>
   );
 };
