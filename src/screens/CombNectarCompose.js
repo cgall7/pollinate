@@ -259,7 +259,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
       <Text style={styles.label}>TO</Text>
       <View style={styles.members}>{members.map((member) => <PressableScale key={member.profile_id} innerRef={recipientId === member.profile_id ? recipientDestination : undefined} onPress={() => chooseRecipient(member.profile_id)} style={[styles.member, recipientId === member.profile_id && styles.selected]}><Text style={styles.memberName}>{memberName(member.display_name)}</Text></PressableScale>)}</View>
       <Text style={styles.target}>To {recipientLabel}</Text>
-      {!nectarConsent && <PressableScale onPress={() => setNectarConsentSheetOpen(true)} style={styles.consent}><Text style={styles.consentText}>Turn this on before sending.</Text></PressableScale>}
+      {!nectarConsent && <PressableScale onPress={() => setNectarConsentSheetOpen(true)} style={styles.consent}><Text style={styles.consentText}>Gifts are off. Tap to turn them on.</Text></PressableScale>}
       {/* R-N3.6. `subjectBeneath={false}` below, and it is read off this
           screen's structure rather than chosen. The panel is a child in
           ordinary flow inside `styles.container`, and the gift's destination

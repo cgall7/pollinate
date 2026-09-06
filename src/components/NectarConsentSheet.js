@@ -45,10 +45,18 @@ export const NectarConsentSheet = ({
               reason this is `HoneyDrop` and not an illustration. */}
           <HoneyDrop radius={DROP_MAX_RADIUS} style={styles.drop} />
           <Text style={styles.headline}>Give gifts of gratitude</Text>
+          {/* R-N7. This body ends at the grant and says nothing about what
+              comes after it. Both doors it used to promise are permanently
+              shut: purchase by SPEC 19a, and the wage frame by doctrine, so
+              the allowance does not reopen either one. If replenishment is
+              ever named here it states the allowance law in the timeless
+              register, in the same string family as the grant sentence above.
+              It never offers a person a way to get more. The struck words
+              are deliberately not quoted: a grep for them must find nothing
+              in this tree. */}
           <Text style={styles.body}>
             When you send a gift to {senderName || 'someone'}, we'll add{' '}
-            <Text style={styles.bodyStrong}>500 drops</Text> to your account to say thanks. You
-            can always send more later by earning or buying.
+            <Text style={styles.bodyStrong}>500 drops</Text> to your account to say thanks.
           </Text>
           <Text style={styles.footnote}>Drops are units on a simulated Bitcoin network.</Text>
           {error && <Text style={styles.error}>Failed — please try again.</Text>}
