@@ -314,10 +314,46 @@ for (const position of POSITIONS) {
 //
 //   (a) identifiers rendered inside a <Text> must not appear in
 //       NOT_COPY_ATTRS. 78 identifiers across 174 <Text> elements, 1 hit,
-//       and it is FALSE: Avatar.js:69 renders initialsFor(name) — a
-//       person's name, data rather than authored copy. (The way it could
-//       have been live was the tab labels; refuted at MainTabs.js:101,
-//       `tabBarShowLabel: false`, so route ids are never read by anyone.)
+//       and it is FALSE: Avatar.js:73 renders initialsFor(name) — a
+//       person's name, data rather than authored copy.
+//
+//       THE SECOND HALF OF THIS PARAGRAPH WAS WRONG AND IS CORRECTED HERE
+//       RATHER THAN DELETED, because a justification comment is a
+//       dependency and the next reader needs to know the argument expired.
+//       It read: "The way it could have been live was the tab labels;
+//       refuted at MainTabs.js:101, `tabBarShowLabel: false`, so route ids
+//       are never read by anyone."
+//
+//       ROUTE IDS ARE READ. `tabBarShowLabel` gates the PAINTED label only.
+//       Read out of the installed @react-navigation/bottom-tabs@7.18.15:
+//       BottomTabBar.tsx:424-427 builds the label with
+//       `getLabel({label: tabBarLabel, title}, route.name)`; neither
+//       `tabBarLabel` nor `title` is set on any of the four tab screens, so
+//       it falls back to `route.name`. :429-433 composes the iOS
+//       `accessibilityLabel` from that string, and BottomTabItem.tsx:348-350
+//       hands the same string to `accessibilityLargeContentTitle` with
+//       `accessibilityShowsLargeContentViewer: true`. So the word reaches a
+//       person twice: SPOKEN by VoiceOver, and DRAWN as a HUD by the iOS
+//       Large Content Viewer on a long press at large text sizes. The
+//       second one is a rendering, not an announcement.
+//
+//       The comment was true when it was written, and true BECAUSE Today,
+//       Hive and Garden are not reserved words. R-NT is the commit that
+//       first put a reserved word in that position, so its justification
+//       expired inside a change that had no reason to look here, and the
+//       gate went quiet rather than red. The line cite had gone stale on
+//       the same commit as well: `tabBarShowLabel: false` sits at
+//       MainTabs.js:122 today, not :101, because R-NT's fourth tab moved
+//       it. Wrong about the mechanism, and wrong about where to look.
+//
+//       The residual below is UNCHANGED by this: instrument (a) still has
+//       one hit and it is still Avatar's. What changed is that route ids
+//       are now a population somebody measures — scripts/check-collector-
+//       null-class.mjs section N4 asks the wider question of them (is this
+//       word read to a person, and is it the ruled one) and carries the one
+//       disagreement on this tree. Nothing here pre-empts the fix; a string
+//       `tabBarLabel` on all four screens is the commit that makes the
+//       `route.name` fallback unreachable, and it has not landed yet.
 //   (b) a not-copy attribute may not carry a value beginning with a
 //       capital. 16 hits, ALL of them `name=` route ids.
 //
