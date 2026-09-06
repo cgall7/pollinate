@@ -9,6 +9,7 @@ import { MintRotationSheet } from './MintRotationSheet';
 import { useDaysLeft } from './useDaysLeft';
 import { getCombInviteUrl } from '../services/combInviteLinking';
 import { isPlaceholderName } from '../utils/placeholderName';
+import { numberInWordsCapped } from '../utils/numberWords';
 import { CombStore, classifyMintRefusal } from '../services/CombStore';
 
 const ROTATION_WRITER_COUNT_KIND = 'writers';
@@ -64,12 +65,19 @@ export const OrganizerCombCard = ({ comb, expanded, onPress, onWrite, onNectar, 
     ? `Write for ${organizerChapterSubjectName(rotation.subjectName)}`
     : WRITE_CTA_TEXT;
   const shareInvite = () => Share.share({ message: inviteUrl });
+  // FU3.1 (Lumen, thread 160660d9): one sentence, one spelling. This line is
+  // the fourth writer of "N people are in this comb." and was the only one
+  // rendering the count as a digit; `CombInvite.js`, and both of
+  // `RotationFold.js`'s, already speak it as a word. The register criterion
+  // is stated in `numberWords.js`'s header and measured by
+  // `check-number-register.mjs`: a count inside a SENTENCE is a word, a count
+  // in a verb-less LABEL is a digit. This is a sentence.
   const memberLabel =
     comb.memberCount == null
       ? null
       : comb.memberCount === 1
         ? 'One person is in this comb.'
-        : `${comb.memberCount} people are in this comb.`;
+        : `${numberInWordsCapped(comb.memberCount)} people are in this comb.`;
 
   // DES-29 §8.1 — pre-launch (no open rotation, no chapters — waiting on
   // people) is a different state from dormant (no open rotation, chapters
