@@ -8,6 +8,7 @@ import { HiveStore } from '../services/HiveStore';
 import { PressableScale } from './PressableScale';
 import { GradientCard } from './GradientCard';
 import { StaggeredItem } from './StaggeredItem';
+import { numberInWords } from '../utils/numberWords';
 
 // DES-16 — "File this to…". Files today's saved entry into one or more of
 // the user's hives as a frozen COPY (Fizz's routing, msg `3da67b75`): the
@@ -114,10 +115,16 @@ export const FileToHive = ({ entry, hives }) => {
     }
   };
 
+  // FU3.2 (Lumen, thread 160660d9) — a tally in a sentence, so the count is
+  // spelled as a word, and `numberInWords` rather than the capped form
+  // because the number is mid-sentence, not sentence-initial. The singular
+  // is structurally absent, not missing: the `=== 1` arm one line up names
+  // the single hive's subject instead of counting, so the `> 1` arm can
+  // never render `Filed to one hives.`
   const filedHives = hives.filter((h) => filedIds.has(h.id));
   let collapsedLabel = 'File this to…';
   if (filedHives.length === 1) collapsedLabel = `Filed to ${filedHives[0].subjectName}'s hive.`;
-  else if (filedHives.length > 1) collapsedLabel = `Filed to ${filedHives.length} hives.`;
+  else if (filedHives.length > 1) collapsedLabel = `Filed to ${numberInWords(filedHives.length)} hives.`;
 
   const rowsDisabled = !readResolved;
   const rows = hives.length > 5 ? (

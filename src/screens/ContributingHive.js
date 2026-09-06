@@ -13,6 +13,7 @@ import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { RotationFold } from '../components/RotationFold';
 import { useDaysLeft } from '../components/useDaysLeft';
 import { isPlaceholderName } from '../utils/placeholderName';
+import { numberInWordsCapped } from '../utils/numberWords';
 
 const longDate = (isoDate) => {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -55,7 +56,20 @@ const rosterLabel = (ownerName, contributors, selfId) => {
   // screen's banner two rows up already renders that same organizer as
   // absence, and 'someone' is this file's own house word for the SUBJECT
   // (`subjectDisplayName`), not the organizer. One word, one referent.
-  if (totalWriters > 4 || names.length === 0) return `${totalWriters} of you are writing.`;
+  // FU3.2 (Lumen, thread 160660d9) — a tally in a sentence, so the count is
+  // a word, and sentence-initial, so it is the capped form. Her singular
+  // question, answered here because she asked for it in the same commit:
+  // can `totalWriters` be 1 while `names` is empty, which would render
+  // `One of you are writing.`?  No, and not by a guard that could be moved:
+  // `totalWriters` is `otherNames.length + 2`, so its floor is 2 whatever
+  // the roster does. The owner and the caller are both counted
+  // unconditionally, and the `names.length === 0` branch is the case where
+  // neither of them can be NAMED, never the case where they are absent.
+  // `check-number-register.mjs` computes that lower bound rather than
+  // taking this paragraph's word for it, so changing the `+ 2` reds the
+  // gate. The house singular sentence, if it were ever reachable, is
+  // HiveDetail.js:56's `You're the only one writing so far.`
+  if (totalWriters > 4 || names.length === 0) return `${numberInWordsCapped(totalWriters)} of you are writing.`;
   return `Writing with ${joinNames(names)}.`;
 };
 

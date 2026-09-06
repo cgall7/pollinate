@@ -469,8 +469,8 @@ const TABLE = [
   { at: 'src/screens/HoneycombTab.js:374 [\\bnectar\\b] "HoneycombTab: failed to load nectar balance"', kind: 'not-copy/developer-log' },
   { at: 'src/screens/NectarTab.js:206 [\\bnectar\\b] "NectarTab: failed to load nectar consent"', kind: 'not-copy/developer-log' },
   { at: 'src/screens/NectarTab.js:238 [\\bnectar\\b] "NectarTab: failed to load nectar balance or events"', kind: 'not-copy/developer-log' },
-  { at: 'src/screens/PackageOpen.js:165 [\\bnectar\\b] "PackageOpenScreen: failed to load nectar consent"', kind: 'not-copy/developer-log' },
-  { at: 'src/screens/PackageOpen.js:207 [\\bnectar\\b] "PackageOpenScreen: failed to load nectar balance"', kind: 'not-copy/developer-log' },
+  { at: 'src/screens/PackageOpen.js:166 [\\bnectar\\b] "PackageOpenScreen: failed to load nectar consent"', kind: 'not-copy/developer-log' },
+  { at: 'src/screens/PackageOpen.js:208 [\\bnectar\\b] "PackageOpenScreen: failed to load nectar balance"', kind: 'not-copy/developer-log' },
 
   // --- P1 as themeTagger's KEYWORDS ----------------------------------
   // `THEMES[].keywords` is the left side of `lower.includes(kw)`

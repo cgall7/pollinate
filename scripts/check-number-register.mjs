@@ -12,41 +12,57 @@
 // waiting to outlive its justification — the exact failure this repo has
 // already paid for once in `check-copy-rules`' route-id argument.
 //
-// Lumen ruled the criterion (thread 160660d9, FU3.1) and it is a REGISTER,
-// not a blanket:
+// Lumen ruled the criterion in FU3.1 and amended it in FU3.2 (thread
+// 160660d9). It is a criterion on TWO AXES, and a count is spelled as a
+// word only where both of them agree it is speech:
 //
-//   a count inside a SENTENCE — a clause with a verb, prose speaking to
-//   the reader — is a word:            "Six people are in this comb."
-//   a count in a bare noun-phrase LABEL — the stat register, card
-//   metadata with no verb — is a digit:  "12 memories"
+//   REGISTER   is the count inside a SENTENCE, a clause with a verb, prose
+//              speaking to the reader?  Or in a bare noun-phrase LABEL,
+//              the stat register, card metadata with no verb?
+//   SUBSTANCE  is the count a TALLY — people, or the things they made,
+//              present in the product and counted?  Or a MEASURE — a value
+//              on an external scale: money, characters, days, years, a
+//              bound, a ratio?
 //
-// Digits read as data, words read as speech. Her ruling also asked that
-// the census be PRINTED and classified against the criterion, "so the
-// criterion lands as a measurement rather than prose". That is this file.
+//   sentence + tally   -> WORD
+//   every other cell   -> DIGIT
 //
-// WHAT THE CENSUS MEASURED, AND WHERE IT PARTED FROM THE RULING'S OWN
-// LICENCE CLAUSE
+// Digits read as data, words read as speech, and a measure is data in any
+// register: money is figures wherever it appears, and spelling one side of
+// a ratio and not the other reads worse than both as figures.
 //
-// The ruling's supporting sentence was that "every digit site you and I
-// both found is a verb-less label, and every sentence writer but
-// OrganizerCombCard already speaks words". That was true of the sites the
-// two of us had found by hand, and it is FALSE of the tree. Swept here,
-// there are sentence-register digit sites beyond the label ones, and they
-// do not form one class:
+// Her ruling also asked that the census be PRINTED and classified against
+// the criterion, "so the criterion lands as a measurement rather than
+// prose". That is this file.
 //
-//   people and things   "Filed to 3 hives." / "3 of you are writing."
-//                       "5 people wrote this for you." / "Invite 2 writers"
-//                       — the same class as the OrganizerCombCard defect
-//   quantities          "You have 40 drops." / "Sent 40 drops."
-//                       — drops are money (SATS ruling); money is figures
-//   ratios and spans    "12 of 30 days this month" / "at least 13 years old"
-//                       — a ratio spelled out reads worse, not better
+// WHY THERE ARE TWO AXES, WHICH IS THE PART THIS FILE MEASURED
 //
-// So the criterion needs a second axis nobody has ruled, and this gate
-// does NOT invent it. Every such site is filed `unruled` and PRINTED ON
-// EVERY RUN. What is asserted is the part that is ruled: the sentence
-// "N people are in this comb." has one spelling across all four of its
-// writers, and no entry may drift from its declared classification.
+// FU3.1's criterion had only the register axis, and its supporting
+// sentence was that "every digit site you and I both found is a verb-less
+// label, and every sentence writer but OrganizerCombCard already speaks
+// words". That was true of the sites two people had found by hand, and the
+// sweep in this file refuted it: 27 of the 48 counts were sentence-register
+// digits, and they were not one class. Money, caps, spans and ratios each
+// wanted a different answer from people-and-things. The gate filed all 27
+// `unruled` and printed them rather than inventing the answer; FU3.2 is
+// Lumen ruling them, and the substance axis is that ruling.
+//
+// The six people-and-things sites became words in the same commit. The 21
+// measure sites keep their digits and keep their axis note, which is now
+// the RULING RECORD rather than an owed question. The owed list prints
+// zero and the mechanism that files the next stranger is untouched.
+//
+// THE SINGULAR QUESTION, WHICH IS NOT THE REGISTER QUESTION
+//
+// A count that can vary reads wrong at 1 unless something handles it —
+// "1 drops", "1 of these seats are samples", "One of you are writing." That
+// is subject-verb agreement, not register, and it is the defect class this
+// whole FU arc started from. Section E holds it as a standing property:
+// every site whose count can VARY declares how it reads at 1, from a closed
+// vocabulary, and three of the four answers are measured rather than taken
+// on trust. Sites whose count is a fixed literal ("Keep the note under 280
+// characters.") are outside that row because the question does not arise
+// for them, and the row says so by construction rather than by omission.
 //
 // THE UNIVERSE IS RAW, AND THAT IS DELIBERATE
 //
@@ -99,8 +115,37 @@ const check = (label, got, want) => {
 // and a tab label.
 const KINDS = ['count', 'not-copy'];
 const REGISTERS = ['sentence', 'label'];
+const SUBSTANCES = ['tally', 'measure'];
 const SPELLINGS = ['word', 'digit'];
 const DISPOSITIONS = ['ruled', 'unruled'];
+
+// How a site that can render 1 keeps its subject and verb agreeing. Three
+// of the four are MEASURED; `unreachable` is a person's answer and is
+// printed on every run rather than trusted quietly, the same posture
+// UNRESOLVED_SLOTS takes above.
+//
+//   sibling      a separate arm renders at 1. MEASURED: the declared
+//                sentence is one of the shapes the site's own file
+//                RENDERS — a string literal, a JSX text node, or a
+//                template read the same way the census keys are, with
+//                `{}` for each interpolation. Not a substring of the
+//                file's bytes: prose about a sentence is not the
+//                sentence.
+//   inline       this site's own template picks the noun at 1. MEASURED:
+//                one of its slots tests `=== 1`.
+//   floor        the count cannot be 1. MEASURED: the lower bound the
+//                walk computes for the count expression is at least 2.
+//   unreachable  the count cannot be 1 for a reason the walk cannot
+//                compute — a guard earlier in the function, a closed set
+//                of preset values, a constant behind an import. DECLARED,
+//                with a reason, and printed.
+//   no-agreement the count has no noun to agree with, so 1 reads correctly
+//                as written. The raw walk collects a slot whenever a
+//                lowercase word follows it, and "of" and "to" are
+//                lowercase words. This is NOT the same claim as
+//                `unreachable`: `NECTAR_MIN_DROPS` is 1 and renders as 1.
+//                DECLARED, with a reason, and printed.
+const SINGULAR_KINDS = ['sibling', 'inline', 'floor', 'unreachable', 'no-agreement'];
 
 // --- the ruled sentence -------------------------------------------------
 // FU3.1's whole subject. One sentence, four writers, one spelling.
@@ -157,86 +202,111 @@ const UNRESOLVED_SLOTS = {
 // conforms; `'unruled'` means the criterion does not reach it yet and the
 // question is printed on every run. `spelling` is DECLARED here and
 // MEASURED by B4, so a site cannot claim a spelling the code does not have.
-const count = (register, spelling, disposition, owed) => ({ kind: 'count', register, spelling, disposition, owed });
+// The axes stay INDEPENDENTLY declarable rather than folded into
+// per-cell constructors. A constructor that could only emit legal
+// combinations would make section C unfalsifiable: the mutation that
+// should red the law — a site declaring the wrong cell — would not be
+// expressible, and the row would pass forever by construction.
+const count = (register, substance, spelling, disposition, note = '') =>
+  ({ kind: 'count', register, substance, spelling, disposition, note });
 const notCopy = (why) => ({ kind: 'not-copy', why });
 
-const SENTENCE_THINGS = 'people-and-things: the OrganizerCombCard class, a countable noun in prose';
-const QUANTITY = 'quantity: drops are money (SATS ruling), and money is figures in every register';
-const LIMIT = 'limit: a bound or a cap, not a tally of anything on screen';
-const SPAN = 'span: a duration, an age, a date range';
-const RATIO = 'ratio: N of M, where spelling one side and not the other reads worse than both as figures';
+// The axis notes. These were the OWED questions in FU3.1 and they are the
+// RULING RECORD in FU3.2: each one is the reason its cell reads the way it
+// does, kept beside the sites it governs so the reasoning does not drift
+// out of reach of the thing it decided.
+const TALLY_PEOPLE =
+  'tally: people, or the things they made — the one cell where a sentence spells its count as a word';
+const TALLY_LABEL =
+  'tally in the stat register: a countable thing, but card metadata with no verb, so a digit';
+const MEASURE_MONEY =
+  'measure/money: drops are money (SATS ruling), and money is figures in every register';
+const MEASURE_BOUND =
+  'measure/bound: a cap or a range is a specification, and precision is its register';
+const MEASURE_SPAN = 'measure/span: a duration, an age, a legal period — calendar data';
+const MEASURE_RATIO =
+  'measure/ratio: N of M, where spelling one side and not the other reads worse than both as figures';
 
 const NUMBER_SITES = {
-  // --- the ruled sentence. FU3.1's whole subject: four writers, one
-  // spelling. OrganizerCombCard was the outlier and is fixed here.
-  'src/components/OrganizerCombCard.js :: {} people are in this comb.': count('sentence', 'word', 'ruled', ''),
-  'src/components/RotationFold.js :: {} people are in this comb.': count('sentence', 'word', 'ruled', ''),
-  'src/screens/CombInvite.js :: {} people are in this comb.': count('sentence', 'word', 'ruled', ''),
-  'src/components/RotationFold.js :: {} people are writing': count('sentence', 'word', 'ruled', ''),
+  // --- SENTENCE + TALLY. The one cell the law spells as a word. FU3.1
+  // fixed OrganizerCombCard, the fourth writer of the ruled sentence and
+  // the only one rendering a digit; FU3.2 added the six below it.
+  'src/components/OrganizerCombCard.js :: {} people are in this comb.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/components/RotationFold.js :: {} people are in this comb.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/screens/CombInvite.js :: {} people are in this comb.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/components/RotationFold.js :: {} people are writing': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
 
-  // --- the stat register. Card metadata, a chip, an a11y label for a grid
-  // cell: no verb, and a digit is right. These are the sites the header's
-  // old universal was wrong about.
-  'src/components/FileToHive.js :: 1 memory': count('label', 'digit', 'ruled', ''),
-  'src/components/FileToHive.js :: {} memories': count('label', 'digit', 'ruled', ''),
-  'src/components/HiveCard.js :: 1 memory': count('label', 'digit', 'ruled', ''),
-  'src/components/HiveCard.js :: {} memories': count('label', 'digit', 'ruled', ''),
-  'src/screens/ContributingHive.js :: 1 memory': count('label', 'digit', 'ruled', ''),
-  'src/screens/ContributingHive.js :: {} memories': count('label', 'digit', 'ruled', ''),
-  'src/screens/HiveDetail.js :: 1 memory': count('label', 'digit', 'ruled', ''),
-  'src/screens/HiveDetail.js :: {} memories': count('label', 'digit', 'ruled', ''),
-  'src/components/OrganizerCombCard.js :: 1 past month': count('label', 'digit', 'ruled', ''),
-  'src/components/OrganizerCombCard.js :: {} past months': count('label', 'digit', 'ruled', ''),
-  'src/components/RotationFold.js :: {} day{} left': count('label', 'digit', 'ruled', ''),
-  'src/screens/HoneycombTab.js :: Last 7 days': count('label', 'digit', 'ruled', ''),
-  'src/screens/MonthlyRecap.js :: {} {}, {} {}': count('label', 'digit', 'ruled', ''),
-  'src/screens/MonthlyRecap.js :: {} of {} days filled in': count('label', 'digit', 'ruled', ''),
-  'src/components/NectarSendPanel.js :: {} drops': count('label', 'digit', 'ruled', ''),
-  'src/components/NectarSendPanel.js :: Up to 8 words': count('label', 'digit', 'ruled', ''),
-  'src/components/NectarSendPanel.js :: Or an amount, {} to {}': count('label', 'digit', 'ruled', ''),
+  'src/components/FileToHive.js :: Filed to {} hives.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/screens/ContributingHive.js :: {} of you are writing.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/screens/HiveDetail.js :: {} of you are writing.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/screens/InviteContributor.js :: Invite {} {}': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/screens/PackageOpen.js :: {} {} wrote this for you.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
+  'src/components/HoneycombGrid.js :: {} of these seats are samples.': count('sentence', 'tally', 'word', 'ruled', TALLY_PEOPLE),
 
-  // --- SENTENCE REGISTER, SPELLED AS A DIGIT. The class the ruling's own
-  // licence clause said did not exist. Printed on every run, split by the
-  // axis each one seems to want, and NOT fixed here: a pre-agreed clear
-  // contains only what was cleared.
-  'src/components/FileToHive.js :: Filed to {} hives.': count('sentence', 'digit', 'unruled', SENTENCE_THINGS),
-  'src/screens/ContributingHive.js :: {} of you are writing.': count('sentence', 'digit', 'unruled', SENTENCE_THINGS),
-  'src/screens/HiveDetail.js :: {} of you are writing.': count('sentence', 'digit', 'unruled', SENTENCE_THINGS),
-  'src/screens/InviteContributor.js :: Invite {} {}': count('sentence', 'digit', 'unruled', SENTENCE_THINGS),
-  'src/screens/PackageOpen.js :: {} {} wrote this for you.': count('sentence', 'digit', 'unruled', SENTENCE_THINGS),
-  'src/components/HoneycombGrid.js :: {} of these seats are samples.': count('sentence', 'digit', 'unruled', SENTENCE_THINGS),
+  // --- LABEL. Card metadata, a chip, an a11y label for a grid cell: no
+  // verb, and a digit is right whatever the substance. These are the sites
+  // the header's old universal was wrong about.
+  'src/components/FileToHive.js :: 1 memory': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/components/FileToHive.js :: {} memories': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/components/HiveCard.js :: 1 memory': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/components/HiveCard.js :: {} memories': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/screens/ContributingHive.js :: 1 memory': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/screens/ContributingHive.js :: {} memories': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/screens/HiveDetail.js :: 1 memory': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/screens/HiveDetail.js :: {} memories': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  // Counts completed rotation CHAPTERS, which are things the comb made;
+  // "months" is how they are named, not what is being counted.
+  'src/components/OrganizerCombCard.js :: 1 past month': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  'src/components/OrganizerCombCard.js :: {} past months': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
+  // The one count-bearing slot here is `dayEntries.length`; `cell.day` is a
+  // date the walk does not treat as a count, and `monthName` is a name.
+  'src/screens/MonthlyRecap.js :: {} {}, {} {}': count('label', 'tally', 'digit', 'ruled', TALLY_LABEL),
 
-  'src/components/NectarConsentSheet.js :: 500 drops': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/components/NectarSendPanel.js :: You have 1 drop.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/components/NectarSendPanel.js :: You have {} drops.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/screens/CombNectarCompose.js :: Sent 1 drop.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/screens/CombNectarCompose.js :: Sent 1 drop to {}.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/screens/CombNectarCompose.js :: Sent {} drops.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/screens/CombNectarCompose.js :: Sent {} drops to {}.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/screens/CombNectarCompose.js :: Your balance changed. You have 1 drop now.': count('sentence', 'digit', 'unruled', QUANTITY),
-  'src/screens/CombNectarCompose.js :: Your balance changed. You have {} drops now.': count('sentence', 'digit', 'unruled', QUANTITY),
+  'src/components/RotationFold.js :: {} day{} left': count('label', 'measure', 'digit', 'ruled', MEASURE_SPAN),
+  'src/screens/HoneycombTab.js :: Last 7 days': count('label', 'measure', 'digit', 'ruled', MEASURE_SPAN),
+  'src/screens/MonthlyRecap.js :: {} of {} days filled in': count('label', 'measure', 'digit', 'ruled', MEASURE_RATIO),
+  'src/components/NectarSendPanel.js :: {} drops': count('label', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/components/NectarSendPanel.js :: Up to 8 words': count('label', 'measure', 'digit', 'ruled', MEASURE_BOUND),
+  'src/components/NectarSendPanel.js :: Or an amount, {} to {}': count('label', 'measure', 'digit', 'ruled', MEASURE_BOUND),
 
-  'src/screens/CombNectarCompose.js :: Choose {} to {} drops.': count('sentence', 'digit', 'unruled', LIMIT),
-  'src/screens/CombNectarCompose.js :: Keep it to 8 words.': count('sentence', 'digit', 'unruled', LIMIT),
-  'src/screens/CombNectarCompose.js :: Keep the note under 280 characters.': count('sentence', 'digit', 'unruled', LIMIT),
+  // --- SENTENCE + MEASURE. The class FU3.1's licence clause said did not
+  // exist. The census found 27 of them, filed every one `unruled` and
+  // printed it rather than inventing an answer; FU3.2 ruled them, six to
+  // the word cell above and these 21 to the digit. The note each one
+  // carries is now the ruling, not the question.
+  'src/components/NectarConsentSheet.js :: 500 drops': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/components/NectarSendPanel.js :: You have 1 drop.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/components/NectarSendPanel.js :: You have {} drops.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/screens/CombNectarCompose.js :: Sent 1 drop.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/screens/CombNectarCompose.js :: Sent 1 drop to {}.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/screens/CombNectarCompose.js :: Sent {} drops.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/screens/CombNectarCompose.js :: Sent {} drops to {}.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/screens/CombNectarCompose.js :: Your balance changed. You have 1 drop now.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+  'src/screens/CombNectarCompose.js :: Your balance changed. You have {} drops now.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_MONEY),
+
+  'src/screens/CombNectarCompose.js :: Choose {} to {} drops.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
+  'src/screens/CombNectarCompose.js :: Keep it to 8 words.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
+  'src/screens/CombNectarCompose.js :: Keep the note under 280 characters.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
   // All three of these say the same thing about the same constant. The two
   // Store lines are `throw new Error(...)` and the seedDraft line is a
   // returned validation `message` a compose screen renders. Filed together
   // and filed as counts, because proving a thrown message never reaches a
   // person is a measurement nobody has taken.
-  'src/services/NotesStore.js :: Notes are capped at {} characters': count('sentence', 'digit', 'unruled', LIMIT),
-  'src/services/SeedsStore.js :: Seeds are capped at {} characters': count('sentence', 'digit', 'unruled', LIMIT),
-  'src/utils/seedDraft.js :: Seeds are capped at {} characters': count('sentence', 'digit', 'unruled', LIMIT),
+  'src/services/NotesStore.js :: Notes are capped at {} characters': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
+  'src/services/SeedsStore.js :: Seeds are capped at {} characters': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
+  'src/utils/seedDraft.js :: Seeds are capped at {} characters': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
 
-  'src/screens/HoneycombTab.js :: Shares from the last 7 days will gather here.': count('sentence', 'digit', 'unruled', SPAN),
-  'src/screens/TodayTab.js :: Filled the last {} days with entries.': count('sentence', 'digit', 'unruled', SPAN),
+  'src/screens/HoneycombTab.js :: Shares from the last 7 days will gather here.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
+  'src/screens/TodayTab.js :: Filled the last {} days with entries.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
+  // Colin's veto lane. These two are legal copy and nobody touches them on
+  // style grounds; the ruling records why they would stay digits anyway.
   'src/constants/legalCopy.js :: You need to be at least 13 years old. Give us an email address that is really yours, keep your password to yourself, and understand that what happens under your account is your responsibility.':
-    count('sentence', 'digit', 'unruled', SPAN),
+    count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
   'src/constants/legalCopy.js :: For a copy of what we hold about you, or to have something corrected, email {} from the address on your account and we will act within 30 days. Export and correction have not been built into the app yet. That is why those two are an email rather than a button, and it is a gap we intend to close.\n\n':
-    count('sentence', 'digit', 'unruled', SPAN),
+    count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
 
-  'src/screens/PollinateWrapped.js :: You leaned into "{}" {} of {} days this month.': count('sentence', 'digit', 'unruled', RATIO),
-  'src/screens/RecapTab.js :: You leaned into "{}" {} of {} {}.': count('sentence', 'digit', 'unruled', RATIO),
+  'src/screens/PollinateWrapped.js :: You leaned into "{}" {} of {} days this month.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_RATIO),
+  'src/screens/RecapTab.js :: You leaned into "{}" {} of {} {}.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_RATIO),
 
   // --- numbers in strings a person never reads as copy -----------------
   'src/components/FileToHive.js :: FileToHive: 42501 refetch failed, leaving cause unresolved':
@@ -251,6 +321,109 @@ const NUMBER_SITES = {
   'src/screens/CreateComb.js :: 2 months': notCopy('cadence value; the visible label is `Two months`'),
   'src/screens/CreateComb.js :: 3 months': notCopy('cadence value; the visible label is `Three months`'),
   'src/services/CombStore.js :: 1 month': notCopy('default argument for the same cadence value'),
+};
+
+// --- how each varying count reads at 1 ----------------------------------
+// Keyed `file :: shape :: slot source`, so the answer belongs to the SLOT
+// rather than to the site: `RotationFold.js` writes the ruled sentence
+// twice under one key, from two different expressions, and each writer
+// owes its own answer. A site whose count is a fixed literal is not in
+// this table's universe, because the question does not arise for it.
+const sibling = (sentence) => ['sibling', sentence];
+const inline = () => ['inline', ''];
+const floorAtLeastTwo = () => ['floor', ''];
+const unreachable = (why) => ['unreachable', why];
+const noAgreement = (why) => ['no-agreement', why];
+
+const SINGULAR_ANSWERS = {
+  // --- the tally sentences. Every one of these is a word now, and a
+  // spelled-out count that disagrees with its noun ("One of you are
+  // writing") is the loudest form the defect takes.
+  'src/components/OrganizerCombCard.js :: {} people are in this comb. :: numberInWordsCapped(comb.memberCount)':
+    sibling('One person is in this comb.'),
+  'src/components/RotationFold.js :: {} people are in this comb. :: numberInWordsCapped(sizeCount)':
+    sibling('One person is in this comb.'),
+  'src/components/RotationFold.js :: {} people are in this comb. :: numberInWordsCapped(count)':
+    sibling('One person is in this comb.'),
+  'src/components/RotationFold.js :: {} people are writing :: numberInWordsCapped(count)':
+    sibling('One person is writing'),
+  // The only writer of the ruled sentence with no singular arm, and it
+  // needs none: the line is rendered behind a `>= 3` test, so the sentence
+  // never exists below three members.
+  'src/screens/CombInvite.js :: {} people are in this comb. :: numberInWordsCapped(preview.memberCount)':
+    unreachable('rendered only when `preview.memberCount >= 3` (CombInvite.js:113)'),
+
+  'src/components/FileToHive.js :: Filed to {} hives. :: numberInWords(filedHives.length)':
+    sibling("Filed to {}'s hive."),
+  // Measured rather than declared: `totalWriters` is `otherNames.length + 2`,
+  // so the walk computes a floor of 2 and changing the `+ 2` reds E6.
+  'src/screens/ContributingHive.js :: {} of you are writing. :: numberInWordsCapped(totalWriters)':
+    floorAtLeastTwo(),
+  // The sibling case one screen over, and NOT a floor: `contributors.length
+  // + 1` bottoms out at 1 arithmetically, and what lifts it to 2 is the
+  // `=== 0` guard that returns before this line. A guard is not something
+  // this walk can compute, so the answer is declared and printed.
+  'src/screens/HiveDetail.js :: {} of you are writing. :: numberInWordsCapped(contributors.length + 1)':
+    unreachable('the `contributors.length === 0` guard at HiveDetail.js:56 returns first, so the count here is at least 2'),
+  'src/screens/InviteContributor.js :: Invite {} {} :: numberInWords(selected.size)': inline(),
+  'src/screens/PackageOpen.js :: {} {} wrote this for you. :: numberInWordsCapped(pkg.contributorNames.length)': inline(),
+  'src/components/HoneycombGrid.js :: {} of these seats are samples. :: numberInWordsCapped(sampleSeats)':
+    sibling('One of these seats is a sample.'),
+
+  // --- the stat register. Each pair is two sites, and the singular one IS
+  // the sibling.
+  'src/components/FileToHive.js :: {} memories :: hive.entryCount': sibling('1 memory'),
+  'src/components/HiveCard.js :: {} memories :: hive.entryCount': sibling('1 memory'),
+  'src/screens/ContributingHive.js :: {} memories :: entries.length': sibling('1 memory'),
+  'src/screens/HiveDetail.js :: {} memories :: entries.length': sibling('1 memory'),
+  'src/components/OrganizerCombCard.js :: {} past months :: chapterCount': sibling('1 past month'),
+  'src/components/RotationFold.js :: {} day{} left :: daysLeft': inline(),
+  'src/screens/MonthlyRecap.js :: {} {}, {} {} :: dayEntries.length': inline(),
+  'src/components/NectarSendPanel.js :: {} drops :: amount':
+    unreachable('the label is rendered once per member of `NECTAR_PRESETS`, which is `[10, 50, 100]` (nectar.js:454)'),
+
+  // --- money. FU3 gave all four of these their singular arms; this table
+  // is what keeps them.
+  'src/components/NectarSendPanel.js :: You have {} drops. :: displayDrops === undefined ? balanceDrops : displayDrops':
+    sibling('You have 1 drop.'),
+  'src/screens/CombNectarCompose.js :: Sent {} drops. :: resolvedAmount': sibling('Sent 1 drop.'),
+  'src/screens/CombNectarCompose.js :: Sent {} drops to {}. :: resolvedAmount':
+    sibling('Sent 1 drop to {}.'),
+  'src/screens/CombNectarCompose.js :: Your balance changed. You have {} drops now. :: drops':
+    sibling('Your balance changed. You have 1 drop now.'),
+
+  // --- counts with no noun of their own. The raw walk collects a slot
+  // whenever a lowercase word follows it, and "of" and "to" are lowercase
+  // words. There is no agreement to break at these, and saying so is not
+  // the same as saying the count cannot be 1 — `NECTAR_MIN_DROPS` IS 1.
+  'src/components/NectarSendPanel.js :: Or an amount, {} to {} :: NECTAR_MIN_DROPS':
+    noAgreement('followed by "to"; the range\'s only noun belongs to the maximum'),
+  'src/screens/CombNectarCompose.js :: Choose {} to {} drops. :: NECTAR_MIN_DROPS':
+    noAgreement('followed by "to"; the noun "drops" belongs to the maximum'),
+  'src/screens/MonthlyRecap.js :: {} of {} days filled in :: entriesByDay.size':
+    noAgreement('followed by "of"; the noun "days" belongs to the denominator'),
+  'src/screens/PollinateWrapped.js :: You leaned into "{}" {} of {} days this month. :: count':
+    noAgreement('followed by "of"; the noun "days" belongs to the denominator'),
+  'src/screens/RecapTab.js :: You leaned into "{}" {} of {} {}. :: count':
+    noAgreement('followed by "of"; the period noun is a separate slot'),
+
+  // --- bounds and spans whose value is fixed at the source. Not literals
+  // in the copy, so the walk cannot see the number, but the constant
+  // behind each one is a constant.
+  'src/screens/CombNectarCompose.js :: Choose {} to {} drops. :: NECTAR_MAX_DROPS':
+    unreachable('`NECTAR_MAX_DROPS` is 1000 (NectarSendPanel.js:67)'),
+  'src/services/NotesStore.js :: Notes are capped at {} characters :: NOTE_CONTENT_MAX':
+    unreachable('`NOTE_CONTENT_MAX` is 500 (NotesStore.js:11)'),
+  'src/services/SeedsStore.js :: Seeds are capped at {} characters :: SEED_CONTENT_MAX':
+    unreachable('`SEED_CONTENT_MAX` is 500 (SeedsStore.js:12)'),
+  'src/utils/seedDraft.js :: Seeds are capped at {} characters :: SEED_CONTENT_MAX':
+    unreachable('`SEED_CONTENT_MAX` is 500 (SeedsStore.js:12)'),
+  'src/screens/MonthlyRecap.js :: {} of {} days filled in :: daysInMonth':
+    unreachable('a month length; the prop defaults to 31 and its callers pass a real one'),
+  'src/screens/PollinateWrapped.js :: You leaned into "{}" {} of {} days this month. :: total':
+    unreachable('a month length, the denominator of the same ratio'),
+  'src/screens/TodayTab.js :: Filled the last {} days with entries. :: count':
+    unreachable('the resolved value of `EntryStore.seedDemoData(180)`, a demo-only alert (EntryStore.js:158)'),
 };
 
 // --- the walk -----------------------------------------------------------
@@ -331,6 +504,39 @@ const classify = (node, decls, depth = 0) => {
   }
 };
 
+// A LOWER BOUND on a count expression, used only by the `floor` answer in
+// section E. `.length`/`.size` bottom out at 0, a numeric literal is
+// itself, `+` adds bounds, and the spelling helpers are transparent
+// because they render their argument. Anything else is `null`, which fails
+// the row rather than passing it — the point of the bound is to make
+// "this count can never be 1" a measurement instead of a paragraph.
+const lowerBound = (node, decls, depth = 0) => {
+  if (!node || depth > 8) return null;
+  switch (node.type) {
+    case 'NumericLiteral':
+      return node.value;
+    case 'MemberExpression':
+      return !node.computed && (node.property?.name === 'length' || node.property?.name === 'size') ? 0 : null;
+    case 'BinaryExpression': {
+      if (node.operator !== '+') return null;
+      const l = lowerBound(node.left, decls, depth + 1);
+      const r = lowerBound(node.right, decls, depth + 1);
+      return l === null || r === null ? null : l + r;
+    }
+    case 'CallExpression':
+      return node.callee?.type === 'Identifier' && WORD_FNS.has(node.callee.name)
+        ? lowerBound(node.arguments[0], decls, depth + 1)
+        : null;
+    case 'Identifier': {
+      const inits = decls.get(node.name);
+      if (!inits || inits.length !== 1) return null;
+      return lowerBound(inits[0], decls, depth + 1);
+    }
+    default:
+      return null;
+  }
+};
+
 // Two reconstructions of the same template, and they are not
 // interchangeable. `cooked` is what a person reads, so it is the census
 // key. `raw` is what the file says, so it is what A2 can look for in the
@@ -346,24 +552,54 @@ const shapeOf = (node, which) =>
 // a key — `RotationFold.js` writes the ruled sentence twice — and that is
 // the point: the census is about sentences, not about lines.
 const sites = new Map();
-const addSite = (rel, line, key, shape, slot, rawShape = shape) => {
+const addSite = (rel, line, key, shape, slot, rawShape = shape, testsOne = false) => {
   const id = `${rel} :: ${key}`;
-  if (!sites.has(id)) sites.set(id, { id, rel, key, shape, rawShape, lines: [], slots: [] });
+  if (!sites.has(id)) sites.set(id, { id, rel, key, shape, rawShape, lines: [], slots: [], testsOne: false });
   const s = sites.get(id);
   if (!s.lines.includes(line)) s.lines.push(line);
+  s.testsOne = s.testsOne || testsOne;
   if (slot) s.slots.push({ ...slot, line });
+};
+
+// Does this template pick its own noun at 1?  Asked of the AST rather than
+// of the slot table, because the singular/plural ternary is usually the
+// LAST expression in the template and a trailing expression is followed by
+// nothing, so the walk never records it as a slot. `Invite ${n} ${n === 1 ?
+// 'writer' : 'writers'}` is the shape, and a text scan of the slots it
+// happens to have collected cannot see the test that makes it correct.
+const testsForOne = (node) => {
+  let found = false;
+  walkWithAncestry(node, (n) => {
+    if (
+      n.type === 'BinaryExpression' &&
+      (n.operator === '===' || n.operator === '==') &&
+      ((n.left?.type === 'NumericLiteral' && n.left.value === 1) ||
+        (n.right?.type === 'NumericLiteral' && n.right.value === 1))
+    ) {
+      found = true;
+    }
+  });
+  return found;
 };
 
 // The independent witness for A2. A raw text scan, no AST: every literal
 // count fragment the walk reports must appear in the file's own bytes.
 const rawFragments = new Map();
 const fileText = new Map();
+// Every string this file could render, as a shape, whether or not it is a
+// count site. E4's witness is checked against THIS and not against the
+// file's bytes: calibration caught the raw-bytes version passing because
+// the sentence it was hunting for also appeared in the paragraph of
+// comment that explains why the arm exists. A gate that hunts a string
+// must not be satisfied by prose about that string.
+const fileShapes = new Map();
 
 for (const file of sourceFiles) {
   const rel = path.relative(ROOT, file);
   const src = fs.readFileSync(file, 'utf8');
   fileText.set(rel, src);
   rawFragments.set(rel, new Set((src.match(/\d+ [a-z]+/g) || []).map((m) => m.trim())));
+  fileShapes.set(rel, new Set());
   let ast;
   try {
     ast = parse(src, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
@@ -373,6 +609,9 @@ for (const file of sourceFiles) {
   }
   const decls = declaratorsFor(ast);
   walkWithAncestry(ast.program, (node) => {
+    if (node.type === 'StringLiteral') fileShapes.get(rel).add(node.value);
+    if (node.type === 'JSXText' && node.value.trim()) fileShapes.get(rel).add(node.value.trim());
+    if (node.type === 'TemplateLiteral') fileShapes.get(rel).add(shapeOf(node, 'cooked'));
     if (
       node.type === 'CallExpression' &&
       node.callee?.type === 'Identifier' &&
@@ -404,7 +643,8 @@ for (const file of sourceFiles) {
     // only reads StringLiteral for literals cannot see it.
     const quasiText = node.quasis.map((q) => q.value.cooked ?? q.value.raw).join(' ');
     const qm = LITERAL_COUNT.exec(quasiText);
-    if (qm) addSite(rel, node.loc.start.line, shape, shape, { src: qm[1], cls: 'numeric', literal: true }, rawShape);
+    const testsOne = node.expressions.some((e) => testsForOne(e));
+    if (qm) addSite(rel, node.loc.start.line, shape, shape, { src: qm[1], cls: 'numeric', literal: true }, rawShape, testsOne);
     node.expressions.forEach((expr, i) => {
       const after = node.quasis[i + 1]?.value.cooked ?? '';
       // Noun-adjacent two ways: a literal noun follows the slot, or the
@@ -419,8 +659,9 @@ for (const file of sourceFiles) {
       addSite(rel, node.loc.start.line, shape, shape, {
         src: srcOf(src, expr),
         cls: classify(expr, decls),
+        bound: lowerBound(expr, decls),
         literal: false,
-      }, rawShape);
+      }, rawShape, testsOne);
     });
   });
 }
@@ -516,9 +757,14 @@ check(
       ([, v]) =>
         !KINDS.includes(v.kind) ||
         (v.kind === 'count' &&
-          !(REGISTERS.includes(v.register) && SPELLINGS.includes(v.spelling) && DISPOSITIONS.includes(v.disposition))) ||
+          !(
+            REGISTERS.includes(v.register) &&
+            SUBSTANCES.includes(v.substance) &&
+            SPELLINGS.includes(v.spelling) &&
+            DISPOSITIONS.includes(v.disposition)
+          )) ||
         // An unruled entry with no note is a question filed as an answer.
-        (v.kind === 'count' && v.disposition === 'unruled' && !v.owed) ||
+        (v.kind === 'count' && v.disposition === 'unruled' && !v.note) ||
         (v.kind === 'not-copy' && !v.why)
     )
     .map(([k, v]) => `${k} → ${JSON.stringify(v)}`)
@@ -572,23 +818,46 @@ check(
   ruledWriters.filter((s) => measuredSpelling(s) !== 'word').map(at).sort(),
   []
 );
+// Lumen's FU3.2 law, as ONE function with a total domain. A count is
+// spelled as a word only where both axes agree it is speech: a TALLY,
+// inside a SENTENCE. Every other cell is data. Written this way rather than
+// as two independent rules so that a substance or register value nobody
+// anticipated lands in the digit half instead of in a null class — a
+// classifier written as a list of shapes has a null class, and the null
+// class is a population.
+const ruledSpelling = (v) => (v.register === 'sentence' && v.substance === 'tally' ? 'word' : 'digit');
+const ruledCounts = Object.entries(NUMBER_SITES).filter(
+  ([, v]) => v.kind === 'count' && v.disposition === 'ruled'
+);
 check(
-  'C2 every ruled sentence-register count is spelled as a word',
-  Object.entries(NUMBER_SITES)
-    .filter(([, v]) => v.kind === 'count' && v.disposition === 'ruled' && v.register === 'sentence')
+  'C2 every ruled sentence+tally count is spelled as a word',
+  ruledCounts
+    .filter(([, v]) => ruledSpelling(v) === 'word')
     .filter(([, v]) => v.spelling !== 'word')
     .map(([k]) => k)
     .sort(),
   []
 );
 check(
-  'C3 every ruled label-register count is spelled as a digit',
-  Object.entries(NUMBER_SITES)
-    .filter(([, v]) => v.kind === 'count' && v.disposition === 'ruled' && v.register === 'label')
+  'C3 every other ruled count is spelled as a digit',
+  ruledCounts
+    .filter(([, v]) => ruledSpelling(v) === 'digit')
     .filter(([, v]) => v.spelling !== 'digit')
     .map(([k]) => k)
     .sort(),
   []
+);
+// C4. Neither half may be empty. Two complementary universals over a set
+// that has drifted to one side are both green and both vacuous, and the
+// word half is exactly the half FU3.2 created — an empty one would mean
+// the ruling had been undone rather than upheld.
+check(
+  'C4 both halves of the law have members',
+  {
+    word: ruledCounts.filter(([, v]) => ruledSpelling(v) === 'word').length > 0,
+    digit: ruledCounts.filter(([, v]) => ruledSpelling(v) === 'digit').length > 0,
+  },
+  { word: true, digit: true }
 );
 
 // --- D. the header may not restate a universal the census refutes -------
@@ -598,8 +867,9 @@ check(
 const numberWordsSrc = fs.readFileSync(path.join(ROOT, 'src/utils/numberWords.js'), 'utf8');
 const header = numberWordsSrc.slice(0, numberWordsSrc.indexOf('\nconst '));
 check(
-  'D1 numberWords.js states the register criterion and cites this gate',
-  /\bsentence\b/i.test(header) && /\blabel\b/i.test(header) && /check-number-register/.test(header),
+  'D1 numberWords.js states both axes of the criterion and cites this gate',
+  ['sentence', 'label', 'tally', 'measure'].every((w) => new RegExp(`\\b${w}\\b`, 'i').test(header)) &&
+    /check-number-register/.test(header),
   true
 );
 // D2. The WORD side's own coverage. Every call of the helper must land
@@ -619,6 +889,81 @@ check(
   []
 );
 
+// --- E. how each varying count reads at 1 -------------------------------
+// The register question and the singular question are different questions.
+// "1 drops", "1 of these seats are samples", "One of you are writing" are
+// subject-verb agreement, and that is the defect class this whole FU arc
+// started from: FU3 fixed four of them, FU3.2's HoneycombGrid arm is a
+// fifth, and each was found by a person reading rather than by a rule.
+// This section is the rule.
+//
+// The universe is every count slot whose value can VARY — a fixed literal
+// ("Keep the note under 280 characters.") has no singular to get wrong, so
+// it is outside the row by construction rather than by omission. It is
+// taken off ALL sites, not off the resolvable ones: a defect that made a
+// slot unresolvable would otherwise evict the site from its own row, which
+// is the failure calibration caught in C1. Slots the resolver reads as
+// text, and slots a person has declared not-a-number, are the two things
+// excluded, and they are excluded because they are not counts.
+const singularUniverse = allSites.flatMap((s) =>
+  s.slots
+    .filter((sl) => !sl.literal)
+    .filter((sl) => sl.cls !== 'text' && UNRESOLVED_SLOTS[`${s.rel} :: ${sl.src}`] !== 'not-a-number')
+    .map((sl) => ({ site: s, slot: sl, id: `${s.rel} :: ${s.key} :: ${sl.src}` }))
+);
+const singularIds = [...new Set(singularUniverse.map((u) => u.id))].sort();
+check(
+  'E1 every count that can vary declares how it reads at 1',
+  singularIds.filter((id) => !(id in SINGULAR_ANSWERS)),
+  []
+);
+check(
+  'E2 every SINGULAR_ANSWERS entry names a count the walk still finds',
+  Object.keys(SINGULAR_ANSWERS).filter((k) => !singularIds.includes(k)).sort(),
+  []
+);
+check(
+  'E3 every singular answer is from the declared vocabulary, and a declared one carries a reason',
+  Object.entries(SINGULAR_ANSWERS)
+    .filter(([, [kind, why]]) =>
+      !SINGULAR_KINDS.includes(kind) ||
+      ((kind === 'unreachable' || kind === 'no-agreement') && !why) ||
+      (kind === 'sibling' && !why)
+    )
+    .map(([k, v]) => `${k} → ${JSON.stringify(v)}`)
+    .sort(),
+  []
+);
+// E4-E6 are the measured three. Each one asserts the thing the answer
+// claims, in the tree, rather than accepting the word for it.
+check(
+  'E4 every sibling answer quotes an arm its own file renders',
+  singularUniverse
+    .filter((u) => SINGULAR_ANSWERS[u.id]?.[0] === 'sibling')
+    .filter((u) => !fileShapes.get(u.site.rel)?.has(SINGULAR_ANSWERS[u.id][1]))
+    .map((u) => `${at(u.site)} ${JSON.stringify(SINGULAR_ANSWERS[u.id][1])}`)
+    .sort(),
+  []
+);
+check(
+  'E5 every inline answer sits at a site that tests for 1',
+  singularUniverse
+    .filter((u) => SINGULAR_ANSWERS[u.id]?.[0] === 'inline')
+    .filter((u) => !u.site.testsOne)
+    .map((u) => `${at(u.site)} :: ${u.slot.src}`)
+    .sort(),
+  []
+);
+check(
+  'E6 every floor answer has a computed lower bound of at least 2',
+  singularUniverse
+    .filter((u) => SINGULAR_ANSWERS[u.id]?.[0] === 'floor')
+    .filter((u) => !(typeof u.slot.bound === 'number' && u.slot.bound >= 2))
+    .map((u) => `${at(u.site)} :: ${u.slot.src} → ${JSON.stringify(u.slot.bound)}`)
+    .sort(),
+  []
+);
+
 // --- the owed list ------------------------------------------------------
 // PRINTED ON EVERY RUN, not folded into a pass count. A count filed
 // `unruled` is a question this gate found and did not answer; a count
@@ -633,22 +978,45 @@ console.log(
     `${Object.values(NUMBER_SITES).filter((v) => v.kind === 'count').length} counts, ` +
     `${Object.values(NUMBER_SITES).filter((v) => v.kind === 'not-copy').length} not copy ---`
 );
-console.log(
-  `    sentence/word ${Object.values(NUMBER_SITES).filter((v) => v.kind === 'count' && v.register === 'sentence' && v.spelling === 'word').length}   ` +
-    `sentence/digit ${Object.values(NUMBER_SITES).filter((v) => v.kind === 'count' && v.register === 'sentence' && v.spelling === 'digit').length}   ` +
-    `label/digit ${Object.values(NUMBER_SITES).filter((v) => v.kind === 'count' && v.register === 'label' && v.spelling === 'digit').length}   ` +
-    `label/word ${Object.values(NUMBER_SITES).filter((v) => v.kind === 'count' && v.register === 'label' && v.spelling === 'word').length}`
-);
+const counts = Object.values(NUMBER_SITES).filter((v) => v.kind === 'count');
+const cell = (r, sub) => counts.filter((v) => v.register === r && v.substance === sub).length;
+const spelled = (r, sub, sp) =>
+  counts.filter((v) => v.register === r && v.substance === sub && v.spelling === sp).length;
+console.log('    the two axes, and the one cell the law spells as a word:');
+for (const r of REGISTERS) {
+  for (const sub of SUBSTANCES) {
+    console.log(
+      `      ${r.padEnd(8)} + ${sub.padEnd(7)}  ${String(cell(r, sub)).padStart(2)} sites   ` +
+        `${spelled(r, sub, 'word')} word / ${spelled(r, sub, 'digit')} digit` +
+        (r === 'sentence' && sub === 'tally' ? '   <- the word cell' : '')
+    );
+  }
+}
 console.log(
   `\n--- OWED: ${unruledCounts.length} unruled counts ` +
     `(${bySpelling('sentence', 'digit')} sentence/digit, ${bySpelling('label', 'digit')} label/digit, ` +
     `${bySpelling('sentence', 'word')} sentence/word, ${bySpelling('label', 'word')} label/word) ---`
 );
-for (const axis of [...new Set(unruledCounts.map(([, v]) => v.owed))].sort()) {
+for (const axis of [...new Set(unruledCounts.map(([, v]) => v.note))].sort()) {
   console.log(`   ${axis}`);
-  for (const [k, v] of unruledCounts.filter(([, v2]) => v2.owed === axis).sort()) {
-    console.log(`     ${v.register}/${v.spelling}  ${k.replace(/\n/g, ' ').slice(0, 120)}`);
+  for (const [k, v] of unruledCounts.filter(([, v2]) => v2.note === axis).sort()) {
+    console.log(`     ${v.register}/${v.substance}/${v.spelling}  ${k.replace(/\n/g, ' ').slice(0, 120)}`);
   }
+}
+
+// The singular answers a person declared rather than the walk measured.
+// Printed for the same reason the owed list is: an answer nobody can
+// recompute should at least be visible to everybody who reads a run.
+const declaredSingulars = Object.entries(SINGULAR_ANSWERS).filter(
+  ([, [kind]]) => kind === 'unreachable' || kind === 'no-agreement'
+);
+console.log(
+  `\n--- DECLARED: ${declaredSingulars.length} of ${Object.keys(SINGULAR_ANSWERS).length} singular answers ` +
+    `are a person's, not a measurement ---`
+);
+for (const [k, [kind, why]] of declaredSingulars.sort()) {
+  console.log(`   ${kind}  ${k.split(' :: ').slice(0, 2).join(' :: ').slice(0, 96)}`);
+  console.log(`     ${why}`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

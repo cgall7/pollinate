@@ -21,6 +21,7 @@ import {
   shouldAbortPollination,
 } from './combLattice';
 import { boundedPollinationAims } from './pollinationIdentity';
+import { numberInWordsCapped } from '../utils/numberWords';
 
 // Lane D — the hex tap's beat boundaries in ms from contact. `HONEY` names
 // only the fill; contact and ignition (Beats 1-2) belong to the FINGER and
@@ -1158,11 +1159,45 @@ export const HoneycombGrid = forwardRef(({
           Above `HexTapOverlay` in paint order on purpose: it recedes under
           the scrim with the comb it belongs to, rather than staying lit over
           a dimmed hive. */}
+      {/* FU3.2 (Lumen, thread 160660d9) — four arms, because the disclosure
+          asks two independent questions (are ALL the seats samples, and is
+          there exactly ONE) and each answer changes the verb. The count is
+          also a TALLY inside a SENTENCE, the one cell of the register
+          criterion where a number is spelled as a word.
+
+          Both singular arms are LATENT, not decorative, and the reachability
+          is the answer Lumen asked for in the same commit as the guard:
+          `sampleSeats` counts the `isDemo` members of the one mount's
+          `todayMembers` (`HoneycombTab.js:570`), demo shares merge only
+          under `DEMO_CONTENT` and only while the account's graph is still
+          empty, and `demoHive.js` seats SEVEN members at `daysAgo: 0`. So
+          today the count is 0 or 7 and never 1, and neither singular arm
+          can render.
+
+          (The wording above avoids one word on purpose: `check-demo-hive`'s
+          load-bearing negative row scans this whole file, comments
+          included, for the names of the feed and the graph, so the
+          paragraph explaining why the isolation holds would otherwise red
+          the row that enforces it.)
+
+          Both go live the moment that corpus count becomes 1, and they go
+          live TOGETHER, on the same trigger, distinguished only by whether
+          the reader has written today: `One of these seats is a sample.`
+          beside their own share, `This seat is a sample.` when the demo
+          seat is the whole comb. That is why `sampleSeats === members.length
+          === 1` gets a real arm rather than a note saying it cannot happen
+          — it is exactly as reachable as the arm beside it. The guard lands
+          in the commit that owns the trigger, before anything can move that
+          count. */}
       {sampleSeats > 0 && (
         <Text style={styles.sampleNote}>
           {sampleSeats === members.length
-            ? 'These seats are all samples.'
-            : `${sampleSeats} of these seats are samples.`}
+            ? sampleSeats === 1
+              ? 'This seat is a sample.'
+              : 'These seats are all samples.'
+            : sampleSeats === 1
+              ? 'One of these seats is a sample.'
+              : `${numberInWordsCapped(sampleSeats)} of these seats are samples.`}
         </Text>
       )}
 

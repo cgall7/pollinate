@@ -13,6 +13,7 @@ import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor'
 import { FlyingBee } from '../components/FlyingBee';
 import { ringStepFor } from '../components/combLattice';
 import { initialsFor } from '../utils/initials';
+import { numberInWordsCapped } from '../utils/numberWords';
 import { useAuth } from '../contexts/AuthContext';
 
 // R-CD-12 — the home-bound flight needs the same staging-offset geometry as
@@ -55,7 +56,13 @@ const rosterLabel = (contributors) => {
   if (contributors.length === 0) return "You're the only one writing so far.";
   const names = contributors.map((c) => c.name).filter(Boolean);
   if (contributors.length <= 3 && names.length > 0) return `Writing with ${joinNames(names)}.`;
-  return `${contributors.length + 1} of you are writing.`;
+  // FU3.2 (Lumen, thread 160660d9) — tally in a sentence, sentence-initial,
+  // so the capped word form. The singular is owned by the `=== 0` guard at
+  // the top of this function: it returns before this line, so the count
+  // here is `contributors.length + 1` with `contributors.length >= 1`, and
+  // never 1. That is a guard rather than an arithmetic floor, so the gate
+  // files it as a DECLARED answer and prints it, rather than measuring it.
+  return `${numberInWordsCapped(contributors.length + 1)} of you are writing.`;
 };
 
 // 8b.3 — entry list for one hive (Design Language §3), plus the seal/send

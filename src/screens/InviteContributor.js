@@ -12,6 +12,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { LinkButton } from '../components/LinkButton';
 import { BackButton } from '../components/BackButton';
 import { LoadState, LOAD_STATES, resolveListView } from '../components/LoadState';
+import { numberInWords } from '../utils/numberWords';
 
 // ENG-61 — the invite half of Multi-Writer Hives (§4.2's viral loop landing
 // copy — GUIDES/POLLINATE_MULTIWRITER_COPY_VOCAB.md). Reached from
@@ -231,8 +232,13 @@ export const InviteContributor = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={styles.footer}>
+        {/* FU3.2 (Lumen, thread 160660d9) — a tally in a sentence, so a word,
+            and mid-sentence, so the uncapped form. The singular is handled
+            inline by the writer/writers ternary this line already carried,
+            which is why the count reads `Invite one writer` and never
+            `Invite 1 writers`. */}
         <PrimaryButton onPress={handleInvite} disabled={selected.size === 0 || inviting} loading={inviting}>
-          {selected.size === 0 ? 'Invite' : `Invite ${selected.size} ${selected.size === 1 ? 'writer' : 'writers'}`}
+          {selected.size === 0 ? 'Invite' : `Invite ${numberInWords(selected.size)} ${selected.size === 1 ? 'writer' : 'writers'}`}
         </PrimaryButton>
         <LinkButton
           onPress={goToHive}

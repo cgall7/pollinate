@@ -36,6 +36,7 @@ import {
   REVEAL_DATE_ONSET_MS,
 } from '../components/revealSequencer';
 import { RotationFrame } from '../components/RotationFrame';
+import { numberInWordsCapped } from '../utils/numberWords';
 
 // 8b.6 Recipient opens package — `docs/strategy/Pollinate_Delivery_Slices.md`
 // §8b.6, the reveal engine's SECOND mount point (`revealSequencer.js`'s own
@@ -737,7 +738,12 @@ export const PackageOpenScreen = ({ navigation, route }) => {
                   // separately-derived number. A people-count is permitted
                   // presence (§5's "Four of you are writing" precedent);
                   // entry counts stay banned everywhere else in this doc.
-                  `${pkg.contributorNames.length} ${pkg.contributorNames.length === 1 ? 'person' : 'people'} wrote this for you.`
+                  // FU3.2 (Lumen, thread 160660d9): that §5 precedent is a
+                  // WORD, and so is this now — a tally in a sentence,
+                  // sentence-initial, so the capped form. The singular is
+                  // handled inline by the person/people ternary this line
+                  // already carried.
+                  `${numberInWordsCapped(pkg.contributorNames.length)} ${pkg.contributorNames.length === 1 ? 'person' : 'people'} wrote this for you.`
                 : `That's everything ${pkg.senderName} sent.`
               : 'This package has nothing in it yet.'}
           </Text>
