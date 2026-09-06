@@ -1169,16 +1169,21 @@ export const HoneycombGrid = forwardRef(({
           is the answer Lumen asked for in the same commit as the guard:
           `sampleSeats` counts the `isDemo` members of the one mount's
           `todayMembers` (`HoneycombTab.js:570`), demo shares merge only
-          under `DEMO_CONTENT` and only while the account's graph is still
-          empty, and `demoHive.js` seats SEVEN members at `daysAgo: 0`. So
-          today the count is 0 or 7 and never 1, and neither singular arm
-          can render.
+          under `DEMO_CONTENT` and only while `connections` is still empty,
+          and `demoHive.js` seats SEVEN members at `daysAgo: 0`. So today the
+          count is 0 or 7 and never 1, and neither singular arm can render.
 
-          (The wording above avoids one word on purpose: `check-demo-hive`'s
-          load-bearing negative row scans this whole file, comments
-          included, for the names of the feed and the graph, so the
-          paragraph explaining why the isolation holds would otherwise red
-          the row that enforces it.)
+          THE NAMES IN THAT SENTENCE WERE MISSING UNTIL FU4, and their return
+          is load bearing rather than tidy. This file cannot see `mergedFeed`,
+          `connections` or `listFeed`, which is what makes the disclosure's
+          lifetime structural: re-gating the note on emptiness would mean
+          importing emptiness into a component that has no business knowing
+          about it. `check-demo-hive` asserts exactly that, and used to assert
+          it with a byte scan over this file including its comments, so the
+          paragraph explaining the isolation reddened the row enforcing it and
+          had to talk around its own subject. Lumen re-scoped the row to the
+          AST (FU4, thread 160660d9). This paragraph naming all three tokens,
+          beside a green row, is that re-scope's live control on every run.
 
           Both go live the moment that corpus count becomes 1, and they go
           live TOGETHER, on the same trigger, distinguished only by whether

@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { toISODate } from '../utils/dateRanges';
 import { buildDemoEntries } from '../utils/demoSeed';
 import { DEMO_CONTENT } from '../constants/demoMode';
+import { normalizeTheme } from '../utils/themeTagger';
 
 // Supabase-backed as of P0-2 (thread 19e90cf8) — was a single AsyncStorage
 // key with no user_id, so a year of entries lived on exactly one phone and
@@ -27,11 +28,17 @@ const requireUserId = async (client) => {
   return user.id;
 };
 
+// `normalizeTheme` is here and not at any render site because this mapper is
+// the boundary: every personal-journal row this app has ever stored becomes a
+// client entry through exactly this function, so a theme renamed after those
+// rows were written has one place to be answered. Renders read the mapped
+// object (`TodayTab.js:618` prints `entry.theme` with no fallback at all), so
+// a fix at the renders would have been a fix at every render, forever.
 const toEntry = (row) => ({
   id: row.id,
   date: row.entry_date,
   text: row.content,
-  theme: row.theme,
+  theme: normalizeTheme(row.theme),
   savedAt: row.created_at,
   visibility: row.visibility,
   paper: row.paper,

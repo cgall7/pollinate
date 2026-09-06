@@ -53,6 +53,7 @@
     "check:demo-runtime-dormancy": "node scripts/check-demo-runtime-dormancy.mjs",
     "check:collector-null-class": "node scripts/check-collector-null-class.mjs",
     "check:number-register": "node scripts/check-number-register.mjs",
+    "check:theme-keys": "node scripts/check-theme-keys.mjs",
     "check:copy-rules": "node scripts/check-copy-rules.mjs",
     "check:onboarding-flow": "node scripts/check-onboarding-flow.mjs",
     "check:private-hives-seal": "node scripts/check-private-hives-seal.mjs",

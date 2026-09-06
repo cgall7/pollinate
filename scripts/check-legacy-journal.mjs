@@ -33,8 +33,22 @@
 //    or approves nothing at all (never refuses when it should).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { registerHooks } from 'node:module';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// Metro resolves './foo'; Node requires './foo.js'. Bridge only that. The
+// same hook six other gates already carry (`check-demo-hive.mjs` documents
+// it). Added by FU4, when `legacyJournal.js` gained its first import: this
+// gate loads the real module rather than re-typing it, so the module's own
+// dependency graph is this gate's problem the moment it has one.
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith('.') && !/\.[cm]?js$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
+
 const { toISODate } = await import(path.join(ROOT, 'src/utils/dateRanges.js'));
 const { legacyDateKeyToDate, legacyEntriesToMigrate, legacyPredatesAccount } = await import(
   path.join(ROOT, 'src/utils/legacyJournal.js')

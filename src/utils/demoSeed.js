@@ -1,8 +1,18 @@
 import { toISODate } from './dateRanges';
 
 // Sample lines per theme, written to actually match themeTagger's keyword
-// lists so a freshly-tagged entry agrees with the theme we're assigning it —
-// keeps Wrapped/Recap's dominant-theme math honest even on seeded data.
+// lists so a freshly-tagged entry agrees with the theme we're assigning it.
+// That keeps Wrapped/Recap's dominant-theme math honest even on seeded data.
+//
+// THAT SENTENCE IS NOW MEASURED, not just written: `check-theme-keys` T4
+// tags every line below with the real tagger and asserts it lands on its own
+// key. It was false at exactly one line when the row was added, and the
+// reason is worth keeping. `tagEntry` matches by SUBSTRING, so one of the
+// two lines the `Spirit` block replaced scored Family as well as its own
+// theme, because the word `moment` contains `mom`. Family is earlier in `THEMES` and the
+// tie went to it, so a line written for one theme was seeded under another.
+// This is the same false-positive class `forbidden-words.mjs` measured for
+// `sin` inside `single`, and a comment could not fail on it.
 const SAMPLE_LINES = {
   Family: [
     'I am grateful for a quiet dinner with my family tonight.',
@@ -40,9 +50,16 @@ const SAMPLE_LINES = {
     'I am grateful for good coffee and a slow morning.',
     'I am grateful for music that turned my whole day around.',
   ],
-  Faith: [
-    'I am grateful for a moment of real quiet to pray today.',
-    'I am grateful to feel blessed even on an ordinary day.',
+  // FU4 (Lumen, thread 160660d9): both lines here carried a forbidden word
+  // and no gate had ever read them, because a demo screen is still a screen
+  // and its audience is Colin's demo and App Store review. Rewritten in the
+  // demo corpus's register, quiet and concrete, and kept inside this file's
+  // own tagging rule: `spirit` is the ONE keyword on this theme's list that
+  // is not itself banned, so the label the app speaks back is a word the
+  // person's own entry actually used.
+  Spirit: [
+    'I am grateful for a quiet half hour that settled my spirit.',
+    'I am thankful for a slow evening that put my spirits right again.',
   ],
   Creativity: [
     'I am grateful for an hour to just write today.',
@@ -54,7 +71,7 @@ const SAMPLE_LINES = {
 // distribution, so Wrapped's "top 3 themes" reads like an actual year.
 const THEME_WEIGHTS = [
   ['Family', 24], ['Friendship', 16], ['Health', 14], ['Joy', 12],
-  ['Growth', 10], ['Career', 9], ['Nature', 8], ['Creativity', 4], ['Faith', 3],
+  ['Growth', 10], ['Career', 9], ['Nature', 8], ['Creativity', 4], ['Spirit', 3],
 ];
 
 const weightedTheme = (rand) => {

@@ -1,5 +1,6 @@
 // Pure logic for legacyJournalMigration.js, split out so it's gateable
 // without AsyncStorage or a Supabase session — see check-legacy-journal.mjs.
+import { normalizeTheme } from './themeTagger';
 
 // "YYYY-MM-DD" -> the local Date that EntryStore.saveEntry's toISODate()
 // will serialize back to the SAME string. `new Date(dateKey)` parses a bare
@@ -25,7 +26,12 @@ export const legacyEntriesToMigrate = (legacy, existingDates) =>
       dateKey,
       date: legacyDateKeyToDate(dateKey),
       text: entry.text,
-      theme: entry.theme,
+      // The third and last place a stored theme becomes a client value, and
+      // the only one that is a WRITE: this list is uploaded to Supabase. The
+      // AsyncStorage blob it reads has had no writer since P0-2, so every key
+      // in it predates the rename by definition, and normalising here is what
+      // stops a retired key being minted into a fresh row today.
+      theme: normalizeTheme(entry.theme),
     }));
 
 // One-sided safety check on the claiming account, using a field the blob

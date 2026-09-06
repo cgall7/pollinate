@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { toISODate } from '../utils/dateRanges';
 import { isPlaceholderName } from '../utils/placeholderName';
+import { normalizeTheme } from '../utils/themeTagger';
 
 // Private Hives — the client half. Until this file, `private_hives` had a
 // full server side (six migrations, live in production) and ZERO readers or
@@ -48,12 +49,16 @@ const DEFAULT_REVIEW_CADENCE = 'yearly';
 // §2 site #7: this mapper used to discard it). `authorName` is the frozen
 // `entries.author_name_at_seal` snapshot (Sage's §8 ruling, thread
 // b4533a52) — survives the writer renaming later, null pre-migration.
+// `theme` is normalised for the same reason `toEntry` does it: this is the
+// second and last mapper turning an `entries` row into a client object, and a
+// theme key renamed after the row was written is a read problem. Both mappers
+// are asserted by `check-theme-keys` T3, so neither can quietly drop it.
 const toHiveEntry = (row) => ({
   id: row.id,
   hiveId: row.hive_id,
   date: row.entry_date,
   text: row.content,
-  theme: row.theme,
+  theme: normalizeTheme(row.theme),
   savedAt: row.created_at,
   paper: row.paper,
   authorId: row.user_id,

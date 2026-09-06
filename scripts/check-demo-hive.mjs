@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerHooks } from 'node:module';
+import { parse } from '@babel/parser';
 import { FORBIDDEN_WORDS } from './forbidden-words.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -212,6 +213,31 @@ check('every line ends in a period', lines.filter((l) => !l.endsWith('.')), []);
 //       cannot re-gate the note on emptiness without first importing emptiness
 //       into a file that has no business knowing about it.
 //
+// (c) IS SCOPED TO WHAT EXECUTES, and it did not used to be (Lumen, FU4,
+// 2026-09-06, thread 160660d9). It was a byte scan over the whole file,
+// comments included, which is the cheap implementation of the claim and not
+// the claim: PROSE IMPORTS NOTHING. A negative byte row can only ever
+// over-trigger, loudly, so nothing false shipped through it. What it did
+// instead was tax the one thing this house treats as a dependency. The
+// paragraph in HoneycombGrid.js explaining WHY the isolation holds names the
+// mechanism, so writing it truthfully reddened the row that enforces it, and
+// the sanctioned workaround was to write "the names of the feed and the
+// graph" plus a second paragraph apologising for the vagueness. A gate that
+// pushes justification comments toward talking around their subject is
+// manufacturing the defect that class exists to prevent.
+//
+// So the scan collects identifiers and string content OFF THE AST and never
+// visits a comment node. Same containment test as the byte scan it replaces,
+// over a smaller domain: this removes comments from the row's reach and
+// nothing else. It FAILS CLOSED, because a file that will not parse is a file
+// this row cannot make its claim about.
+//
+// The two calibrations, one each way. A real reference in code reds it; a
+// comment naming all three tokens does not. The second one is not a mutation
+// somebody has to remember to re-run: HoneycombGrid.js's restored paragraph
+// names `mergedFeed`, `connections` and `listFeed` in prose, so this row
+// being green on every future run IS that control.
+//
 // FeedCard's own marker (§23.9.1) is pinned here too, so the two surfaces that
 // render demo-authored content are asserted in one place rather than each
 // drifting alone.
@@ -227,8 +253,41 @@ check('comb: reveal card marks a sample member',
 check('feed card marks a sample share',
   /\{isDemo && <Text style=\{styles\.sampleLabel\}>SAMPLE<\/Text>\}/.test(feedCard), true);
 // The negative half, and it is the load-bearing one.
-check('comb cannot see the feed or the connection list',
-  ['mergedFeed', 'connections', 'listFeed'].filter((t) => grid.includes(t)), []);
+{
+  const ISOLATION_TOKENS = ['mergedFeed', 'connections', 'listFeed'];
+  let executable = null;
+  let parseError = null;
+  try {
+    const ast = parse(grid, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+    const seen = new Set();
+    // Comments are attached to nodes rather than being nodes, so they are
+    // skipped by NAME here and not by hoping the walk misses them.
+    (function walk(node) {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (node.type === 'Identifier' || node.type === 'JSXIdentifier') seen.add(node.name);
+      else if (node.type === 'StringLiteral' || node.type === 'JSXText') seen.add(String(node.value));
+      else if (node.type === 'TemplateElement') seen.add(String(node.value.cooked ?? node.value.raw));
+      for (const k of Object.keys(node)) {
+        if (k === 'loc' || k === 'leadingComments' || k === 'trailingComments' || k === 'innerComments') continue;
+        walk(node[k]);
+      }
+    })(ast.program);
+    executable = [...seen];
+  } catch (e) {
+    parseError = e.message;
+  }
+  // Fail closed, and say which failure it was: an unparseable file and a
+  // clean one are different answers and must not print the same row.
+  check('comb: the isolation scan parsed the grid', parseError, null);
+  // A walk that returned nothing would satisfy any negative. Guard it.
+  check('comb: the isolation scan found executable tokens', (executable?.length ?? 0) > 0, true);
+  check('comb cannot see the feed or the connection list',
+    executable === null
+      ? ['scan did not run']
+      : ISOLATION_TOKENS.filter((t) => executable.some((tok) => tok.includes(t))),
+    []);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

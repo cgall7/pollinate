@@ -130,7 +130,25 @@ const check = (label, got, want) => {
   );
 };
 
-// --- the universe, the same one check-copy-rules stands over ------------
+// --- the universe: check-copy-rules' own, PLUS one file it cannot reach ---
+//
+// The tree half is exactly the universe `check-copy-rules` stands over, which
+// is what makes this gate its complement rather than a second opinion.
+//
+// THE CORPUS IS THE OTHER HALF, and it widens the subject on purpose (Lumen,
+// FU4, thread 160660d9). `scripts/lib/demo-seed-corpus.mjs` is authored copy:
+// 180 streak entries and two combs of keepsake text, ratified line by line,
+// written by `seed-demo-account.mjs` into a real account that Colin demos and
+// that App Store review reads. No gate had ever run the forbidden list over
+// it, and not because anything exempted it. It sits under `scripts/`, so it
+// was outside every copy gate's FILE universe the way the null class is
+// outside the collector's NODE universe.
+//
+// Those are the same failure wearing two costumes, which is why the fold
+// belongs here and not in a fourteenth gate: this file's subject is authored
+// copy that no gate reads. The collector's null class is one source of it.
+// A file nobody pointed a gate at is the other.
+const CORPUS = path.join(ROOT, 'scripts/lib/demo-seed-corpus.mjs');
 const files = [];
 (function walkDir(dir) {
   for (const name of fs.readdirSync(dir).sort()) {
@@ -140,6 +158,7 @@ const files = [];
   }
 })(SRC);
 files.push(path.join(ROOT, 'App.js'));
+files.push(CORPUS);
 files.sort();
 
 const RESERVE = NECTAR_RESERVE.map((r) => ({ word: r.source, re: new RegExp(r.source, r.flags) }));
@@ -277,6 +296,10 @@ const routeIds = [];     // every *.Screen name= value, for P3's own row
 const headerOverrides = [];
 const tabBarButtons = [];  // the component named by screenOptions.tabBarButton
 const components = new Map();  // component name -> how it treats the props it is handed
+// The corpus's own contribution, tracked separately from the tree's. A row
+// that says "zero hits in the corpus" is vacuous unless the same run can say
+// how many of its strings were examined to get there.
+let corpusDropped = 0;
 
 for (const file of files) {
   const rel = path.relative(ROOT, file);
@@ -393,6 +416,7 @@ for (const file of files) {
       return;
     }
     droppedCount += 1;
+    if (file === CORPUS) corpusDropped += 1;
 
     const forbidden = FORBIDDEN.filter((f) => f.re.test(text)).map((f) => f.word);
     const reserved = RESERVE.filter((r) => r.re.test(text)).map((r) => r.word);
@@ -417,7 +441,29 @@ check('the collector dropped strings', droppedCount > 0, true);
 check('P1 (forbidden) matched at least one dropped string', population.some((p) => FORBIDDEN.some((f) => f.word === p.key.match(/\[([^\]]+)\]/)?.[1])), true);
 check('P2 (nectar reserve) matched at least one dropped string', population.some((p) => RESERVE.some((r) => r.word === p.key.match(/\[([^\]]+)\]/)?.[1])), true);
 check('P3 (navigator route ids) found at least one', routeIds.length > 0, true);
+
+// THE CORPUS ARM, and it is the END STATE of FU4's rename rather than a
+// standing question. Lumen ruled the fold in the same commit as the rename
+// (thread 160660d9) because the corpus's fifteen `Faith` strings were
+// exactly the strings the rename moved: fourteen `theme:` tags and the
+// STREAK_THEMES membership. Before the rename this arm produced fifteen
+// entries the table would have had to carry. After it, zero.
+//
+// So the row below is not decorative. A rename that reached the app tree and
+// stopped at `scripts/` reds it by name and line, and so does any future
+// corpus line written with a banned word in it. The cross-file half, that
+// all four writers of the theme identity moved together, is
+// `check-theme-keys` T1 and is not restated here.
+const corpusRel = path.relative(ROOT, CORPUS);
+check('the corpus file is in the universe', files.includes(CORPUS), true);
+check('the corpus contributed strings to examine', corpusDropped > 0, true);
+check(
+  'no corpus string matches a forbidden or reserved word',
+  population.filter((p) => p.key.startsWith(`${corpusRel}:`)).map((p) => p.key).sort(),
+  []
+);
 console.log(`     collected ${collectedCount}, dropped ${droppedCount} (+${droppedEmptyCount} empty), raw string-bearing nodes ${rawCount}`);
+console.log(`     of which the corpus: ${corpusDropped} dropped strings, 0 predicate hits`);
 
 console.log(`\n--- N2. the extractor, reconciled against the raw walk in both directions ---`);
 // A MATCHING TOTAL IS NOT A RECONCILIATION, so both directions are asserted:
@@ -484,6 +530,15 @@ const TABLE = [
   { at: 'src/utils/themeTagger.js:13 [blessed] "blessed"', kind: 'not-copy/matcher-input' },
   { at: 'src/utils/themeTagger.js:13 [church] "church"', kind: 'not-copy/matcher-input' },
 
+  // --- P1 as a RETIRED KEY, which is a matcher input too -------------------
+  // FU4's legacy map. `LEGACY_THEME_KEYS.get(theme)` compares this string
+  // against a theme read out of `entries.theme`, so it sits on the same side
+  // of the same kind of comparison as the keywords above: it is what the
+  // lookup LOOKS FOR, and the only value it can ever produce is `Spirit`.
+  // The banned word survives in the tree precisely so that no row still
+  // holding it can render it.
+  { at: 'src/utils/themeTagger.js:40 [faith] "Faith"', kind: 'not-copy/matcher-input' },
+
   // --- reaches a person, and the word is the ruled one ----------------
   // Lumen, 2026-09-06, thread 160660d9: the dock may say `Nectar`, and the
   // four destination names become authored labels. FU2 declares all four as
@@ -494,13 +549,13 @@ const TABLE = [
   // the reason this gate exists: `options` is not a TEXT_ATTRS attribute, so
   // `positionFor` settles nothing above it and the string never enters the
   // collector's universe. The one word the dock speaks is in the null class.
-  { at: 'src/navigation/MainTabs.js:196 [\\bnectar\\b] "Nectar"', kind: 'reads-to-user/ruled' },
+  { at: 'src/navigation/MainTabs.js:204 [\\bnectar\\b] "Nectar"', kind: 'reads-to-user/ruled' },
 
   // The route id on the line beside it. Same text, different object, and
   // after FU2 a different disposition: `getLabel` reaches `route.name` only
   // when neither a string `tabBarLabel` nor a `title` is declared, and N4
   // asserts all four labels are declared. Nothing reads it to a person.
-  { at: 'src/navigation/MainTabs.js:194 [\\bnectar\\b] "Nectar"', kind: 'not-copy/route-identity' },
+  { at: 'src/navigation/MainTabs.js:202 [\\bnectar\\b] "Nectar"', kind: 'not-copy/route-identity' },
 
   // --- reaches a person, and the word is the ruled one ----------------
   // FU3 (Lumen, 2026-09-06, same thread; R-NT ratification items 5 and 6).
@@ -537,38 +592,37 @@ const TABLE = [
   { at: 'src/screens/CombNectarCompose.js:197 [\\bdrops\\b] "Sent drops to ."', kind: 'reads-to-user/ruled' },
   { at: 'src/screens/CombNectarCompose.js:237 [\\bdrops\\b] "Choose to drops."', kind: 'reads-to-user/ruled' },
 
-  // A THEME KEY IS USER-FACING COPY. `THEMES[].key` is rendered directly:
-  // MonthlyRecap.js:93 `{entry.theme || tagEntry(entry.text)}` inside a
-  // <Text>, PollinateWrapped.js:274 `themeWord={insight.theme}`, and
-  // RecapTab.js:25 spells it into `You leaned into "…"`. So the word
-  // `Faith` is on a screen whenever an entry tags to that theme, and the
-  // app chose the label — the user did not write it. That is what makes it
-  // a register question rather than the user's own words. UNRULED: the
-  // forbidden list bans `\bfaith`, and whether a theme LABEL is inside that
-  // ban is a copy ruling nobody has made.
-  { at: 'src/utils/themeTagger.js:13 [faith] "Faith"', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
-  { at: 'src/utils/demoSeed.js:57 [faith] "Faith"', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
+  // A THEME KEY IS USER-FACING COPY, and both rows that used to sit here are
+  // GONE rather than reclassified. `THEMES[].key` renders directly
+  // (TodayTab.js:618, MonthlyRecap.js:93, PollinateWrapped.js:274,
+  // RecapTab.js:428), so the label was a banned word on a screen in our own
+  // voice. Lumen ruled it INSIDE the ban (FU4, 2026-09-06, thread
+  // 160660d9): no exemption, because a carve-out from R15 is Colin's to
+  // grant. The key is now `Spirit`, which is a word already on the theme's
+  // own keyword list, so a person who writes it gets their own word back.
+  //
+  // THE DELETION IS THE ASSERTION. This gate's own N3 rows are two-sided: a
+  // string that stops matching must leave the table, and a string that
+  // starts matching must arrive in it. So the four rows FU4 removed cannot
+  // be removed early, and a revert of the rename cannot pass by leaving
+  // them behind. `check-theme-keys` T1 holds the other half, that all four
+  // writers of the identity moved together.
 
-  // Demo entry text. `check-demo-hive` runs the forbidden list over
-  // `demoHiveShares` on the stated ground that the demo set is authored
-  // copy too. These two are the same class and no gate has ever read them.
+  // Demo entry text. The two `demoSeed.js` lines that used to sit here are
+  // gone for the same reason and by the same rule as the theme rows above.
+  // Lumen's ground, FU4: R15's own sentence is "on a screen", and a demo
+  // screen is a screen whose audience is exactly who the register bar exists
+  // for. The law already reached authored demo content anyway, since
+  // `check-demo-hive` runs the forbidden list over `demoHiveShares`; these
+  // two were never exempt, they had just never been inside any gate's
+  // universe until this one.
   //
-  // REACH, measured rather than assumed, because "demo" is not one thing.
-  // `buildDemoEntries` is called at `EntryStore.js:168` inside
-  // `seedDemoData`, whose own body consults DEMO_CONTENT
-  // (`__DEV__ || DEMO_MODE`), from `TodayTab.js:296`. Run at its default
-  // 180 days with its fixed seed, the corpus draws 4 Faith days: 2 `pray`
-  // lines and 2 `blessed` lines. At 365 it is 13, 7 and 6.
-  //
-  // THE DEMO ACCOUNT IS A DIFFERENT WRITER AND IT IS CLEAN ON THE TEXT.
-  // `scripts/lib/demo-seed-corpus.mjs` is what `seed-demo-account.mjs`
-  // writes, and its Faith-tagged lines carry no listed word — somebody
-  // already avoided them there. What it does carry is the THEME, so the
-  // label `Faith` renders on that account too. Scope: that file is under
-  // `scripts/`, outside this gate's universe, so this is a statement about
-  // where I looked and not a claim about the tree.
-  { at: 'src/utils/demoSeed.js:44 [pray] "I am grateful for a moment of real quiet to pray today."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
-  { at: 'src/utils/demoSeed.js:45 [blessed] "I am grateful to feel blessed even on an ordinary day."', kind: 'reads-to-user/unruled', owner: 'Lumen (copy)' },
+  // The scope sentence that used to close this block is now retired by
+  // measurement rather than by argument. It said the demo ACCOUNT corpus was
+  // clean on the text but carried the theme, and that the claim was only
+  // about where I had looked, because `scripts/` was outside this gate's
+  // universe. `scripts/lib/demo-seed-corpus.mjs` IS the universe now, and
+  // the rows in N1 say what it contributes.
 ];
 
 const measured = new Map();
@@ -647,10 +701,10 @@ check(
 // navigation identity that nothing carries, and the rows below assert the
 // structure that makes that true rather than the sentence that says it.
 const RULED_TAB_LABELS = {
-  'src/navigation/MainTabs.js:184': 'Today',
-  'src/navigation/MainTabs.js:189': 'Honeycomb',
-  'src/navigation/MainTabs.js:194': 'Nectar',
-  'src/navigation/MainTabs.js:204': 'Garden',
+  'src/navigation/MainTabs.js:192': 'Today',
+  'src/navigation/MainTabs.js:197': 'Honeycomb',
+  'src/navigation/MainTabs.js:202': 'Nectar',
+  'src/navigation/MainTabs.js:212': 'Garden',
 };
 
 // The props BottomTabItem hands to `tabBarButton`, which is what makes the

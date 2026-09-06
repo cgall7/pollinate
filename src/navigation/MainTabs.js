@@ -175,11 +175,19 @@ export const MainTabs = () => {
           false and `labelVisibilityMode` is unset, which is this tree. The
           dock stays icons only per R-NT-1.
 
-          Route ids are NOT renamed. They are navigation identity: `TabIcon`
-          keys `TAB_ICONS` on `route.name` and the cross-tab
-          `getParent()?.navigate` targets resolve against these four names.
-          Changing an identity to fix a label is paying in the wrong
-          currency. */}
+          Route ids are NOT renamed: they are navigation identity, and
+          changing an identity to fix a label is paying in the wrong
+          currency. The presentation lever is `tabBarLabel` above.
+
+          WHICH callers depend on the ids, corrected in FU4 (Lumen's rider on
+          FU2). `TabIcon` keying `TAB_ICONS` on `route.name` is true and
+          indexes with no fallback. The second clause, `getParent()?.navigate`
+          targets, was false: swept at FU4, all twelve such calls target STACK
+          routes (`Input`, `HiveDetail`, `Wrapped`, ...) and not one names a
+          tab, so it would have sent an editor grepping the wrong callers. The
+          real resolvers are five nested `('Main', { screen: 'Today' })` calls,
+          at `CreateComb.js:45`, `CombInvite.js:180` and `App.js` :171, :189,
+          :262. */}
       <Tab.Screen
         name="Today"
         component={TodayTab}
