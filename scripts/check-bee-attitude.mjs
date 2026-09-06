@@ -3613,6 +3613,107 @@ const readPaddingH = (src, styleName) => {
 
 const themeSource = await readFile(path.join(ROOT, 'src/constants/theme.js'), 'utf8');
 
+// --- the K3 discharge predicate: is the bee suppressed at the call site? --
+//
+// R-CD-12 rider (Lumen, 2026-09-06). This was a regex over the host's raw
+// source until today, and the regex was load-bearing on PROSE: on HiveDetail
+// it was satisfied by the citation comment above the mount, which quotes
+// TodayTab's idiom, while the real suppression three lines below it
+// (`entries.length > 0 ? perches : null`, arms reversed) never matched at all.
+// Deleting that suppression left the gate fully green over the exact hazard
+// this row exists to catch; rewording the comment redded it over correct code.
+// A lexical island inside an instrument that already owns a parser is not a
+// tradeoff to weigh, so the predicate is bound to the attribute node instead.
+//
+// It answers one question: does the value handed to `<FlyingBee perches>` go
+// falsy on some arm? `usePerchSet`'s binding is resolved from the host rather
+// than assumed to be spelled `perches`, so a rename moves this with it.
+//
+// WHAT IT DOES NOT ASSERT, stated rather than hidden: condition-EQUALITY. It
+// does not check that the arm suppressing the bee is the same arm that drops
+// the home anchor. Deriving render-state reachability is not a claim this
+// instrument can make honestly (Lumen, R-CD-12(2)); the eye-read owns that
+// half, and a stated residual with a named owner beats a pretended coverage.
+const perchSetBinding = (ast) => {
+  let name = null;
+  walk(ast.program, (n) => {
+    if (
+      n.type === 'VariableDeclarator' &&
+      n.id?.type === 'Identifier' &&
+      n.init?.type === 'CallExpression' &&
+      n.init.callee?.type === 'Identifier' &&
+      n.init.callee.name === 'usePerchSet'
+    ) {
+      name = n.id.name;
+    }
+  });
+  return name;
+};
+
+// null / undefined / false. What `<FlyingBee>` reads as "there is nowhere to
+// stand" — `homeKey` resolves null, `sequenceHalted` follows, no bee renders.
+const isSuppressingValue = (n) =>
+  n?.type === 'NullLiteral' ||
+  (n?.type === 'Identifier' && n.name === 'undefined') ||
+  (n?.type === 'BooleanLiteral' && n.value === false);
+
+// Both ternary orders are the same suppression by construction: whichever arm
+// holds the perch set, the other one goes falsy. The `&&` form needs no
+// suppressing literal at all — the falsy short-circuit IS the suppressing
+// value, which is why the perch set must be the RIGHT operand. `perches && x`
+// is the perch set used as a GUARD, a different thing, and is refused.
+//
+// The condition NODE rides along, because K6 pins the two ratified
+// suppressions to their specific conditions and needs the same immunity: a
+// node's own source slice is bounded by the expression, so a comment cannot
+// be inside it.
+const suppressionForm = (expr, perchesName) => {
+  if (!expr || !perchesName) return null;
+  const isSet = (n) => n?.type === 'Identifier' && n.name === perchesName;
+  if (expr.type === 'ConditionalExpression') {
+    if (isSet(expr.consequent) && isSuppressingValue(expr.alternate))
+      return { form: 'ternary, set on the consequent', test: expr.test, suppressOn: 'false' };
+    if (isSet(expr.alternate) && isSuppressingValue(expr.consequent))
+      return { form: 'ternary, set on the alternate', test: expr.test, suppressOn: 'true' };
+    return null;
+  }
+  if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
+    if (isSet(expr.right) && !isSet(expr.left))
+      return { form: '&&, set on the right', test: expr.left, suppressOn: 'false' };
+    return null;
+  }
+  return null;
+};
+
+// Every `<FlyingBee>` mount in the host, and whether each one suppresses.
+// A host with no mount is NOT suppressed — fail-closed, and the mount count
+// rides in the diagnosis so a harness break cannot read as a clean discharge.
+const perchSuppression = (ast, src) => {
+  const perchesName = perchSetBinding(ast);
+  const mounts = [];
+  walk(ast.program, (n) => {
+    if (n.type !== 'JSXOpeningElement' || n.name?.name !== 'FlyingBee') return;
+    const attr = n.attributes.find(
+      (a) => a.type === 'JSXAttribute' && a.name?.name === 'perches',
+    );
+    const expr = attr?.value?.type === 'JSXExpressionContainer' ? attr.value.expression : null;
+    const hit = suppressionForm(expr, perchesName);
+    mounts.push({
+      line: n.loc.start.line,
+      form: hit?.form ?? null,
+      suppressOn: hit?.suppressOn ?? null,
+      // Whitespace-normalised so a reformat does not red the row, but sliced
+      // from the node, so nothing outside the condition can reach it.
+      condition: hit ? src.slice(hit.test.start, hit.test.end).replace(/\s+/g, ' ').trim() : null,
+    });
+  });
+  return {
+    perchesName,
+    mounts,
+    suppressed: mounts.length > 0 && mounts.every((m) => m.form !== null),
+  };
+};
+
 // --- read every <PerchAnchor> off every host, with whether it is conditional
 const perchSets = new Map();
 for (const host of PERCH_HOSTS) {
@@ -3650,7 +3751,13 @@ for (const host of PERCH_HOSTS) {
     stack.pop();
   };
   descend(ast.program);
-  perchSets.set(host.file, { host, src, anchors, paddingH: readPaddingH(src, host.paddingStyle) });
+  perchSets.set(host.file, {
+    host,
+    src,
+    anchors,
+    suppression: perchSuppression(ast, src),
+    paddingH: readPaddingH(src, host.paddingStyle),
+  });
 }
 
 // --- K1. every cruise mount has a set, and every set is readable ----------
@@ -3720,10 +3827,15 @@ for (const [file, { anchors, host }] of perchSets) {
 // only where the same condition also suppresses the bee — TodayTab's error arm
 // does exactly this (`perches={error ? null : perches}`, K6 row 2), so the row
 // takes the suppression as the discharge rather than re-deriving it.
-for (const [file, { anchors, src }] of perchSets) {
+//
+// The discharge is read off the `perches` attribute node by
+// `perchSuppression` above, NOT off the host's text. It used to be a regex
+// over raw source, which made it satisfiable by a comment; see that
+// function's header for the two-directional mutation that proved it.
+for (const [file, { anchors, suppression }] of perchSets) {
   const homes = anchors.filter((a) => a.home === true);
   const conditionalHomes = homes.filter((a) => a.conditional);
-  const suppressed = /perches=\{[^}]*\?[^}]*:\s*perches\}|perches=\{[^}]*&&\s*perches\}/.test(src);
+  const suppressed = suppression.suppressed;
   const NAME = `${path.basename(file)} declares exactly one home anchor`;
   if (homes.length !== 1) {
     bad(
@@ -3741,13 +3853,81 @@ for (const [file, { anchors, src }] of perchSets) {
       NAME,
       `the one home anchor (${homes[0].id}:${homes[0].line}) is inside a conditional arm, and this ` +
         'host does not suppress the bee on the other arm — so there is a render state with a mount, ' +
-        'anchors, and nowhere to live.',
+        'anchors, and nowhere to live. ' +
+        (suppression.mounts.length === 0
+          ? 'No <FlyingBee> mount was found in this file at all, which is a reading failure, not a clean verdict.'
+          : `<FlyingBee> at ${suppression.mounts
+              .map((m) => `${m.line}${m.form ? ` (${m.form})` : ' (no suppression on `perches`)'}`)
+              .join(', ')}; the perch set is bound as \`${suppression.perchesName ?? 'nothing — no usePerchSet() call found'}\`.`),
     );
   } else {
     ok(
       `${path.basename(file)} declares exactly one home anchor (${homes[0].id} ${homes[0].on}@${homes[0].at}` +
-        `${conditionalHomes.length ? ', conditional — discharged by the call-site suppression' : ''})`,
+        `${
+          conditionalHomes.length
+            ? `, conditional — discharged by the call-site suppression at :${suppression.mounts[0].line}, ${suppression.mounts[0].form}`
+            : `; unconditional, call-site suppression ${
+                suppressed ? `present anyway (${suppression.mounts.map((m) => m.form).join(', ')})` : 'not required'
+              }`
+        })`,
     );
+  }
+}
+
+// --- K3a. the discharge predicate itself, on fixtures ---------------------
+//
+// K3 consults `suppressed` on ONE host today (HiveDetail is the only
+// conditional home), so two of the three shipped suppression forms are never
+// exercised by a pass/fail row, and the `&&` form ships nowhere at all. A
+// predicate whose behaviour is invisible on the tree it guards is the same
+// class of instrument as the regex it replaces, so it is fixtured directly.
+//
+// Rows 1-5 and 9 are Lumen's ratification floor (R-CD-12 rider, 2026-09-06),
+// costume included: row 6 is the exact composite mutation her practice change
+// added — the defect wearing the fix's text as prose. Floor, not ceiling.
+{
+  const FIXTURES = [
+    // --- must discharge ---
+    ['TodayTab idiom, set on the alternate', true,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={error ? null : perches} />;"],
+    ['HiveDetail idiom, arms reversed — the form the old regex never matched', true,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={entries.length > 0 ? perches : null} />;"],
+    ['the `&&` form, which ships nowhere and would otherwise go unproven', true,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={ready && perches} />;"],
+    ['`undefined` as the suppressing arm', true,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={ok ? perches : undefined} />;"],
+    ['`false` as the suppressing arm', true,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={ok ? perches : false} />;"],
+    ['the binding follows a rename of the usePerchSet() variable', true,
+      "const nest = usePerchSet();\nexport const S = () => <FlyingBee perches={ok ? nest : null} />;"],
+    // --- must refuse ---
+    ['the bare hazard: a mount with anchors and nowhere to live', false,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={perches} />;"],
+    ['the costume: that same hazard wearing a comment that quotes both idioms', false,
+      "const perches = usePerchSet();\n// same idiom as TodayTab: perches={error ? null : perches}\n// and HiveDetail: perches={entries.length > 0 ? perches : null}\nexport const S = () => <FlyingBee perches={perches} />;"],
+    ['the perch set used as a GUARD rather than suppressed by one', false,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={perches && ready} />;"],
+    ['a ternary whose other arm is a second perch set rather than a suppression', false,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={ok ? perches : fallbackPerches} />;"],
+    ['a ternary whose live arm is not the perch set', false,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee perches={ok ? somethingElse : null} />;"],
+    ['a mount with no `perches` attribute at all', false,
+      "const perches = usePerchSet();\nexport const S = () => <FlyingBee active />;"],
+    ['a file with no <FlyingBee> mount — a reading failure, never a discharge', false,
+      "const perches = usePerchSet();\nexport const S = () => <View />;"],
+  ];
+  for (const [name, expected, source] of FIXTURES) {
+    const NAME = `K3 discharge predicate: ${name}`;
+    const got = perchSuppression(parseJs(source), source).suppressed;
+    if (got === expected) {
+      ok(`${NAME} — ${expected ? 'discharges' : 'refused'}`);
+    } else {
+      bad(
+        NAME,
+        `expected ${expected ? 'a discharge' : 'a refusal'} and got ${got ? 'a discharge' : 'a refusal'}. ` +
+          'A predicate that cannot separate these cannot stand in for the eye-read K3 hands it.',
+      );
+    }
   }
 }
 
@@ -3829,26 +4009,56 @@ for (const [file, { anchors }] of perchSets) {
 // easy shape to delete by accident while doing something else, at which point
 // a bee reappears over the week feed or over failure copy and nothing fails.
 // A removal that was argued for deserves a row.
+//
+// Read off the `perches` attribute node, not off the file's text. This row
+// carried the same defect K3 did and it was live: reverting TodayTab to
+// `perches={perches}` with a comment reading `was: perches={error ? null :
+// perches}` left this row GREEN over a deleted ratified suppression. The
+// condition is compared as a source slice of the CONDITION NODE, so the
+// ruled condition is still pinned exactly — this is not K3's weaker "some
+// suppression exists" test — while a comment has nowhere to sit inside it.
 {
   const rows = [
     {
       file: 'src/screens/HoneycombTab.js',
-      want: /perches=\{hiveView === 'week' \? null : perches\}/,
-      what: "week view gets no bee (a feed is for reading)",
+      condition: "hiveView === 'week'",
+      suppressOn: 'true',
+      what: 'week view gets no bee (a feed is for reading)',
     },
     {
       file: 'src/screens/TodayTab.js',
-      want: /perches=\{error \? null : perches\}/,
+      condition: 'error',
+      suppressOn: 'true',
       what: 'the error arm gets no bee (a mascot doing laps over failure copy performs cheerfulness at failure)',
     },
   ];
-  const broken = rows.filter((r) => !r.want.test(perchSets.get(r.file).src));
+  const found = (r) =>
+    perchSets
+      .get(r.file)
+      .suppression.mounts.find((m) => m.condition === r.condition && m.suppressOn === r.suppressOn);
+  const broken = rows.filter((r) => !found(r));
   if (broken.length === 0) {
-    ok(`both ratified suppressions are wired at their call sites (${rows.map((r) => r.what).join('; ')})`);
+    ok(
+      `both ratified suppressions are wired at their call sites (${rows
+        .map((r) => `${path.basename(r.file)}:${found(r).line} on \`${r.condition}\` — ${r.what}`)
+        .join('; ')})`,
+    );
   } else {
     bad(
       'both ratified suppressions are wired at their call sites',
-      `${broken.map((r) => `${path.basename(r.file)}: ${r.what}`).join('; ')} — the guard is gone and the ` +
+      `${broken
+        .map((r) => {
+          const mounts = perchSets.get(r.file).suppression.mounts;
+          return (
+            `${path.basename(r.file)}: ${r.what} — no <FlyingBee perches> suppressed on \`${r.condition}\`; ` +
+            (mounts.length
+              ? `found ${mounts
+                  .map((m) => `:${m.line} ${m.condition ? `suppressed on \`${m.condition}\`` : 'unsuppressed'}`)
+                  .join(', ')}`
+              : 'no <FlyingBee> mount in the file at all')
+          );
+        })
+        .join('; ')} — the guard is gone and the ` +
         'bee is back on a surface a ruling took it off.',
     );
   }
