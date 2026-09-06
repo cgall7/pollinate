@@ -599,6 +599,18 @@ const fileShapes = new Map();
 // six. `NBSP` is written as an escape here for the same reason section F
 // requires it of `src/` — a byte scan is only an independent witness of a
 // character it can read in the source.
+//
+// THE LICENCE TO SPELL IT HERE IS THE UNIVERSE FILTER, AND THAT FILTER IS
+// LOAD-BEARING. Two independent guards keep this file out of its own
+// census: the walk roots at `src/` plus `App.js`, and the extension test
+// `/\.jsx?$/` rejects `.mjs`. Measured, not argued: pushing this one file
+// into `sourceFiles` reds F1 with `scripts/check-number-register.mjs ::
+// <NBSP>` as an undeclared eviction, while F2 and F3 stay green, because
+// this file's own spelling is honest and both channels agree on it. So the
+// row that fires is the population row, not the two that hunt the token.
+// Anything that widens the universe toward `scripts/` inherits a choice:
+// declare these two constants, or exclude this file by name. It must not
+// become a silent pass.
 const NBSP = '\u00A0';
 const NBSP_ESCAPE = '\\u00A0';
 const nbspSites = [];
