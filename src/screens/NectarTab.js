@@ -329,9 +329,9 @@ export const NectarTab = () => {
                   <HeroVessel level={honeyLevel} reduced={reduced} />
                   {/* A NON-BREAKING SPACE BETWEEN THE NUMBER AND ITS UNIT,
                       and it is the whole of the wrap rule on this card.
-                      Measured on the rig at 402pt: the sentence cannot fit
-                      beside a 104pt vessel at any register a hero would use,
-                      so it wraps — and with an ordinary space it wrapped as
+                      Measured at 402pt: the sentence cannot fit beside the
+                      108pt vessel at any register a hero would use, so it
+                      wraps — and with an ordinary space it wrapped as
                       "You have 1240" / "drops.", orphaning a unit from its
                       quantity. Worked the other way too: there is NO column
                       width that breaks correctly at every balance, because
@@ -339,10 +339,58 @@ export const NectarTab = () => {
                       and at n = 1240 do not overlap. So the fix is not a
                       width, it is forbidding the one break that is wrong.
                       This is also just correct typography: a quantity and
-                      its unit are one token. */}
+                      its unit are one token.
+
+                      THE VESSEL IS 108, NOT THE 104 THIS COMMENT USED TO
+                      SAY, and the number was load-bearing rather than
+                      cosmetic. R-CL-1's canvas pad widened the box by 4 and
+                      narrowed this column from 180 to 176, and "You have
+                      1 drop." measures 179.5, so at the old geometry the
+                      n = 1 register fitted on one line by half a point. The
+                      claim above is true of the card as it ships and was
+                      within rounding of false before the pad landed. */}
+                  {/* ZERO IS NOT THE N SENTENCE AT N = 0 (Lumen, UX Design
+                      2026-09-06). Drops are money and money is figures in
+                      every register, but zero is not a quantity, it is the
+                      absence of one, and this house has never rendered an
+                      absence as arithmetic: DES-31/39's zero suppression
+                      forbids "Zero people are writing." and takes the line
+                      away instead. Here the line cannot go away, because the
+                      hero has to answer the balance question and hold the
+                      card's second column, so it restructures. "no" is a
+                      determiner and not a spelled number, so the two axes of
+                      the number register are untouched and the gate has
+                      nothing to bite on.
+
+                      "YET" IS LICENSED BY THE LINE BENEATH, AND THAT IS A
+                      DEPENDENCY, WRITTEN AS ONE FROM BIRTH. `allowanceNote`
+                      renders unconditionally in this consented state, so the
+                      sentence leans forward onto a mechanism the screen
+                      states one line down rather than onto a promise. If the
+                      allowance law ever becomes conditional here, "yet" loses
+                      its licence and this branch is re-ruled with it.
+
+                      THE NULL BRANCH STAYS ABOVE IT AND STAYS DISTINCT. Zero
+                      and could-not-read are different sentences for the same
+                      reason DES-31/39 suppresses rather than prints: a render
+                      layer that says "none" when it means "I could not look"
+                      is lying. The branch order is the contract.
+
+                      Same one-token wrap rule as the branches below, measured
+                      the same way: CoreText, Nunito-Bold 24, kern -0.3, in
+                      this card's 176pt text column at 402pt (354 card, less
+                      2 border, less 48 padding, less the 108pt vessel, less
+                      the 20pt gap). The break lands "You have" / "no drops
+                      yet." and it is solved rather than sampled: that break
+                      holds for every column from 141.5pt to 205.1pt, which is
+                      every iPhone width up to 431. At 432 and wider "yet."
+                      orphans onto its own line and this wants looking at
+                      again. */}
                   <Text style={styles.balance}>
                     {balanceDrops === null
                       ? "We couldn't check your drops."
+                      : balanceDrops === 0
+                      ? 'You have no\u00A0drops yet.'
                       : balanceDrops === 1
                       ? 'You have 1\u00A0drop.'
                       : `You have ${balanceDrops}\u00A0drops.`}
