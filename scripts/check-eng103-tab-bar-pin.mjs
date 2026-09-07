@@ -163,6 +163,7 @@ const isNavOrReplaceCall = (node) =>
 }
 
 // --- 2. The backstop: no bare navigate('Main') / replace('Main') ----------
+const censusSites = [];
 {
   const bareSites = [];
   const namedSites = [];
@@ -186,6 +187,7 @@ const isNavOrReplaceCall = (node) =>
         bareSites.push(`${rel(file)}:${line}`);
       } else {
         namedSites.push(`${rel(file)}:${line}`);
+        censusSites.push(`${rel(file)}:${line}`);
       }
     });
   }
@@ -244,8 +246,15 @@ const findMainCallsWithin = (node) => {
   return out;
 };
 
-const checkAnchor = (key, expectedCount, matches, extract) => {
+// Every anchor records the sites it actually bound. The key is an
+// address, and that is deliberate and safe here: it is an EPHEMERAL JOIN
+// KEY between two derivations inside one run, never a stored pin. Nothing
+// in this file remembers it across a commit, so a reorder cannot orphan it.
+const claimedSites = [];
+
+const checkAnchor = (key, expectedCount, matches, extract, relFile) => {
   const label = `anchor "${key}"`;
+  matches.forEach((m) => claimedSites.push({ key, at: `${relFile}:${m.loc.start.line}` }));
   if (matches.length !== expectedCount) {
     bad(
       `${label} is unambiguous`,
@@ -294,7 +303,7 @@ const checkAnchor = (key, expectedCount, matches, extract) => {
       }
     });
     const nudgeCalls = nudgeIfs.flatMap((ifNode) => findMainCallsWithin(ifNode.consequent));
-    checkAnchor('nudgeGuard', 2, nudgeCalls, findScreenValue);
+    checkAnchor('nudgeGuard', 2, nudgeCalls, findScreenValue, 'App.js');
 
     // entryJustSaved: the one nav-Main call whose params carry entryJustSaved: true
     const entryJustSavedCalls = findMainCallsWithin(appAst.program).filter((call) => {
@@ -313,7 +322,7 @@ const checkAnchor = (key, expectedCount, matches, extract) => {
           p.value.value === true
       );
     });
-    checkAnchor('entryJustSaved', 1, entryJustSavedCalls, findScreenValue);
+    checkAnchor('entryJustSaved', 1, entryJustSavedCalls, findScreenValue, 'App.js');
 
     // onboarding: the sole <Stack.Screen name="Onboarding"> subtree's one Main call
     const onboardingScreens = [];
@@ -332,7 +341,7 @@ const checkAnchor = (key, expectedCount, matches, extract) => {
       bad('anchor "onboarding" is unambiguous', `AMBIGUOUS ANCHOR — expected exactly 1 <Stack.Screen name="Onboarding">, found ${onboardingScreens.length}`);
     } else {
       const onboardingCalls = findMainCallsWithin(onboardingScreens[0]);
-      checkAnchor('onboarding', 1, onboardingCalls, findScreenValue);
+      checkAnchor('onboarding', 1, onboardingCalls, findScreenValue, 'App.js');
     }
 
     // onClose: the file's only onClose JSXAttribute
@@ -344,7 +353,7 @@ const checkAnchor = (key, expectedCount, matches, extract) => {
       bad('anchor "onClose" is unambiguous', `AMBIGUOUS ANCHOR — expected exactly 1 onClose attribute in App.js, found ${onCloseAttrs.length}`);
     } else {
       const onCloseCalls = findMainCallsWithin(onCloseAttrs[0].value);
-      checkAnchor('onClose', 1, onCloseCalls, findScreenValue);
+      checkAnchor('onClose', 1, onCloseCalls, findScreenValue, 'App.js');
     }
   }
 }
@@ -364,18 +373,49 @@ for (const [key, relFile] of [
     continue;
   }
   const calls = findMainCallsWithin(ast.program);
-  checkAnchor(key, 1, calls, findScreenValue);
+  checkAnchor(key, 1, calls, findScreenValue, relFile);
 }
 
-// Cross-check: the anchor sites should exactly cover the 7-member census
-// counted in section 2 above (2 + 1 + 1 + 1 + 1 + 1 = 7). If this drifts,
-// either an anchor's scope is wrong or an unenumerated member exists.
+// Cross-check: the anchor set must be a PARTITION of the section-2 census.
+//
+// The previous form of this row compared 2+1+1+1+1+1 against 7, which is a
+// literal against a literal: it printed green on every possible tree,
+// including one where four anchors bound nothing at all. Measured.
+//
+// Counts alone do not carry coverage either. Each anchor asserting its own
+// exact count, plus a census of 7, forces full coverage ONLY IF the anchors
+// are pairwise disjoint, and disjointness was never asserted. Two anchors
+// can bind the SAME call while both report one match, leaving a third ruled
+// site pinned by nothing: reproduced by moving `entryJustSaved`'s params
+// onto the `onClose` call, after which App.js:271 flipped to 'Hive' under a
+// fully green run. So the reconciliation is over SETS, not sums.
 {
-  const anchorTotal = 2 + 1 + 1 + 1 + 1 + 1;
-  if (anchorTotal !== 7) {
-    bad('anchor set covers the full census', `anchor members sum to ${anchorTotal}, expected 7 — this file's own arithmetic is wrong, fix before trusting any anchor row above`);
+  const claimedAts = claimedSites.map((c) => c.at);
+  const distinct = new Set(claimedAts);
+
+  if (distinct.size !== claimedAts.length) {
+    const seen = new Set();
+    const dupes = [];
+    for (const c of claimedSites) {
+      if (seen.has(c.at)) dupes.push(c.at);
+      seen.add(c.at);
+    }
+    const owners = dupes.map((at) => `${at} claimed by [${claimedSites.filter((c) => c.at === at).map((c) => c.key).join(', ')}]`);
+    bad('anchors are pairwise disjoint', `DOUBLE-BOUND ANCHOR — ${owners.join('; ')}; two anchors on one node means another ruled site is pinned by nothing`);
   } else {
-    ok('anchor set covers the full 7-member tab-arrival navigate census');
+    ok(`anchors are pairwise disjoint (${distinct.size} distinct site(s), no node claimed twice)`);
+  }
+
+  const censusSet = new Set(censusSites);
+  const unpinned = censusSites.filter((c) => !distinct.has(c));
+  const phantom = [...distinct].filter((c) => !censusSet.has(c));
+  if (unpinned.length || phantom.length) {
+    bad(
+      'anchor set covers the full tab-arrival census',
+      `${unpinned.length} censused site(s) pinned by no anchor${unpinned.length ? `: ${unpinned.join(', ')}` : ''}${phantom.length ? `; ${phantom.length} anchor site(s) outside the census: ${phantom.join(', ')}` : ''}`
+    );
+  } else {
+    ok(`anchor set covers the full ${censusSites.length}-member tab-arrival navigate census (set equality, both directions)`);
   }
 }
 
