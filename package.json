@@ -30,6 +30,7 @@
     "check:hex-tap": "node scripts/check-hex-tap.mjs",
     "check:nectar-delivery-allowance": "node scripts/check-nectar-delivery-allowance.mjs",
     "check:nectar-exchange": "node scripts/check-nectar-exchange.mjs",
+    "check:eng102-garden-nectar-reads": "node scripts/check-eng102-garden-nectar-reads.mjs",
     "check:stage-light": "node scripts/check-stage-light.mjs",
     "check:streaks": "node scripts/check-streaks.mjs",
     "check:share-visibility": "node scripts/check-share-visibility.mjs",
@@ -147,5 +148,8 @@
     "embedded-postgres": "18.4.0-beta.17",
     "pg": "8.23.0",
     "typescript": "~6.0.3"
+  },
+  "allowScripts": {
+    "@embedded-postgres/darwin-arm64@18.4.0-beta.17": true
   }
 }

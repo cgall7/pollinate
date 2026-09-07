@@ -416,6 +416,8 @@ async function main() {
     ['send_comb_nectar_note(uuid,uuid,uuid,text,bigint)', { roles: ['authenticated', 'service_role'], why: 'ENG-90 comb nectar-note send RPC, requires a session' }],
     ['seal_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'legacy (pre-volumes) hive-seal RPC, requires a session' }],
     ['send_hive(uuid)', { roles: ['authenticated', 'service_role'], why: 'hive-send RPC, requires a session' }],
+    ['get_nectar_garden_totals()', { roles: ['authenticated', 'service_role'], why: 'ENG-102 Garden totals RPC, requires a session' }],
+    ['get_nectar_senders()', { roles: ['authenticated', 'service_role'], why: 'ENG-102 Garden unranked-sender RPC (DES-42), requires a session' }],
 
     // -- service_role only: internal/cron, no client role needs direct EXECUTE --
     ['comb_advance_rotation(uuid)', { roles: ['service_role'], why: 'ENG-60 row 1.9a, advance policy wrapper called by the clock (OPS-9) — an authenticated grant would be an unruled organizer force-advance, §1B.31.2' }],

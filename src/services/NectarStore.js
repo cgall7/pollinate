@@ -253,4 +253,14 @@ export const NectarStore = {
       })
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
   },
+
+  // ENG-102's client wrapper for get_nectar_garden_totals/get_nectar_senders
+  // (supabase/migrations/20260907000001) is deliberately NOT added here yet.
+  // check-nectar-consent.mjs's E2/E3a arms (store propagation, effect
+  // authority) require a reserved-query store method to resolve to at least
+  // one guarded caller or fail as CANNOT-TELL — an uncalled store method
+  // carrying a money-lexicon query is evidence of nothing, by that gate's
+  // own reasoning. Vector's ticket scoped ENG-102 as read-layer-only, render
+  // deferred to DES-42's ruled surface; the wrapper methods land in the same
+  // commit as that render wiring, not before it.
 };

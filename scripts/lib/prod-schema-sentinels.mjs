@@ -386,4 +386,13 @@ export const SENTINELS = {
     args: { p_rotation_id: '00000000-0000-0000-0000-000000000000' },
     expect: '42501',
   },
+  // ENG-102 (Fizz). Two new SECURITY DEFINER functions, both revoked from
+  // anon — same posture as seal_volume/record_zap. 42501 is what "these
+  // landed" looks like from outside.
+  '20260907000001_eng102_garden_nectar_reads': {
+    kind: 'rpc',
+    fn: 'get_nectar_garden_totals',
+    args: {},
+    expect: '42501',
+  },
 };
