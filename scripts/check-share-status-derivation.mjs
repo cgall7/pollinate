@@ -1,5 +1,5 @@
 // Gate for `alreadySharedToday`'s eight conjuncts (HoneycombTab.js), ruled
-// end-to-end by Lumen (thread f2c15b7d, consolidated 2026-09-07T20:49:11Z,
+// end-to-end by Lumen (consolidated 2026-09-07T20:49:11Z,
 // published top-level and restated in-thread at 3d3e3d44 / 8a4cefc3 after
 // Vector traced the ruling to the wrong container) and by Vector's own
 // ledger message (event a217ac44), against `fizz/eng104-honeycomb-regroup`
@@ -233,13 +233,34 @@ if (setterName) {
   bad('failOpenOuter', 'no setter identified from handleShareToday — see row argument/ordering');
 }
 
+// --- discovery: the useState declaration (rows: vacuity, initialOffer) -----
+
+// Read, never derived: a naming convention (strip `set`, lowercase the
+// first letter) can hold even when the declared name and the setter have
+// drifted apart, if whoever renamed one also renamed the other consistently
+// everywhere but the render site — which is exactly the shape a careless
+// rename takes. Reading the actual pairing from the `useState` call is the
+// only way `vacuity` asserts the binding rather than the spelling habit.
+let declaredStateName = null;
+let declInitialValue = null;
+if (setterName) {
+  const declRe = new RegExp(`const \\[([A-Za-z_$][\\w$]*), ${setterName}\\] = useState\\((true|false)\\);`);
+  const declMatch = declRe.exec(src);
+  if (declMatch) {
+    declaredStateName = declMatch[1];
+    declInitialValue = declMatch[2];
+  }
+}
+
 // --- row: vacuity — render site and producer site name the same binding ----
 
 // Deliberately NOT anchored on the literal "alreadySharedToday": `setterName`
-// came from handleShareToday's own call, structurally. A rename that moves
-// the declaration and all four setter sites but misses this render ternary
-// is exactly what this row exists to catch — every other row above is blind
-// to it, because none of them read the identifier's spelling either.
+// came from handleShareToday's own call, structurally, and `declaredStateName`
+// came from the useState declaration those calls pair with, also structurally.
+// A rename that moves the declaration and all four setter sites but misses
+// this render ternary is exactly what this row exists to catch — every other
+// row above is blind to it, because none of them read the identifier's
+// spelling either.
 const RENDER_ANCHOR = 'PrimaryButton onPress={handleShareToday}';
 const renderAnchorIndex = mustFindOne(src, RENDER_ANCHOR, 'share-door render site');
 const beforeRender = src.slice(Math.max(0, renderAnchorIndex - 200), renderAnchorIndex);
@@ -248,34 +269,32 @@ const renderTernary = ternaryMatches.length ? ternaryMatches[ternaryMatches.leng
 
 if (!setterName) {
   bad('vacuity', 'no setter identified from handleShareToday — see row argument/ordering');
+} else if (!declaredStateName) {
+  bad('vacuity', `could not find the useState declaration pairing a state with setter ${setterName}`);
 } else if (!renderTernary) {
   bad('vacuity', `could not find a "!<name> ? (" ternary immediately before ${JSON.stringify(RENDER_ANCHOR)}`);
 } else {
-  const expectedStateName = setterName.replace(/^set/, '');
-  const expectedStateNameLower = expectedStateName.charAt(0).toLowerCase() + expectedStateName.slice(1);
   const renderName = renderTernary[1];
-  if (renderName === expectedStateNameLower) {
-    ok(`vacuity — the share-door render reads ${renderName}, the same binding handleShareToday writes via ${setterName}`);
+  if (renderName === declaredStateName) {
+    ok(`vacuity — the share-door render reads ${renderName}, the same binding handleShareToday writes via ${setterName} (declared as [${declaredStateName}, ${setterName}])`);
   } else {
     bad(
       'vacuity',
-      `the share-door render reads ${renderName}, but handleShareToday writes via ${setterName} (expected state name ${expectedStateNameLower}) — declaration and render have drifted apart`
+      `the share-door render reads ${renderName}, but the useState declaration pairs ${setterName} with ${declaredStateName} — declaration and render have drifted apart`
     );
   }
 }
 
 // --- row: initialOffer — mount-time default ---------------------------------
 
-if (setterName) {
-  const declRe = new RegExp(`const \\[[A-Za-z_$][\\w$]*, ${setterName}\\] = useState\\((true|false)\\);`);
-  const declMatch = declRe.exec(src);
-  if (!declMatch) {
-    bad('initialOffer', `could not find the useState declaration pairing a state with setter ${setterName}`);
-  } else if (declMatch[1] === 'false') {
+if (setterName && declaredStateName) {
+  if (declInitialValue === 'false') {
     ok(`initialOffer — ${setterName}'s useState initializer is false`);
   } else {
-    bad('initialOffer', `${setterName}'s useState initializer is ${declMatch[1]}, not false — every cold render would open already claiming today is spent`);
+    bad('initialOffer', `${setterName}'s useState initializer is ${declInitialValue}, not false — every cold render would open already claiming today is spent`);
   }
+} else if (setterName) {
+  bad('initialOffer', `could not find the useState declaration pairing a state with setter ${setterName}`);
 } else {
   bad('initialOffer', 'no setter identified from handleShareToday — see row argument/ordering');
 }
@@ -296,11 +315,20 @@ if (setterName) {
   bad('cardinality', 'no setter identified from handleShareToday — see row argument/ordering');
 }
 
-console.log(`\ncheck-share-status-derivation: ${pass} passed, ${failures.length} failed`);
-if (failures.length) {
-  failures.forEach((f) => console.log(`  - ${f}`));
-  process.exit(1);
-}
+// The verdict prints AFTER the mutation ledger below, not here — but the
+// ledger's own anchor-or-throw computations are wrapped in a try/catch
+// rather than left to throw straight out of the module, so a broken ledger
+// anchor becomes a reported row-less failure instead of an uncaught crash
+// sitting under whatever the row verdict happened to be (Lumen's rider: a
+// run that reddened an anchor used only by the ledger used to print
+// "N passed, 0 failed" and THEN throw, because the ledger was built after
+// the verdict printed — a green summary line sitting on top of a crash, the
+// exact confusion scripts/run-checks.mjs:71-84 names three other costumes
+// of). Catching it here, rather than just moving the throw earlier, also
+// keeps a genuinely bad row's own diagnostic (e.g. `argument` failing for
+// real because the source actually passes `false`) from being swallowed by
+// a `mustFindOne` throw on `ARG_CALL_STMT` below, which reads that same
+// literal.
 
 // --- mutation ledger (Lumen, consolidated ruling + event a217ac44; adopted
 // verbatim in-thread by Vector and Pixel) -----------------------------------
@@ -312,27 +340,29 @@ if (failures.length) {
 // anchors rather than hand-retyped, so a rewrap or a stray space upstream
 // cannot desync a mutation's `from` from what the file actually contains.
 
-const AWAIT_STMT = 'await HoneycombStore.shareEntry({ entryId: todayEntry.id });';
-const ARG_CALL_STMT = 'setAlreadySharedToday(true);';
-const awaitStmtIdx = mustFindOne(src, AWAIT_STMT, 'shareEntry await statement (mutation span)');
-const argCallIdx = mustFindOne(src, ARG_CALL_STMT, 'argument-conjunct call statement (mutation span)');
-const orderingFrom = src.slice(awaitStmtIdx, argCallIdx + ARG_CALL_STMT.length);
-const between_ = src.slice(awaitStmtIdx + AWAIT_STMT.length, argCallIdx);
-const orderingTo = ARG_CALL_STMT + between_ + AWAIT_STMT;
+let MUTATIONS_BUILT = [];
+try {
+  const AWAIT_STMT = 'await HoneycombStore.shareEntry({ entryId: todayEntry.id });';
+  const ARG_CALL_STMT = 'setAlreadySharedToday(true);';
+  const awaitStmtIdx = mustFindOne(src, AWAIT_STMT, 'shareEntry await statement (mutation span)');
+  const argCallIdx = mustFindOne(src, ARG_CALL_STMT, 'argument-conjunct call statement (mutation span)');
+  const orderingFrom = src.slice(awaitStmtIdx, argCallIdx + ARG_CALL_STMT.length);
+  const between_ = src.slice(awaitStmtIdx + AWAIT_STMT.length, argCallIdx);
+  const orderingTo = ARG_CALL_STMT + between_ + AWAIT_STMT;
 
-// Same declaration-to-flip span the `vacuity` discussion above reasons
-// about: renaming the setter's substring first (longer, so it can't be
-// re-matched by the shorter state-name pass) then the bare state name
-// leaves every occurrence INSIDE the span consistent with itself, and the
-// render ternary — hundreds of lines further down, outside the span
-// entirely — untouched. That mismatch is the whole mutation.
-const VACUITY_SPAN_START = 'const [alreadySharedToday, setAlreadySharedToday] = useState(false);';
-const vacuitySpanStartIdx = mustFindOne(src, VACUITY_SPAN_START, 'vacuity mutation span start');
-const vacuitySpanEndIdx = argCallIdx + ARG_CALL_STMT.length;
-const vacuityFrom = src.slice(vacuitySpanStartIdx, vacuitySpanEndIdx);
-const vacuityTo = vacuityFrom.split('setAlreadySharedToday').join('setAlreadySharedTodayRenamed').split('alreadySharedToday').join('alreadySharedTodayRenamed');
+  // Same declaration-to-flip span the `vacuity` discussion above reasons
+  // about: renaming the setter's substring first (longer, so it can't be
+  // re-matched by the shorter state-name pass) then the bare state name
+  // leaves every occurrence INSIDE the span consistent with itself, and the
+  // render ternary — hundreds of lines further down, outside the span
+  // entirely — untouched. That mismatch is the whole mutation.
+  const VACUITY_SPAN_START = 'const [alreadySharedToday, setAlreadySharedToday] = useState(false);';
+  const vacuitySpanStartIdx = mustFindOne(src, VACUITY_SPAN_START, 'vacuity mutation span start');
+  const vacuitySpanEndIdx = argCallIdx + ARG_CALL_STMT.length;
+  const vacuityFrom = src.slice(vacuitySpanStartIdx, vacuitySpanEndIdx);
+  const vacuityTo = vacuityFrom.split('setAlreadySharedToday').join('setAlreadySharedTodayRenamed').split('alreadySharedToday').join('alreadySharedTodayRenamed');
 
-export const MUTATIONS = [
+  MUTATIONS_BUILT = [
   {
     row: 'argument',
     why: 'ledger item 1 — the write-confirmed flip must pass true, not false.',
@@ -377,6 +407,14 @@ export const MUTATIONS = [
     to: vacuityTo,
   },
   {
+    row: 'vacuity',
+    why:
+      "Lumen's rider (2026-09-07) — renaming ONLY the declared state name, leaving the setter's spelling untouched, satisfies the old setter-name-convention check while breaking the render/producer pairing; only a row that reads the useState declaration rather than deriving the expected name from the setter's spelling catches this.",
+    file: FILE,
+    from: VACUITY_SPAN_START,
+    to: "const [sharedTodayFlag, setAlreadySharedToday] = useState(false);",
+  },
+  {
     row: 'initialOffer',
     why: 'ledger item 6 — the useState initializer must be false, not true.',
     file: FILE,
@@ -398,4 +436,20 @@ export const MUTATIONS = [
     from: "const [hiveView, setHiveView] = useState('today');",
     to: "const [hiveViewX, setHiveViewX] = useState('today');",
   },
-];
+  ];
+} catch (err) {
+  bad('harness', `mutation ledger failed to build — ${err.message}`);
+}
+
+export const MUTATIONS = MUTATIONS_BUILT;
+
+// Deferred to here, after MUTATIONS is fully built (or the attempt has
+// failed and been reported via `bad('harness', ...)` above), on purpose —
+// see the comment above the ledger. Every row is already computed and
+// printed by this point; this only decides the exit code and prints the
+// total.
+console.log(`\ncheck-share-status-derivation: ${pass} passed, ${failures.length} failed`);
+if (failures.length) {
+  failures.forEach((f) => console.log(`  - ${f}`));
+  process.exit(1);
+}

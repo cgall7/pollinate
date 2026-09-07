@@ -274,8 +274,8 @@ const HoneycombFeed = () => {
   // moved whole from TodayTab onto this screen's first viewport. ----------
   //
   // `entryLoading`/`error` are the card's OWN read, split out of `loadAll`'s
-  // Promise.all rather than folded into it (Vector's finding, thread
-  // f2c15b7d, 2026-09-07): a shared Promise.all fails as one unit, so a feed
+  // Promise.all rather than folded into it (Vector's finding, 2026-09-07):
+  // a shared Promise.all fails as one unit, so a feed
   // or connections read failing would blank `todayEntry` too and the card
   // would show the BLANK arm — no entry, no error — on an account that had
   // in fact already written today. Tapping its write door then reopens
@@ -780,7 +780,7 @@ const HoneycombFeed = () => {
     setSharing(true);
     try {
       await HoneycombStore.shareEntry({ entryId: todayEntry.id });
-      // ENG-104 fix (Vector, thread f2c15b7d, 2026-09-07): `alreadySharedToday`'s
+      // ENG-104 fix (Vector, 2026-09-07): `alreadySharedToday`'s
       // producer moved to the focus effect above, which does not re-run on
       // demand (empty deps — it only fires on focus). `loadAll` no longer
       // touches this state, so the flip has to happen here, from the fact
