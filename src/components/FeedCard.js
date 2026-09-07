@@ -178,8 +178,10 @@ export const FeedCard = ({ share, onShareChanged }) => {
   // When that stops holding, `max` comes out and the closed count renders the
   // prop, trading the N+1, N, N+1 flicker on a fresh post back knowingly. The
   // trigger is recorded where the change that breaks it will be read, at
-  // `docs/strategy/Pollinate_Strategy.md:11`'s Apple 1.2 clause, stated as the
-  // property rather than as any one feature's name.
+  // `docs/strategy/Pollinate_Strategy.md`, the Tab 3 audience paragraph's Apple
+  // 1.2 clause, stated as the property rather than as any one feature's name.
+  // Addressed by section rather than by line: a line number into a document is
+  // a join key, not a pin, and that paragraph has already moved once.
   //
   // "Open and RENDERED" is the caption's precondition and it is `commentsLoaded`,
   // not `comments.length`. A first open whose read is still in flight, and a

@@ -411,9 +411,12 @@ let builtMaxExpression = null;
   }
 }
 
-// D3. Acceptance row 8, as a machine check instead of a promise. The strategy
-// paragraph at `docs/strategy/Pollinate_Strategy.md:11` names THIS EXPRESSION
-// by name, as the trigger for a change that is scheduled but unwritten. A
+// D3. Acceptance row 8, as a machine check instead of a promise. The Tab 3
+// audience paragraph in `docs/strategy/Pollinate_Strategy.md` names THIS
+// EXPRESSION by name, as the trigger for a change that is scheduled but
+// unwritten. Addressed by section, not by line: the row below is keyed on the
+// sentence's own text, so a line number here would be a second address with a
+// shorter life than the one the row uses. A
 // builder who finds a better shape than the ruled one should take it and say
 // so — and a strategy paragraph naming a dead expression is worse than one
 // naming none, because nobody re-reads a strategy paragraph on the strength of
