@@ -35,6 +35,7 @@
     "check:stage-light": "node scripts/check-stage-light.mjs",
     "check:streaks": "node scripts/check-streaks.mjs",
     "check:share-visibility": "node scripts/check-share-visibility.mjs",
+    "check:share-status-derivation": "node scripts/check-share-status-derivation.mjs",
     "check:modal-dismiss": "node scripts/check-modal-dismiss.mjs",
     "check:nav-depth": "node scripts/check-nav-depth.mjs",
     "check:entry-writes": "node scripts/check-entry-writes.mjs",
