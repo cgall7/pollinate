@@ -505,7 +505,7 @@ const TABLE = [
   { at: 'src/components/NectarSendPanel.js:4 [\\bnectar\\b] "../constants/nectar"', kind: 'not-copy/module-specifier' },
   { at: 'src/screens/CombNectarCompose.js:7 [\\bnectar\\b] "../constants/nectar"', kind: 'not-copy/module-specifier' },
   { at: 'src/screens/HoneycombTab.js:27 [\\bnectar\\b] "../constants/nectar"', kind: 'not-copy/module-specifier' },
-  { at: 'src/screens/NectarTab.js:10 [\\bnectar\\b] "../constants/nectar"', kind: 'not-copy/module-specifier' },
+  { at: 'src/screens/NectarTab.js:9 [\\bnectar\\b] "../constants/nectar"', kind: 'not-copy/module-specifier' },
   { at: 'src/screens/PackageOpen.js:10 [\\bnectar\\b] "../constants/nectar"', kind: 'not-copy/module-specifier' },
   // --- P1, `crypto`, in an import path -------------------------------
   { at: 'src/screens/Onboarding.js:13 [crypto] "expo-crypto"', kind: 'not-copy/module-specifier' },
@@ -514,8 +514,8 @@ const TABLE = [
   { at: 'src/screens/HoneycombTab.js:307 [\\bnectar\\b] "HoneycombTab: failed to load nectar consent"', kind: 'not-copy/developer-log' },
   { at: 'src/screens/HoneycombTab.js:381 [\\bnectar\\b] "HoneycombTab: failed to load received nectar total"', kind: 'not-copy/developer-log' },
   { at: 'src/screens/HoneycombTab.js:401 [\\bnectar\\b] "HoneycombTab: failed to load nectar balance"', kind: 'not-copy/developer-log' },
-  { at: 'src/screens/NectarTab.js:206 [\\bnectar\\b] "NectarTab: failed to load nectar consent"', kind: 'not-copy/developer-log' },
-  { at: 'src/screens/NectarTab.js:238 [\\bnectar\\b] "NectarTab: failed to load nectar balance or events"', kind: 'not-copy/developer-log' },
+  { at: 'src/screens/NectarTab.js:205 [\\bnectar\\b] "NectarTab: failed to load nectar consent"', kind: 'not-copy/developer-log' },
+  { at: 'src/screens/NectarTab.js:237 [\\bnectar\\b] "NectarTab: failed to load nectar balance or events"', kind: 'not-copy/developer-log' },
   { at: 'src/screens/PackageOpen.js:166 [\\bnectar\\b] "PackageOpenScreen: failed to load nectar consent"', kind: 'not-copy/developer-log' },
   { at: 'src/screens/PackageOpen.js:208 [\\bnectar\\b] "PackageOpenScreen: failed to load nectar balance"', kind: 'not-copy/developer-log' },
 

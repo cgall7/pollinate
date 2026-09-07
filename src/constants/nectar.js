@@ -104,8 +104,9 @@ export const NECTAR_CONSENT_SHEET_GUARD = 'nectarConsentSheetOpen';
 //
 // R-NT-4 as amended (GUIDES/POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md, Lumen,
 // 2026-09-05; UX Design thread 160660d9) puts the full explainer on the tab
-// before consent: a headline, a body naming the starter grant, and a CTA that
-// opens the sheet above. That copy carries reserve words and is BY
+// before consent: a headline, a body naming what a drop is, and a CTA that
+// opens the sheet above. (The body named the starter grant until Colin struck
+// the free-nectar promise on 2026-09-07; it still carries reserve words.) That copy carries reserve words and is BY
 // CONSTRUCTION not under a positive `nectarConsent` — measured rather than
 // predicted, on a four-arm probe run at 9b6ebed and reproduced by Sage:
 // `{!nectarConsent && …}`, `{nectarUnconsented && …}` with the name

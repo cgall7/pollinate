@@ -45,18 +45,20 @@ export const NectarConsentSheet = ({
               reason this is `HoneyDrop` and not an illustration. */}
           <HoneyDrop radius={DROP_MAX_RADIUS} style={styles.drop} />
           <Text style={styles.headline}>Give gifts of gratitude</Text>
-          {/* R-N7. This body ends at the grant and says nothing about what
-              comes after it. Both doors it used to promise are permanently
-              shut: purchase by SPEC 19a, and the wage frame by doctrine, so
-              the allowance does not reopen either one. If replenishment is
-              ever named here it states the allowance law in the timeless
-              register, in the same string family as the grant sentence above.
-              It never offers a person a way to get more. The struck words
-              are deliberately not quoted: a grep for them must find nothing
-              in this tree. */}
+          {/* R-N7 as amended by Colin, 2026-09-07 (Strategy thread
+              74c51440): THE BODY NO LONGER NAMES A GRANT. It used to read
+              "we'll add 500 drops to your account to say thanks" — a promise
+              of free nectar, which is not the offer. What consent does is set
+              a person up to send; it does not hand them a balance in copy.
+              Every other door stays shut for the same reasons as before:
+              purchase by SPEC 19a, the wage frame by doctrine. This body
+              never offers a person a way to get more, and it no longer offers
+              them something for nothing either. The struck words above are
+              quoted once, here, so the next reader knows what was removed and
+              why; a grep of RENDERED copy for them must find nothing. */}
           <Text style={styles.body}>
-            When you send a gift to {senderName || 'someone'}, we'll add{' '}
-            <Text style={styles.bodyStrong}>500 drops</Text> to your account to say thanks.
+            When you send a gift to {senderName || 'someone'}, drops travel with
+            your note.
           </Text>
           <Text style={styles.footnote}>Drops are units on a simulated Bitcoin network.</Text>
           {error && <Text style={styles.error}>Failed. Please try again.</Text>}
@@ -113,9 +115,6 @@ const styles = StyleSheet.create({
     color: theme.colors.ink,
     textAlign: 'center',
     marginTop: theme.spacing.md,
-  },
-  bodyStrong: {
-    fontFamily: theme.fonts.bodySemiBold,
   },
   footnote: {
     ...theme.type.bodySm,

@@ -4,7 +4,6 @@ import Svg, { Polygon } from 'react-native-svg';
 import { theme } from '../constants/theme';
 import { useReducedMotion } from '../constants/motion';
 import {
-  NECTAR_STARTER_GRANT_DROPS,
   hasNectarConsent,
   honeyLevelForDrops,
 } from '../constants/nectar';
@@ -414,9 +413,11 @@ export const NectarTab = () => {
             {/* R-NT-4 as amended. The on-state pill does not build: NectarStore
                 exports consentToNectar() and nothing that reverses it, so a
                 pill drawn as a control would state a condition nobody can
-                change from here. Pre-consent, the whole tab is the explainer —
-                the empty vessel, the headline, the body naming the grant, the
-                door, and the status beneath it. */}
+                change from here. Pre-consent, the whole tab is the explainer:
+                the empty vessel, the headline, the body saying what a drop is,
+                the door, and the status beneath it. (The body named the
+                starter grant until Colin struck the free-nectar promise on
+                2026-09-07.) */}
             {nectarUnconsented && (
               <>
                 <ScreenHeader eyebrow="YOUR NECTAR" title="Nectar" style={styles.header} />
@@ -429,8 +430,8 @@ export const NectarTab = () => {
                     Nectar is how you say thank you with something.
                   </Text>
                   <Text style={styles.explainerBody}>
-                    A drop is a small thank you that travels with a note. Turn gifts on and{' '}
-                    {NECTAR_STARTER_GRANT_DROPS} drops are yours to start.
+                    A drop is a small thank you that travels with a note. Turn
+                    gifts on to send one.
                   </Text>
                   <PrimaryButton
                     onPress={() => setNectarConsentSheetOpen(true)}
