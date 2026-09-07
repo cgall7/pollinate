@@ -199,13 +199,33 @@ const censusSites = [];
   // walk broke, over-count means an eighth member joined the class with no
   // anchor pinning it yet (section 3 below needs a new row before this
   // number changes).
+  // TWO PROPERTIES, TWO ROWS, BOTH ALWAYS EXECUTED (Vector's rider,
+  // 2026-09-07). These were one if/else-if/else chain producing a single
+  // printed row whose green label named only the weakest of the three
+  // things it decided. Two consequences, both bad: the exactly-7 pin the
+  // comment above calls a deliberate tightening had no visible row in a
+  // passing run, and a red on the census SKIPPED the bare-site check
+  // entirely, so a census drift hid a bare call rather than reporting it.
+  // Symmetric to the arithmetic row this commit's parent replaced: that
+  // label over-claimed what it proved, this one under-claimed. Same class,
+  // a label that does not match its assertion.
+  //
+  // The second row's label carries the population it actually examined, so
+  // a green over a SHRUNKEN census reads as green-over-2 rather than as an
+  // unqualified all-clear. That is the row's own guard against being
+  // vacuously true when the walk breaks.
   const totalMainCalls = namedSites.length + bareSites.length;
+
   if (totalMainCalls !== 7) {
     bad('navigate/replace("Main", ...) census is exactly 7', `found ${totalMainCalls} call(s) total — expected 7; either the AST walk broke or an unenumerated member joined the class (see §11)`);
-  } else if (bareSites.length > 0) {
-    bad('no bare navigate("Main") / replace("Main")', `${bareSites.length} site(s) omit a screen target: ${bareSites.join(', ')}`);
   } else {
-    ok(`every navigate/replace("Main") call names a screen (${namedSites.length} site(s): ${namedSites.join(', ')})`);
+    ok(`navigate/replace("Main", ...) census is exactly 7 (the §11 membership, pinned exactly rather than "at least")`);
+  }
+
+  if (bareSites.length > 0) {
+    bad('no bare navigate("Main") / replace("Main")', `${bareSites.length} of ${totalMainCalls} censused site(s) omit a screen target: ${bareSites.join(', ')}`);
+  } else {
+    ok(`every navigate/replace("Main") call names a screen (${namedSites.length} of ${totalMainCalls} censused site(s): ${namedSites.join(', ')})`);
   }
 }
 
