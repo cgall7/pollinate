@@ -9,26 +9,22 @@
       "distribution": "internal",
       "ios": {
         "simulator": true
-      },
-      "channel": "development"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_DEMO_MODE": "true"
       }
     },
     "internal": {
       "distribution": "internal",
-      "channel": "internal",
       "env": {
         "EXPO_PUBLIC_DEMO_MODE": "false"
       }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production",
       "env": {
         "EXPO_PUBLIC_DEMO_MODE": "false"
       }
