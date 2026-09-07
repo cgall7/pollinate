@@ -63,6 +63,7 @@
     "check:private-hives-client-seal": "node scripts/check-private-hives-client-seal.mjs",
     "check:resolve-initial-route": "node scripts/check-resolve-initial-route.mjs",
     "check:eng103-tab-bar-pin": "node scripts/check-eng103-tab-bar-pin.mjs",
+    "check:feedcard-claims": "node scripts/check-feedcard-claims.mjs",
     "check:date-ranges-utils": "node scripts/check-date-ranges-utils.mjs",
     "check:hive-state-utils": "node scripts/check-hive-state-utils.mjs",
     "check:nectar-ledger": "node scripts/check-nectar-ledger.mjs",

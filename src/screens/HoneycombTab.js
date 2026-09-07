@@ -161,7 +161,7 @@ const HiveViewToggle = ({ view, onChange }) => (
 // The Venmo-style last-7-days body (§18.1): day sections newest-first, each
 // day's shares under one header. Demo rows arrive pre-merged (paler +
 // read-only via FeedCard's own §18.1.1 guard, so this stays a dumb list).
-const WeekView = ({ sections, truncated, onLikeToggled }) => {
+const WeekView = ({ sections, truncated, onShareChanged }) => {
   if (sections.length === 0) {
     return (
       <View style={[styles.emptyState, styles.emptyStateSky]}>
@@ -177,7 +177,7 @@ const WeekView = ({ sections, truncated, onLikeToggled }) => {
         <View key={section.date} style={styles.weekSection}>
           <Text style={styles.sectionLabel}>{section.label.toUpperCase()}</Text>
           {section.shares.map((share) => (
-            <FeedCard key={share.id} share={share} onLikeToggled={onLikeToggled} />
+            <FeedCard key={share.id} share={share} onShareChanged={onShareChanged} />
           ))}
         </View>
       ))}
@@ -577,7 +577,10 @@ const HoneycombFeed = () => {
     }
   };
 
-  const handleLikeToggled = () => {
+  // DES-44 R-FC-5: this fires on a like AND on a posted comment, so neither the
+  // prop nor the handler is named for one of its two causes any more. A callback
+  // named for one cause is the next reader's wrong assumption.
+  const handleShareChanged = () => {
     loadAll().catch((err) => console.warn('Failed to refresh feed', err));
   };
 
@@ -818,7 +821,7 @@ const HoneycombFeed = () => {
         <WeekView
           sections={weekSections}
           truncated={weekFeed.length >= WEEK_FEED_LIMIT}
-          onLikeToggled={handleLikeToggled}
+          onShareChanged={handleShareChanged}
         />
       ) : (
         // §32.2 anchor — the comb as a whole, wrapped rather than per-cell.
@@ -955,7 +958,7 @@ const HoneycombFeed = () => {
               item.kind === 'send' ? (
                 <SendEventCard key={`send-${item.id}`} event={item} />
               ) : (
-                <FeedCard key={item.id} share={item} onLikeToggled={handleLikeToggled} />
+                <FeedCard key={item.id} share={item} onShareChanged={handleShareChanged} />
               )
             )}
           </View>
