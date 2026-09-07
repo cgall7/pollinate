@@ -74,7 +74,10 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { parse } from '@babel/parser';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RULED_INITIAL_ROUTE = 'Today';
+// Flipped 2026-09-07 (ENG-104, FIVE_TAB_IA_SPEC.md §5/§11): cold launch now
+// lands on the write door, same commit as the compose-card transplant onto
+// Honeycomb. This is the row this gate exists to force an edit to.
+const RULED_INITIAL_ROUTE = 'Hive';
 
 let pass = 0;
 const failures = [];
@@ -244,12 +247,12 @@ const censusSites = [];
 // § 11 tally: nudgeGuard/entryJustSaved/onboarding -> 'Hive'; onClose/
 // combInvite/createComb stay 'Today').
 const RULED_DESTINATIONS = {
-  nudgeGuard: 'Today', // App.js:171, :189 — isNudgeResponse(...) guard consequents (2 sites, same value)
-  entryJustSaved: 'Today', // App.js:271 — the one nav call carrying params.entryJustSaved
-  onboarding: 'Today', // App.js:233 — the Stack.Screen name="Onboarding" onDone else-branch
-  onClose: 'Today', // App.js:405 — the file's only onClose attribute (EveningMirror)
-  combInvite: 'Today', // CombInvite.js:180 — the file's one navigate/replace('Main', ...)
-  createComb: 'Today', // CreateComb.js:45 — the file's one navigate/replace('Main', ...)
+  nudgeGuard: 'Hive', // App.js:177, :196 — isNudgeResponse(...) guard consequents (2 sites, same value)
+  entryJustSaved: 'Hive', // App.js:287 — the one nav call carrying params.entryJustSaved
+  onboarding: 'Hive', // App.js:241 — the Stack.Screen name="Onboarding" onDone else-branch
+  onClose: 'Today', // App.js:421 — the file's only onClose attribute (EveningMirror)
+  combInvite: 'Today', // CombInvite.js:186 — the file's one navigate/replace('Main', ...)
+  createComb: 'Today', // CreateComb.js:49 — the file's one navigate/replace('Main', ...)
 };
 
 const findScreenValue = (call) => {

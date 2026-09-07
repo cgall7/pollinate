@@ -19,8 +19,10 @@
 //
 //   1. RENDERED-STRING RULE (structural, scales): any rendered string
 //      matching /demo/i must sit inside a DEMO_CONTENT guard. The two
-//      affordances that say the word — Today's "Load demo data",
-//      Onboarding's "Skip to the logged-in view (demo)" — are caught by
+//      affordances that say the word — Honeycomb's "Load demo data"
+//      (re-pointed 2026-09-07, ENG-104: the entry card and this link moved
+//      from Today whole, FIVE_TAB_IA_SPEC §5), Onboarding's "Skip to the
+//      logged-in view (demo)" — are caught by
 //      what they SAY, so the demo affordance somebody adds in November is
 //      covered without anyone registering it, as long as it names itself.
 //      Extraction is scripts/lib/rendered-strings.mjs, shared with the
@@ -263,11 +265,13 @@ check(`every rendered string matching /demo/i is inside a ${FLAG} guard`, unguar
 
 // Walker controls — a broken extractor must not read as "no violations".
 // Host moved 2026-09-05: R-OD deleted `CoreRitual.js`'s Lock gate and Lumen
-// ruled the affordance transplanted to Today's empty card. The control follows
-// the string, because a control that names a file the string has left stops
-// being a calibration witness and starts being a second way to go red.
-check('walker control: finds "Load demo data" in TodayTab.js',
-  demoStrings.some((s) => s.rel === 'src/screens/TodayTab.js' && s.value === 'Load demo data'), true);
+// ruled the affordance transplanted to Today's empty card. Host moved again
+// 2026-09-07 (ENG-104): the entry card and this link moved from Today to
+// Honeycomb whole (FIVE_TAB_IA_SPEC §5). The control follows the string,
+// because a control that names a file the string has left stops being a
+// calibration witness and starts being a second way to go red.
+check('walker control: finds "Load demo data" in HoneycombTab.js',
+  demoStrings.some((s) => s.rel === 'src/screens/HoneycombTab.js' && s.value === 'Load demo data'), true);
 check('walker control: finds the skip-demo link string in Onboarding.js',
   demoStrings.some((s) => s.rel === 'src/screens/Onboarding.js' && /skip to the logged-in view/i.test(s.value)), true);
 

@@ -3,20 +3,13 @@ import { StyleSheet, View, Text, ActivityIndicator, ScrollView, Alert } from 're
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
-import { EntryStore } from '../services/EntryStore';
-import { toISODate } from '../utils/dateRanges';
-import { FirstSaveCelebration } from '../services/firstSaveCelebration';
-import { FirstSaveCard } from '../components/FirstSaveCard';
 import { HiveStore } from '../services/HiveStore';
 import { FlyingBee } from '../components/FlyingBee';
 import { GlowOrb } from '../components/GlowOrb';
 import { SUPPRESS_BEE } from '../constants/beeSuppression';
 import { PerchAnchor, PerchField, usePerchSet } from '../components/PerchAnchor';
-import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { StaggeredItem } from '../components/StaggeredItem';
-import { FileToHive } from '../components/FileToHive';
-import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { HiveCard } from '../components/HiveCard';
 import { StartHiveDoorCard } from '../components/StartHiveDoorCard';
 import { OrganizerCombCard } from '../components/OrganizerCombCard';
@@ -27,8 +20,6 @@ import { PendingCombRow } from '../components/PendingCombRow';
 import { useDaysLeft } from '../components/useDaysLeft';
 import { TAB_CLEARANCE, DOOR_RESERVE } from '../navigation/tabBarLayout';
 import { MASCOT_WIDTH_FRACTION } from '../constants/mascot';
-import { DEMO_CONTENT } from '../constants/demoMode';
-import * as Haptics from 'expo-haptics';
 
 // --- P1a, the greeting's staging (Pixel, 2026-08-28) ---------------------
 //
@@ -164,29 +155,8 @@ const greeting = (date) => {
 const longDate = (date) =>
   date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-export const TodayTab = ({ navigation, route }) => {
+export const TodayTab = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
-  // Deezine's post-auth nudge ruling (`6f9e87ad`): the first-save celebration
-  // is a Today card, and it renders ONLY after the first `EntryStore.saveEntry`
-  // resolves — never on auth, mount, resume, failed save, or later saves.
-  //
-  // THE SIGNAL AND THE ELIGIBILITY ARE TWO DIFFERENT FACTS, carried by two
-  // different mechanisms on purpose:
-  //
-  //   the SIGNAL is `route.params.entryJustSaved`, set synchronously by
-  //   App.js's unlock handler as it navigates. It is the ruling's "one-shot
-  //   first-save signal through the existing replace-to-Main path", and it
-  //   costs no I/O — which is what keeps it out of the unlock overlay
-  //   CoreRitual holds for the whole life of `onUnlock` (App.js's own comment
-  //   at the save-side re-arm explains why anything awaited there animates
-  //   inside it). It says only "an entry was just persisted", which is all
-  //   the save site can honestly say.
-  //
-  //   the ELIGIBILITY is decided below, where the reads are clear of that
-  //   overlay and the account's own history is reachable.
-  const [showFirstSave, setShowFirstSave] = useState(false);
-  const [error, setError] = useState(false);
-  const [entry, setEntry] = useState(null);
   // §32.2 — where the bee may land, held by the screen and read by the flight.
   // Membership only: the coordinates are measured at the moment of choosing,
   // so scrolling this list does not touch this value and does not re-render.
@@ -260,189 +230,78 @@ export const TodayTab = ({ navigation, route }) => {
       });
   }, []);
 
-  // --- "Load demo data" (transplanted from the Lock gate, R-OD) ----------
+  // Independent of every other read below and on its own error state — a
+  // failed hive list must not blank another shelf (or vice versa); each
+  // shelf's own comment gives its reasoning.
   //
-  // Colin, 2026-08-10: a real button rather than the old hidden five-tap
-  // gesture, seeding 180 days so Wrapped and Recap have something to show.
-  // It lived on `CoreRitual.js`'s LockScreen, which R-OD deletes; Lumen ruled
-  // TRANSPLANT rather than delete (thread 160660d9), because the capability
-  // has a live justification and Today's empty card is the surface a fresh
-  // dev build now opens on. The mechanism below is the gate's, moved whole:
-  // same DEMO_CONTENT guard, same `getFirstEntryDate` eligibility read, same
-  // fail-dormant default.
-  //
-  // FAIL-DORMANT, AND IT IS THE SHAPE NOT THE VALUE. Initial state is `false`
-  // and the `.catch` leaves it false, so an unanswered or failed read renders
-  // nothing: absent is the safe value. It also starts hidden rather than
-  // flashing on for one frame on every genuinely fresh account — a one-tap-late
-  // appearance costs less than a control that appears and vanishes under a
-  // thumb.
-  const [eligibleForDemoData, setEligibleForDemoData] = useState(false);
-
-  useEffect(() => {
-    if (!DEMO_CONTENT) return undefined;
-    let cancelled = false;
-    EntryStore.getFirstEntryDate()
-      .then((firstISO) => {
-        if (!cancelled) setEligibleForDemoData(!firstISO);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleLoadDemoData = () => {
-    EntryStore.seedDemoData(180)
-      .then((count) => {
-        setEligibleForDemoData(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        Alert.alert('Demo data loaded', `Filled the last ${count} days with entries.`);
-      })
-      .catch(() => {
-        // Reworded on transplant: the gate's copy read "went wrong — try
-        // again", and the dash is Colin's standing ban (2026-09-05). Two
-        // sentences say it without one.
-        Alert.alert("Couldn't load demo data", 'Something went wrong. Try again.');
-      });
-  };
-
-  // ELIGIBILITY. Runs only when the signal is present, so an ordinary Today
-  // mount, a tab switch, a resume and a later save all cost nothing here.
-  //
-  // TWO CONDITIONS, AND BOTH ARE NECESSARY:
-  //   - `FirstSaveCelebration.isUnspent()` — device-local, and it is what
-  //     makes relaunch unable to replay the card. It is not sufficient alone:
-  //     the key is absent on a fresh INSTALL, not on a fresh ACCOUNT, so a
-  //     long-time user reinstalling, or signing in on a second device,
-  //     arrives with it unset.
-  //   - `getFirstEntryDate()` equals today — the account's own history, which
-  //     is the only place "is this the FIRST save" is written down.
-  //     `saveEntry` cannot answer it (upsert-shaped; the update and insert
-  //     branches return the same shape), so no signal from the save site
-  //     could have carried it.
-  //
-  // THE PARAM IS CONSUMED EITHER WAY — eligible or not, this save has had its
-  // one look — so a re-render, a tab switch or a back-navigation cannot bring
-  // the question round again. That clear is synchronous and deliberately
-  // outside the async body: it has to happen on the early-return paths too.
-  useEffect(() => {
-    if (!route?.params?.entryJustSaved) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        if (!(await FirstSaveCelebration.isUnspent())) return;
-        const firstDate = await EntryStore.getFirstEntryDate();
-        if (cancelled || firstDate !== toISODate(new Date())) return;
-        await FirstSaveCelebration.spend();
-        if (cancelled) return;
-        setShowFirstSave(true);
-      } catch (err) {
-        // A failed read is not a first save. Staying silent costs one absent
-        // card; guessing costs congratulating a long-time user on their first
-        // entry, and those are not symmetric.
-        console.warn('TodayTab: first-save celebration eligibility check failed', err);
-      }
-    })();
-    navigation.setParams({ entryJustSaved: undefined });
-    return () => {
-      cancelled = true;
-    };
-  }, [route?.params?.entryJustSaved, navigation]);
-
+  // ENG-104 (2026-09-07): this effect used to run alongside a fourth,
+  // journal-only read (EntryStore.getEntry), and `loading` cleared in THAT
+  // effect's own `finally`. The entry card — and the read that fed it —
+  // moved to Honeycomb whole (FIVE_TAB_IA_SPEC §5); this screen's remaining
+  // content is the three shelves below, so the `finally` that guarantees
+  // the spinner can't get stuck (Sage, thread e10d0fed) moves here with
+  // them, wrapping all three reads in one `Promise.all` rather than the
+  // three independent fire-and-forget calls this effect used to fire.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const now = new Date();
         try {
-          const today = await EntryStore.getEntry(now);
-          if (cancelled) return;
-          setError(false);
-          setEntry(today);
-        } catch (err) {
-          // requireUserId (EntryStore.js) throws 'Not signed in' with no
-          // session — reachable via DEMO_MODE's Welcome skip link, which
-          // lands on Main with no auth. Without this catch, `loading` never
-          // flips and the tab spins forever instead of showing empty state
-          // (Sage/Pixel, thread 19e90cf8, 2026-08-13).
-          //
-          // `error` is what actually distinguishes this from a genuinely
-          // empty day (Pixel, thread 19e90cf8: setting entry to its empty
-          // value here was asserting "Today's page is blank." about a user
-          // we simply failed to read, not one who wrote nothing). §23
-          // unknown state is Deezine's when it lands; this is the
-          // placeholder that keeps the read/write path honest until then.
-          if (cancelled) return;
-          console.warn('TodayTab: failed to load entries', err);
-          setError(true);
-          setEntry(null);
+          await Promise.all([
+            (async () => {
+              try {
+                const list = await HiveStore.listHives();
+                if (cancelled) return;
+                setHivesError(false);
+                setHives(list);
+              } catch (err) {
+                if (cancelled) return;
+                console.warn('TodayTab: failed to load hives', err);
+                setHivesError(true);
+                setHives([]);
+              }
+            })(),
+            // Independent try/catch, not folded into the block above — a failed
+            // contributing-hives read must not blank the owner's own shelf (or
+            // vice versa), same reasoning as this effect's own comment for why
+            // hives and contributing hives get separate flags.
+            (async () => {
+              try {
+                const list = await HiveStore.listContributingHives();
+                if (cancelled) return;
+                setContributingHivesError(false);
+                setContributingHives(list);
+              } catch (err) {
+                if (cancelled) return;
+                console.warn('TodayTab: failed to load contributing hives', err);
+                setContributingHivesError(true);
+                setContributingHives([]);
+              }
+            })(),
+            // The pre-launch/dormant membership read. No error flag beside it,
+            // and that is deliberate rather than an omission: the shelf's own
+            // standing treatment (see its comment below) is that a zero-row
+            // state and a failed read both simply WITHHOLD — there is no
+            // evergreen action this row could offer in place of itself, and a
+            // "we couldn't reach your combs" line here would double the one
+            // the organizer shelf already renders for the same outage.
+            (async () => {
+              try {
+                const list = await HiveStore.listPendingCombMemberships();
+                if (cancelled) return;
+                setPendingCombs(list);
+              } catch (err) {
+                if (cancelled) return;
+                console.warn('TodayTab: failed to load pending comb memberships', err);
+                setPendingCombs([]);
+              }
+            })(),
+          ]);
         } finally {
           if (!cancelled) setLoading(false);
         }
       })();
-      return () => {
-        cancelled = true;
-      };
-    }, [])
-  );
-
-  // Independent of the journal fetch above and on its own error state — a
-  // failed hive list must not blank out an already-loaded journal (or vice
-  // versa), same reasoning as the `error` flag above: a read failure and a
-  // genuine zero-hives state are different facts and get different copy.
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const list = await HiveStore.listHives();
-          if (cancelled) return;
-          setHivesError(false);
-          setHives(list);
-        } catch (err) {
-          if (cancelled) return;
-          console.warn('TodayTab: failed to load hives', err);
-          setHivesError(true);
-          setHives([]);
-        }
-      })();
       reloadOrganizerCombs();
-      // Independent try/catch, not folded into the block above — a failed
-      // contributing-hives read must not blank the owner's own shelf (or
-      // vice versa), same reasoning as this effect's own comment for why it
-      // is split from the journal fetch.
-      (async () => {
-        try {
-          const list = await HiveStore.listContributingHives();
-          if (cancelled) return;
-          setContributingHivesError(false);
-          setContributingHives(list);
-        } catch (err) {
-          if (cancelled) return;
-          console.warn('TodayTab: failed to load contributing hives', err);
-          setContributingHivesError(true);
-          setContributingHives([]);
-        }
-      })();
-      // The pre-launch/dormant membership read. No error flag beside it, and
-      // that is deliberate rather than an omission: the shelf's own standing
-      // treatment (see its comment below) is that a zero-row state and a
-      // failed read both simply WITHHOLD — there is no evergreen action this
-      // row could offer in place of itself, and a "we couldn't reach your
-      // combs" line here would double the one the organizer shelf already
-      // renders for the same outage.
-      (async () => {
-        try {
-          const list = await HiveStore.listPendingCombMemberships();
-          if (cancelled) return;
-          setPendingCombs(list);
-        } catch (err) {
-          if (cancelled) return;
-          console.warn('TodayTab: failed to load pending comb memberships', err);
-          setPendingCombs([]);
-        }
-      })();
       return () => {
         cancelled = true;
       };
@@ -506,7 +365,17 @@ export const TodayTab = ({ navigation, route }) => {
         <FlyingBee
           active
           size={HERO_SIZE}
-          perches={error ? null : perches}
+          // ENG-104 (2026-09-07): this read `error ? null : perches`, gating
+          // errand-flight targeting on the journal read's failure state. That
+          // read — and the entry card whose failure copy this suppressed a
+          // mascot lapping over — moved to Honeycomb whole; no anchor on this
+          // screen has ever had an errand land on it (Bee Doctrine State 1:
+          // "the other anchors are errand landing sites that nothing lands on
+          // yet"), so the gate was already a no-op and dropping it changes
+          // nothing observable. A future errand landing here should read this
+          // screen's OWN failure state (hivesError, below), never a re-derived
+          // echo of a read that no longer happens on this screen.
+          perches={perches}
           onSettle={handleBeeSettle}
         />
       )}
@@ -611,112 +480,19 @@ export const TodayTab = ({ navigation, route }) => {
             sentence. The slot is quiet until Lane P3's time-aware greeting
             lands. */}
 
-        <StaggeredItem index={0}>
-          <PerchAnchor id="entry-card" on="right" at={0.5}>
-          {entry ? (
-            <View style={styles.quoteCard}>
-              <Text style={styles.themeBadge}>{entry.theme}</Text>
-              <PaperBlock paper={entry.paper}>
-                <Text style={[styles.gratitudeText, { color: paperInk(entry.paper) }]}>"{entry.text}"</Text>
-              </PaperBlock>
-              {/* DES-16 §4 — "File this to…". Zero hives or a failed hive
-                  read both withhold the affordance: the shelf below already
-                  owns the zero-hives door and the failure copy, and this
-                  card naming a destination class the user can't reach would
-                  be the §23.10 failure one register down. */}
-              {!hivesError && hives.length > 0 && <FileToHive entry={entry} hives={hives} />}
-            </View>
-          ) : error ? (
-            // No CTA: a failed read can't rule out today already having an
-            // entry, and the write button routes into saveEntry's update
-            // branch on a day that turns out to be shared — reopening the
-            // edit-after-share hazard Pixel's own enumeration had ruled
-            // latent (thread 19e90cf8). Placeholder copy; Deezine's when
-            // §23 lands.
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>We couldn't reach your journal.</Text>
-              <Text style={styles.emptyBody}>Check your connection and try again.</Text>
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Today's page is blank.</Text>
-              <Text style={styles.emptyBody}>
-                One line is enough.
-              </Text>
-              {/* R-OD-1: straight to Input. The `Lock` interstitial this
-                  used to open is deleted — it asked the user to Begin
-                  something this card had already begun. */}
-              <PrimaryButton onPress={() => navigation.getParent()?.navigate('Input')}>
-                Write today's entry
-              </PrimaryButton>
-            </View>
-          )}
-          </PerchAnchor>
-
-          {/* The transplanted seeding link, R-OD, form ruled by Lumen: a quiet
-              inkSoft text link at the caption register, below the empty card's
-              own content, never a button and never gold. That is the register
-              it already shipped in on the gate, so nothing is re-registered
-              here — only the host moved.
-
-              OUTSIDE the `PerchAnchor`, deliberately. `PerchAnchor` measures
-              its own wrapping View, so a second child would grow the
-              `entry-card` perch rect and move where the bee lands. It also
-              keeps the link off the card, which is what makes "below the empty
-              card's own content" and "never adjacent to the write door" both
-              true at once.
-
-              NO `!entry` CLAUSE, and that is a derivation rather than an
-              omission. Eligibility IS `getFirstEntryDate()` returning nothing,
-              so an eligible account has never written an entry and today's
-              card is necessarily the empty one. The single case the derivation
-              does not cover is a SPLIT READ: the journal date resolves and
-              today's entry fails, putting the error card here instead of the
-              empty one. Not impossible, two calls; bounded, because the whole
-              consequence is a caption-size link under an error card in a build
-              that already opted into demo content. Duplicating the branch test
-              here would also break the shape both demo gates read:
-              they require a bare `DEMO_CONTENT` as the guard's left operand
-              and the eligibility flag alone as the nested test. */}
-          {DEMO_CONTENT && (
-            // Nested inside the DEMO_CONTENT guard, not ANDed alongside it at
-            // the top level — check-demo-content-callsites.mjs's isUnderGuard
-            // only recognises a bare `DEMO_CONTENT` as the LogicalExpression's
-            // immediate left operand, and `DEMO_CONTENT && eligibleForDemoData
-            // && (…)` would leave the JSX reading as unguarded to that walker.
-            eligibleForDemoData ? (
-              <PressableScale onPress={handleLoadDemoData} style={styles.demoDataLink}>
-                <Text style={styles.demoDataLinkText}>Load demo data</Text>
-              </PressableScale>
-            ) : null
-          )}
-
-          {/* IMMEDIATELY BENEATH the entry that was just persisted, and inside
-              index 0 so it settles with the journal card rather than opening a
-              cascade step of its own. `entry &&` is not belt and braces: the
-              ruling places this relative to a VISIBLE saved entry, and the
-              focus read that fills `entry` and the eligibility read above are
-              independent — a card celebrating an entry the screen failed to
-              load would congratulate the user on something they cannot see.
-
-              No modal, no full-screen beat, no forced dwell, nothing blocking:
-              it is one more card in the same ScrollView, and every control on
-              Today stays live beside it. Dismissal is local state only — the
-              persisted flag was already spent when it rendered, so closing
-              records no nudge choice, requests no permission, and leaves the
-              Account screen's re-ask available. */}
-          {entry && showFirstSave && <FirstSaveCard onDismiss={() => setShowFirstSave(false)} />}
-        </StaggeredItem>
-
-        {/* Private Hives shelf (8b.2/8b.3, WP-1 §26.1). Index 0 above
-            is the journal's; this is the next cascade step, so the two
-            shelves settle in reading order. The written-state footer that
-            used to sit between them narrated exactly what this shelf now IS
-            ("share it with your hive") — the affordance replaced its own
-            caption in the quiet-page cut. `hivesError` never blanks the
-            shelf into nothing — the door card still renders, since it's a
-            local navigation target with no data dependency, same reasoning
-            as the journal's own error branch not hiding its CTA. */}
+        {/* Private Hives shelf (8b.2/8b.3, WP-1 §26.1). This used to be the
+            second cascade step, after the journal card at index 0; ENG-104
+            (2026-09-07) moved that card — and its `entry-card` PerchAnchor —
+            to Honeycomb whole (FIVE_TAB_IA_SPEC §5), so this shelf is now
+            the first thing in the cascade and keeps its own index unchanged
+            (renumbering the survivors would cost a diff line with no
+            behavior behind it). The written-state footer that used to sit
+            between the journal card and this shelf narrated exactly what
+            this shelf now IS ("share it with your hive") — the affordance
+            replaced its own caption in the quiet-page cut. `hivesError`
+            never blanks the shelf into nothing — the door card still
+            renders, since it's a local navigation target with no data
+            dependency. */}
         <StaggeredItem index={1}>
           <PerchAnchor id="hive-shelf" on="left" at={0.5}>
           <View style={styles.hiveShelf}>
@@ -874,66 +650,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: HERO_CHAR_WIDTH / 2 + DOOR_RESERVE,
     width: 1,
-  },
-  emptyCard: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-    borderRadius: theme.borderRadius.large,
-    padding: 28,
-    alignItems: 'center',
-    ...theme.shadows.card,
-  },
-  emptyTitle: {
-    ...theme.type.h2,
-    color: theme.colors.ink,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptyBody: {
-    ...theme.type.body,
-    color: theme.colors.inkSoft,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  demoDataLink: {
-    alignSelf: 'center',
-    marginTop: 16,
-  },
-  demoDataLinkText: {
-    ...theme.type.bodySm,
-    color: theme.colors.textSecondary,
-    textDecorationLine: 'underline',
-  },
-  quoteCard: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-    borderRadius: theme.borderRadius.large,
-    paddingHorizontal: 28,
-    paddingVertical: 40,
-    alignItems: 'center',
-    ...theme.shadows.card,
-  },
-  themeBadge: {
-    ...theme.type.label,
-    // ink, not accentDeep — same fix as Wrapped's identical pairing
-    // (accentDeep-on-accentDeepWash 2.3712:1 -> ink-on-accentDeepWash
-    // 15.5404:1). The pigment keeps its job as the fill; text reads ink.
-    color: theme.colors.ink,
-    backgroundColor: theme.colors.accentDeepWash,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: theme.borderRadius.full,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  gratitudeText: {
-    fontFamily: theme.fonts.bodyItalic,
-    fontSize: 26,
-    color: theme.colors.ink,
-    textAlign: 'center',
-    lineHeight: 37,
   },
   hiveShelf: {
     marginTop: 28,

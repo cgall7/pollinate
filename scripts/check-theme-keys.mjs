@@ -410,7 +410,10 @@ const SOURCES = {
 const DOWNSTREAM = {
   'src/utils/themeTagger.js:73 entry.theme': 'EntryStore.toEntry',
   'src/services/EntryStore.js:193 demo[date].theme': 'demoSeed.buildDemoEntries',
-  'src/screens/TodayTab.js:618 entry.theme': 'EntryStore.toEntry',
+  // Re-keyed 2026-09-07 (ENG-104): the entry card's ternary — this read
+  // included — moved from TodayTab to HoneycombTab whole (FIVE_TAB_IA_SPEC
+  // §5), and the card's local variable is `todayEntry` there, not `entry`.
+  'src/screens/HoneycombTab.js:1032 todayEntry.theme': 'EntryStore.toEntry',
   'src/screens/MonthlyRecap.js:93 entry.theme': 'EntryStore.toEntry',
   'src/screens/MonthlyRecap.js:178 entry.theme': 'EntryStore.toEntry',
   'src/screens/PollinateWrapped.js:71 entry.theme': 'EntryStore.toEntry',

@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { theme } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { HoneycombStore, WEEK_FEED_LIMIT } from '../services/HoneycombStore';
 import { EntryStore } from '../services/EntryStore';
+import { HiveStore } from '../services/HiveStore';
 import { toISODate, daysAgoISO, groupSharesByDay, HIVE_WEEK_DAYS } from '../utils/dateRanges';
+import { FirstSaveCelebration } from '../services/firstSaveCelebration';
+import { FirstSaveCard } from '../components/FirstSaveCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PressableScale } from '../components/PressableScale';
 import { PillButton } from '../components/PillButton';
@@ -14,6 +17,9 @@ import { FeedCard } from '../components/FeedCard';
 import { SendEventCard } from '../components/SendEventCard';
 import { HoneycombGrid, HIVE_SLOTS, personKey } from '../components/HoneycombGrid';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { StaggeredItem } from '../components/StaggeredItem';
+import { FileToHive } from '../components/FileToHive';
+import { PaperBlock, paperInk } from '../components/PaperBlock';
 import { BeeTransition } from '../components/BeeTransition';
 import { FlyingBee } from '../components/FlyingBee';
 import { pollinationCancelResult, pollinationLandingResult } from '../components/pollinationIdentity';
@@ -26,6 +32,7 @@ import { isBlooming } from '../utils/hiveState';
 import { NectarStore } from '../services/NectarStore';
 import { hasNectarConsent, honeyLevelForDrops, nectarArrivalDrops } from '../constants/nectar';
 import { NectarArrivalState } from '../services/nectarArrivalState';
+import * as Haptics from 'expo-haptics';
 
 // Real shares go first (center of the spiral, full opacity) so they read as
 // the actual hive; demo members fill the ring behind them so the honeycomb
@@ -225,6 +232,13 @@ const RequestRow = ({ request, onRespond, onBlock }) => {
 
 const HoneycombFeed = () => {
   const navigation = useNavigation();
+  // ENG-104 — the entry compose card's transplant carries the same signal
+  // it read on Today: `route.params.entryJustSaved`, set synchronously by
+  // App.js's unlock handler as it navigates (now to this tab — see App.js's
+  // own comment at the save site). `HoneycombTab`'s outer component takes no
+  // navigation props (it dispatches on `useAuth()` alone, above), so this
+  // screen has no other way to reach the param than the hook.
+  const route = useRoute();
   // R-N4 — the arrival memory is keyed PER USER (nectarArrivalState's own
   // header: a device is not an account), so this screen needs the id. Read
   // with `?.` even though `HoneycombTab` only mounts this branch with a
@@ -255,6 +269,42 @@ const HoneycombFeed = () => {
   const [todayEntry, setTodayEntry] = useState(null);
   const [alreadySharedToday, setAlreadySharedToday] = useState(false);
   const [sharing, setSharing] = useState(false);
+
+  // --- ENG-104 transplant (FIVE_TAB_IA_SPEC.md §5): the entry compose card,
+  // moved whole from TodayTab onto this screen's first viewport. ----------
+  //
+  // `entryLoading`/`error` are the card's OWN read, split out of `loadAll`'s
+  // Promise.all rather than folded into it (Vector's finding, thread
+  // f2c15b7d, 2026-09-07): a shared Promise.all fails as one unit, so a feed
+  // or connections read failing would blank `todayEntry` too and the card
+  // would show the BLANK arm — no entry, no error — on an account that had
+  // in fact already written today. Tapping its write door then reopens
+  // `saveEntry`'s update branch on a day that turns out to be shared, the
+  // overwrite hazard Pixel's own enumeration ruled latent (thread 19e90cf8).
+  // Self-settling, TodayTab's own catch semantics verbatim: a failed read
+  // sets `error`, not an empty entry, so the card's error arm (no CTA) is
+  // the one that renders, never the blank one. `entryLoading` gates this
+  // screen's overall spinner ALONGSIDE `loading` below, so the ternary is
+  // already settled by the time either withdraws.
+  const [entryLoading, setEntryLoading] = useState(true);
+  const [error, setError] = useState(false);
+  // The card's SUPPLY (§5): whether it may offer "File this to…". Same
+  // shelf-independent shape as `hivesError` would be on the Private hives
+  // tab — a failed read here must not blank the entry the card DID load.
+  const [hives, setHives] = useState([]);
+  const [hivesError, setHivesError] = useState(false);
+  // Deezine's post-auth nudge ruling (`6f9e87ad`), transplanted with the
+  // card: the first-save celebration renders ONLY after the first
+  // `EntryStore.saveEntry` resolves — never on auth, mount, resume, failed
+  // save, or later saves. See the eligibility effect below for the signal
+  // vs. eligibility split (unchanged from TodayTab's own comment).
+  const [showFirstSave, setShowFirstSave] = useState(false);
+  // R-OD, transplanted from the Lock gate onto TodayTab's empty card
+  // 2026-09-05, and now onto this one with the rest of the block (ENG-104).
+  // FAIL-DORMANT, AND IT IS THE SHAPE NOT THE VALUE: initial state is
+  // `false` and the `.catch` leaves it false, so an unanswered or failed
+  // read renders nothing — absent is the safe value.
+  const [eligibleForDemoData, setEligibleForDemoData] = useState(false);
 
   // ENG-65's producer half. The renderer for `honeyed` merged with ENG-65's
   // first half; nothing set the cell's level — check-honey-fill.mjs said so
@@ -440,16 +490,21 @@ const HoneycombFeed = () => {
   }, []);
 
   const loadAll = useCallback(async ({ suppressArrival = false } = {}) => {
-    // finally, not a trailing call: any of the seven Promise.all members below
+    // finally, not a trailing call: any of the six Promise.all members below
     // rejecting — or hasSharedDate() further down — must still clear the
     // spinner. Before this, only the happy path reached setLoading(false),
     // so a rejection left the tab spinning forever with no exit (Sage,
     // thread e10d0fed). This doesn't add an error state — that's unowned,
     // filed to Pixel's queue in the same post — it only guarantees the
     // loading indicator itself can't get stuck.
+    //
+    // ENG-104 (2026-09-07): this batch WAS seven members — `EntryStore.
+    // getEntry(new Date())` sat here too. Split out to its own self-settling
+    // effect below (see the entryLoading/error state comment above); see
+    // that comment for why sharing this Promise.all with the entry read was
+    // the hazard, not a style preference.
     try {
-      const today = toISODate(new Date());
-      const [feedResult, sendEventsResult, weekFeedRaw, connectionsResult, requestsResult, entry, hiveState] = await Promise.all([
+      const [feedResult, sendEventsResult, weekFeedRaw, connectionsResult, requestsResult, hiveState] = await Promise.all([
         HoneycombStore.listFeed(),
         // 8b.7 — its own query against hive_send_events, merged with
         // feedResult only at render time (mergedFeed below).
@@ -458,7 +513,6 @@ const HoneycombFeed = () => {
         HoneycombStore.listFeedSince(daysAgoISO(HIVE_WEEK_DAYS - 1)),
         HoneycombStore.listConnections(),
         HoneycombStore.listIncomingRequests(),
-        EntryStore.getEntry(new Date()),
         // A blooming decoration failing must not take down the membership
         // list, the feed, or friend requests — five things that exist in
         // prod today riding on one that doesn't yet (Sage, thread e10d0fed:
@@ -493,8 +547,6 @@ const HoneycombFeed = () => {
       setWeekFeed(weekFeedResult);
       setConnections(connectionsResult);
       setIncomingRequests(requestsResult);
-      setTodayEntry(entry);
-      setAlreadySharedToday(entry ? await HoneycombStore.hasSharedDate(today) : false);
     } finally {
       setLoading(false);
     }
@@ -511,6 +563,166 @@ const HoneycombFeed = () => {
       };
     }, [loadAll])
   );
+
+  // ENG-104 transplant (FIVE_TAB_IA_SPEC.md §5): the journal read, unified at
+  // this host. Self-settling, TodayTab's own catch semantics verbatim — split
+  // out of `loadAll`'s Promise.all rather than folded into it (see the
+  // entryLoading/error state comment above for the hazard this avoids).
+  // Feeds both the entry card AND the pre-existing share-door consumers
+  // (`todayEntry`, `alreadySharedToday`), which is why this effect — not
+  // `loadAll` — is now their one producer.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const now = new Date();
+        try {
+          const today = await EntryStore.getEntry(now);
+          if (cancelled) return;
+          setError(false);
+          setTodayEntry(today);
+          // Independent try/catch, not folded into the read above — a failed
+          // share-status check must not flip the card's error arm; the card's
+          // error state is the journal read's alone (TodayTab's own reasoning
+          // for splitting reads by what they each actually answer).
+          try {
+            setAlreadySharedToday(today ? await HoneycombStore.hasSharedDate(toISODate(now)) : false);
+          } catch (err) {
+            if (cancelled) return;
+            console.warn('HoneycombTab: failed to load share status', err);
+            setAlreadySharedToday(false);
+          }
+        } catch (err) {
+          // requireUserId (EntryStore.js) throws 'Not signed in' with no
+          // session — reachable via DEMO_MODE's Welcome skip link, which
+          // lands on Main with no auth. Without this catch, `entryLoading`
+          // never flips and the card spins forever instead of showing empty
+          // state (Sage/Pixel, thread 19e90cf8, 2026-08-13, TodayTab's own
+          // finding, transplanted with the read that produced it).
+          //
+          // `error` is what actually distinguishes this from a genuinely
+          // empty day (Pixel, thread 19e90cf8: setting the entry to its empty
+          // value here was asserting "Today's page is blank." about a user we
+          // simply failed to read, not one who wrote nothing).
+          if (cancelled) return;
+          console.warn('HoneycombTab: failed to load entries', err);
+          setError(true);
+          setTodayEntry(null);
+          setAlreadySharedToday(false);
+        } finally {
+          if (!cancelled) setEntryLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  // ENG-104 transplant: the card's SUPPLY, self-settling (TodayTab's
+  // :397-408 shape verbatim). A failed read here must not blank the entry
+  // the card DID load — same reasoning as `hivesError` on the Private hives
+  // tab not blanking that shelf's own hives.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const list = await HiveStore.listHives();
+          if (cancelled) return;
+          setHivesError(false);
+          setHives(list);
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('HoneycombTab: failed to load hives', err);
+          setHivesError(true);
+          setHives([]);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  // --- "Load demo data" (transplanted from TodayTab with the rest of the
+  // block, ENG-104) ---------------------------------------------------------
+  //
+  // Colin, 2026-08-10: a real button rather than the old hidden five-tap
+  // gesture, seeding 180 days so Wrapped and Recap have something to show.
+  // FAIL-DORMANT, AND IT IS THE SHAPE NOT THE VALUE. Initial state is `false`
+  // and the `.catch` leaves it false, so an unanswered or failed read renders
+  // nothing: absent is the safe value.
+  useEffect(() => {
+    if (!DEMO_CONTENT) return undefined;
+    let cancelled = false;
+    EntryStore.getFirstEntryDate()
+      .then((firstISO) => {
+        if (!cancelled) setEligibleForDemoData(!firstISO);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLoadDemoData = () => {
+    EntryStore.seedDemoData(180)
+      .then((count) => {
+        setEligibleForDemoData(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Alert.alert('Demo data loaded', `Filled the last ${count} days with entries.`);
+      })
+      .catch(() => {
+        Alert.alert("Couldn't load demo data", 'Something went wrong. Try again.');
+      });
+  };
+
+  // Deezine's post-auth nudge ruling (`6f9e87ad`), transplanted with the
+  // card: the first-save celebration renders ONLY after the first
+  // `EntryStore.saveEntry` resolves — never on auth, mount, resume, failed
+  // save, or later saves.
+  //
+  // THE SIGNAL AND THE ELIGIBILITY ARE TWO DIFFERENT FACTS, carried by two
+  // different mechanisms on purpose: the SIGNAL is `route.params.
+  // entryJustSaved`, set synchronously by App.js's unlock handler as it
+  // navigates (now to this tab). the ELIGIBILITY is decided below, where the
+  // reads are clear of that overlay and the account's own history is
+  // reachable.
+  //
+  // TWO CONDITIONS, AND BOTH ARE NECESSARY: `FirstSaveCelebration.
+  // isUnspent()` (device-local, not sufficient alone — absent on a fresh
+  // INSTALL, not a fresh ACCOUNT) and `getFirstEntryDate()` equals today (the
+  // account's own history, since `saveEntry` is upsert-shaped and cannot
+  // answer "is this the first save" itself).
+  //
+  // THE PARAM IS CONSUMED EITHER WAY — eligible or not, this save has had its
+  // one look — so a re-render, a tab switch or a back-navigation cannot bring
+  // the question round again. That clear is synchronous and deliberately
+  // outside the async body: it has to happen on the early-return paths too.
+  useEffect(() => {
+    if (!route?.params?.entryJustSaved) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await FirstSaveCelebration.isUnspent())) return;
+        const firstDate = await EntryStore.getFirstEntryDate();
+        if (cancelled || firstDate !== toISODate(new Date())) return;
+        await FirstSaveCelebration.spend();
+        if (cancelled) return;
+        setShowFirstSave(true);
+      } catch (err) {
+        // A failed read is not a first save. Staying silent costs one absent
+        // card; guessing costs congratulating a long-time user on their
+        // first entry, and those are not symmetric.
+        console.warn('HoneycombTab: first-save celebration eligibility check failed', err);
+      }
+    })();
+    navigation.setParams({ entryJustSaved: undefined });
+    return () => {
+      cancelled = true;
+    };
+  }, [route?.params?.entryJustSaved, navigation]);
 
   const handleAddConnection = async () => {
     const email = addEmail.trim();
@@ -581,7 +793,11 @@ const HoneycombFeed = () => {
     loadAll().catch((err) => console.warn('Failed to refresh feed', err));
   };
 
-  if (loading) {
+  // `entryLoading` gates the spinner ALONGSIDE `loading` (ENG-104): the two
+  // are independent self-settling reads and the screen isn't ready to render
+  // until both have withdrawn, so the ternary below is already settled by
+  // the time either does.
+  if (loading || entryLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={theme.colors.accent} size="large" />
@@ -642,13 +858,28 @@ const HoneycombFeed = () => {
           fast-follow, deliberately not folded in here.
 
           It leaves over `PRESENCE_FADE_MS` rather than disappearing; that is
-          FlyingBee's, and it is the same 160ms as the descent. */}
+          FlyingBee's, and it is the same 160ms as the descent.
+
+          SECOND SUPPRESSION JOINED HERE 2026-09-07 (ENG-104). `error` is the
+          entry card's own read failure, transplanted onto this screen whole
+          (FIVE_TAB_IA_SPEC §5) along with its `entry-card` PerchAnchor —
+          `usePerchSet()` collects every anchor on the screen with no
+          exemption, so that anchor is already a cruise-perch candidate. This
+          is TodayTab's OWN ratified suppression (Lumen, 2026-08-17: "a
+          mascot doing laps over failure copy performs cheerfulness at
+          failure"), carried to its new host rather than dropped — the
+          reasoning binds to wherever the failure copy lives, not to the file
+          it used to live in. `||`, not a second nested ternary: the walker
+          this row is gated by (check-bee-attitude.mjs's K6) reads each
+          operand of an OR'd test as an independently pinned condition, so
+          both ratified reasons keep their own named row without either
+          being restated as one merged, unnamed boolean. */}
       {/* `SUPPRESS_BEE` is the idle-motion instrument's control build, off in
           every real build — see the constant. */}
       {!SUPPRESS_BEE && (
         <FlyingBee
           active
-          perches={hiveView === 'week' ? null : perches}
+          perches={hiveView === 'week' || error ? null : perches}
           pollinate={pollination}
           canceledPollination={canceledPollination}
           // R-N4 — THE DROP IS A PROPERTY OF THE FLIGHT, NOT OF THIS SCREEN.
@@ -785,6 +1016,94 @@ const HoneycombFeed = () => {
           </PerchAnchor>
         }
       />
+
+      {/* ENG-104 (2026-09-07, FIVE_TAB_IA_SPEC.md §5): the entry compose card,
+          moved WHOLE from TodayTab onto Honeycomb's first viewport — the
+          write door lives on the first thing this screen shows, right under
+          the header. All three ternary states below are TodayTab's own
+          verbatim (entry+FileToHive / error, no CTA / blank+door), reading
+          this screen's own `todayEntry`/`error`/`hives`/`hivesError` state
+          (see the reads above for why they are split from `loadAll`'s
+          Promise.all rather than folded into it). */}
+      <StaggeredItem index={0}>
+        <PerchAnchor id="entry-card" on="right" at={0.5}>
+        {todayEntry ? (
+          <View style={styles.quoteCard}>
+            <Text style={styles.themeBadge}>{todayEntry.theme}</Text>
+            <PaperBlock paper={todayEntry.paper}>
+              <Text style={[styles.gratitudeText, { color: paperInk(todayEntry.paper) }]}>"{todayEntry.text}"</Text>
+            </PaperBlock>
+            {/* DES-16 §4 — "File this to…". Zero hives or a failed hive read
+                both withhold the affordance. Re-pointed 2026-09-07 (ENG-104):
+                the zero-hives door and the failure copy this used to defer
+                to ("the shelf below") lived on THIS screen when this comment
+                was written; the hive shelf is now the Private hives tab's
+                own residue (FIVE_TAB_IA_SPEC §7), a different screen
+                entirely. Withholding the affordance here is still not
+                stating a falsehood — it names no destination class the user
+                can't reach — but the door and its failure copy are a tab
+                away, not a scroll away. */}
+            {!hivesError && hives.length > 0 && <FileToHive entry={todayEntry} hives={hives} />}
+          </View>
+        ) : error ? (
+          // No CTA: a failed read can't rule out today already having an
+          // entry, and the write button routes into saveEntry's update
+          // branch on a day that turns out to be shared — reopening the
+          // edit-after-share hazard Pixel's own enumeration had ruled
+          // latent (thread 19e90cf8). Placeholder copy; Deezine's when
+          // §23 lands.
+          <View style={styles.emptyCard}>
+            <Text style={styles.entryEmptyTitle}>We couldn't reach your journal.</Text>
+            <Text style={styles.entryEmptyBody}>Check your connection and try again.</Text>
+          </View>
+        ) : (
+          <View style={styles.emptyCard}>
+            <Text style={styles.entryEmptyTitle}>Today's page is blank.</Text>
+            <Text style={styles.entryEmptyBody}>
+              One line is enough.
+            </Text>
+            {/* R-OD-1: straight to Input. The `Lock` interstitial this used
+                to open is deleted — it asked the user to Begin something
+                this card had already begun. */}
+            <PrimaryButton onPress={() => navigation.getParent()?.navigate('Input')}>
+              Write today's entry
+            </PrimaryButton>
+          </View>
+        )}
+        </PerchAnchor>
+
+        {/* The transplanted seeding link, R-OD, form ruled by Lumen: a quiet
+            inkSoft text link at the caption register, below the empty card's
+            own content, never a button and never gold. OUTSIDE the
+            `PerchAnchor`, deliberately — `PerchAnchor` measures its own
+            wrapping View, so a second child would grow the `entry-card`
+            perch rect and move where the bee lands. NO `!todayEntry` clause,
+            by derivation not omission: eligibility IS `getFirstEntryDate()`
+            returning nothing, so an eligible account has never written an
+            entry and today's card is necessarily the empty one (TodayTab's
+            own reasoning, transplanted verbatim). */}
+        {DEMO_CONTENT && (
+          // Nested inside the DEMO_CONTENT guard, not ANDed alongside it at
+          // the top level — check-demo-runtime-dormancy.mjs's isUnderGuard
+          // only recognises a bare `DEMO_CONTENT` as the LogicalExpression's
+          // immediate left operand.
+          eligibleForDemoData ? (
+            <PressableScale onPress={handleLoadDemoData} style={styles.demoDataLink}>
+              <Text style={styles.demoDataLinkText}>Load demo data</Text>
+            </PressableScale>
+          ) : null
+        )}
+
+        {/* IMMEDIATELY BENEATH the entry that was just persisted, and inside
+            index 0 so it settles with the journal card rather than opening a
+            cascade step of its own. `todayEntry &&` is not belt and braces:
+            the ruling places this relative to a VISIBLE saved entry, and the
+            focus read that fills `todayEntry` and the eligibility read above
+            are independent — a card celebrating an entry the screen failed
+            to load would congratulate the user on something they cannot
+            see. */}
+        {todayEntry && showFirstSave && <FirstSaveCard onDismiss={() => setShowFirstSave(false)} />}
+      </StaggeredItem>
 
       {/* HOME — Bee Doctrine State 1, the one residence on this screen.
           `on="right"` puts him at x = 378 on a 402pt screen, so the character
@@ -1011,6 +1330,71 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  // ENG-104 transplant (TodayTab.js's own block, verbatim): the entry
+  // compose card's three ternary states. `emptyTitle`/`emptyBody` were
+  // already taken below by the empty-hive copy's own distinct treatment
+  // (different color/padding, no card surface), so the entry card's own
+  // pair is named `entryEmptyTitle`/`entryEmptyBody` rather than colliding.
+  emptyCard: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+    borderRadius: theme.borderRadius.large,
+    padding: 28,
+    alignItems: 'center',
+    ...theme.shadows.card,
+  },
+  entryEmptyTitle: {
+    ...theme.type.h2,
+    color: theme.colors.ink,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  entryEmptyBody: {
+    ...theme.type.body,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  demoDataLink: {
+    alignSelf: 'center',
+    marginTop: 16,
+  },
+  demoDataLinkText: {
+    ...theme.type.bodySm,
+    color: theme.colors.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  quoteCard: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceBorder,
+    borderRadius: theme.borderRadius.large,
+    paddingHorizontal: 28,
+    paddingVertical: 40,
+    alignItems: 'center',
+    ...theme.shadows.card,
+  },
+  themeBadge: {
+    ...theme.type.label,
+    // ink, not accentDeep — same fix as Wrapped's identical pairing
+    // (accentDeep-on-accentDeepWash 2.3712:1 -> ink-on-accentDeepWash
+    // 15.5404:1). The pigment keeps its job as the fill; text reads ink.
+    color: theme.colors.ink,
+    backgroundColor: theme.colors.accentDeepWash,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: theme.borderRadius.full,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  gratitudeText: {
+    fontFamily: theme.fonts.bodyItalic,
+    fontSize: 26,
+    color: theme.colors.ink,
+    textAlign: 'center',
+    lineHeight: 37,
   },
   headerActions: {
     flexDirection: 'row',

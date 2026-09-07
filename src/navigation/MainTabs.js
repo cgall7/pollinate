@@ -143,10 +143,10 @@ export const MainTabs = () => {
       // Tab.Screen is declared first, silently, on any future reorder; this
       // prop is what makes the two call sites' own explicit screen
       // arguments (added in the same commit) a real pin rather than a
-      // restatement of an accident. Flips to "Hive" only in the commit that
+      // restatement of an accident. Flipped to "Hive" in the commit that
       // makes that premise true — ENG-104's compose card (Lumen, thread
       // f2c15b7d, 2026-09-07). Gated: scripts/check-eng103-tab-bar-pin.mjs.
-      initialRouteName="Today"
+      initialRouteName="Hive"
       tabBar={(props) => <TabDock {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
