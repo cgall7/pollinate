@@ -380,6 +380,12 @@ if (skippedInCI) {
     'required check — a skip here is indistinguishable from coverage.'));
 }
 
-const ok = failed.length === 0 && driftErrors.length === 0 && !skippedInCI;
+// Defence in depth, not the primary fix: a gate's own exit code is the
+// verdict this file trusts everywhere else, and it was only wrong when a
+// dependency owned the exit path out from under it (embedded-postgres's
+// async-exit-hook hard-exiting 0 at 'beforeExit' — fixed gate-side).
+// totalFailed catches that class even if a future dependency finds a new
+// way to do the same thing.
+const ok = failed.length === 0 && driftErrors.length === 0 && !skippedInCI && totalFailed === 0;
 console.log(`\n  SUITE EXIT=${ok ? 0 : 1}\n`);
 process.exit(ok ? 0 : 1);
