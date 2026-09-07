@@ -343,7 +343,13 @@ if (setterName) {
 let MUTATIONS_BUILT = [];
 try {
   const AWAIT_STMT = 'await HoneycombStore.shareEntry({ entryId: todayEntry.id });';
-  const ARG_CALL_STMT = 'setAlreadySharedToday(true);';
+  // Built from the discovered names, not retyped, per Lumen's rider
+  // (2026-09-07): a fully consistent rename of setterName/declaredStateName
+  // across declaration, calls AND the render ternary is legal and must not
+  // red the harness itself — only a rename that MISSES a site (the `vacuity`
+  // mutations below) should. Hardcoding the pre-rename spelling here would
+  // make that legal rename read as a broken anchor instead of 9 clean rows.
+  const ARG_CALL_STMT = `${setterName}(true);`;
   const awaitStmtIdx = mustFindOne(src, AWAIT_STMT, 'shareEntry await statement (mutation span)');
   const argCallIdx = mustFindOne(src, ARG_CALL_STMT, 'argument-conjunct call statement (mutation span)');
   const orderingFrom = src.slice(awaitStmtIdx, argCallIdx + ARG_CALL_STMT.length);
@@ -356,7 +362,7 @@ try {
   // leaves every occurrence INSIDE the span consistent with itself, and the
   // render ternary — hundreds of lines further down, outside the span
   // entirely — untouched. That mismatch is the whole mutation.
-  const VACUITY_SPAN_START = 'const [alreadySharedToday, setAlreadySharedToday] = useState(false);';
+  const VACUITY_SPAN_START = `const [${declaredStateName}, ${setterName}] = useState(false);`;
   const vacuitySpanStartIdx = mustFindOne(src, VACUITY_SPAN_START, 'vacuity mutation span start');
   const vacuitySpanEndIdx = argCallIdx + ARG_CALL_STMT.length;
   const vacuityFrom = src.slice(vacuitySpanStartIdx, vacuitySpanEndIdx);
