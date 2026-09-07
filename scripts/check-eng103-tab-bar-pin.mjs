@@ -183,11 +183,19 @@ const censusSites = [];
       const [first, second] = node.arguments;
       if (!first || first.type !== 'StringLiteral' || first.value !== 'Main') return;
       const line = node.loc.start.line;
+      // censusSites takes BOTH arms. A bare navigate('Main') is still a
+      // tab-arrival site under §11: it lands on the navigator's
+      // initialRouteName, so it decides which tab the person sees. Section
+      // 3's coverage row quantifies over this list, and populating it from
+      // the named arm alone would make coverage a property of a SUBSET that
+      // equals the whole only because a sibling row says so (Vector,
+      // 2026-09-07). That is the enforced-sideways shape this file's
+      // arithmetic row died of; a row's population is its own business.
+      censusSites.push(`${rel(file)}:${line}`);
       if (!second || second.type !== 'ObjectExpression') {
         bareSites.push(`${rel(file)}:${line}`);
       } else {
         namedSites.push(`${rel(file)}:${line}`);
-        censusSites.push(`${rel(file)}:${line}`);
       }
     });
   }
@@ -214,7 +222,7 @@ const censusSites = [];
   // a green over a SHRUNKEN census reads as green-over-2 rather than as an
   // unqualified all-clear. That is the row's own guard against being
   // vacuously true when the walk breaks.
-  const totalMainCalls = namedSites.length + bareSites.length;
+  const totalMainCalls = censusSites.length;
 
   if (totalMainCalls !== 7) {
     bad('navigate/replace("Main", ...) census is exactly 7', `found ${totalMainCalls} call(s) total — expected 7; either the AST walk broke or an unenumerated member joined the class (see §11)`);
@@ -435,7 +443,7 @@ for (const [key, relFile] of [
       `${unpinned.length} censused site(s) pinned by no anchor${unpinned.length ? `: ${unpinned.join(', ')}` : ''}${phantom.length ? `; ${phantom.length} anchor site(s) outside the census: ${phantom.join(', ')}` : ''}`
     );
   } else {
-    ok(`anchor set covers the full ${censusSites.length}-member tab-arrival navigate census (set equality, both directions)`);
+    ok(`anchor set covers the full ${censusSites.length}-member navigate/replace("Main") census, bare arms included (set equality, both directions)`);
   }
 }
 
