@@ -296,7 +296,7 @@ export const TodayTab = ({ navigation, route }) => {
     EntryStore.seedDemoData(180)
       .then((count) => {
         setEligibleForDemoData(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         Alert.alert('Demo data loaded', `Filled the last ${count} days with entries.`);
       })
       .catch(() => {

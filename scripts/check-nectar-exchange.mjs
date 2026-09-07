@@ -807,35 +807,76 @@ const PANEL = await read('src/components/NectarSendPanel.js');
   // row itself asks for. The haptic must sit inside the ANIMATION's
   // completion, never inside the promise's: "a success haptic that waits for
   // a round trip is a haptic about the server."
+  // BEING THE RECEIVER OF `.catch` IS NOT BEING INSIDE ITS CALLBACK, and this
+  // predicate used to conflate the two (Pixel, DES-40). The walk outward
+  // stopped at the first enclosing `.then`/`.catch` CallExpression without
+  // asking WHICH PART of it the path came through, so `Haptics.x(...)` was
+  // read as "inside a promise handler" the moment it grew the module-standard
+  // `.catch(() => {})` — the call is then a descendant of the `.catch` node,
+  // as its callee's object.
+  //
+  // The row's own header already said the right thing: "is it a `.then(...)`
+  // ARGUMENT?" The code was wider than its header, so this restores the header
+  // rather than inventing a new rule — a containment test is not a resolution,
+  // and the resolution here is which branch of the call node the path took.
+  // `classify` is extracted so the control below runs the SAME predicate,
+  // rather than a second copy of it that could agree with itself.
+  const classifyHapticSite = (tree) => {
+    let inSettleAnywhere = false;
+    let inHandlerAnywhere = false;
+    visit(tree, (n, anc) => {
+      if (n.type !== 'CallExpression') return;
+      const callee = n.callee;
+      if (callee?.type !== 'MemberExpression') return;
+      if (callee.object?.name !== 'Haptics') return;
+      let inSettle = false;
+      let inThen = false;
+      for (let i = anc.length - 1; i >= 0; i -= 1) {
+        const a = anc[i];
+        // `anc` holds only typed nodes, so this is the direct child the path
+        // descended through.
+        const child = i + 1 < anc.length ? anc[i + 1] : n;
+        if (a.type === 'VariableDeclarator' && a.id?.name === 'settle') { inSettle = true; break; }
+        if (
+          a.type === 'CallExpression' &&
+          a.callee?.type === 'MemberExpression' &&
+          (a.callee.property?.name === 'then' || a.callee.property?.name === 'catch') &&
+          a.arguments.includes(child)
+        ) { inThen = true; break; }
+      }
+      if (inSettle) inSettleAnywhere = true;
+      if (inThen) inHandlerAnywhere = true;
+    });
+    return { inSettle: inSettleAnywhere, inHandler: inHandlerAnywhere };
+  };
   const tree = ast(HOOK);
-  let hapticInSettle = false;
-  let hapticInPromiseThen = false;
-  visit(tree, (n, anc) => {
-    if (n.type !== 'CallExpression') return;
-    const callee = n.callee;
-    if (callee?.type !== 'MemberExpression') return;
-    if (callee.object?.name !== 'Haptics') return;
-    // Walk outward: is the nearest enclosing named function `settle`, or is
-    // it a `.then(...)` argument? Read from the AST, not from line order.
-    let inSettle = false;
-    let inThen = false;
-    for (let i = anc.length - 1; i >= 0; i -= 1) {
-      const a = anc[i];
-      if (a.type === 'VariableDeclarator' && a.id?.name === 'settle') { inSettle = true; break; }
-      if (
-        a.type === 'CallExpression' &&
-        a.callee?.type === 'MemberExpression' &&
-        (a.callee.property?.name === 'then' || a.callee.property?.name === 'catch')
-      ) { inThen = true; break; }
-    }
-    if (inSettle) hapticInSettle = true;
-    if (inThen) hapticInPromiseThen = true;
-  });
+  const { inSettle: hapticInSettle, inHandler: hapticInPromiseThen } = classifyHapticSite(tree);
   const rmHaptic = /if \(reduced\)[\s\S]{0,400}?Haptics\.notificationAsync/.test(HOOK);
   if (hapticInSettle && !hapticInPromiseThen && rmHaptic) {
-    ok('D1 the haptic fires from the animation, not from the network — its motion-path call site is inside `settle`, the travel animation\'s completion, and NO Haptics call sits inside a .then/.catch. The Reduce Motion path fires one too, so the gift still lands in the hand when it cannot land on the screen');
+    ok('D1 the haptic fires from the animation, not from the network — its motion-path call site is inside `settle`, the travel animation\'s completion, and NO Haptics call sits inside a .then/.catch CALLBACK. The Reduce Motion path fires one too, so the gift still lands in the hand when it cannot land on the screen');
   } else {
     bad('D1', `haptic in settle=${hapticInSettle}, haptic in a promise handler=${hapticInPromiseThen}, RM haptic=${rmHaptic} — §6 row 4 wants the call site inside absorption and nowhere else`);
+  }
+
+  // D1a — THE CONTROLS FOR D1's REPAIR, run through the same `classifyHapticSite`
+  // the row uses. A predicate that has only ever been shown to stay green has
+  // not been shown to be measuring anything, and a narrowing repair is exactly
+  // the kind that can go green by measuring less. Two fixtures, one each way.
+  const HANDLER_FIXTURE = `
+    const settle = () => {};
+    send().then(() => { Haptics.notificationAsync('Success'); });
+  `;
+  const RECEIVER_FIXTURE = `
+    const settle = Animated.timing(x, {}).start(() => {
+      Haptics.notificationAsync('Success').catch(() => {});
+    });
+  `;
+  const handlerCase = classifyHapticSite(ast(HANDLER_FIXTURE));
+  const receiverCase = classifyHapticSite(ast(RECEIVER_FIXTURE));
+  if (handlerCase.inHandler && !receiverCase.inHandler && receiverCase.inSettle) {
+    ok('D1a the repaired predicate still reds a real violation and no longer reds the repair — a haptic INSIDE a `.then(...)` callback classifies as a handler call, while a haptic that merely CARRIES a `.catch(() => {})` inside `settle` does not. The two cases are distinguished by which branch of the call node the path descends through, which is what "argument" means');
+  } else {
+    bad('D1a', `controls disagree: handler fixture inHandler=${handlerCase.inHandler} (want true), receiver fixture inHandler=${receiverCase.inHandler} (want false) inSettle=${receiverCase.inSettle} (want true)`);
   }
 
   // MP-3: the travel profile starts and ends at rest. This samples the exact

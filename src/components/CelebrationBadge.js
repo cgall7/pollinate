@@ -33,7 +33,7 @@ export const CelebrationBadge = () => {
       // the re-run that does arrive).
       if (!finished || hapticFiredRef.current) return;
       hapticFiredRef.current = true;
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     });
     // R18/R20: a live OS toggle re-runs this effect mid-animation — the
     // cleanup must stop the *composite* handle: `reveal.stopAnimation()`

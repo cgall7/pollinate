@@ -1,6 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { View, Text, Animated, StyleSheet, Pressable, Easing } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import Svg, { Polygon, Path, Line, Circle, G, Defs, ClipPath, Image as SvgImage } from 'react-native-svg';
 import { theme } from '../constants/theme';
 import { BLOOM_BREATHE_MS, BLOOM_FLOOR_OPACITY, BLOOM_LIGHT_ALPHA } from '../constants/bloomLight';
@@ -27,10 +26,16 @@ import { numberInWordsCapped } from '../utils/numberWords';
 // only the fill; contact and ignition (Beats 1-2) belong to the FINGER and
 // the LIGHT, not to the honey, so they're not in that module — named here
 // instead of left as bare literals scattered through the timeline below.
-// `CONTACT_MS` is also the last beat of `hexTap.contact()`'s haptic
-// sequence; the two are one number wearing two hats, and moving either
-// without the other desynchronises the touch from the picture.
-const CONTACT_MS = 180;
+// `CONTACT_MS` is also the span of `hexTap.contact()`'s haptic sequence; the
+// two are one number wearing two hats. That used to be a hazard held by hand
+// — the sequence hardcoded 0/90/180 and moving this constant desynchronised
+// the touch from the picture — and DES-40 CLOSED IT BY CONSTRUCTION: the
+// sequence takes its span as an argument and this constant is what the full-
+// motion call site passes, so the two hats are now one number at one call
+// site. Exported for the same reason: the dev harness demonstrates this
+// primitive live rather than re-typing its clock (a rig that re-types a
+// number is only checking what it did not inherit).
+export const CONTACT_MS = 180;
 const IGNITION_MS = 80;
 
 // Re-exported because the comb's identity rule is one expression and this is
@@ -716,7 +721,31 @@ export const HoneycombGrid = forwardRef(({
       // nothing. The fill alone carries selection here, at ΔE00 19.2493 from
       // the weaker of the two member tints — 2.7x the whole range §21.2
       // struck `register` for.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      // DES-40 (Lumen, `4f9f3365` + `da767b3b`; IA spec §10). This line used
+      // to be a lone Medium, and it was never authored — it survived two
+      // module generations and the `drip` -> `hexTap` rename while the full-
+      // motion path called sequences, and the module's header strikes
+      // `pinch()` in prose without ever mentioning it. A shipped line votes
+      // only if someone wrote it; this one is a survivor, so it is now the
+      // same named sequence the full-motion arm fires.
+      //
+      // The span is DERIVED, not fitted. The press depression `contact`
+      // mirrors on the other arm does not shorten under Reduce Motion, it is
+      // ABSENT (`pressDepth` animates only inside `startHexTap`, and
+      // `HexCell` gates it on `selected && !reduced`). The visual that
+      // actually plays here is the 200ms `revealProgress` fade below — one
+      // picture standing in for press, ignition and reveal together — so the
+      // sequence rebinds to it: beats 0/100/200, the closing Medium landing
+      // as the fade completes. A tail past the picture would be legal; this
+      // one does not need the allowance.
+      //
+      // Result for a Reduce Motion user: three distinct signatures where the
+      // lone Medium gave one — the rising triple here, the inverted pair on
+      // the send, and `SealCrack`'s lone Medium, which stays the app's only
+      // opening-in-hand mark. See `:701-703`: the haptic is what makes the
+      // acknowledgement independent of the flight, and it is the same act in
+      // both modes; only the picture standing in for it changes.
+      hexTapHaptics.contact(DURATIONS.reducedMotionFade);
       fillProgress.setValue(1);
       revealProgress.setValue(0);
       setHeldId(personKey(member));
@@ -757,7 +786,7 @@ export const HoneycombGrid = forwardRef(({
   // is nothing after 430 any more, which is the point — LP-R21's hold is
   // state, and the acceptance bar is a still frame.
   const startHexTap = () => {
-    hexTapHaptics.contact();
+    hexTapHaptics.contact(CONTACT_MS);
 
     pressDepth.setValue(1);
     glowBloomOpacity.setValue(0);
@@ -810,7 +839,13 @@ export const HoneycombGrid = forwardRef(({
     // MB-D2b — the fill, triggered at contact-complete, which is the score's
     // own word and is also the frame `hexTap.contact()`'s closing Medium
     // lands on: the finger's last confirmation and the honey's first frame
-    // are the same instant. It does not wait for the ignition to finish —
+    // are the same instant.
+    //
+    // DES-40 states what that closing beat MEANS, because it now has two
+    // bindings: the acknowledgement completes with the picture. On this arm
+    // the picture completes at contact-complete, which is fill-start, below.
+    // On the Reduce Motion arm it completes as the 200ms fade does. One
+    // meaning, two spans, both derived — see the RM branch above. It does not wait for the ignition to finish —
     // the light rises across the fill's first 80ms rather than ahead of it,
     // which is what "the fill performs within that light" describes.
     //

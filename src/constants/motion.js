@@ -247,6 +247,67 @@ export const NECTAR_EASING = {
   settle: Easing.inOut(Easing.cubic),
 };
 
+// SEND — DES-40, the two endings of one compose surface (Lumen, IA spec §10;
+// the referents are ruled there, the picture is the builder's lane).
+//
+// `Compose` is one screen with one variable, so it has one act with two
+// endings, and the endings are opposites: a note sent NOW LEAVES, a note held
+// ON A DATE STAYS. Two pictures, not one picture with a parameter.
+//
+// WHY THESE CONSTANTS EXIST AT ALL, rather than the send reading `NECTAR`'s.
+// §10's referent rule for the take names "the LIFT-OFF element of departure,
+// its OWN named constant when built — NEVER `NECTAR.gather`." The take's
+// haptic span IS one of these numbers, so a borrowed constant would mean
+// retuning the nectar drop silently retunes the finger's report on a screen
+// that has nothing to do with nectar. That same rule cites `gather` as SCALE
+// EVIDENCE, which is all it is here: `liftOff` lands on the same 180 by the
+// bounded argument below and not by reference, and moving `gather` must not
+// move this.
+export const SEND = {
+  // THE TAKE'S SPAN. The note detaches from the page — it rises off the sheet
+  // and takes its shadow with it. This is the element the two-impact take
+  // mirrors, so it is bounded on both sides rather than chosen:
+  //   floor — two impacts have to be felt as two, and the tightest gap any
+  //     shipping sequence produces today is 100ms (`hexTap.contact` at
+  //     `reducedMotionFade`), so 100 is the lowest interval with evidence
+  //     behind it, and at two beats this sequence's gap IS its whole span;
+  //   ceiling — §12.5 Rule 2 keeps a treatment the finger causes under 200ms
+  //     so it never queues behind the tap.
+  // 180 sits inside that band with room at both edges.
+  liftOff: 180,
+  // The travel, and it is UN-MIRRORED BY DESIGN (§10: nectar's travel carries
+  // no haptic and the landing causes nothing). It is the only beat on this
+  // screen the finger never hears, which is why it is the only one allowed
+  // past Rule 2's band: Rule 2 governs what the tap causes, and by the time
+  // this runs the tap has been answered twice and the note has left the hand.
+  travel: 320,
+  // THE SEED SEAL'S SPAN. The note comes to rest and closes over. One timing
+  // carrying two beats: the Light lands as it touches down (the placement
+  // tick) and the Medium as the seal completes, so this number is the whole
+  // rhythm — "at two beats the gap IS the span" (§10's seed-seal row).
+  //
+  // Longer than `liftOff` and shorter than the departure's 500 total, in that
+  // order and for one reason each. A seal is not a click, so Rule 2's band
+  // does not bind it and it must not read like one. A stowage is a single act
+  // where a departure is two, so it cannot be the longer of the pair.
+  sealSettle: 280,
+};
+
+export const SEND_EASING = {
+  // The detach. Rest velocity at the start, one acceleration away: the note
+  // is picked up, not flicked.
+  liftOff: Easing.in(Easing.cubic),
+  // The travel continues what the lift-off started and never decelerates back
+  // — the note leaves still moving, which is what makes this a departure
+  // rather than a hop.
+  travel: Easing.in(Easing.cubic),
+  // The stowage arrives and STOPS. This is the only curve in the block that
+  // ends at zero velocity, and it is the one that has to: the closing Medium
+  // lands on the frame the picture settles, and a beat still moving under it
+  // would report an act that had not finished.
+  sealSettle: Easing.out(Easing.cubic),
+};
+
 // Stage light (MB-D1, Deezine 2026-08-27; Lumen ratified with amendments
 // 2026-08-28) — the one-shot bloom that announces a ceremony hero before it
 // performs. Two consumers, ever: the P2 celebration card and the P3 greeting

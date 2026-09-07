@@ -70,7 +70,7 @@ export const SealCrack = ({ onCracked, copy = 'Your year, poured.' }) => {
   const handleCrack = () => {
     if (cracked) return;
     setCracked(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     // R17 (Pixel): the full-viewport accentBurst flash is the largest
     // luminance jump in the app — §14.1 "no exceptions" means reduced
     // motion skips it outright rather than just shortening it.

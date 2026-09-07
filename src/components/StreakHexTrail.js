@@ -60,7 +60,7 @@ const Hex = ({ delay, isLast, reduced, resolved, haptic, onIgnite }) => {
       Animated.timing(progress, { toValue: 1, duration: DURATIONS.reducedMotionFade, useNativeDriver: true }).start();
       if (isLast) {
         Animated.timing(glow, { toValue: 1, duration: DURATIONS.reducedMotionFade, useNativeDriver: true }).start();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         onIgnite?.();
       }
       // R18: a live OS toggle mid-beat can still re-run this effect after
@@ -73,11 +73,11 @@ const Hex = ({ delay, isLast, reduced, resolved, haptic, onIgnite }) => {
     }
 
     const t = setTimeout(() => {
-      if (haptic) Haptics.selectionAsync();
+      if (haptic) Haptics.selectionAsync().catch(() => {});
       Animated.spring(progress, { toValue: 1, ...SPRINGS.tick, useNativeDriver: true }).start();
       if (isLast) {
         Animated.timing(glow, { toValue: 1, duration: DURATIONS.arrival, useNativeDriver: true }).start();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         onIgnite?.();
       }
     }, delay);

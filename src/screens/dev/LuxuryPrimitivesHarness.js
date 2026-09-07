@@ -2,8 +2,9 @@ import React, { useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import Svg, { Polygon, Circle, Defs, ClipPath } from 'react-native-svg';
 import { theme } from '../../constants/theme';
-import { HONEY, HONEY_EASING, useReducedMotion } from '../../constants/motion';
+import { DURATIONS, HONEY, HONEY_EASING, useReducedMotion } from '../../constants/motion';
 import { hexTap } from '../../constants/haptics';
+import { CONTACT_MS } from '../../components/HoneycombGrid';
 import { hexPoints } from '../../components/HexShape';
 import { useSvgId } from '../../utils/svgId';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -44,16 +45,24 @@ export const LuxuryPrimitivesHarness = () => {
 
   const runFill = () => {
     fill.setValue(0);
-    hexTap.contact();
 
     if (reduced) {
       // LP-R21's reduced-motion line: final value, no sweep. Same branch the
       // shipped cell takes — `setValue`, not a short timing.
+      //
+      // DES-40: the sequence takes its span, so the call moves inside the
+      // branches. This rig has no RM substitute picture of its own — the fill
+      // arrives instantly here — so it inherits the SHIPPED binding rather
+      // than deriving from a picture it does not draw, which is the same
+      // reason it imports `HONEY` and `CONTACT_MS` live instead of re-typing
+      // them. What you are feeling in this arm is `HoneycombGrid`'s RM span.
+      hexTap.contact(DURATIONS.reducedMotionFade);
       setPhase('held (reduced motion)');
       fill.setValue(1);
       return;
     }
 
+    hexTap.contact(CONTACT_MS);
     setPhase('filling');
     Animated.timing(fill, {
       toValue: 1,

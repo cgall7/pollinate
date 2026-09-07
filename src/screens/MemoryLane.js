@@ -195,7 +195,7 @@ export const MemoryLaneScreen = ({ navigation, route }) => {
     arrivalStepKeyRef.current = null;
     arrivalGenerationRef.current += 1;
     spatialFrozenStepRef.current = null;
-    Haptics.selectionAsync();
+    Haptics.selectionAsync().catch(() => {});
     setRevealState(next);
   };
 

@@ -380,7 +380,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
           amountDrops: amount,
         });
         setBalanceDrops(await NectarStore.getBalanceDrops());
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         setEntrySendOpen(false);
         beginAttempt();
       } catch (err) {
@@ -519,7 +519,7 @@ export const PackageOpenScreen = ({ navigation, route }) => {
     arrivalStepKeyRef.current = null;
     arrivalGenerationRef.current += 1;
     spatialFrozenStepRef.current = null;
-    Haptics.selectionAsync();
+    Haptics.selectionAsync().catch(() => {});
     setRevealState(next);
   };
 

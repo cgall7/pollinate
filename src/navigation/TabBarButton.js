@@ -40,7 +40,7 @@ export const TabBarButton = ({ children, onPress, style, ...rest }) => {
       onPressIn={() => animateTo(PRESS.standard)}
       onPressOut={() => animateTo(1)}
       onPress={(e) => {
-        Haptics.selectionAsync();
+        Haptics.selectionAsync().catch(() => {});
         onPress?.(e);
       }}
     >

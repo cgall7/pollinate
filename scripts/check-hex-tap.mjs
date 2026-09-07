@@ -173,23 +173,57 @@ const hapticsSrc = sources.get(HAPTICS);
 const hapticsAst = ast(hapticsSrc);
 let hexTapKeys = null;
 let hapticExports = [];
+const hapticGroupKeys = [];
 visit(hapticsAst, (n) => {
   if (n.type === 'ExportNamedDeclaration' && n.declaration?.type === 'VariableDeclaration') {
     for (const d of n.declaration.declarations) {
       if (d.id.type !== 'Identifier') continue;
       hapticExports.push(d.id.name);
-      if (d.id.name === 'hexTap' && d.init?.type === 'ObjectExpression') {
-        hexTapKeys = d.init.properties
+      if (d.init?.type === 'ObjectExpression') {
+        const keys = d.init.properties
           .filter((p) => p.type === 'ObjectProperty' && p.key.type === 'Identifier')
           .map((p) => p.key.name);
+        if (d.id.name === 'hexTap') hexTapKeys = keys;
+        // Every exported sequence group's keys feed the retired-name scan
+        // below, not just `hexTap`'s. The property being asserted is about the
+        // MODULE, so scoping the scan to one export would let a retired
+        // treatment return through any group added later — which DES-40 made
+        // reachable: `send` is the second group this module has ever had.
+        hapticGroupKeys.push(...keys);
       }
     }
   }
 });
-if (hapticExports.length === 1 && hapticExports[0] === 'hexTap') {
-  ok('A5a haptics.js exports exactly `hexTap` — `drip` is gone, and with it the name of a retired treatment');
+// The row this replaces asserted a CARDINALITY (`exactly one export`). The
+// property that licensed it was narrower and outlives the count: no name in
+// this module may be a retired treatment's, because a module named for a
+// retired treatment is how that treatment finds its way back. DES-40 adds two
+// more exports — `MIN_FELT_GAP_MS`, the legibility floor, which §10 requires
+// to live in the module exactly once, and `send`, the second sequence group
+// this module has ever carried — so the count moved twice and the property did
+// not. Both halves are asserted: the retired names are absent, AND the export
+// set matches this list, so a new export is a deliberate edit here rather than
+// a silent widening.
+//
+// The rows measuring `send`'s own beats are NOT here. They live in
+// `check-send-ending.mjs`, which is DES-40's gate; this row's subject is
+// LP-R21's retirement and it stays that.
+const EXPECTED_HAPTIC_EXPORTS = ['MIN_FELT_GAP_MS', 'hexTap', 'send'];
+const RETIRED_TREATMENT_NAMES = ['drip', 'swell', 'pinch', 'fall'];
+const retiredFound = [...hapticExports, ...hapticGroupKeys].filter((n) =>
+  RETIRED_TREATMENT_NAMES.includes(n),
+);
+const exportsMatch =
+  hapticExports.length === EXPECTED_HAPTIC_EXPORTS.length &&
+  EXPECTED_HAPTIC_EXPORTS.every((n) => hapticExports.includes(n));
+if (retiredFound.length === 0 && exportsMatch) {
+  ok(
+    `A5a haptics.js exports {${hapticExports.join(', ')}} — the declared set, and no name in the module is a retired treatment's (${RETIRED_TREATMENT_NAMES.join('/')})`,
+  );
+} else if (retiredFound.length) {
+  bad('A5a', `retired treatment names back in haptics.js: {${retiredFound.join(', ')}}`);
 } else {
-  bad('A5a', `haptics.js exports {${hapticExports.join(', ')}} — expected exactly hexTap`);
+  bad('A5a', `haptics.js exports {${hapticExports.join(', ')}} — expected {${EXPECTED_HAPTIC_EXPORTS.join(', ')}}`);
 }
 if (hexTapKeys && hexTapKeys.length === 1 && hexTapKeys[0] === 'contact') {
   ok('A5b hexTap has exactly one pattern, `contact` — `pinch` retired with the neck it fired on');
@@ -436,7 +470,7 @@ if (missing.length === 0 && ascending) {
 console.log('\nD. The hold is a still screen — every timing ends on one frame');
 
 const constFromGrid = (name) => {
-  const m = new RegExp(`^const ${name} = (\\d+);`, 'm').exec(gridSrc);
+  const m = new RegExp(`^(?:export )?const ${name} = (\\d+);`, 'm').exec(gridSrc);
   return m ? Number(m[1]) : null;
 };
 const CONTACT_MS = constFromGrid('CONTACT_MS');
@@ -446,17 +480,91 @@ if (CONTACT_MS === 180 && IGNITION_MS === 80) {
 } else {
   bad('D1a', `read CONTACT_MS=${CONTACT_MS}, IGNITION_MS=${IGNITION_MS} out of HoneycombGrid.js — the spec scores Beat 1 at 180ms and Beat 2 at 80ms, and the rest of section D is computed from these`);
 }
-// D1b: `CONTACT_MS` is ALSO the last beat of the contact haptic, which lives
-// in a different file and cannot import it. Two copies of one number, and
-// the failure is silent in both directions: retune the constant and the
-// finger's confirmation lands early; retune the haptic and it lands late.
-// Neither shows up in a screenshot.
-const hapticBeats = [...hapticsSrc.matchAll(/setTimeout\([^,]*,\s*(\d+)\)/g)].map((m) => Number(m[1]));
-const lastHapticBeat = hapticBeats.length ? Math.max(...hapticBeats) : null;
-if (lastHapticBeat === CONTACT_MS) {
-  ok(`D1b hexTap.contact()'s closing impact lands at ${lastHapticBeat}ms — the same frame as CONTACT_MS, in a file that cannot import it (beats read: ${hapticBeats.join(', ')})`);
+// D1b-D1e: `CONTACT_MS` is ALSO the span of the contact haptic, which lives
+// in a different file and cannot import it.
+//
+// WHAT THIS SECTION USED TO ASSERT, AND WHY IT NO LONGER CAN. The haptic used
+// to hardcode 0/90/180, so the number existed in two files and the failure was
+// silent in both directions: retune the constant and the finger's confirmation
+// lands early, retune the haptic and it lands late, and neither shows in a
+// screenshot. The row compared the last `setTimeout` literal against
+// `CONTACT_MS`.
+//
+// DES-40 closed that hazard BY CONSTRUCTION (Lumen, IA spec §10): a sequence
+// is fractions plus styles and the span is an argument, so the closing beat
+// lands at the span because its fraction is 1, and the call site is where the
+// number is spent. There is nothing left to compare, which is exactly why the
+// old row could not survive the change — and it did not fail loudly, it went
+// VACUOUS: with no literals left the extractor returned null, `CONTACT_MS`
+// was also null for an unrelated reason, and `null === null` reported green.
+// A row keyed on a mechanism dies with that mechanism, so the rows below are
+// keyed on the new one: the FRACTIONS, and the SPAN each call site passes.
+let contactBeats = null;
+visit(hapticsAst, (n) => {
+  if (n.type !== 'ObjectProperty' || n.key?.name !== 'contact') return;
+  const call = n.value;
+  if (call?.type !== 'CallExpression' || call.callee?.name !== 'sequence') return;
+  const arr = call.arguments[0];
+  if (arr?.type !== 'ArrayExpression') return;
+  contactBeats = arr.elements.map((el) => {
+    if (el?.type !== 'ArrayExpression' || el.elements.length !== 2) return null;
+    const [frac, style] = el.elements;
+    if (frac?.type !== 'NumericLiteral' || style?.type !== 'MemberExpression') return null;
+    return [frac.value, style.property?.name ?? null];
+  });
+});
+const CONTACT_FRACTIONS = [
+  [0, 'Light'],
+  [0.5, 'Light'],
+  [1, 'Medium'],
+];
+const beatsMatch =
+  Array.isArray(contactBeats) &&
+  contactBeats.length === CONTACT_FRACTIONS.length &&
+  contactBeats.every(
+    (b, i) => b && b[0] === CONTACT_FRACTIONS[i][0] && b[1] === CONTACT_FRACTIONS[i][1],
+  );
+if (beatsMatch) {
+  ok(
+    `D1b hexTap.contact is fractions plus styles — ${contactBeats.map(([f, st]) => `${f}:${st}`).join(', ')}. The closing fraction is 1, so the last impact lands ON the span whatever the span is, and at CONTACT_MS ${CONTACT_MS} that is the shipped 0/90/180 with no rounding`,
+  );
 } else {
-  bad('D1b', `the contact haptic's last beat is ${lastHapticBeat ?? '(none found)'}ms but CONTACT_MS is ${CONTACT_MS} — the touch and the picture have come apart, and only one of them is visible`);
+  bad(
+    'D1b',
+    `hexTap.contact's beats read ${JSON.stringify(contactBeats)} — expected ${JSON.stringify(CONTACT_FRACTIONS)}. The rising Light/Light/Medium and the closing fraction of 1 are both ruled (IA spec §10)`,
+  );
+}
+
+// D1c/D1d: the two spans, read at their call sites. This is the half the
+// fractions cannot carry — a sequence with the right shape fired with the
+// wrong span is the desync the old row existed to catch, relocated.
+const fullSpanCall = /hexTapHaptics\.contact\(CONTACT_MS\)/.test(gridSrc);
+if (fullSpanCall) {
+  ok('D1c the full-motion call site passes CONTACT_MS — the two hats are one number at one call site now, not two copies in two files');
+} else {
+  bad('D1c', 'the full-motion `hexTapHaptics.contact(...)` no longer passes CONTACT_MS — the touch and the picture have come apart, and only one of them is visible');
+}
+const rmSpanCall = /hexTapHaptics\.contact\(DURATIONS\.reducedMotionFade\)/.test(gridSrc);
+const rmLoneImpact = /Haptics\.impactAsync\(/.test(gridSrc);
+if (rmSpanCall && !rmLoneImpact) {
+  ok('D1d the Reduce Motion branch fires the SAME named sequence over DURATIONS.reducedMotionFade (beats 0/100/200) and no raw impact survives in the file — RM damps the picture, so the haptic carries more of the message, not less');
+} else if (!rmSpanCall) {
+  bad('D1d', 'the Reduce Motion branch does not fire `hexTapHaptics.contact(DURATIONS.reducedMotionFade)` — the ruled derived fix (Lumen, `4f9f3365` + `da767b3b`)');
+} else {
+  bad('D1d', 'a raw `Haptics.impactAsync(` survives in HoneycombGrid.js — the lone impact this module exists to prevent, back at a call site');
+}
+
+// D1e: the two-copies hazard is closed rather than merely unused. A literal
+// millisecond back in the module is the old mechanism returning, and it would
+// be invisible to D1b, which reads only the beats it recognises.
+const survivingLiterals = [...hapticsSrc.matchAll(/setTimeout\([^,]*,\s*(\d+)\)/g)].map((m) => m[1]);
+const setTimeoutSites = (hapticsSrc.match(/setTimeout\(/g) ?? []).length;
+if (setTimeoutSites === 0) {
+  bad('D1e', 'no `setTimeout(` found in haptics.js at all — the scan is not reading the module, so its zero is not an absence');
+} else if (survivingLiterals.length === 0) {
+  ok(`D1e no hardcoded millisecond survives in haptics.js (${setTimeoutSites} setTimeout site read, all scheduled off the span) — the number lives at the call site now, once`);
+} else {
+  bad('D1e', `hardcoded beat literals back in haptics.js: {${survivingLiterals.join(', ')}} — a second copy of a number that belongs to the picture`);
 }
 
 // The glow's decay must be WRITTEN as the offset, not typed. A literal 170

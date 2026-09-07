@@ -165,7 +165,7 @@ export const PollinateWrapped = ({ onComplete }) => {
   // Medium haptic on the crack itself, and stacking this on top of it
   // would read as two taps registering instead of one.
   const advance = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     nextBeat();
   }, [nextBeat]);
 
@@ -313,7 +313,7 @@ const CardBeat = ({ data, onAdvance }) => {
 
   const handleSettled = useCallback(() => {
     setDetonating(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     const delay = reduced ? DURATIONS.reducedMotionFade : DURATIONS.celebrate;
     resolveTimer.current = setTimeout(() => {
       setResolved(true);

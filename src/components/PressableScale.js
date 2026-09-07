@@ -113,7 +113,7 @@ export const PressableScale = ({
   };
 
   const handlePress = () => {
-    if (haptic) Haptics.impactAsync(haptic);
+    if (haptic) Haptics.impactAsync(haptic).catch(() => {});
     onPress?.();
   };
 

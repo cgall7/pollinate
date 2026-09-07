@@ -195,7 +195,7 @@ export const CombNectarComposeScreen = ({ navigation, route }) => {
           : recipientIsPlaceholder
             ? `Sent ${resolvedAmount} drops.`
             : `Sent ${resolvedAmount} drops to ${recipientLabel}.`;
-      if (!origin || !destination) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (!origin || !destination) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (reduced || !origin || !destination) await wait(NECTAR.settle);
       setSuccessMessage(message);
       AccessibilityInfo.announceForAccessibility(message);

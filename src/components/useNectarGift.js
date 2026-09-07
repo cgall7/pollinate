@@ -233,7 +233,7 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
       // opacity, for zero frames of travel) — acceptance row 6.
       if (reduced) {
         setPhase(GIFT_SETTLE);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         // R-N3.4's Reduced Motion clause: the send surface still yields, as
         // the ruled interaction-feedback substitute — a flat fade at
         // `DURATIONS.reducedMotionFade`, §14.1's one number for this. It is
@@ -351,7 +351,7 @@ export const useNectarGift = ({ reduced, balanceDrops }) => {
           contacted = true;
           // THE HAPTIC IS HERE, and this call site IS acceptance row 4: it
           // is inside the animation's completion, not inside the promise's.
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setPhase(GIFT_SETTLE);
           // The drop's area collapses into the paper and the paper takes the
           // stain. Absorption and the count start on the same frame — the

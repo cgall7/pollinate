@@ -1,9 +1,21 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View, Text, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+  Easing,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { theme } from '../constants/theme';
+import { DURATIONS, SEND, SEND_EASING, useReducedMotion } from '../constants/motion';
+import { send as sendHaptics } from '../constants/haptics';
 import { HoneycombStore } from '../services/HoneycombStore';
 import { NotesStore, NOTE_CONTENT_MAX } from '../services/NotesStore';
 import { SeedsStore, SEED_CONTENT_MAX } from '../services/SeedsStore';
@@ -204,6 +216,143 @@ export const Compose = ({ navigation }) => {
       ? draft.message
       : null;
 
+  // DES-40 — THE ENDING. This screen's first motion and first haptic, a mount
+  // and not a tune (Lumen, ruling 1 of `5a0d6a0a`). One act, two endings, and
+  // the object that performs them is the NOTE: the thing the person wrote is
+  // the thing that leaves or the thing that stays. Nothing else on the screen
+  // moves, because nothing else on the screen is the note.
+  //
+  // WHY IT PLAYS AFTER THE WRITE AND NOT WITH IT. The picture is the
+  // acknowledgement of a completed act, so it is bound to the act completing:
+  // the note leaves because it left. Run concurrently, a rejected write leaves
+  // a departed note on a screen that then has to say it failed, and the two
+  // sentences contradict each other. The cost is that the ending starts at an
+  // unpredictable instant; the alternative is that it sometimes lies.
+  const reduced = useReducedMotion();
+  // `useReducedMotion`, not `useReducedMotionState`, and this is the one place
+  // the distinction is safely free: the ending fires from `onPress` on a
+  // screen that has been mounted since before the person typed a word, so the
+  // hook's async read resolved long ago and there is no substitute racing a
+  // first commit here (R-RM-1's hazard is a substitute that MOUNTS on the read
+  // — `SealCrack`'s own crack handler takes this same shape for this reason).
+  const lift = useRef(new Animated.Value(0)).current;
+  const fly = useRef(new Animated.Value(0)).current;
+  const stow = useRef(new Animated.Value(0)).current;
+  const rmFade = useRef(new Animated.Value(1)).current;
+
+  // The animation's completion callback navigates, so it needs to know whether
+  // there is still a screen to navigate off. Same guard and same reason as
+  // `SealCrack`'s `mountedRef`: a hardware back or a swipe during the ending
+  // unmounts this before the last frame lands.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Built once. Three drivers compose into three outputs rather than one
+  // driver per output, because the two endings share an object and not a
+  // path: `lift` and `fly` are the departure's two segments, `stow` is the
+  // stowage, and only one of the two ever runs. An ending that did not run
+  // holds its driver at 0, which is the identity of every expression below.
+  //
+  // NOTHING RESETS THESE, and that is checked rather than assumed. `Compose`
+  // is a modal `Stack.Screen` (App.js), so the `goBack` at the end of the
+  // ending POPS it and the next visit is a fresh mount with fresh values. A
+  // reset on focus would be dead code today; if this screen ever stops
+  // unmounting on dismiss, it stops being true and the ending would replay
+  // from its own end state.
+  const noteMotion = useMemo(
+    () => ({
+      opacity: Animated.multiply(
+        rmFade,
+        Animated.multiply(
+          fly.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          // The stowed note DIMS, it does not vanish: it is still on the
+          // screen because it is still in the app, waiting for a date. The
+          // departed note goes to 0 because it went somewhere.
+          stow.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] })
+        )
+      ),
+      translateY: Animated.add(
+        lift.interpolate({ inputRange: [0, 1], outputRange: [0, -16] }),
+        Animated.add(
+          fly.interpolate({ inputRange: [0, 1], outputRange: [0, -144] }),
+          // Down, not up, and that is the whole difference between the two
+          // endings in one sign.
+          stow.interpolate({ inputRange: [0, 1], outputRange: [0, 8] })
+        )
+      ),
+      scale: Animated.multiply(
+        lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.97] }),
+        stow.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] })
+      ),
+    }),
+    [lift, fly, stow, rmFade]
+  );
+
+  // Every timing here is `useNativeDriver: true` — opacity and transform only,
+  // no layout property anywhere in `noteMotion`, which is what makes that true
+  // rather than aspirational.
+  const playEnding = (isSeed) =>
+    new Promise((resolve) => {
+      if (reduced) {
+        // §14.1's blanket: reduced motion collapses to a flat fade at
+        // `reducedMotionFade`, no exceptions. The two endings become one
+        // picture here, and the haptic is what still tells them apart — which
+        // is the doctrine, not a shortfall (§10: RM damps the visual, so the
+        // haptic carries MORE of the message, not less).
+        //
+        // The span rebinds to the substitute, per the derivation rule: the
+        // visual that actually plays is the fade, so the fade is the referent.
+        (isSeed ? sendHaptics.seedSeal : sendHaptics.take)(DURATIONS.reducedMotionFade);
+        Animated.timing(rmFade, {
+          toValue: 0,
+          duration: DURATIONS.reducedMotionFade,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }).start(() => resolve());
+        return;
+      }
+      if (isSeed) {
+        // ON A DATE — the stowage. One timing carrying both beats: the Light
+        // is the placement tick at t=0 and the Medium lands as the seal
+        // completes, which is why the span is the settle and not some part of
+        // it. `out(cubic)` ends at zero velocity so the closing impact does
+        // not report an act still in progress.
+        sendHaptics.seedSeal(SEND.sealSettle);
+        Animated.timing(stow, {
+          toValue: 1,
+          duration: SEND.sealSettle,
+          easing: SEND_EASING.sealSettle,
+          useNativeDriver: true,
+        }).start(() => resolve());
+        return;
+      }
+      // NOW — the departure, and the take spans only its FIRST segment. The
+      // Medium fires as the note detaches and the Light lands on the frame the
+      // lift completes, which is the same frame the travel begins; the travel
+      // itself is un-mirrored by ruling, so the finger is finished with this
+      // note while it is still visibly leaving.
+      sendHaptics.take(SEND.liftOff);
+      Animated.sequence([
+        Animated.timing(lift, {
+          toValue: 1,
+          duration: SEND.liftOff,
+          easing: SEND_EASING.liftOff,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fly, {
+          toValue: 1,
+          duration: SEND.travel,
+          easing: SEND_EASING.travel,
+          useNativeDriver: true,
+        }),
+      ]).start(() => resolve());
+    });
+
   const handleSubmit = async () => {
     if (!canSubmit || sending) return;
     setSending(true);
@@ -211,6 +360,13 @@ export const Compose = ({ navigation }) => {
     try {
       if (onADate) await SeedsStore.plantSeed(recipientId, content, bloomAt);
       else await NotesStore.sendNote(recipientId, content);
+      // DES-40: the ending plays between the write landing and the screen
+      // closing, and `goBack` waits for it. `sending` stays true across it on
+      // purpose — the CTA is still the disabled in-flight label while the note
+      // performs, so no control comes back to life under a note that has
+      // already left.
+      await playEnding(onADate);
+      if (!mountedRef.current) return;
       navigation.goBack();
     } catch (err) {
       // Deliberately a state on this screen rather than a rejection that
@@ -309,16 +465,28 @@ export const Compose = ({ navigation }) => {
         )}
 
         <Text style={styles.sectionLabel}>NOTE</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="I am grateful for..."
-          placeholderTextColor={theme.colors.textSecondary}
-          value={content}
-          onChangeText={setContent}
-          multiline
-          maxLength={contentMax}
-          editable={!sending}
-        />
+        {/* DES-40's performing object. The wrapper exists only to carry the
+            ending — the field's own style is untouched, so nothing about the
+            resting screen moved. `pointerEvents` is not set: `editable` is
+            already false for the whole of `sending`, which covers the window
+            the ending plays in. */}
+        <Animated.View
+          style={{
+            opacity: noteMotion.opacity,
+            transform: [{ translateY: noteMotion.translateY }, { scale: noteMotion.scale }],
+          }}
+        >
+          <TextInput
+            style={styles.textInput}
+            placeholder="I am grateful for..."
+            placeholderTextColor={theme.colors.textSecondary}
+            value={content}
+            onChangeText={setContent}
+            multiline
+            maxLength={contentMax}
+            editable={!sending}
+          />
+        </Animated.View>
         <Text style={styles.charCount}>
           {content.length}/{contentMax}
         </Text>
@@ -400,7 +568,16 @@ export const Compose = ({ navigation }) => {
         {draftWarning && <Text style={styles.warning}>{draftWarning}</Text>}
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <PrimaryButton onPress={handleSubmit} disabled={!canSubmit || sending}>
+        {/* DES-40, and this prop is INDIVISIBLE from the sequences above.
+            `PrimaryButton` defaults `haptic` to Light and forwards it to
+            `PressableScale`, so a component default is a call site with no
+            text: without this, the take's opening Medium would land on top of
+            a Light nobody wrote and the send would ship the stacked click the
+            haptics module exists to prevent. The rule is that a sequence
+            REPLACES the default, never stacks on it (IA spec §10). The mode
+            chips above keep their default Light — a uniform substrate is what
+            makes the named sequences read as named. */}
+        <PrimaryButton onPress={handleSubmit} disabled={!canSubmit || sending} haptic={null}>
           {ctaLabel}
         </PrimaryButton>
       </ScrollView>

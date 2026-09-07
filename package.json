@@ -28,6 +28,7 @@
     "check:hive-state-rls": "node scripts/check-hive-state-rls.mjs",
     "check:honey-fill": "node scripts/check-honey-fill.mjs",
     "check:hex-tap": "node scripts/check-hex-tap.mjs",
+    "check:send-ending": "node scripts/check-send-ending.mjs",
     "check:nectar-delivery-allowance": "node scripts/check-nectar-delivery-allowance.mjs",
     "check:nectar-exchange": "node scripts/check-nectar-exchange.mjs",
     "check:eng102-garden-nectar-reads": "node scripts/check-eng102-garden-nectar-reads.mjs",
