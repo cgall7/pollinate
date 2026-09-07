@@ -854,7 +854,9 @@ check(
 // with the TAB_ICONS rows, not reorder, and insertion is the one that
 // already fired — a route-id key survives both.
 const RULED_TAB_LABELS = {
-  Today: 'Today',
+  // FIVE_TAB_IA_SPEC.md §2 row 2 / §7 (Lumen, 2026-09-07): rides ENG-104's
+  // landing, same commit — TodayTab's residue is the private-hives surface.
+  Today: 'Private hives',
   Hive: 'Honeycomb',
   Nectar: 'Nectar',
   Garden: 'Garden',

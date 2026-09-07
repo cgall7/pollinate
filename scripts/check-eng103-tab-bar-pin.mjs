@@ -450,6 +450,100 @@ for (const [key, relFile] of [
   }
 }
 
+// --- 4. Co-location: the entryJustSaved anchor's screen actually reads it --
+//
+// FIVE_TAB_IA_SPEC.md §5 (Lumen, 2026-09-07): the celebration transplant is
+// ruled as "screen named at the entryJustSaved anchor site == tab whose file
+// consumes route.params.entryJustSaved." Section 3 above pins the FIRST half
+// — the anchor names 'Hive' — but nothing asserted the second half. Delete
+// the consumer effect from that screen tomorrow and this file stays green
+// while the celebration signal arrives at a screen nothing reads it on,
+// which is the exact failure the ruling exists to bar (Lumen's finding,
+// review of 1fd82db).
+{
+  const mainTabsFile = path.join(ROOT, 'src/navigation/MainTabs.js');
+  const mainTabsSrc = await readFile(mainTabsFile, 'utf8');
+  let mainTabsAst;
+  try {
+    mainTabsAst = parse(mainTabsSrc, { sourceType: 'module', plugins: ['jsx'] });
+  } catch (err) {
+    bad(`${rel(mainTabsFile)} parses (co-location section)`, err.message);
+    mainTabsAst = null;
+  }
+
+  const routeToComponent = {};
+  const componentToImportSource = {};
+  if (mainTabsAst) {
+    walk(mainTabsAst.program, (node) => {
+      if (node.type !== 'JSXElement' || node.openingElement.name.type !== 'JSXMemberExpression') return;
+      const { object, property } = node.openingElement.name;
+      if (object.type !== 'JSXIdentifier' || object.name !== 'Tab' || property.name !== 'Screen') return;
+      const nameAttr = node.openingElement.attributes.find((a) => a.type === 'JSXAttribute' && a.name.name === 'name');
+      const componentAttr = node.openingElement.attributes.find((a) => a.type === 'JSXAttribute' && a.name.name === 'component');
+      if (nameAttr?.value?.type !== 'StringLiteral') return;
+      if (componentAttr?.value?.type !== 'JSXExpressionContainer' || componentAttr.value.expression.type !== 'Identifier') return;
+      routeToComponent[nameAttr.value.value] = componentAttr.value.expression.name;
+    });
+    walk(mainTabsAst.program, (node) => {
+      if (node.type !== 'ImportDeclaration') return;
+      for (const spec of node.specifiers) {
+        if (spec.type === 'ImportSpecifier' || spec.type === 'ImportDefaultSpecifier') {
+          componentToImportSource[spec.local.name] = node.source.value;
+        }
+      }
+    });
+  }
+
+  const targetRoute = RULED_DESTINATIONS.entryJustSaved;
+  const componentName = routeToComponent[targetRoute];
+  const importSource = componentName ? componentToImportSource[componentName] : undefined;
+
+  if (!componentName || !importSource) {
+    bad(
+      'entryJustSaved anchor resolves to a screen file',
+      `could not resolve Tab.Screen name=${JSON.stringify(targetRoute)} to an imported component in ${rel(mainTabsFile)}`
+    );
+  } else {
+    const screenFile = path.join(path.dirname(mainTabsFile), `${importSource}.js`);
+    const screenSrc = await readFile(screenFile, 'utf8').catch(() => null);
+    if (screenSrc === null) {
+      bad('entryJustSaved anchor resolves to a screen file', `resolved import ${JSON.stringify(importSource)} does not exist on disk`);
+    } else {
+      let screenAst;
+      try {
+        screenAst = parse(screenSrc, { sourceType: 'module', plugins: ['jsx'] });
+      } catch (err) {
+        bad(`${rel(screenFile)} parses (co-location section)`, err.message);
+        screenAst = null;
+      }
+      let reads = false;
+      if (screenAst) {
+        walk(screenAst.program, (node) => {
+          if (reads) return;
+          if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') return;
+          if (node.property.type !== 'Identifier' || node.property.name !== 'entryJustSaved') return;
+          const obj = node.object;
+          if (
+            (obj.type === 'MemberExpression' || obj.type === 'OptionalMemberExpression') &&
+            obj.property.type === 'Identifier' &&
+            obj.property.name === 'params'
+          ) {
+            reads = true;
+          }
+        });
+      }
+      if (reads) {
+        ok(`entryJustSaved's mounted screen (${rel(screenFile)}) reads route.params.entryJustSaved`);
+      } else {
+        bad(
+          'entryJustSaved anchor is co-located with its consumer',
+          `${rel(screenFile)} (mounted at route "${targetRoute}") has no route.params.entryJustSaved read — the celebration signal would arrive at a screen nothing consumes it on`
+        );
+      }
+    }
+  }
+}
+
 console.log(`\ncheck-eng103-tab-bar-pin: ${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   failures.forEach((f) => console.log(`  - ${f}`));

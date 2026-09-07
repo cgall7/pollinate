@@ -45,7 +45,10 @@ export const NUDGE_BODY = 'What did it show you?';
 // its own word. D5's RATIFIED replacement takes the destination block's own
 // vocabulary instead of its noun:
 //
-//   HoneycombTab.js:1046-1048  "Today's page is blank." / "One line is enough…"
+//   HoneycombTab.js, the empty entry card's blank state (cited BY NAME, not
+//   by line — a re-point of this same comment shipped in ENG-104's own
+//   commit already went stale at its own tree, Lumen's finding, review of
+//   1fd82db): "Today's page is blank." / "One line is enough…"
 //   (re-pointed 2026-09-07, ENG-104 — the entry card and this render state
 //   moved to Honeycomb whole; FIVE_TAB_IA_SPEC §5. The words are unchanged.)
 //

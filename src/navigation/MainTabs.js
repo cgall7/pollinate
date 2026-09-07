@@ -51,7 +51,11 @@ const Tab = createBottomTabNavigator();
 // (@expo/vector-icons .../glyphmaps/{Ionicons,MaterialCommunityIcons}.json)
 // rather than recalled — a missing name renders a blank square, not an error.
 const TAB_ICONS = {
-  Today: { active: 'sunny', inactive: 'sunny-outline' },
+  // FIVE_TAB_IA_SPEC.md §2 row 2 / §7 (Lumen, 2026-09-07): Today's surface is
+  // now the private-hives residue, not a daily check-in — sunny retires with
+  // the word. `hexagon` (not Hive's `hexagon-multiple`) so the two tabs stay
+  // visually distinct; both checked against the installed glyphmap.
+  Today: { active: 'hexagon', inactive: 'hexagon-outline', set: MaterialCommunityIcons },
   Hive: { active: 'hexagon-multiple', inactive: 'hexagon-multiple-outline', set: MaterialCommunityIcons },
   // R-NT-2 amendment: the DROP, not a hexagon and not a jar. The hexagon is
   // Honeycomb's glyph and the vessel on the tab itself is the own cell drawn
@@ -226,7 +230,7 @@ export const MainTabs = () => {
       <Tab.Screen
         name="Today"
         component={TodayTab}
-        options={{ tabBarLabel: 'Today' }}
+        options={{ tabBarLabel: 'Private hives' }}
       />
       <Tab.Screen
         name="Hive"

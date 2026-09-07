@@ -561,11 +561,13 @@ export const TodayTab = ({ navigation }) => {
         )}
 
         {/* "Writing with others" shelf (ENG-61) — only rendered when
-            non-empty, same door-less treatment `FileToHive` above gets for
-            an empty/failed read: there is no evergreen local action this
-            shelf could show in its place (unlike the private-hives shelf's
-            "start a hive" door card), so a zero-row state and a failed read
-            both simply withhold the shelf rather than asserting either one. */}
+            non-empty, same door-less treatment the private-hives shelf above
+            gets for an empty/failed read (its own comment: `hivesError`
+            never blanks it, the door card has no data dependency): there is
+            no evergreen local action this shelf could show in its place
+            (unlike the private-hives shelf's "start a hive" door card), so a
+            zero-row state and a failed read both simply withhold the shelf
+            rather than asserting either one. */}
         {(contributingHives.length > 0 || pendingCombs.length > 0) && (
           <StaggeredItem index={3}>
             <PerchAnchor id="contributing-hive-shelf" on="left" at={0.5}>

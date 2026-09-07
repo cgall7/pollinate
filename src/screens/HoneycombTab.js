@@ -491,10 +491,10 @@ const HoneycombFeed = () => {
 
   const loadAll = useCallback(async ({ suppressArrival = false } = {}) => {
     // finally, not a trailing call: any of the six Promise.all members below
-    // rejecting — or hasSharedDate() further down — must still clear the
-    // spinner. Before this, only the happy path reached setLoading(false),
-    // so a rejection left the tab spinning forever with no exit (Sage,
-    // thread e10d0fed). This doesn't add an error state — that's unowned,
+    // rejecting must still clear the spinner. Before this, only the happy
+    // path reached setLoading(false), so a rejection left the tab spinning
+    // forever with no exit (Sage, thread e10d0fed). This doesn't add an
+    // error state — that's unowned,
     // filed to Pixel's queue in the same post — it only guarantees the
     // loading indicator itself can't get stuck.
     //
@@ -780,6 +780,12 @@ const HoneycombFeed = () => {
     setSharing(true);
     try {
       await HoneycombStore.shareEntry({ entryId: todayEntry.id });
+      // ENG-104 fix (Vector, thread f2c15b7d, 2026-09-07): `alreadySharedToday`'s
+      // producer moved to the focus effect above, which does not re-run on
+      // demand (empty deps — it only fires on focus). `loadAll` no longer
+      // touches this state, so the flip has to happen here, from the fact
+      // this call just established, rather than by re-reading it.
+      setAlreadySharedToday(true);
       setShareCarryKey((key) => key + 1);
       await loadAll({ suppressArrival: true });
     } catch (err) {

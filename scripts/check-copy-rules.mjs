@@ -600,9 +600,12 @@ for (const [label, line] of FROZEN) check(`${label} is still rendered`, texts.ha
 // banned — they are ordinary English, and stay ordinary English right up
 // until a second surface spends either on a DIFFERENT object. D5 (Lumen,
 // `fedeaff5`, 2026-08-19) ratified `NUDGE_ASK_LABEL` — "Let me know on days
-// my page is still blank." — on the argument that it takes TodayTab's own
-// blank-state vocabulary (`TodayTab.js:200`, "Today's page is blank.")
-// rather than inventing a new noun. That argument holds only against the
+// my page is still blank." — on the argument that it takes the empty entry
+// card's own blank-state vocabulary ("Today's page is blank.", hosted on
+// HoneycombTab.js since ENG-104's 2026-09-07 transplant — cited BY NAME,
+// not TodayTab.js, per the same class of stale citation Lumen flagged on
+// nudgeCopy.js's own re-point of this line) rather than inventing a new
+// noun. That argument holds only against the
 // tree it was measured on: `line` was withdrawn the same way, after
 // `fizz/private-hives-rails` spent it on a different object
 // (`ComposeHiveEntry.js:56`, `CreateHive.js:180`) between one sweep and the
@@ -620,8 +623,9 @@ for (const [label, line] of FROZEN) check(`${label} is still rendered`, texts.ha
 // allowlist is a NEW spend of the word, and reds here rather than needing a
 // second human sweep to notice.
 //
-// `page`'s allowlist has three members, not two: the destination
-// (`TodayTab.js`), `legalCopy.js`'s deictic self-reference to the document
+// `page`'s allowlist has three members, not two: the destination (the empty
+// entry card's blank state, hosted on `HoneycombTab.js` since ENG-104),
+// `legalCopy.js`'s deictic self-reference to the document
 // being read (never an object-noun claim about a screen — a different sense
 // of the word, not a different OBJECT), and the nudge ask this PR adds,
 // which is the same referent as the destination by D5's own ruling. `blank`
