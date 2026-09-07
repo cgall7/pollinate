@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../constants/theme';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -64,24 +64,58 @@ export const CombInviteLandingScreen = ({ navigation, route }) => {
   // 'loading' | 'unreachable' | 'notFound' | 'ready'
   const [status, setStatus] = useState('loading');
 
-  const load = async () => {
+  // DES-45. `preview` is the subject and `status` is the claim about it, and
+  // this pass writes both. The effect keys on a route param, so a second deep
+  // link lands on the MOUNTED screen and starts a second pass with no remount:
+  // two codes in flight left `status` from one pass over `preview` from
+  // another, and the failure arms wrote the claim alone. `notFound` against a
+  // valid invite, or `ready` against a preview the route no longer names, on
+  // the surface a stranger meets first.
+  //
+  // The token is a ref rather than state because it must survive the re-render
+  // its own writes cause, and it is an id rather than a boolean because ONE
+  // cancel point has to retire whichever pass is in flight — the effect's or
+  // the retry's. `load` is also the retry handler, so it takes NO parameter:
+  // `onRetry={load}` hands it a press event, and a token read off an event
+  // object is `undefined`, which is falsy, which is every write landing.
+  const passRef = useRef(0);
+
+  const load = () => {
+    const pass = (passRef.current += 1);
+    const current = () => pass === passRef.current;
     setStatus('loading');
-    try {
-      const next = await CombInviteStore.preview(inviteCode);
-      if (!next) {
-        setStatus('notFound');
-        return;
+    return (async () => {
+      try {
+        const next = await CombInviteStore.preview(inviteCode);
+        // One guard per await, not one per function. Both arms below are
+        // reached only through this suspension point, and BOTH are guarded:
+        // status and preview are one pair, so a superseded pass writes
+        // neither, its failure arms included. A stale `notFound` is the
+        // wrong-claim arm and it is the one this repair exists for.
+        if (!current()) return;
+        if (!next) {
+          setStatus('notFound');
+          return;
+        }
+        setPreview(next);
+        setStatus('ready');
+      } catch (err) {
+        if (!current()) return;
+        console.warn('Comb invite preview failed', err);
+        setStatus('unreachable');
       }
-      setPreview(next);
-      setStatus('ready');
-    } catch (err) {
-      console.warn('Comb invite preview failed', err);
-      setStatus('unreachable');
-    }
+    })();
   };
 
   useEffect(() => {
     load();
+    // The cleanup is what makes the token load-bearing: a token declared
+    // without a cleanup that sets it is decorative. Advancing the id retires
+    // whatever is in flight, so a retry that outlives a route change is
+    // superseded by the same mechanism as a superseded effect pass.
+    return () => {
+      passRef.current += 1;
+    };
   }, [inviteCode]);
 
   const continueToJoin = async () => {
