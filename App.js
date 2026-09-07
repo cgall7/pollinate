@@ -221,7 +221,16 @@ export default function App() {
                   onDone={async () => {
                     const inviteCode = await PendingCombInvite.get();
                     if (inviteCode) props.navigation.replace('CombInvite', { inviteCode });
-                    else props.navigation.replace('Main');
+                    // Post-onboarding destination, ruled explicitly (Lumen,
+                    // thread f2c15b7d, 2026-09-07): named rather than
+                    // inherited from Tab.Screen declaration order, which is
+                    // the hazard ENG-103's initialRouteName pin closes.
+                    // Stays Today until ENG-104 mounts the compose card on
+                    // Honeycomb and flips this to Hive in the same commit —
+                    // flipping early lands a brand-new account on an empty
+                    // connection-acquisition prompt, not the write door
+                    // (Vector's finding, same thread).
+                    else props.navigation.replace('Main', { screen: 'Today' });
                   }}
                   splashHidden={splashHidden}
                 />
@@ -388,7 +397,12 @@ export default function App() {
                 <EveningMirror
                   {...props}
                   gratitudeText="I am grateful for this beautiful day."
-                  onClose={() => props.navigation.navigate('Main')}
+                  // Ruled to stay Today even once ENG-104 flips the other
+                  // bare-Main sites to Hive (Lumen, thread f2c15b7d,
+                  // 2026-09-07): the mirror is the evening entry beat, and
+                  // its close returns to the practice surface, not the
+                  // landing tab. Re-decided only if/when Today itself folds.
+                  onClose={() => props.navigation.navigate('Main', { screen: 'Today' })}
                 />
               )}
             </Stack.Screen>

@@ -285,6 +285,38 @@ const channelOf = (ancestors) => {
   return 'declaration';
 };
 
+// N3's discriminator for the two MainTabs.js tab-dock entries, ruled by
+// Lumen 2026-09-07: the two Nectar rows are already different OBJECTS by
+// `kind` (`reads-to-user/ruled` vs `not-copy/route-identity`), the table
+// just wasn't keying on that fact. This walks outward from a dropped string
+// to the nearest enclosing `<X.Screen>` and reads its `name=` value, so a
+// tab-route string can be keyed on the route id it belongs to instead of
+// the line it happened to sit on. Stops at the first JSX element it meets —
+// a string nested inside some OTHER element inside `component={...}` must
+// not inherit the enclosing Screen's route id.
+const enclosingScreenRouteId = (ancestors) => {
+  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+    const { node: a } = ancestors[i];
+    if (a.type !== 'JSXOpeningElement') continue;
+    const n = a.name;
+    if (n?.type !== 'JSXMemberExpression' || n.property?.name !== 'Screen') return undefined;
+    const nameAttr = a.attributes.find((attr) => attr.type === 'JSXAttribute' && attr.name?.name === 'name');
+    return nameAttr?.value?.type === 'StringLiteral' ? nameAttr.value.value : undefined;
+  }
+  return undefined;
+};
+
+// The only two attribute slots a `<Tab.Screen>` carries a dock word in
+// today: the route id itself (`name=`) and the declared label
+// (`options={{ tabBarLabel }}`). Anything else nested inside a Screen
+// element (e.g. `component={...}`) is not one of these and keeps the
+// ordinary file:line key below — this table is not widening to cover every
+// string a Screen element can contain, only the two FU2 already ruled on.
+const TAB_SCREEN_ATTR_SLOTS = {
+  'jsx-attribute:name': 'route-name',
+  'jsx-attribute:options': 'options-label',
+};
+
 let collectedCount = 0;
 let droppedCount = 0;      // not collected, non-empty text
 let droppedEmptyCount = 0; // not collected, empty after collapse (whitespace JSXText, '')
@@ -296,6 +328,7 @@ const routeIds = [];     // every *.Screen name= value, for P3's own row
 const headerOverrides = [];
 const tabBarButtons = [];  // the component named by screenOptions.tabBarButton
 const components = new Map();  // component name -> how it treats the props it is handed
+const tabIconKeys = [];  // TAB_ICONS's own keys, for the N4b pair below
 // The corpus's own contribution, tracked separately from the tree's. A row
 // that says "zero hits in the corpus" is vacuous unless the same run can say
 // how many of its strings were examined to get there.
@@ -348,6 +381,32 @@ for (const file of files) {
             tabBarButtons.push({ at: `${rel}:${attr.loc?.start.line}`, name });
           }
         }
+      }
+      return;
+    }
+    // `TAB_ICONS`'s own keys, collected here since MainTabs.js is already an
+    // AST this walk parses. Vector, thread 83a9b421, 2026-09-07: this table
+    // is indexed with no fallback at MainTabs.js:85/:91, so a route id
+    // absent from it throws inside the app's only ErrorBoundary. A fresh
+    // ObjectExpression grab, not a reuse of RULED_TAB_LABELS's collection or
+    // tabRoutes's own walk — the two gates below share a KEY SCHEME (route
+    // id), not a collector (Lumen, same thread).
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id?.type === 'Identifier' &&
+      node.id.name === 'TAB_ICONS' &&
+      node.init?.type === 'ObjectExpression'
+    ) {
+      for (const prop of node.init.properties) {
+        if (prop.type !== 'ObjectProperty') continue;
+        const id =
+          prop.key?.type === 'Identifier'
+            ? prop.key.name
+            : prop.key?.type === 'StringLiteral'
+              ? prop.key.value
+              : undefined;
+        if (id === undefined) continue;
+        tabIconKeys.push({ at: `${rel}:${prop.key.loc?.start.line}`, id });
       }
       return;
     }
@@ -421,10 +480,37 @@ for (const file of files) {
     const forbidden = FORBIDDEN.filter((f) => f.re.test(text)).map((f) => f.word);
     const reserved = RESERVE.filter((r) => r.re.test(text)).map((r) => r.word);
     if (!forbidden.length && !reserved.length) return;
+    const channel = channelOf(ancestors);
+    // Insertion-fragile only for strings inside an `*.Screen`'s `name=` or
+    // `options=` (N3/N4's shared finding); every other dropped string in
+    // the tree still keys on file:line, which is stable for everything
+    // else.
+    //
+    // enclosingScreenRouteId matches any JSXMemberExpression ending in
+    // `.Screen` — not `Tab.Screen` specifically, the `tab-route:` prefix
+    // notwithstanding — and the only such elements under src/ right now
+    // are the four tabs. That scoping is a population fact today, not a
+    // mechanism guarantee: a future in-src Stack.Screen (or any other
+    // `X.Screen`) whose `name=` carries a predicate word re-keys here too —
+    // and goes loud, missing-from-table, not silent, because the
+    // bidirectional pair below still has to find it in TABLE.
+    const slot = channel === 'jsx-attribute:options'
+      ? (() => {
+          for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+            const { node: a } = ancestors[i];
+            if (a.type === 'JSXAttribute') return undefined;
+            if (a.type === 'ObjectProperty') return `options:${a.key?.name ?? a.key?.value}`;
+          }
+          return undefined;
+        })()
+      : TAB_SCREEN_ATTR_SLOTS[channel];
+    const routeId = slot && enclosingScreenRouteId(ancestors);
     for (const word of [...forbidden, ...reserved]) {
       population.push({
-        key: `${rel}:${node.loc?.start.line} [${word}] ${JSON.stringify(text)}`,
-        channel: channelOf(ancestors),
+        key: routeId
+          ? `tab-route:${rel}:${routeId} [${slot}] [${word}] ${JSON.stringify(text)}`
+          : `${rel}:${node.loc?.start.line} [${word}] ${JSON.stringify(text)}`,
+        channel,
       });
     }
   });
@@ -474,6 +560,26 @@ check(
   'collected + dropped + empty accounts for every raw string-bearing node',
   collectedCount + droppedCount + droppedEmptyCount,
   rawCount
+);
+// A GENERIC backstop, not a tab-route-specific one. `measured` is a `Map`
+// keyed on `p.key`, so two population entries that derive the same key
+// collapse to one silently — the second write wins and the first is gone
+// before N3 ever runs, which is exactly the failure mode the tab-route key
+// had (Vector, this thread): `options={{ tabBarLabel, title }}` on one
+// route produced two population members under one key, and N3's
+// bidirectional pair, built on `measured.keys()`, cannot see a member that
+// never made it into the Map. This row asserts the population is injective
+// BEFORE any key scheme gets to rely on it, so a future key that is too
+// coarse — tab-route or otherwise — reds here first, structurally, instead
+// of going quiet inside a `Map` overwrite. It also closes a hole that
+// predates the tab-route key entirely: two identical predicate matches on
+// one literal `file:line` collapse under the plain key too.
+const keyCounts = new Map();
+for (const p of population) keyCounts.set(p.key, (keyCounts.get(p.key) ?? 0) + 1);
+check(
+  'no two dropped strings collapse onto the same population key',
+  [...keyCounts.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${k} (${n}×)`).sort(),
+  []
 );
 
 // --- N3. the declared table -------------------------------------------
@@ -550,13 +656,43 @@ const TABLE = [
   // the reason this gate exists: `options` is not a TEXT_ATTRS attribute, so
   // `positionFor` settles nothing above it and the string never enters the
   // collector's universe. The one word the dock speaks is in the null class.
-  { at: 'src/navigation/MainTabs.js:204 [\\bnectar\\b] "Nectar"', kind: 'reads-to-user/ruled' },
+  //
+  // Keyed on the file, the route id, and the attribute SLOT — not file:line,
+  // and not the attribute name alone. Vector found `check-collector-null-
+  // class` red in Fizz's ENG-103 worktree with no reorder performed:
+  // ENG-103 pins `initialRouteName` and only inserts a comment block above
+  // the declarations, and that alone shifted these two lines and orphaned
+  // both. Insertion is the fragility, not reorder; reorder (ENG-104) is the
+  // rare member of the class, insertion is the one that already fired.
+  //
+  // The file is back in the key because line is the only thing that moves —
+  // `rel` is insertion-stable — and cross-file uniqueness starts mattering
+  // the day a `Nectar` STACK screen exists beside the `Nectar` TAB screen.
+  //
+  // The slot is deeper than the attribute name. `channelOf` reports the same
+  // `jsx-attribute:options` channel for every string anywhere inside
+  // `options={{ ... }}`, so keying on the attribute alone collapses TWO
+  // ruled properties (`tabBarLabel` and, if one is ever added beside it,
+  // `title`) onto one key — a container is only as fine as what it contains,
+  // and a Map assign on a collision is a SILENT overwrite, not a red. Vector
+  // proved it live: adding `title: 'Nectar'` next to `tabBarLabel: 'Nectar'`
+  // left both N3 rows green. The fix walks outward from the string to the
+  // nearest `ObjectProperty` inside `options` and keys on ITS name
+  // (`options:tabBarLabel`), which is a different key from `options:title`
+  // even though `channelOf` reports them identically.
+  //
+  // These two rows are the same text at the same route in different slots,
+  // so a bare route-id key would still collide them; `kind` already told
+  // them apart (`reads-to-user/ruled` vs `not-copy/route-identity` below)
+  // and the slot is that same discriminator, read off the AST instead of
+  // asserted by hand.
+  { at: 'tab-route:src/navigation/MainTabs.js:Nectar [options:tabBarLabel] [\\bnectar\\b] "Nectar"', kind: 'reads-to-user/ruled' },
 
   // The route id on the line beside it. Same text, different object, and
   // after FU2 a different disposition: `getLabel` reaches `route.name` only
   // when neither a string `tabBarLabel` nor a `title` is declared, and N4
   // asserts all four labels are declared. Nothing reads it to a person.
-  { at: 'src/navigation/MainTabs.js:202 [\\bnectar\\b] "Nectar"', kind: 'not-copy/route-identity' },
+  { at: 'tab-route:src/navigation/MainTabs.js:Nectar [route-name] [\\bnectar\\b] "Nectar"', kind: 'not-copy/route-identity' },
 
   // --- reaches a person, and the word is the ruled one ----------------
   // FU3 (Lumen, 2026-09-06, same thread; R-NT ratification items 5 and 6).
@@ -701,12 +837,35 @@ check(
 // the subject: the LABEL is now the word a person reads, the route id is
 // navigation identity that nothing carries, and the rows below assert the
 // structure that makes that true rather than the sentence that says it.
+//
+// Keyed on the route id (the JSX Screen `name=` value — "Hive", not the
+// label "Honeycomb") rather than file:line. Vector ran this gate in Fizz's
+// live ENG-103 worktree with no reorder performed and it was already red,
+// 4 of 31 checks failing: `initialRouteName`'s pin inserted a comment block
+// above the declarations and that alone shifted all four addresses. The
+// failure is worth reading as a pair, not one sentence, because the two
+// structural rows below and the "ruled word" row do not fail the same way:
+// "has a ruled label declared" and "names a route id that is no longer a
+// tab screen" both go loud, four misses each, while "every declared tab
+// label is the ruled word" prints ok — vacuously, filtering over zero
+// routes because no `r.at` survives the shift, so the one row that actually
+// asserts Lumen's ruled words is the row silently not checking them. ENG-103
+// inserts; ENG-104 reorders. Insertion is the fragility this class shares
+// with the TAB_ICONS rows, not reorder, and insertion is the one that
+// already fired — a route-id key survives both.
 const RULED_TAB_LABELS = {
-  'src/navigation/MainTabs.js:192': 'Today',
-  'src/navigation/MainTabs.js:197': 'Honeycomb',
-  'src/navigation/MainTabs.js:202': 'Nectar',
-  'src/navigation/MainTabs.js:212': 'Garden',
+  Today: 'Today',
+  Hive: 'Honeycomb',
+  Nectar: 'Nectar',
+  Garden: 'Garden',
 };
+// FIFTH ROW, RULED NOT YET MOUNTED: POLLINATE_FIVE_TAB_IA_SPEC.md §6 (design
+// workspace, Lumen, 2026-09-07) fixes ENG-105's Friends tab as `Friends: 'Friends'`
+// (route id and word are the same string; "Friends feed" is the ticket's
+// descriptor, never the dock word). Not added here for the same structural
+// reason as the TAB_ICONS entry beside it in MainTabs.js: entering the key
+// before the route mounts reds "no ruled tab label names a route id that is
+// no longer a tab screen." Rides ENG-105's own commit.
 
 // The props BottomTabItem hands to `tabBarButton`, which is what makes the
 // declared label reach a person at all:
@@ -735,12 +894,12 @@ check('tab route ids were found', tabRoutes.length > 0, true);
 check('route ids outside the tab bar were found', otherRoutes.length > 0, true);
 check(
   'every tab route id has a ruled label declared for it',
-  tabRoutes.filter((r) => !RULED_TAB_LABELS[r.at]).map((r) => `${r.at} "${r.text}"`).sort(),
+  tabRoutes.filter((r) => !RULED_TAB_LABELS[r.text]).map((r) => `${r.at} "${r.text}"`).sort(),
   []
 );
 check(
-  'no ruled tab label names a position that is no longer a tab screen',
-  Object.keys(RULED_TAB_LABELS).filter((at) => !tabRoutes.some((r) => r.at === at)).sort(),
+  'no ruled tab label names a route id that is no longer a tab screen',
+  Object.keys(RULED_TAB_LABELS).filter((id) => !tabRoutes.some((r) => r.text === id)).sort(),
   []
 );
 // THE STRUCTURAL LICENCE for every other route id: a native-stack header
@@ -773,8 +932,8 @@ check(
 check(
   'every declared tab label is the ruled word',
   tabRoutes
-    .filter((r) => RULED_TAB_LABELS[r.at] && r.label !== RULED_TAB_LABELS[r.at])
-    .map((r) => `${r.at} label ${JSON.stringify(r.label)} vs ruled "${RULED_TAB_LABELS[r.at]}"`)
+    .filter((r) => RULED_TAB_LABELS[r.text] && r.label !== RULED_TAB_LABELS[r.text])
+    .map((r) => `${r.at} label ${JSON.stringify(r.label)} vs ruled "${RULED_TAB_LABELS[r.text]}"`)
     .sort(),
   []
 );
@@ -806,6 +965,40 @@ check(
         .map((n) => `${components.get(b.name).at} ${b.name} names ${JSON.stringify(n)}`)
     )
     .sort(),
+  []
+);
+
+// --- N4b. TAB_ICONS: the map MainTabs.js:85/:91 index with no fallback ---
+// Vector, thread 83a9b421, 2026-09-07: `TAB_ICONS[routeName].set` at :85 and
+// its two neighbors at :91 throw the instant a route id has no entry, and
+// the throw happens inside the app's only ErrorBoundary (App.js), whose
+// Reload deterministically re-crashes on this cause because it is source,
+// not state (ErrorBoundary.js:29-35 anticipates the state version; a
+// missing map key is not that version). `tabBarLabel` is gated above (N4);
+// TAB_ICONS had zero hits in scripts/ before this pair.
+//
+// Keyed on the route id string, same scheme as RULED_TAB_LABELS and for the
+// same reason: a file:line key orphans on any edit above the declaration,
+// and TAB_ICONS is exactly as insertion-fragile as N4 proved
+// RULED_TAB_LABELS to be (ENG-103's `initialRouteName` pin shifted both
+// tables' addresses with no reorder performed).
+//
+// Deliberately NOT gated here: whether a glyph NAME inside a present entry
+// resolves in the installed glyphmap. That reads an installed module, an
+// input Vector found broken in the shared root checkout for reasons with
+// nothing to do with the code (the vector-icons package is a truncated
+// extraction there) — a wrong name renders a blank square, not a crash, so
+// it stays a manual acceptance step verified against a healthy worktree,
+// never gated.
+console.log(`\n--- N4b. TAB_ICONS: does every tab route have an icon entry? ---`);
+check(
+  'every tab route id has a TAB_ICONS entry',
+  tabRoutes.filter((r) => !tabIconKeys.some((k) => k.id === r.text)).map((r) => `${r.at} "${r.text}"`).sort(),
+  []
+);
+check(
+  'no TAB_ICONS key names a route that is no longer a tab screen',
+  tabIconKeys.filter((k) => !tabRoutes.some((r) => r.text === k.id)).map((k) => `${k.at} "${k.id}"`).sort(),
   []
 );
 

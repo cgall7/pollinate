@@ -342,9 +342,19 @@ for (const position of POSITIONS) {
 //       first put a reserved word in that position, so its justification
 //       expired inside a change that had no reason to look here, and the
 //       gate went quiet rather than red. The line cite had gone stale on
-//       the same commit as well: `tabBarShowLabel: false` sits at
-//       MainTabs.js:122 today, not :101, because R-NT's fourth tab moved
-//       it. Wrong about the mechanism, and wrong about where to look.
+//       the same commit as well: `tabBarShowLabel: false` sat at
+//       MainTabs.js:122 as of R-NT, not :101, because R-NT's fourth tab
+//       moved it. Wrong about the mechanism, and wrong about where to
+//       look. It moved a second time on ENG-103, by-name re-point per
+//       Lumen and Vector 2026-09-07 (same rule as nudgeCopy.js:48): the
+//       ":122 as of R-NT" line above is a frozen dated fact and keeps its
+//       number. The living clause names the thing instead — it is
+//       `tabBarShowLabel: false` in MainTabs.js's `screenOptions`, no line
+//       number at all, because ENG-103's `initialRouteName` pin already
+//       moved it once more by inserting a comment block above the
+//       declarations, and a by-name re-point that ends in a number is
+//       not a by-name re-point. Nothing here reads the citation, so
+//       nothing enforces it, and any number written down will drift again.
 //
 //       The residual below is UNCHANGED by this: instrument (a) still has
 //       one hit and it is still Avatar's. What changed is that route ids
@@ -372,7 +382,7 @@ for (const position of POSITIONS) {
 const NOT_COPY_ATTRS = new Set([
   // RN / component API enums and identifiers
   'accessibilityLiveRegion', 'accessibilityRole', 'animationType', 'autoCapitalize', 'glassEffectStyle', 'icon', 'id',
-  'importantForAccessibility', 'key', 'keyboardShouldPersistTaps', 'keyboardType',
+  'importantForAccessibility', 'initialRouteName', 'key', 'keyboardShouldPersistTaps', 'keyboardType',
   'countKind', 'mode', 'name', 'on', 'pointerEvents', 'preset', 'resizeMode',
   'returnKeyType', 'role', 'size', 'stage', 'textContentType', 'tint', 'tone', 'variant',
   // SVG geometry and paint

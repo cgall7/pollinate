@@ -20,13 +20,24 @@ const Tab = createBottomTabNavigator();
 // Garden — the Wallet shell retired (it was never more than a "Coming Soon"
 // placeholder, Project 10) and the capsule went back to being symmetric.
 //
-// R-NT-1 (Lumen, 2026-09-05, POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 3):
-// FOUR icons now — Today | Hive | Nectar | Garden. Nectar is a tab and not a
-// room on the Hive because Colin looked at the shipped header and could not
-// find nectar at all; the owner failing to locate a surface is the legibility
-// verdict on its placement. Today stays FIRST: landing trains writing, not
-// checking. The old "centre slot = focal" note was an artifact of a 3-dock
-// and dies with it.
+// R-NT-1 (Lumen, 2026-09-05, POLLINATE_OPENDAY_NECTAR_RECUT_SPEC.md Part 3)
+// SUPERSEDED 2026-09-07: Colin ratified five tabs, Honeycomb first, at his
+// co-founder meeting (Vector, thread f2c15b7d, ts 1788787805 — "Today
+// demotes to slot 2 and gets renamed, Honeycomb promotes to home, one tab
+// is net new"). "Today stays FIRST: landing trains writing, not checking"
+// no longer holds; below still describes the four tabs actually declared
+// today. The reorder itself is ENG-104's commit, not this one — it rides
+// the compose-card build, since reordering before that card exists would
+// land a brand-new account on an empty connection-acquisition prompt
+// instead of a write door (Vector, same thread). Citation retargets to
+// Lumen's DES-43 IA spec once it lands; this pointer is the placeholder
+// she asked ENG-103 to carry in the meantime.
+//
+// FOUR icons, current state: Today | Hive | Nectar | Garden. Nectar is a
+// tab and not a room on the Hive because Colin looked at the shipped
+// header and could not find nectar at all; the owner failing to locate a
+// surface is the legibility verdict on its placement. The old "centre
+// slot = focal" note was an artifact of a 3-dock and dies with it.
 //
 // The tab-name mappings left from Project 10's rename:
 //
@@ -55,6 +66,14 @@ const TAB_ICONS = {
   // device eye, not acted on here.
   Garden: { active: 'flower', inactive: 'flower-outline' },
 };
+// FIFTH ROW, RULED NOT YET MOUNTED: POLLINATE_FIVE_TAB_IA_SPEC.md §6 (design
+// workspace, Lumen, 2026-09-07) fixes ENG-105's Friends tab as
+// `Friends: { active: 'people', inactive: 'people-outline' }` (Ionicons,
+// both names run-time verified in the installed glyphmap). Not added here:
+// the TAB_ICONS gate rows in check-collector-null-class.mjs are
+// bidirectional, so a key entered before the route mounts reds "no
+// TAB_ICONS key names a route that is no longer a tab screen." The entry
+// rides ENG-105's own commit; nothing about the value is open.
 
 // The active marker is a soft tonal field one step off the bar, not a
 // saturated marigold badge sitting on top of it. Marigold survives as the
@@ -116,6 +135,18 @@ export const MainTabs = () => {
 
   return (
     <Tab.Navigator
+      // Explicit, not a restatement of the declaration-order fallback: this
+      // is the SOLE mechanism deciding the tab every ordinary daily open
+      // lands on (App.js:210's Stack initialRouteName only picks the Stack
+      // route, 'Main' — it structurally cannot see inside this navigator).
+      // Vector found both `App.js:224` and `:391` free-ride on whichever
+      // Tab.Screen is declared first, silently, on any future reorder; this
+      // prop is what makes the two call sites' own explicit screen
+      // arguments (added in the same commit) a real pin rather than a
+      // restatement of an accident. Flips to "Hive" only in the commit that
+      // makes that premise true — ENG-104's compose card (Lumen, thread
+      // f2c15b7d, 2026-09-07). Gated: scripts/check-eng103-tab-bar-pin.mjs.
+      initialRouteName="Today"
       tabBar={(props) => <TabDock {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -185,9 +216,13 @@ export const MainTabs = () => {
           targets, was false: swept at FU4, all twelve such calls target STACK
           routes (`Input`, `HiveDetail`, `Wrapped`, ...) and not one names a
           tab, so it would have sent an editor grepping the wrong callers. The
-          real resolvers are five nested `('Main', { screen: 'Today' })` calls,
-          at `CreateComb.js:45`, `CombInvite.js:180` and `App.js` :171, :189,
-          :262. */}
+          real resolvers were five nested `('Main', { screen: 'Today' })`
+          calls, at `CreateComb.js:45`, `CombInvite.js:180` and `App.js`
+          :171, :189, :262 — grown to SEVEN by ENG-103 (2026-09-07), which
+          named the two that were still bare (`App.js:224`, `:391`; Vector's
+          finding, thread f2c15b7d) rather than letting them free-ride on
+          Tab.Screen declaration order. Gated:
+          scripts/check-eng103-tab-bar-pin.mjs. */}
       <Tab.Screen
         name="Today"
         component={TodayTab}
