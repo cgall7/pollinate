@@ -160,15 +160,21 @@ export default function App() {
     return () => subscription.remove();
   }, []);
 
-  // §C12 — tap routing, navigation only. Registered unconditionally: no
-  // notification is ever scheduled while `NUDGE_TITLE`/`NUDGE_BODY` are
-  // still the sentinel (`reconcile()`'s content guard, and the sentinel
-  // check above), so this listener has nothing to catch yet, but it costs
-  // nothing to have wired ahead of half B.
+  // §C12 — tap routing, navigation only. Registered unconditionally.
+  // Stale premise corrected 2026-09-07 (ENG-104): this comment previously
+  // read "no notification is ever scheduled while NUDGE_TITLE/NUDGE_BODY
+  // are still the sentinel, so this listener has nothing to catch yet" —
+  // that premise expired when `nudgeCopy.js` ratified its pair (event
+  // `5fb43947`); `rearmDailyNudge.js`'s own sentinel guard is moot for the
+  // same reason. The listener is live for any account that has granted
+  // notification permission. Destination is `Hive`, not `Today`: the nudge
+  // fires about the entry card's blank-page render state, and the card
+  // moved to Honeycomb whole (FIVE_TAB_IA_SPEC §5, §11) — the referent is
+  // the state, and the destination follows the state, never the origin.
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       if (isNudgeResponse(response)) {
-        navigationRef.current?.navigate('Main', { screen: 'Today' });
+        navigationRef.current?.navigate('Main', { screen: 'Hive' });
       }
     });
     return () => subscription.remove();
@@ -183,10 +189,11 @@ export default function App() {
       // attached, so it needs the paired one-shot read. Composed into this
       // callback rather than a second `onReady` prop (`NotificationContainer`
       // only takes one) and read after the splash hides so `navigationRef`
-      // is already mounted.
+      // is already mounted. Destination Hive, same referent as the listener
+      // above (ENG-104, FIVE_TAB_IA_SPEC §11).
       const lastResponse = await Notifications.getLastNotificationResponseAsync();
       if (isNudgeResponse(lastResponse)) {
-        navigationRef.current?.navigate('Main', { screen: 'Today' });
+        navigationRef.current?.navigate('Main', { screen: 'Hive' });
       }
       if (pendingInviteNavigation.current) {
         const destination = pendingInviteNavigation.current;
@@ -225,12 +232,13 @@ export default function App() {
                     // thread f2c15b7d, 2026-09-07): named rather than
                     // inherited from Tab.Screen declaration order, which is
                     // the hazard ENG-103's initialRouteName pin closes.
-                    // Stays Today until ENG-104 mounts the compose card on
-                    // Honeycomb and flips this to Hive in the same commit —
-                    // flipping early lands a brand-new account on an empty
+                    // Flipped to Hive in ENG-104's commit, same one that
+                    // mounts the compose card on Honeycomb — the two are
+                    // indivisible, because flipping this alone would have
+                    // landed a brand-new account on an empty
                     // connection-acquisition prompt, not the write door
                     // (Vector's finding, same thread).
-                    else props.navigation.replace('Main', { screen: 'Today' });
+                    else props.navigation.replace('Main', { screen: 'Hive' });
                   }}
                   splashHidden={splashHidden}
                 />
@@ -268,8 +276,16 @@ export default function App() {
                     // Nested `screen`/`params`: `Main` is
                     // `component={MainTabs}`, so a flat param would land on
                     // the navigator and never reach the tab.
+                    //
+                    // Screen flipped to Hive in ENG-104's commit, same one
+                    // that moves `entryJustSaved`'s consumer (the
+                    // FirstSaveCard mount) to Honeycomb along with the rest
+                    // of the entry card — this line and its consumer must
+                    // name the same tab, or the celebration signal arrives
+                    // at a screen nothing reads it on (co-location gate row,
+                    // FIVE_TAB_IA_SPEC §5).
                     props.navigation.replace('Main', {
-                      screen: 'Today',
+                      screen: 'Hive',
                       params: { entryJustSaved: true },
                     });
                     // §4.1's save-side re-arm, and it sits AFTER the

@@ -51,7 +51,11 @@ const Tab = createBottomTabNavigator();
 // (@expo/vector-icons .../glyphmaps/{Ionicons,MaterialCommunityIcons}.json)
 // rather than recalled — a missing name renders a blank square, not an error.
 const TAB_ICONS = {
-  Today: { active: 'sunny', inactive: 'sunny-outline' },
+  // FIVE_TAB_IA_SPEC.md §2 row 2 / §7 (Lumen, 2026-09-07): Today's surface is
+  // now the private-hives residue, not a daily check-in — sunny retires with
+  // the word. `hexagon` (not Hive's `hexagon-multiple`) so the two tabs stay
+  // visually distinct; both checked against the installed glyphmap.
+  Today: { active: 'hexagon', inactive: 'hexagon-outline', set: MaterialCommunityIcons },
   Hive: { active: 'hexagon-multiple', inactive: 'hexagon-multiple-outline', set: MaterialCommunityIcons },
   // R-NT-2 amendment: the DROP, not a hexagon and not a jar. The hexagon is
   // Honeycomb's glyph and the vessel on the tab itself is the own cell drawn
@@ -143,10 +147,10 @@ export const MainTabs = () => {
       // Tab.Screen is declared first, silently, on any future reorder; this
       // prop is what makes the two call sites' own explicit screen
       // arguments (added in the same commit) a real pin rather than a
-      // restatement of an accident. Flips to "Hive" only in the commit that
+      // restatement of an accident. Flipped to "Hive" in the commit that
       // makes that premise true — ENG-104's compose card (Lumen, thread
       // f2c15b7d, 2026-09-07). Gated: scripts/check-eng103-tab-bar-pin.mjs.
-      initialRouteName="Today"
+      initialRouteName="Hive"
       tabBar={(props) => <TabDock {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -226,7 +230,7 @@ export const MainTabs = () => {
       <Tab.Screen
         name="Today"
         component={TodayTab}
-        options={{ tabBarLabel: 'Today' }}
+        options={{ tabBarLabel: 'Private hives' }}
       />
       <Tab.Screen
         name="Hive"

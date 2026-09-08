@@ -187,9 +187,18 @@ check('the call site\'s third argument is `connections.length > 0` (real data, n
 // `getFirstEntryDate` eligibility read, same fail-dormant default. So all ten
 // assertions below move with it, unchanged in kind, and the rule they enforce
 // is the same rule.
-const todayAst = await parseFile('src/screens/TodayTab.js');
+//
+// HOST MOVED AGAIN 2026-09-07 (ENG-104, FIVE_TAB_IA_SPEC.md §5). The entire
+// entry-card StaggeredItem — this eligibility mechanism included — moved
+// whole from TodayTab onto Honeycomb's first viewport. The scope that now
+// owns the flag/effect/handler/render is `HoneycombFeed` (HoneycombTab.js's
+// inner, session-gated component), not the outer `HoneycombTab` export, which
+// is a thin session wrapper and never holds this state. The ten assertions
+// below are unchanged in kind and untouched in wording — only the two
+// host-binding literals move.
+const todayAst = await parseFile('src/screens/HoneycombTab.js');
 
-const todayTab = findDeclarator(todayAst.program, 'TodayTab');
+const todayTab = findDeclarator(todayAst.program, 'HoneycombFeed');
 check('TodayTab is found as a const declarator', Boolean(todayTab), true);
 const hostBody = todayTab?.init?.body;
 

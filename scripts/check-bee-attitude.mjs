@@ -3685,6 +3685,17 @@ const suppressionForm = (expr, perchesName) => {
   return null;
 };
 
+// A test can name more than one ratified reason at once — two suppressions
+// joining the same mount (HoneycombTab, ENG-104: week-view AND the
+// transplanted entry-card error) is an OR of the conditions that each,
+// independently, make the test true. Flattened so `a || b || c` reports
+// three named conditions rather than one opaque compound; a bare (non-`||`)
+// test reports itself, unchanged from before this existed.
+const flattenOr = (node) =>
+  node.type === 'LogicalExpression' && node.operator === '||'
+    ? [...flattenOr(node.left), ...flattenOr(node.right)]
+    : [node];
+
 // Every `<FlyingBee>` mount in the host, and whether each one suppresses.
 // A host with no mount is NOT suppressed — fail-closed, and the mount count
 // rides in the diagnosis so a harness break cannot read as a clean discharge.
@@ -3698,14 +3709,25 @@ const perchSuppression = (ast, src) => {
     );
     const expr = attr?.value?.type === 'JSXExpressionContainer' ? attr.value.expression : null;
     const hit = suppressionForm(expr, perchesName);
-    mounts.push({
-      line: n.loc.start.line,
-      form: hit?.form ?? null,
-      suppressOn: hit?.suppressOn ?? null,
-      // Whitespace-normalised so a reformat does not red the row, but sliced
-      // from the node, so nothing outside the condition can reach it.
-      condition: hit ? src.slice(hit.test.start, hit.test.end).replace(/\s+/g, ' ').trim() : null,
-    });
+    if (hit) {
+      // One mount entry per OR'd operand, all sharing the same line/form/
+      // suppressOn — decomposing the test does not change what makes the
+      // whole expression suppress, only how many named conditions K6 can
+      // pin independently against it.
+      for (const test of flattenOr(hit.test)) {
+        mounts.push({
+          line: n.loc.start.line,
+          form: hit.form,
+          suppressOn: hit.suppressOn,
+          // Whitespace-normalised so a reformat does not red the row, but
+          // sliced from the node, so nothing outside the condition can
+          // reach it.
+          condition: src.slice(test.start, test.end).replace(/\s+/g, ' ').trim(),
+        });
+      }
+    } else {
+      mounts.push({ line: n.loc.start.line, form: null, suppressOn: null, condition: null });
+    }
   });
   return {
     perchesName,
@@ -4026,7 +4048,11 @@ for (const [file, { anchors }] of perchSets) {
       what: 'week view gets no bee (a feed is for reading)',
     },
     {
-      file: 'src/screens/TodayTab.js',
+      // Re-pointed 2026-09-07 (ENG-104): the entry card, its `error` state
+      // and its `entry-card` PerchAnchor moved from TodayTab to HoneycombTab
+      // whole (FIVE_TAB_IA_SPEC §5), joining the week-view suppression above
+      // on the same mount via `||` — see that mount's own comment.
+      file: 'src/screens/HoneycombTab.js',
       condition: 'error',
       suppressOn: 'true',
       what: 'the error arm gets no bee (a mascot doing laps over failure copy performs cheerfulness at failure)',

@@ -177,6 +177,12 @@ export const CombInviteNameScreen = ({ navigation, route }) => {
     try {
       await CombInviteStore.saveNameAndJoin(inviteCode, needsName ? name : undefined);
       await PendingCombInvite.clear();
+      // Ruled to stay route 'Today' even when ENG-104 flips the other
+      // bare-Main sites to Hive (Lumen, FIVE_TAB_IA_SPEC §11, 2026-09-07):
+      // the just-joined comb renders as a shelf row on this tab (DES-39
+      // one-shelf-presence). Flipping to Hive lands the joiner on the write
+      // door, where the comb they just joined is nowhere in view. Changes
+      // only if the shelf itself moves.
       navigation.replace('Main', { screen: 'Today' });
     } catch (err) {
       console.warn('Comb invite join failed', err);

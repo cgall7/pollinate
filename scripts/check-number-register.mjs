@@ -174,7 +174,7 @@ const UNRESOLVED_SLOTS = {
   'src/screens/PollinateWrapped.js :: count': 'numeric',
   'src/screens/PollinateWrapped.js :: total': 'numeric',
   'src/screens/RecapTab.js :: count': 'numeric',
-  'src/screens/TodayTab.js :: count': 'numeric',
+  'src/screens/HoneycombTab.js :: count': 'numeric', // re-pointed 2026-09-07 (ENG-104): the demo-data alert moved from TodayTab to HoneycombTab whole, FIVE_TAB_IA_SPEC §5
   'src/utils/seedDraft.js :: SEED_CONTENT_MAX': 'numeric',
 
   // not numbers at all — a name, a label, an address. These are the price
@@ -296,7 +296,9 @@ const NUMBER_SITES = {
   'src/utils/seedDraft.js :: Seeds are capped at {} characters': count('sentence', 'measure', 'digit', 'ruled', MEASURE_BOUND),
 
   'src/screens/HoneycombTab.js :: Shares from the last 7 days will gather here.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
-  'src/screens/TodayTab.js :: Filled the last {} days with entries.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
+  // Re-pointed 2026-09-07 (ENG-104): the demo-data alert moved from
+  // TodayTab to HoneycombTab whole, FIVE_TAB_IA_SPEC §5.
+  'src/screens/HoneycombTab.js :: Filled the last {} days with entries.': count('sentence', 'measure', 'digit', 'ruled', MEASURE_SPAN),
   // Colin's veto lane. These two are legal copy and nobody touches them on
   // style grounds; the ruling records why they would stay digits anyway.
   'src/constants/legalCopy.js :: You need to be at least 13 years old. Give us an email address that is really yours, keep your password to yourself, and understand that what happens under your account is your responsibility.':
@@ -421,7 +423,7 @@ const SINGULAR_ANSWERS = {
     unreachable('a month length; the prop defaults to 31 and its callers pass a real one'),
   'src/screens/PollinateWrapped.js :: You leaned into "{}" {} of {} days this month. :: total':
     unreachable('a month length, the denominator of the same ratio'),
-  'src/screens/TodayTab.js :: Filled the last {} days with entries. :: count':
+  'src/screens/HoneycombTab.js :: Filled the last {} days with entries. :: count':
     unreachable('the resolved value of `EntryStore.seedDemoData(180)`, a demo-only alert (EntryStore.js:158)'),
 };
 

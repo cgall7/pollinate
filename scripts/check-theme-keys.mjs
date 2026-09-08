@@ -410,7 +410,14 @@ const SOURCES = {
 const DOWNSTREAM = {
   'src/utils/themeTagger.js:73 entry.theme': 'EntryStore.toEntry',
   'src/services/EntryStore.js:193 demo[date].theme': 'demoSeed.buildDemoEntries',
-  'src/screens/TodayTab.js:618 entry.theme': 'EntryStore.toEntry',
+  // Re-keyed 2026-09-07 (ENG-104): the entry card's ternary — this read
+  // included — moved from TodayTab to HoneycombTab whole (FIVE_TAB_IA_SPEC
+  // §5), and the card's local variable is `todayEntry` there, not `entry`.
+  // Re-keyed again same day: the share-button state fix (Pixel's review of
+  // 1fd82db) inserted lines above this read, shifting it 1032 -> 1038 — the
+  // same line-number-key fragility this file's own header names for the
+  // `1017->1032` drift. Cite the actual line at push time, not a carried one.
+  'src/screens/HoneycombTab.js:1038 todayEntry.theme': 'EntryStore.toEntry',
   'src/screens/MonthlyRecap.js:93 entry.theme': 'EntryStore.toEntry',
   'src/screens/MonthlyRecap.js:178 entry.theme': 'EntryStore.toEntry',
   'src/screens/PollinateWrapped.js:71 entry.theme': 'EntryStore.toEntry',

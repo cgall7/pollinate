@@ -39,9 +39,13 @@ export const CreateCombScreen = ({ navigation }) => {
     try {
       if (needsOrganizerName) await CombStore.saveOrganizerName(organizerName);
       await CombStore.createComb({ name, cadence });
-      // DES-39's organizer contract is the expandable card on Today, not a
-      // rotation-hive detail route. The new (pre-launch) comb is visible
-      // there immediately, with the mint affordance in reach.
+      // Ruled to stay route 'Today' even when ENG-104 flips the other
+      // bare-Main sites to Hive (Lumen, FIVE_TAB_IA_SPEC §11, 2026-09-07):
+      // the organizer's contract is the expandable comb card on this tab's
+      // shelf (DES-39 one-shelf-presence), visible immediately with the mint
+      // affordance in reach. Flipping to Hive lands them on the write door,
+      // where the new comb is nowhere in view. Changes only if the shelf
+      // itself moves.
       navigation.replace('Main', { screen: 'Today' });
     } catch (err) {
       console.warn('CreateCombScreen: create failed', err);
