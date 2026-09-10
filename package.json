@@ -23,6 +23,7 @@
     "check:seeds-contract": "node scripts/check-seeds-contract.mjs",
     "check:plant-seed": "node scripts/check-plant-seed.mjs",
     "check:load-state": "node scripts/check-load-state.mjs",
+    "check:interleave-write-guards": "node scripts/check-interleave-write-guards.mjs",
     "check:migration-sentinels": "node scripts/check-migration-sentinels.mjs",
     "check:seed-view": "node scripts/check-seed-view.mjs",
     "check:hive-state-rls": "node scripts/check-hive-state-rls.mjs",
