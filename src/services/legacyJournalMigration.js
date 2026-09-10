@@ -40,14 +40,12 @@ const MIGRATED_KEY = 'gratitude_entries_v1_migrated';
 
 // One in-flight run per module instance, memoised by promise rather than by
 // a synchronous flag — Sage (thread ba3783a7): Supabase's GoTrueClient fires
-// `INITIAL_SESSION` to every subscriber on subscribe, so AuthContext's
-// `getSession().then(...)` and its `onAuthStateChange` handler both call
-// this within the same tick on a cold launch with a stored session, and
-// `TOKEN_REFRESHED` fires again on every refresh after that. Without this,
-// concurrent calls all pass the not-yet-migrated check before any of them
-// writes it, race the same uploads, and the loser's failed insert can leave
-// the marker unset on the run that actually did the work. Same shape as
-// `flushPendingEntry`'s in-flight guard.
+// `INITIAL_SESSION` on subscribe and can emit `TOKEN_REFRESHED` while an
+// earlier migration is still running. Without this, concurrent calls all
+// pass the not-yet-migrated check before any of them writes it, race the same
+// uploads, and the loser's failed insert can leave the marker unset on the
+// run that actually did the work. Same shape as `flushPendingEntry`'s
+// in-flight guard.
 let inFlight = null;
 
 export const migrateLegacyJournal = (userId, accountCreatedAt, deps = {}) => {

@@ -52,14 +52,13 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-      if (data.session) onSessionAvailable(data.session);
-    });
-
+    // `onAuthStateChange` emits INITIAL_SESSION after subscription, so it is
+    // both the bootstrap read and the ongoing source of truth. A separate
+    // getSession() races later SIGNED_IN/SIGNED_OUT events and can overwrite
+    // the newer session with an older read.
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      setLoading(false);
       if (nextSession) onSessionAvailable(nextSession);
     });
 
@@ -97,7 +96,9 @@ export const AuthProvider = ({ children }) => {
       });
     };
 
-    Linking.getInitialURL().then(handleUrl);
+    Linking.getInitialURL().then(handleUrl).catch((err) => {
+      console.warn('Initial auth callback URL read failed', err);
+    });
     const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
     return () => subscription.remove();
   }, []);

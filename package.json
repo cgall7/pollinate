@@ -45,6 +45,7 @@
     "check:eng90-comb-nectar": "node scripts/check-eng90-comb-nectar.mjs",
     "check:bee-attitude": "node scripts/check-bee-attitude.mjs",
     "check:bee-transition": "node scripts/check-bee-transition.mjs",
+    "check:bootstrap-resilience": "node scripts/check-bootstrap-resilience.mjs",
     "check:press-feedback": "node scripts/check-press-feedback.mjs",
     "check:daily-nudge": "node scripts/check-daily-nudge.mjs",
     "check:reveal-pacing": "node scripts/check-reveal-pacing.mjs",

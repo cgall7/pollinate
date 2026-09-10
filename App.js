@@ -114,7 +114,20 @@ export default function App() {
   const pendingInviteNavigation = useRef(null);
 
   useEffect(() => {
-    Font.loadAsync(fontAssets).then(() => setFontsLoaded(true));
+    let active = true;
+    const loadFonts = async () => {
+      try {
+        await Font.loadAsync(fontAssets);
+      } catch (error) {
+        console.warn('Custom fonts failed to load; continuing with system fonts', error);
+      } finally {
+        if (active) setFontsLoaded(true);
+      }
+    };
+    loadFonts();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -125,7 +138,9 @@ export default function App() {
       if (navigationRef.current?.isReady()) navigationRef.current.navigate(destination.name, destination.params);
       else pendingInviteNavigation.current = destination;
     };
-    Linking.getInitialURL().then(handleInviteUrl);
+    Linking.getInitialURL().then(handleInviteUrl).catch((error) => {
+      console.warn('Initial comb invite URL read failed', error);
+    });
     const subscription = Linking.addEventListener('url', ({ url }) => handleInviteUrl(url));
     return () => subscription.remove();
   }, []);
@@ -191,9 +206,13 @@ export default function App() {
       // only takes one) and read after the splash hides so `navigationRef`
       // is already mounted. Destination Hive, same referent as the listener
       // above (ENG-104, FIVE_TAB_IA_SPEC §11).
-      const lastResponse = await Notifications.getLastNotificationResponseAsync();
-      if (isNudgeResponse(lastResponse)) {
-        navigationRef.current?.navigate('Main', { screen: 'Hive' });
+      try {
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (isNudgeResponse(lastResponse)) {
+          navigationRef.current?.navigate('Main', { screen: 'Hive' });
+        }
+      } catch (error) {
+        console.warn('Initial notification response read failed', error);
       }
       if (pendingInviteNavigation.current) {
         const destination = pendingInviteNavigation.current;
